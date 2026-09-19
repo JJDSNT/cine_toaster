@@ -170,3 +170,8 @@ The initial focus is the Project Core, production workflow, visual decision tool
 ## Inspiration
 
 Cine Toaster is inspired by the **Amiga Video Toaster** and by modern open-source AI filmmaking projects exploring generative production, visual directing, workflow orchestration, and automated film pipelines.
+
+https://github.com/LudwigKienle/ai-video-production-editor
+https://github.com/vladimirvalcourt/kupkaprod-cinema-pipeline
+https://github.com/benjiyaya/Calliope
+https://github.com/Heroesjouney/AIMovieStudiov2
