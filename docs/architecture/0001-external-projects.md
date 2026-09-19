@@ -4,10 +4,9 @@ Status: accepted
 
 ## Context
 
-Cine Toaster is an application. Productions such as `Singular` and `Ceva` have
-their own identity, lifecycle, storage needs, and potentially their own version
-control. The earlier `confyui` workspace combines tools and productions because
-it grew as a productive laboratory; Cine Toaster must not require that coupling.
+Cine Toaster is an application. Productions have their own identity, lifecycle,
+storage needs, and potentially their own version control. Cine Toaster must not
+require application code and production content to share a workspace.
 
 ## Decision
 
@@ -34,7 +33,11 @@ It is never the exclusive location of creative or production decisions.
 - Moving a legacy project creates a new cache until a future project manifest
   supplies a path-independent project ID.
 - Search remains fast even for projects containing thousands of files.
-- The current scanner can be tested against `Singular` without modifying it.
+- Unstructured directories can still be inspected through the supporting file
+  library without application-specific adapters.
 - Future canonical metadata must be stored in an open, portable format inside
   the project, not only in this cache.
 
+The repository may contain small demo fixtures and templates under `examples/`.
+They are copied to an external destination before normal use and are not a user
+project store.

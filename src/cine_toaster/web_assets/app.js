@@ -1,25 +1,332 @@
 const state = {
   project: null,
-  current: null,
-  selected: null,
-  comparison: [],
+  production: null,
+  currentView: "overview",
+  libraryPath: null,
 };
 
 const byId = (id) => document.getElementById(id);
+const el = (tag, className, text) => {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+};
 
-async function api(path) {
+async function api(path, { optional = false } = {}) {
   const response = await fetch(path);
-  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  if (!response.ok) {
+    if (optional) return null;
+    throw new Error(`Request failed: ${response.status}`);
+  }
   return response.json();
+}
+
+function label(value) {
+  return String(value || "").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function statusPill(status) {
+  return el("span", `status status-${status}`, label(status));
+}
+
+function metric(value, name, detail = "") {
+  const card = el("article", "metric-card");
+  card.append(el("strong", "metric-value", value), el("span", "metric-name", name));
+  if (detail) card.append(el("small", "metric-detail", detail));
+  return card;
+}
+
+function button(text, action, className = "quiet-button") {
+  const node = el("button", className, text);
+  node.type = "button";
+  node.addEventListener("click", action);
+  return node;
+}
+
+function sectionHeading(eyebrow, title, detail = "") {
+  const heading = el("div", "section-heading");
+  const copy = el("div");
+  copy.append(el("span", "eyebrow", eyebrow), el("h2", "", title));
+  if (detail) copy.append(el("p", "section-detail", detail));
+  heading.append(copy);
+  return heading;
+}
+
+function setView(view) {
+  state.currentView = view;
+  document.querySelectorAll("[data-view]").forEach((node) => {
+    node.classList.toggle("active", node.dataset.view === view);
+  });
+  if (view === "overview") renderOverview();
+  if (view === "scenes") renderScenes();
+  if (view === "review") renderReview();
+  if (view === "library") renderLibrary(state.project.id);
+  byId("workspace").focus();
+}
+
+function phaseRail(phases) {
+  const rail = el("div", "phase-rail");
+  for (const phase of phases) {
+    const card = el("article", `phase-card phase-${phase.status}`);
+    const top = el("div", "phase-top");
+    top.append(el("strong", "", phase.label), statusPill(phase.status));
+    const bar = el("div", "progress-track");
+    const fill = el("span", "progress-fill");
+    fill.style.width = `${phase.progress}%`;
+    bar.append(fill);
+    card.append(top, bar, el("small", "", `${phase.progress}%`));
+    rail.append(card);
+  }
+  return rail;
+}
+
+function renderOverview() {
+  const production = state.production;
+  if (!production) return renderUnstructured();
+  const root = byId("workspace");
+  root.replaceChildren();
+
+  const hero = el("section", "overview-hero");
+  const heroCopy = el("div");
+  heroCopy.append(
+    el("span", "eyebrow", "PRODUCTION OVERVIEW"),
+    el("h1", "", production.title),
+    el("p", "hero-logline", production.logline),
+  );
+  const target = el("div", "target-card");
+  target.append(
+    el("span", "eyebrow", "NEXT TARGET"),
+    el("strong", "", production.production.target || "Not set"),
+    el("small", "", production.production.target_date || "No date"),
+  );
+  hero.append(heroCopy, target);
+
+  const metrics = el("section", "metric-grid");
+  metrics.append(
+    metric(`${production.metrics.overall_progress}%`, "Production progress", "Across scene workflows"),
+    metric(production.metrics.total_scenes, "Scenes", `${production.metrics.approved_scenes} approved`),
+    metric(production.metrics.in_progress_scenes, "In motion", "Currently moving through the pipeline"),
+    metric(production.metrics.attention_items, "Need attention", "Reviews, decisions, and blockers"),
+  );
+
+  const phases = el("section", "panel wide-panel");
+  phases.append(sectionHeading("PHASES", "Production map", "A high-level view; each room will grow its own tools."));
+  phases.append(phaseRail(production.phases));
+
+  const columns = el("section", "overview-columns");
+  const focusPanel = el("article", "panel");
+  focusPanel.append(sectionHeading("NOW", "Current focus"));
+  if (production.active_scene) focusPanel.append(sceneFocus(production.active_scene));
+
+  const attentionPanel = el("article", "panel");
+  attentionPanel.append(sectionHeading("QUEUE", "Requires you", "Only work that needs a human decision."));
+  const queue = el("div", "attention-list");
+  for (const item of production.attention) {
+    const row = button("", () => renderScene(item.scene_id), "attention-row");
+    row.append(
+      el("span", `attention-icon attention-${item.kind}`, item.kind === "blocker" ? "!" : "?"),
+      el("strong", "", `${item.scene_id} · ${item.scene_title}`),
+      el("small", "", item.message),
+      el("b", "", "→"),
+    );
+    queue.append(row);
+  }
+  if (!production.attention.length) queue.append(el("p", "empty-state", "Nothing needs attention."));
+  attentionPanel.append(queue);
+  columns.append(focusPanel, attentionPanel);
+
+  const sceneStrip = el("section", "panel wide-panel");
+  const stripHeading = sectionHeading("SCENES", "Production line", "Move through the film by creative unit, not by directory.");
+  stripHeading.append(button("All scenes →", () => setView("scenes")));
+  sceneStrip.append(stripHeading, compactSceneList(production.scenes));
+  root.append(hero, metrics, phases, columns, sceneStrip);
+}
+
+function sceneFocus(scene) {
+  const card = el("div", "focus-card");
+  const title = el("div", "focus-title");
+  title.append(el("span", "scene-id", scene.id), statusPill(scene.status));
+  card.append(title, el("h3", "", scene.title), el("p", "", scene.summary));
+  const progress = el("div", "focus-progress");
+  progress.append(el("span", "", `${label(scene.current_step)} · iteration ${scene.iteration}`), el("strong", "", `${scene.progress}%`));
+  card.append(progress, button("Open scene workspace", () => renderScene(scene.id), "primary-button"));
+  return card;
+}
+
+function compactSceneList(scenes) {
+  const list = el("div", "scene-strip");
+  for (const scene of scenes) {
+    const card = button("", () => renderScene(scene.id), "scene-chip");
+    card.append(
+      el("span", "scene-id", scene.id),
+      el("strong", "", scene.title),
+      el("small", "", label(scene.current_step)),
+      el("i", `scene-state scene-state-${scene.status}`),
+    );
+    list.append(card);
+  }
+  return list;
+}
+
+function renderScenes() {
+  if (!state.production) return renderUnstructured();
+  const root = byId("workspace");
+  root.replaceChildren();
+  const heading = sectionHeading("SCENE CONTROL", "Scenes", "Every scene, its current gate, iteration, and next action.");
+  heading.classList.add("page-heading");
+  root.append(heading);
+
+  const table = el("div", "scene-table");
+  const header = el("div", "scene-row scene-row-header");
+  for (const value of ["Scene", "Status", "Current gate", "Iteration", "Progress", "Updated"]) header.append(el("span", "", value));
+  table.append(header);
+  for (const scene of state.production.scenes) {
+    const row = button("", () => renderScene(scene.id), "scene-row");
+    const identity = el("span", "scene-identity");
+    identity.append(el("b", "", scene.id), el("strong", "", scene.title), el("small", "", scene.sequence));
+    const progress = el("span", "table-progress");
+    const bar = el("i", "progress-track");
+    const fill = el("i", "progress-fill");
+    fill.style.width = `${scene.progress}%`;
+    bar.append(fill);
+    progress.append(bar, el("small", "", `${scene.progress}%`));
+    row.append(identity, statusPill(scene.status), el("span", "", label(scene.current_step)), el("span", "", `R${String(scene.iteration).padStart(2, "0")}`), progress, el("span", "muted", scene.updated_at));
+    table.append(row);
+  }
+  root.append(table);
+}
+
+async function renderScene(sceneId) {
+  const scene = await api(`/api/scene?id=${encodeURIComponent(sceneId)}`);
+  state.currentView = "scene";
+  document.querySelectorAll("[data-view]").forEach((node) => node.classList.remove("active"));
+  const root = byId("workspace");
+  root.replaceChildren();
+
+  const back = button("← All scenes", () => setView("scenes"), "back-button");
+  const header = el("section", "scene-header");
+  const copy = el("div");
+  const meta = el("div", "scene-header-meta");
+  meta.append(el("span", "scene-id", scene.id), statusPill(scene.status), el("span", "muted", scene.sequence));
+  copy.append(meta, el("h1", "", scene.title), el("p", "hero-logline", scene.summary));
+  const facts = el("div", "scene-facts");
+  facts.append(metric(`R${String(scene.iteration).padStart(2, "0")}`, "Current iteration"), metric(`${scene.duration_seconds}s`, "Target duration"), metric(`${scene.progress}%`, "Workflow"));
+  header.append(copy, facts);
+
+  const workflowPanel = el("section", "panel wide-panel");
+  workflowPanel.append(sectionHeading("PIPELINE", "Scene workflow", "Each gate records what is ready, waiting, or blocked."));
+  const workflow = el("div", "workflow-rail");
+  scene.workflow.forEach((step, index) => {
+    const item = el("article", `workflow-step workflow-${step.status}`);
+    item.append(el("span", "workflow-number", String(index + 1).padStart(2, "0")), el("strong", "", step.label), statusPill(step.status));
+    if (step.note) item.append(el("small", "", step.note));
+    workflow.append(item);
+  });
+  workflowPanel.append(workflow);
+
+  root.append(back, header);
+  if (scene.blockers.length) {
+    const blockers = el("section", "blocker-banner");
+    blockers.append(el("strong", "", "Blocked"), el("span", "", scene.blockers.join(" · ")));
+    root.append(blockers);
+  }
+  root.append(workflowPanel);
+
+  const columns = el("section", "scene-columns");
+  columns.append(renderShots(scene), renderDecisions(scene));
+  root.append(columns, renderIterations(scene));
+}
+
+function renderShots(scene) {
+  const panel = el("article", "panel");
+  panel.append(sectionHeading("SHOTS", `${scene.shots.length} planned shots`, "Selection state and available takes."));
+  const list = el("div", "shot-list");
+  for (const shot of scene.shots) {
+    const row = el("div", "shot-row");
+    const copy = el("span", "shot-copy");
+    copy.append(el("b", "", shot.id), el("strong", "", shot.label));
+    row.append(copy, statusPill(shot.status), el("span", "take-count", `${shot.takes} takes`), el("strong", "selected-take", shot.selected_take || "—"));
+    list.append(row);
+  }
+  if (!scene.shots.length) list.append(el("p", "empty-state", "Shots have not been broken down yet."));
+  panel.append(list);
+  return panel;
+}
+
+function renderDecisions(scene) {
+  const panel = el("article", "panel");
+  panel.append(sectionHeading("DECISIONS", "Creative memory", "Open questions stay attached to the scene."));
+  const list = el("div", "decision-list");
+  for (const decision of scene.decisions) {
+    const card = el("article", "decision-card");
+    card.append(statusPill(decision.status), el("strong", "", decision.question));
+    if (decision.answer) card.append(el("p", "", decision.answer));
+    list.append(card);
+  }
+  if (!scene.decisions.length) list.append(el("p", "empty-state", "No recorded decisions."));
+  panel.append(list);
+  return panel;
+}
+
+function renderIterations(scene) {
+  const panel = el("section", "panel wide-panel");
+  panel.append(sectionHeading("ITERATIONS", "What changed and why", "Previous rounds remain legible instead of becoming mystery folders."));
+  const timeline = el("div", "iteration-timeline");
+  for (const iteration of scene.iterations) {
+    const card = el("article", "iteration-card");
+    card.append(el("strong", "", iteration.id), statusPill(iteration.result), el("p", "", iteration.note));
+    timeline.append(card);
+  }
+  if (!scene.iterations.length) timeline.append(el("p", "empty-state", "This scene has no completed iteration yet."));
+  panel.append(timeline);
+  return panel;
+}
+
+function renderReview() {
+  if (!state.production) return renderUnstructured();
+  const root = byId("workspace");
+  root.replaceChildren();
+  const reviewScenes = state.production.scenes.filter((scene) => scene.status === "in_review" || scene.shots.some((shot) => shot.status === "needs_review"));
+  const heading = sectionHeading("REVIEW ROOM", "Awaiting a creative decision", "Review is a gate in the production, not a folder full of outputs.");
+  heading.classList.add("page-heading");
+  root.append(heading);
+  for (const scene of reviewScenes) {
+    const panel = el("section", "review-scene panel");
+    const panelHeading = sectionHeading(scene.id, scene.title, `${scene.sequence} · iteration ${scene.iteration}`);
+    panelHeading.append(button("Open scene →", () => renderScene(scene.id)));
+    panel.append(panelHeading);
+    const cards = el("div", "review-grid");
+    for (const shot of scene.shots.filter((entry) => entry.status === "needs_review")) {
+      const card = el("article", "review-card");
+      const visual = el("div", "review-placeholder");
+      visual.append(el("span", "", shot.id), el("strong", "", `${shot.takes} candidates`));
+      card.append(visual, el("strong", "", shot.label), el("small", "", "No take selected"), button("Compare candidates", () => renderScene(scene.id), "primary-button"));
+      cards.append(card);
+    }
+    panel.append(cards);
+    root.append(panel);
+  }
+  if (!reviewScenes.length) root.append(el("p", "empty-state", "The review queue is empty."));
+}
+
+function renderUnstructured() {
+  const root = byId("workspace");
+  root.replaceChildren();
+  const panel = el("section", "unstructured panel");
+  panel.append(
+    el("span", "eyebrow", "UNSTRUCTURED DIRECTORY"),
+    el("h1", "", state.project.name),
+    el("p", "", "This directory can be inspected as a library, but it has no Cine Toaster operational manifest. No project files will be changed."),
+    button("Open library", () => setView("library"), "primary-button"),
+  );
+  root.append(panel);
 }
 
 function humanSize(bytes) {
   let value = Number(bytes || 0);
-  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
-  for (const unit of units) {
-    if (value < 1024 || unit === "TiB") {
-      return unit === "B" ? `${value} B` : `${value.toFixed(1)} ${unit}`;
-    }
+  for (const unit of ["B", "KiB", "MiB", "GiB", "TiB"]) {
+    if (value < 1024 || unit === "TiB") return unit === "B" ? `${value} B` : `${value.toFixed(1)} ${unit}`;
     value /= 1024;
   }
 }
@@ -28,254 +335,97 @@ function mediaUrl(item) {
   return `/media/${item.relative_path.split("/").map(encodeURIComponent).join("/")}`;
 }
 
-function iconFor(item) {
-  if (item.kind === "scene") return "SC";
-  if (item.kind === "take") return "TK";
-  if (item.kind === "scene_version") return "V";
-  if (item.kind === "shot_clip") return "CL";
-  if (item.kind === "shot_still") return "ST";
-  if (item.media_type === "video") return "▶";
-  if (item.media_type === "image") return "▧";
-  if (item.media_type === "audio") return "♪";
-  if (item.media_type === "text") return "TXT";
-  if (item.media_type === "document") return "DOC";
-  return item.is_directory ? "DIR" : "FILE";
-}
-
-function canPreview(item) {
-  return Boolean(item && !item.is_directory && item.media_type);
-}
-
-function createPreview(item, compact = false) {
-  const container = document.createElement("div");
-  container.className = compact ? "media-preview compact" : "media-preview";
+function createPreview(item) {
+  const container = el("div", "media-preview");
   const url = mediaUrl(item);
   if (item.media_type === "image") {
-    const image = document.createElement("img");
-    image.src = url;
-    image.alt = item.name;
-    container.append(image);
+    const image = el("img"); image.src = url; image.alt = item.name; container.append(image);
   } else if (item.media_type === "video") {
-    const video = document.createElement("video");
-    video.src = url;
-    video.controls = true;
-    video.preload = "metadata";
-    container.append(video);
+    const video = el("video"); video.src = url; video.controls = true; video.preload = "metadata"; container.append(video);
   } else if (item.media_type === "audio") {
-    const audio = document.createElement("audio");
-    audio.src = url;
-    audio.controls = true;
-    audio.preload = "metadata";
-    container.append(audio);
+    const audio = el("audio"); audio.src = url; audio.controls = true; container.append(audio);
   } else if (item.extension === ".pdf") {
-    const frame = document.createElement("iframe");
-    frame.src = url;
-    frame.title = item.name;
-    container.append(frame);
+    const frame = el("iframe"); frame.src = url; frame.title = item.name; container.append(frame);
   } else if (item.media_type === "text") {
-    const pre = document.createElement("pre");
-    pre.textContent = "Carregando…";
-    fetch(url).then((response) => response.text()).then((text) => {
-      pre.textContent = text;
-    });
+    const pre = el("pre", "", "Loading…");
+    fetch(url).then((response) => response.text()).then((text) => { pre.textContent = text; });
     container.append(pre);
-  } else {
-    container.textContent = "Pré-visualização indisponível.";
-  }
+  } else container.append(el("p", "empty-state", "Preview unavailable."));
   return container;
 }
 
-function cardFor(item) {
-  const card = document.createElement("button");
-  card.type = "button";
-  card.className = "item-card";
-  card.dataset.id = item.id;
-
-  const visual = document.createElement("div");
-  visual.className = "card-visual";
-  if (item.media_type === "image") {
-    const image = document.createElement("img");
-    image.src = mediaUrl(item);
-    image.alt = "";
-    image.loading = "lazy";
-    visual.append(image);
-  } else {
-    const icon = document.createElement("span");
-    icon.className = "card-icon";
-    icon.textContent = iconFor(item);
-    visual.append(icon);
-  }
-
-  const body = document.createElement("div");
-  body.className = "card-body";
-  const kind = document.createElement("span");
-  kind.className = "card-kind";
-  kind.textContent = item.kind.replaceAll("_", " ");
-  const name = document.createElement("strong");
-  name.textContent = item.name;
-  body.append(kind, name);
-  if (item.snippet) {
-    const snippet = document.createElement("p");
-    snippet.textContent = item.snippet;
-    body.append(snippet);
-  }
-  card.append(visual, body);
-  card.addEventListener("click", () => item.is_directory ? navigate(item.id) : inspect(item.id));
-  return card;
+async function openItem(item) {
+  if (item.is_directory) return renderLibrary(item.id);
+  byId("preview-kind").textContent = label(item.kind);
+  byId("preview-name").textContent = item.name;
+  byId("preview-path").textContent = `${item.relative_path} · ${humanSize(item.size)}`;
+  byId("preview-content").replaceChildren(createPreview(item));
+  byId("preview-dialog").showModal();
 }
 
-function renderItems(items) {
-  const grid = byId("content-grid");
-  grid.replaceChildren(...items.map(cardFor));
-  byId("empty-state").hidden = items.length > 0;
-  byId("item-count").textContent = `${items.length} ${items.length === 1 ? "item" : "itens"}`;
-}
-
-function renderBreadcrumbs(ancestors) {
-  const fragment = document.createDocumentFragment();
-  ancestors.forEach((item, index) => {
-    if (index) fragment.append(" / ");
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = item.name;
-    button.addEventListener("click", () => navigate(item.id));
-    fragment.append(button);
-  });
-  byId("breadcrumbs").replaceChildren(fragment);
-}
-
-async function navigate(itemId) {
+async function renderLibrary(itemId) {
+  state.currentView = "library";
+  state.libraryPath = itemId;
+  document.querySelectorAll("[data-view]").forEach((node) => node.classList.toggle("active", node.dataset.view === "library"));
   const [item, children] = await Promise.all([
     api(`/api/item?id=${encodeURIComponent(itemId)}`),
     api(`/api/items?parent=${encodeURIComponent(itemId)}`),
   ]);
-  state.current = item;
-  byId("view-title").textContent = item.name;
-  byId("view-kind").textContent = item.kind.replaceAll("_", " ");
-  renderBreadcrumbs(item.ancestors);
-  renderItems(children);
-}
-
-async function inspect(itemId) {
-  const item = await api(`/api/item?id=${encodeURIComponent(itemId)}`);
-  state.selected = item;
-  byId("inspector-empty").hidden = true;
-  byId("inspector-content").hidden = false;
-  byId("inspect-kind").textContent = item.kind.replaceAll("_", " ");
-  byId("inspect-name").textContent = item.name;
-  byId("preview").replaceChildren(createPreview(item));
-
-  const values = [
-    ["Caminho", item.relative_path],
-    ["Tipo", item.media_type || item.kind],
-    ["Tamanho", humanSize(item.size)],
-  ];
-  const fragment = document.createDocumentFragment();
-  for (const [label, value] of values) {
-    const dt = document.createElement("dt");
-    dt.textContent = label;
-    const dd = document.createElement("dd");
-    dd.textContent = value;
-    fragment.append(dt, dd);
-  }
-  byId("inspect-metadata").replaceChildren(fragment);
-
-  const compareButton = byId("compare-add");
-  compareButton.disabled = !canPreview(item);
-  compareButton.textContent = state.comparison.some((entry) => entry.id === item.id)
-    ? "Remover da comparação"
-    : "Adicionar à comparação";
-}
-
-function updateComparison() {
-  byId("compare-count").textContent = String(state.comparison.length);
-  byId("compare-open").disabled = state.comparison.length < 2;
-  if (state.selected) inspect(state.selected.id);
-}
-
-function toggleComparison() {
-  const item = state.selected;
-  if (!canPreview(item)) return;
-  const existing = state.comparison.findIndex((entry) => entry.id === item.id);
-  if (existing >= 0) {
-    state.comparison.splice(existing, 1);
-  } else {
-    if (state.comparison.length >= 4) state.comparison.shift();
-    state.comparison.push(item);
-  }
-  updateComparison();
-}
-
-function openComparison() {
-  const panes = state.comparison.map((item) => {
-    const pane = document.createElement("section");
-    pane.className = "compare-pane";
-    pane.append(createPreview(item, true));
-    const heading = document.createElement("div");
-    heading.className = "compare-pane-heading";
-    const title = document.createElement("strong");
-    title.textContent = item.name;
-    const path = document.createElement("span");
-    path.textContent = item.relative_path;
-    heading.append(title, path);
-    pane.append(heading);
-    return pane;
+  const root = byId("workspace");
+  root.replaceChildren();
+  const breadcrumbs = el("nav", "breadcrumbs");
+  item.ancestors.forEach((ancestor, index) => {
+    if (index) breadcrumbs.append(" / ");
+    breadcrumbs.append(button(ancestor.name, () => renderLibrary(ancestor.id), "breadcrumb-button"));
   });
-  byId("compare-grid").replaceChildren(...panes);
-  byId("compare-dialog").showModal();
+  const heading = sectionHeading("PROJECT LIBRARY", item.name, `${children.length} items · files are supporting material, not the production model.`);
+  heading.classList.add("page-heading");
+  const grid = el("section", "library-grid");
+  for (const child of children) {
+    const card = button("", () => openItem(child), "library-card");
+    const icon = child.is_directory ? "DIR" : child.media_type === "video" ? "▶" : child.media_type === "image" ? "IMG" : child.media_type === "audio" ? "AUD" : "DOC";
+    card.append(el("span", "library-icon", icon), el("small", "", label(child.kind)), el("strong", "", child.name));
+    grid.append(card);
+  }
+  root.append(breadcrumbs, heading, grid);
 }
 
 async function runSearch(query) {
   const results = await api(`/api/search?q=${encodeURIComponent(query)}`);
-  byId("view-title").textContent = `Busca: ${query}`;
-  byId("view-kind").textContent = "RESULTADOS";
-  byId("breadcrumbs").replaceChildren();
-  renderItems(results);
+  const root = byId("search-results");
+  root.replaceChildren();
+  for (const result of results) {
+    const row = button("", () => openItem(result), "search-result");
+    row.append(el("strong", "", result.name), el("span", "", result.relative_path));
+    if (result.snippet) row.append(el("small", "", result.snippet));
+    root.append(row);
+  }
+  if (!results.length) root.append(el("p", "empty-state", "No matches."));
 }
 
 async function start() {
   state.project = await api("/api/project");
-  byId("project-name").textContent = state.project.name;
-  byId("project-stats").innerHTML = `
-    <span>${state.project.file_count.toLocaleString("pt-BR")} arquivos</span>
-    <span>${humanSize(state.project.total_bytes)}</span>
-    <span>${state.project.adapter}</span>
-  `;
-
-  const rootChildren = await api(`/api/items?parent=${encodeURIComponent(state.project.id)}`);
-  const navigation = rootChildren.filter((item) => item.is_directory).map((item) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.innerHTML = `<span>${iconFor(item)}</span><strong>${item.name}</strong>`;
-    button.addEventListener("click", () => navigate(item.id));
-    return button;
-  });
-  byId("root-navigation").replaceChildren(...navigation);
-  await navigate(state.project.id);
+  state.production = await api("/api/production", { optional: true });
+  byId("project-name").textContent = state.production?.title || state.project.name;
+  byId("project-root").textContent = state.project.root;
+  byId("project-format").textContent = state.production?.format || "UNSTRUCTURED";
+  byId("project-phase").textContent = label(state.production?.production?.current_phase || "Library only");
+  byId("scene-nav-count").textContent = state.production?.metrics.total_scenes || 0;
+  byId("review-nav-count").textContent = state.production?.metrics.attention_items || 0;
+  setView(state.production ? "overview" : "library");
 }
 
-byId("search-form").addEventListener("submit", (event) => {
-  event.preventDefault();
-  const query = byId("search-input").value.trim();
-  if (query) runSearch(query);
-});
-byId("compare-add").addEventListener("click", toggleComparison);
-byId("compare-open").addEventListener("click", openComparison);
-byId("compare-close").addEventListener("click", () => byId("compare-dialog").close());
-byId("compare-clear").addEventListener("click", () => {
-  state.comparison = [];
-  updateComparison();
-  byId("compare-dialog").close();
-});
-byId("compare-play").addEventListener("click", () => {
-  const media = [...byId("compare-grid").querySelectorAll("video, audio")];
-  for (const element of media) {
-    element.currentTime = 0;
-    element.play();
+document.querySelectorAll("[data-view]").forEach((node) => node.addEventListener("click", () => setView(node.dataset.view)));
+byId("quick-find").addEventListener("click", () => { byId("find-dialog").showModal(); byId("search-input").focus(); });
+byId("find-close").addEventListener("click", () => byId("find-dialog").close());
+byId("preview-close").addEventListener("click", () => byId("preview-dialog").close());
+byId("search-form").addEventListener("submit", (event) => { event.preventDefault(); const query = byId("search-input").value.trim(); if (query) runSearch(query); });
+document.addEventListener("keydown", (event) => {
+  if (event.key === "/" && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
+    event.preventDefault(); byId("find-dialog").showModal(); byId("search-input").focus();
   }
 });
 
 start().catch((error) => {
-  byId("content-grid").textContent = `Erro ao abrir projeto: ${error.message}`;
+  byId("workspace").textContent = `Could not open production: ${error.message}`;
 });
-

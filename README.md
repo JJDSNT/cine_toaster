@@ -65,12 +65,17 @@ A Cine Toaster project is a self-contained, filesystem-based production.
 
 ~~~
 project/
-├── project.yaml
-├── screenplay/
-├── characters/
-├── locations/
+├── project.toml
+├── story/
+│   └── screenplay.fountain
+├── world/
+│   ├── characters/
+│   └── locations/
 ├── scenes/
-│   └── shots/
+│   └── 010-scene-name/
+│       ├── scene.toml
+│       ├── shots/
+│       └── iterations/
 ├── assets/
 ├── typography/
 ├── subtitles/
@@ -143,12 +148,19 @@ The Cine Toaster command-line interface is:
 toast
 ~~~
 
-Examples:
+Commands available in the current milestone:
 
 ~~~
-toast init singular
-toast status
+toast demo ~/cine-toaster-projects/the-last-signal
+toast serve ~/cine-toaster-projects/the-last-signal
+toast index ~/cine-toaster-projects/the-last-signal
+toast find ~/cine-toaster-projects/the-last-signal "continuity"
+~~~
 
+The intended operational vocabulary will grow from the same project core:
+
+~~~
+toast status
 toast scene show 4
 toast shot generate 4.3
 
@@ -169,28 +181,27 @@ The initial focus is the Project Core, production workflow, visual decision tool
 
 ## Current Development Milestone
 
-The first executable milestone is a read-only **Project Browser**. It opens an
-external production directory, builds a disposable local index, and provides
-hierarchical navigation, text search, media previews, and side-by-side
-comparison without modifying the source project.
+The first executable milestone is a read-only **Production Control Room**. It
+opens an external project and makes its creative and operational state
+navigable: production phases, scene progress, workflow gates, iterations,
+decisions, blockers, shots, and work waiting for human review.
 
-The existing `Singular` production is the initial reference corpus. Its current
-filesystem conventions are recognized by an adapter, but they are not imposed
-as the final Cine Toaster project format.
+The file library remains available for search and preview, but it is a support
+tool rather than the primary interface. Cine Toaster navigation follows the
+film's production logic instead of mirroring its directory tree.
 
 Development commands:
 
 ~~~bash
-uv run toast index /path/to/project
-uv run toast tree /path/to/project --depth 3
-uv run toast find /path/to/project "continuity note"
-uv run toast serve /path/to/project
+uv run toast demo ~/cine-toaster-projects/the-last-signal
+uv run toast serve ~/cine-toaster-projects/the-last-signal
 ~~~
 
-The browser listens on `http://127.0.0.1:8787` by default. Its SQLite index is
-stored below the user's cache directory and can be deleted and rebuilt at any
-time. See [`docs/milestone-01-project-browser.md`](docs/milestone-01-project-browser.md)
-for the scope and non-goals of this milestone.
+The demo command creates a separate English-language production from the
+versioned template in `examples/demo-project`. The control room listens on
+`http://127.0.0.1:8787` by default. See
+[`docs/milestone-01-production-control-room.md`](docs/milestone-01-production-control-room.md)
+for the scope and project format.
 
 ## Inspiration
 

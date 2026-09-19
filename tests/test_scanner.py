@@ -10,40 +10,37 @@ from cine_toaster.scanner import detect_adapter, scan_project
 class ScannerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name) / "singular"
-        (self.root / "cenas" / "3-01" / "ltx" / "trabalho" / "_tomadas").mkdir(parents=True)
-        (self.root / "cenas" / "3-01" / "ltx" / "versoes").mkdir(parents=True)
-        (self.root / "roteiro").mkdir()
-        (self.root / "elenco").mkdir()
-        (self.root / "cenas" / "3-01" / "ltx" / "decupagem.yaml").write_text(
-            "situacao: olhar errado aos 49 s\n", encoding="utf-8"
+        self.root = Path(self.temporary.name) / "production"
+        (self.root / "scenes" / "030-echo" / "shots").mkdir(parents=True)
+        (self.root / "project.toml").write_text(
+            'id = "demo"\ntitle = "Demo"\n', encoding="utf-8"
         )
-        (self.root / "cenas" / "3-01" / "ltx" / "trabalho" / "_tomadas" / "c13-t23.mp4").write_bytes(b"video")
-        (self.root / "cenas" / "3-01" / "ltx" / "versoes" / "cena-3-01-ltx-v12.mp4").write_bytes(b"render")
+        (self.root / "scenes" / "030-echo" / "scene.toml").write_text(
+            'id = "SC-030"\ntitle = "Echo"\n', encoding="utf-8"
+        )
+        (self.root / "scenes" / "030-echo" / "shots" / "take-03.mp4").write_bytes(
+            b"video"
+        )
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def test_detects_confyui_layout(self) -> None:
-        self.assertEqual(detect_adapter(self.root), "confyui")
+    def test_detects_cine_toaster_manifest(self) -> None:
+        self.assertEqual(detect_adapter(self.root), "cine-toaster")
 
-    def test_classifies_scene_take_and_version(self) -> None:
+    def test_classifies_open_project_structure(self) -> None:
         by_path = {item.relative_path: item for item in scan_project(self.root)}
-        self.assertEqual(by_path["cenas/3-01"].kind, "scene")
+        self.assertEqual(by_path["project.toml"].kind, "project_manifest")
+        self.assertEqual(by_path["scenes/030-echo"].kind, "scene_directory")
         self.assertEqual(
-            by_path["cenas/3-01/ltx/trabalho/_tomadas/c13-t23.mp4"].kind,
-            "take",
+            by_path["scenes/030-echo/scene.toml"].kind,
+            "scene_manifest",
         )
         self.assertEqual(
-            by_path["cenas/3-01/ltx/versoes/cena-3-01-ltx-v12.mp4"].kind,
-            "scene_version",
-        )
-        self.assertIn(
-            "olhar errado",
-            by_path["cenas/3-01/ltx/decupagem.yaml"].text_content or "",
+            by_path["scenes/030-echo/shots/take-03.mp4"].kind,
+            "shot_asset",
         )
 
 
 if __name__ == "__main__":
     unittest.main()
-

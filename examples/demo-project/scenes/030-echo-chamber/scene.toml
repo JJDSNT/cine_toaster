@@ -1,0 +1,83 @@
+id = "SC-030"
+order = 30
+title = "Echo Chamber"
+sequence = "Sequence 02 · The Reply"
+status = "in_review"
+current_step = "review"
+iteration = 3
+duration_seconds = 74
+updated_at = "2026-09-19"
+summary = "The station repeats a sentence Mara has never transmitted."
+
+[[workflow]]
+id = "script"
+label = "Script"
+status = "approved"
+[[workflow]]
+id = "breakdown"
+label = "Breakdown"
+status = "approved"
+[[workflow]]
+id = "references"
+label = "References"
+status = "approved"
+[[workflow]]
+id = "generation"
+label = "Generation"
+status = "complete"
+note = "Three complete scene iterations"
+[[workflow]]
+id = "review"
+label = "Review"
+status = "active"
+note = "Director selection required"
+[[workflow]]
+id = "edit"
+label = "Edit"
+status = "waiting"
+
+[[shots]]
+id = "SH-030-01"
+label = "Speaker wakes"
+status = "selected"
+takes = 4
+selected_take = "T02"
+
+[[shots]]
+id = "SH-030-02"
+label = "Mara crosses the room"
+status = "needs_review"
+takes = 5
+selected_take = ""
+
+[[shots]]
+id = "SH-030-03"
+label = "The impossible sentence"
+status = "needs_review"
+takes = 3
+selected_take = ""
+
+[[decisions]]
+question = "How much of the sentence is intelligible on first hearing?"
+status = "open"
+answer = ""
+
+[[decisions]]
+question = "Keep Mara in profile through the reply?"
+status = "proposed"
+answer = "Use profile in R03; do not cut to an explanatory close-up."
+
+[[iterations]]
+id = "R01"
+result = "rejected"
+note = "The reply arrived too early and removed the suspense."
+
+[[iterations]]
+id = "R02"
+result = "rejected"
+note = "Better timing, but Mara's face changed between shots."
+
+[[iterations]]
+id = "R03"
+result = "review"
+note = "Continuity fixed; compare performance choices in shots 02 and 03."

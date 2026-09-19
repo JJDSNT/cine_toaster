@@ -2,12 +2,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 
 from .index import ProjectIndex, build_index, index_path_for
 from .model import ProjectItem
 from .web import serve_project
+
+
+SOURCE_DEMO_PROJECT = Path(__file__).parents[2] / "examples" / "demo-project"
+PACKAGED_DEMO_PROJECT = Path(__file__).with_name("demo_project")
+DEMO_PROJECT = (
+    SOURCE_DEMO_PROJECT if SOURCE_DEMO_PROJECT.is_dir() else PACKAGED_DEMO_PROJECT
+)
 
 
 def _human_size(size: int) -> str:
@@ -111,10 +119,24 @@ def command_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_demo(args: argparse.Namespace) -> int:
+    destination = args.destination.expanduser().resolve()
+    if destination.exists():
+        print(f"Destination already exists: {destination}", file=sys.stderr)
+        return 2
+    if not DEMO_PROJECT.is_dir():
+        print(f"Demo project template is unavailable: {DEMO_PROJECT}", file=sys.stderr)
+        return 2
+    shutil.copytree(DEMO_PROJECT, destination)
+    print(f"Created demo production at {destination}")
+    print(f"Open it with: toast serve {destination}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="toast",
-        description="Browse and inspect filesystem-based film projects.",
+        description="Operate filesystem-based film productions.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -145,12 +167,20 @@ def build_parser() -> argparse.ArgumentParser:
     stats_parser.add_argument("--json", action="store_true")
     stats_parser.set_defaults(function=command_stats)
 
-    serve_parser = subparsers.add_parser("serve", help="Start the local visual project browser")
+    serve_parser = subparsers.add_parser(
+        "serve", help="Start the local production control room"
+    )
     serve_parser.add_argument("project", type=Path)
     serve_parser.add_argument("--host", default="127.0.0.1")
     serve_parser.add_argument("--port", type=int, default=8787)
     serve_parser.add_argument("--no-refresh", action="store_true")
     serve_parser.set_defaults(function=command_serve)
+
+    demo_parser = subparsers.add_parser(
+        "demo", help="Copy the English demo production to an external directory"
+    )
+    demo_parser.add_argument("destination", type=Path)
+    demo_parser.set_defaults(function=command_demo)
 
     return parser
 
@@ -167,4 +197,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -19,6 +19,7 @@ packages = ["src/cine_toaster"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "src/cine_toaster/web_assets" = "cine_toaster/web_assets"
+"examples/demo-project" = "cine_toaster/demo_project"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

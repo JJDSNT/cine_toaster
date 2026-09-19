@@ -1,0 +1,64 @@
+id = "SC-010"
+order = 10
+title = "The Last Broadcast"
+sequence = "Sequence 01 · Silence"
+status = "approved"
+current_step = "edit"
+iteration = 2
+duration_seconds = 48
+updated_at = "2026-09-14"
+summary = "Earth's final telemetry packet arrives while Mara keeps the station alive."
+
+[[workflow]]
+id = "script"
+label = "Script"
+status = "approved"
+
+[[workflow]]
+id = "breakdown"
+label = "Breakdown"
+status = "approved"
+
+[[workflow]]
+id = "references"
+label = "References"
+status = "approved"
+
+[[workflow]]
+id = "generation"
+label = "Generation"
+status = "complete"
+
+[[workflow]]
+id = "review"
+label = "Review"
+status = "approved"
+
+[[workflow]]
+id = "edit"
+label = "Edit"
+status = "approved"
+
+[[shots]]
+id = "SH-010-01"
+label = "Telemetry dies"
+status = "selected"
+takes = 4
+selected_take = "T03"
+
+[[shots]]
+id = "SH-010-02"
+label = "Mara waits in silence"
+status = "selected"
+takes = 3
+selected_take = "T02"
+
+[[iterations]]
+id = "R01"
+result = "rejected"
+note = "The station felt too clean and the performance was too explicit."
+
+[[iterations]]
+id = "R02"
+result = "approved"
+note = "Held the final close-up four seconds longer."

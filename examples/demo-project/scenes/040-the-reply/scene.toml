@@ -1,0 +1,66 @@
+id = "SC-040"
+order = 40
+title = "The Reply"
+sequence = "Sequence 02 · The Reply"
+status = "blocked"
+current_step = "generation"
+iteration = 2
+duration_seconds = 56
+updated_at = "2026-09-18"
+summary = "Mara sends a question and the antenna field turns before she finishes speaking."
+blockers = ["Antenna motion reference breaks spatial continuity between shots 02 and 03."]
+
+[[workflow]]
+id = "script"
+label = "Script"
+status = "approved"
+[[workflow]]
+id = "breakdown"
+label = "Breakdown"
+status = "approved"
+[[workflow]]
+id = "references"
+label = "References"
+status = "approved"
+[[workflow]]
+id = "generation"
+label = "Generation"
+status = "blocked"
+note = "Needs a locked antenna reference"
+[[workflow]]
+id = "review"
+label = "Review"
+status = "waiting"
+[[workflow]]
+id = "edit"
+label = "Edit"
+status = "waiting"
+
+[[shots]]
+id = "SH-040-01"
+label = "Mara transmits"
+status = "generated"
+takes = 3
+selected_take = ""
+
+[[shots]]
+id = "SH-040-02"
+label = "Dish array turns"
+status = "blocked"
+takes = 6
+selected_take = ""
+
+[[decisions]]
+question = "Regenerate the antenna wide shot or solve the turn in the edit?"
+status = "open"
+answer = ""
+
+[[iterations]]
+id = "R01"
+result = "rejected"
+note = "Dish geometry changed during the move."
+
+[[iterations]]
+id = "R02"
+result = "blocked"
+note = "Camera is stable, but the array turns in the wrong direction."

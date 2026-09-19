@@ -24,9 +24,8 @@ def item_id_for(project_id: str, relative_path: str) -> str:
 
 
 def detect_adapter(root: Path) -> str:
-    expected = (root / "cenas", root / "roteiro", root / "elenco")
-    if sum(path.is_dir() for path in expected) >= 2:
-        return "confyui"
+    if (root / "project.toml").is_file():
+        return "cine-toaster"
     return "generic"
 
 
@@ -118,4 +117,3 @@ def scan_project(root: Path) -> Iterator[ProjectItem]:
                 modified_ns=stat.st_mtime_ns,
                 text_content=_read_text(path),
             )
-

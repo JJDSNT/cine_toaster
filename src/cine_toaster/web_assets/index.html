@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,68 +12,61 @@
         <span class="brand-mark">CT</span>
         <div>
           <strong>Cine Toaster</strong>
-          <span id="project-name">Carregando projeto…</span>
+          <span id="project-name">Opening production…</span>
         </div>
       </div>
-      <form id="search-form" class="search-form">
-        <input id="search-input" type="search" placeholder="Buscar cenas, planos, versões e texto…" autocomplete="off">
-        <button type="submit">Buscar</button>
-      </form>
-      <button id="compare-open" class="quiet-button" disabled>Comparar <span id="compare-count">0</span></button>
+      <div class="production-position">
+        <span id="project-format">PRODUCTION</span>
+        <strong id="project-phase">Loading</strong>
+      </div>
+      <button id="quick-find" class="quiet-button" type="button">Find anything <kbd>/</kbd></button>
     </header>
 
     <div class="app-shell">
       <aside class="sidebar">
-        <div class="sidebar-title">Projeto</div>
-        <nav id="root-navigation" class="root-navigation"></nav>
-        <div class="project-stats" id="project-stats"></div>
+        <div class="sidebar-title">Control room</div>
+        <nav class="module-navigation" aria-label="Production workspaces">
+          <button type="button" data-view="overview" class="active"><span>OV</span><strong>Overview</strong></button>
+          <button type="button" data-view="scenes"><span>SC</span><strong>Scenes</strong><em id="scene-nav-count">0</em></button>
+          <button type="button" data-view="review"><span>RV</span><strong>Review</strong><em id="review-nav-count">0</em></button>
+          <button type="button" data-view="library"><span>LB</span><strong>Library</strong></button>
+        </nav>
+
+        <div class="sidebar-title secondary">Production rooms</div>
+        <div class="future-navigation">
+          <span><b>ST</b> Story <small>planned</small></span>
+          <span><b>WD</b> World <small>planned</small></span>
+          <span><b>ED</b> Edit <small>planned</small></span>
+          <span><b>JB</b> Jobs <small>planned</small></span>
+        </div>
+
+        <div class="sidebar-foot">
+          <span class="live-dot"></span>
+          <div><strong>Filesystem project</strong><small id="project-root">Read-only workspace</small></div>
+        </div>
       </aside>
 
-      <main class="workspace">
-        <nav id="breadcrumbs" class="breadcrumbs"></nav>
-        <div class="workspace-heading">
-          <div>
-            <span id="view-kind" class="eyebrow">PROJETO</span>
-            <h1 id="view-title">Projeto</h1>
-          </div>
-          <span id="item-count" class="item-count"></span>
-        </div>
-        <section id="content-grid" class="content-grid"></section>
-        <div id="empty-state" class="empty-state" hidden>Nenhum item encontrado.</div>
-      </main>
-
-      <aside class="inspector">
-        <div id="inspector-empty" class="inspector-empty">
-          Selecione um arquivo para visualizar.
-        </div>
-        <div id="inspector-content" hidden>
-          <div id="preview" class="preview"></div>
-          <div class="inspector-heading">
-            <span id="inspect-kind" class="eyebrow"></span>
-            <h2 id="inspect-name"></h2>
-          </div>
-          <dl id="inspect-metadata" class="metadata"></dl>
-          <button id="compare-add" class="primary-button">Adicionar à comparação</button>
-        </div>
-      </aside>
+      <main id="workspace" class="workspace" tabindex="-1"></main>
     </div>
 
-    <dialog id="compare-dialog" class="compare-dialog">
-      <div class="compare-header">
-        <div>
-          <span class="eyebrow">COMPARAÇÃO</span>
-          <h2>Resultados lado a lado</h2>
-        </div>
-        <div class="compare-actions">
-          <button id="compare-play" class="quiet-button">Reproduzir juntos</button>
-          <button id="compare-clear" class="quiet-button">Limpar</button>
-          <button id="compare-close" class="quiet-button">Fechar</button>
-        </div>
+    <dialog id="find-dialog" class="find-dialog">
+      <form id="search-form" class="search-form">
+        <input id="search-input" type="search" placeholder="Search production files and text…" autocomplete="off">
+        <button type="submit">Search</button>
+      </form>
+      <div id="search-results" class="search-results"></div>
+      <button id="find-close" class="dialog-close" type="button" aria-label="Close">×</button>
+    </dialog>
+
+    <dialog id="preview-dialog" class="preview-dialog">
+      <div class="dialog-heading">
+        <div><span id="preview-kind" class="eyebrow"></span><h2 id="preview-name"></h2></div>
+        <button id="preview-close" class="quiet-button" type="button">Close</button>
       </div>
-      <div id="compare-grid" class="compare-grid"></div>
+      <div id="preview-content" class="preview-content"></div>
+      <p id="preview-path" class="preview-path"></p>
     </dialog>
 
     <script type="module" src="/static/app.js"></script>
   </body>
 </html>
-

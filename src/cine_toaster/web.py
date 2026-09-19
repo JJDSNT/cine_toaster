@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .index import ProjectIndex
+from .project import ProjectFormatError, load_production, load_scene
 
 
 ASSET_ROOT = Path(__file__).with_name("web_assets")
@@ -36,7 +37,7 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         return self.server.project_root  # type: ignore[attr-defined]
 
     def log_message(self, format: str, *args: object) -> None:
-        print(f"[browser] {self.address_string()} - {format % args}")
+        print(f"[control-room] {self.address_string()} - {format % args}")
 
     def _send_json(self, value: object, status: HTTPStatus = HTTPStatus.OK) -> None:
         payload = json.dumps(value, ensure_ascii=False).encode("utf-8")
@@ -113,6 +114,31 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
 
     def _handle_api(self, parsed) -> None:
         query = parse_qs(parsed.query)
+        if parsed.path == "/api/production":
+            try:
+                self._send_json(load_production(self.project_root))
+            except FileNotFoundError:
+                self._send_json(
+                    {"error": "This directory has no project.toml operational manifest"},
+                    HTTPStatus.NOT_FOUND,
+                )
+            except ProjectFormatError as error:
+                self._send_json({"error": str(error)}, HTTPStatus.UNPROCESSABLE_ENTITY)
+            return
+
+        if parsed.path == "/api/scene":
+            scene_id = query.get("id", [""])[0]
+            try:
+                scene = load_scene(self.project_root, scene_id)
+            except (FileNotFoundError, ProjectFormatError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
+                return
+            if scene is None:
+                self._send_json({"error": "Scene not found"}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json(scene)
+            return
+
         if parsed.path == "/api/project":
             self._send_json(self.project_index.summary().public_dict())
             return
@@ -184,7 +210,6 @@ def serve_project(
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nStopping browser.")
+        print("\nStopping control room.")
     finally:
         server.server_close()
-
