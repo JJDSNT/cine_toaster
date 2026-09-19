@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cine Toaster</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark">CT</span>
+        <div>
+          <strong>Cine Toaster</strong>
+          <span id="project-name">Carregando projeto…</span>
+        </div>
+      </div>
+      <form id="search-form" class="search-form">
+        <input id="search-input" type="search" placeholder="Buscar cenas, planos, versões e texto…" autocomplete="off">
+        <button type="submit">Buscar</button>
+      </form>
+      <button id="compare-open" class="quiet-button" disabled>Comparar <span id="compare-count">0</span></button>
+    </header>
+
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-title">Projeto</div>
+        <nav id="root-navigation" class="root-navigation"></nav>
+        <div class="project-stats" id="project-stats"></div>
+      </aside>
+
+      <main class="workspace">
+        <nav id="breadcrumbs" class="breadcrumbs"></nav>
+        <div class="workspace-heading">
+          <div>
+            <span id="view-kind" class="eyebrow">PROJETO</span>
+            <h1 id="view-title">Projeto</h1>
+          </div>
+          <span id="item-count" class="item-count"></span>
+        </div>
+        <section id="content-grid" class="content-grid"></section>
+        <div id="empty-state" class="empty-state" hidden>Nenhum item encontrado.</div>
+      </main>
+
+      <aside class="inspector">
+        <div id="inspector-empty" class="inspector-empty">
+          Selecione um arquivo para visualizar.
+        </div>
+        <div id="inspector-content" hidden>
+          <div id="preview" class="preview"></div>
+          <div class="inspector-heading">
+            <span id="inspect-kind" class="eyebrow"></span>
+            <h2 id="inspect-name"></h2>
+          </div>
+          <dl id="inspect-metadata" class="metadata"></dl>
+          <button id="compare-add" class="primary-button">Adicionar à comparação</button>
+        </div>
+      </aside>
+    </div>
+
+    <dialog id="compare-dialog" class="compare-dialog">
+      <div class="compare-header">
+        <div>
+          <span class="eyebrow">COMPARAÇÃO</span>
+          <h2>Resultados lado a lado</h2>
+        </div>
+        <div class="compare-actions">
+          <button id="compare-play" class="quiet-button">Reproduzir juntos</button>
+          <button id="compare-clear" class="quiet-button">Limpar</button>
+          <button id="compare-close" class="quiet-button">Fechar</button>
+        </div>
+      </div>
+      <div id="compare-grid" class="compare-grid"></div>
+    </dialog>
+
+    <script type="module" src="/static/app.js"></script>
+  </body>
+</html>
+

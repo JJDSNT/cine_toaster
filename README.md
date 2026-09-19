@@ -167,6 +167,31 @@ Early development.
 
 The initial focus is the Project Core, production workflow, visual decision tools, ComfyUI integration, automation, and human-in-the-loop review.
 
+## Current Development Milestone
+
+The first executable milestone is a read-only **Project Browser**. It opens an
+external production directory, builds a disposable local index, and provides
+hierarchical navigation, text search, media previews, and side-by-side
+comparison without modifying the source project.
+
+The existing `Singular` production is the initial reference corpus. Its current
+filesystem conventions are recognized by an adapter, but they are not imposed
+as the final Cine Toaster project format.
+
+Development commands:
+
+~~~bash
+uv run toast index /path/to/project
+uv run toast tree /path/to/project --depth 3
+uv run toast find /path/to/project "continuity note"
+uv run toast serve /path/to/project
+~~~
+
+The browser listens on `http://127.0.0.1:8787` by default. Its SQLite index is
+stored below the user's cache directory and can be deleted and rebuilt at any
+time. See [`docs/milestone-01-project-browser.md`](docs/milestone-01-project-browser.md)
+for the scope and non-goals of this milestone.
+
 ## Inspiration
 
 Cine Toaster is inspired by the **Amiga Video Toaster** and by modern open-source AI filmmaking projects exploring generative production, visual directing, workflow orchestration, and automated film pipelines.
