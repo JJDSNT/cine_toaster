@@ -2,7 +2,7 @@
 
 **An open production environment for AI filmmaking.**
 
-Toaster Cinema aims to provide an integrated workspace for creating AI-assisted films, from screenplay and visual development to shot generation, review, editing, and delivery.
+Cine Toaster aims to provide an integrated workspace for creating AI-assisted films, from screenplay and visual development to shot generation, review, editing, and delivery.
 
 Inspired by the pioneering spirit of the **Amiga Video Toaster**, the project brings together modern generative tools, production automation, and traditional filmmaking workflows into a single open environment.
 
@@ -23,7 +23,7 @@ Inspired by the pioneering spirit of the **Amiga Video Toaster**, the project br
 
 ## Architecture
 
-Toaster Cinema is built around a shared **Project Core**. The GUI, CLI, API, and AI agents are different interfaces to the same canonical project state and production engine.
+Cine Toaster is built around a shared **Project Core**. The GUI, CLI, API, and AI agents are different interfaces to the same canonical project state and production engine.
 
 ~~~
                 ┌─────────┐
@@ -56,6 +56,30 @@ Projects are intended to remain filesystem-based and human-readable whenever pos
 
 Generation and production services are exposed through replaceable adapters, allowing models, providers, GPU infrastructure, and external filmmaking tools to evolve independently from the core.
 
+## Project Model
+
+A Cine Toaster project is a self-contained, filesystem-based production.
+
+~~~
+project/
+├── project.yaml
+├── screenplay/
+├── characters/
+├── locations/
+├── scenes/
+│   └── shots/
+├── assets/
+├── workflows/
+├── renders/
+└── edit/
+~~~
+
+Human-readable project files describe the production state, while media and generated artifacts remain ordinary files.
+
+The filesystem is the canonical source of truth. GUI, CLI, API, and agents operate on this same state. Databases may be used for indexes and caches, but must be rebuildable from the project itself.
+
+This keeps projects portable, versionable, scriptable, and independent of the GUI.
+
 ## Current Scope
 
 The initial scope is the **production layer**, not the development of new generative models or a replacement for a mature non-linear editor.
@@ -72,34 +96,42 @@ The first milestones focus on:
 - AI-assisted continuity and production review;
 - human-in-the-loop checkpoints.
 
-Professional editing, compositing, audio, color, and delivery should initially be handled through integration with established tools such as **FFmpeg** and **MLT/Kdenlive** rather than reimplemented inside Toaster Cinema.
+Professional editing, compositing, audio, color, and delivery should initially be handled through integration with established tools such as **FFmpeg** and **MLT/Kdenlive** rather than reimplemented inside Cine Toaster.
 
 The scope may expand as real production requirements emerge.
 
 ## CLI
 
-The command-line interface will be available through:
+The Cine Toaster command-line interface is:
 
 ~~~
 toast
 ~~~
 
-Example:
+Examples:
 
 ~~~
 toast init singular
 toast status
+
+toast scene show 4
 toast shot generate 4.3
+
 toast storyboard approve 4.3
+
 toast take select 4.3 T02
+
+toast render
 ~~~
+
+The CLI, GUI, API, and agents are intended to expose the same underlying project operations.
 
 ## Status
 
 Early development.
 
-The initial focus is the project core, production workflow, ComfyUI integration, automation, and human-in-the-loop review.
+The initial focus is the Project Core, production workflow, ComfyUI integration, automation, and human-in-the-loop review.
 
 ## Inspiration
 
-Toaster Cinema is inspired by the **Amiga Video Toaster** and by modern open-source AI filmmaking projects exploring generative production, visual directing, workflow orchestration, and automated film pipelines.
+Cine Toaster is inspired by the **Amiga Video Toaster** and by modern open-source AI filmmaking projects exploring generative production, visual directing, workflow orchestration, and automated film pipelines.
