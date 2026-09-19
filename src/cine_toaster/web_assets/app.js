@@ -1,6 +1,7 @@
 const state = {
   project: null,
   production: null,
+  transitions: [],
   currentView: "overview",
   libraryPath: null,
 };
@@ -61,6 +62,7 @@ function setView(view) {
   if (view === "overview") renderOverview();
   if (view === "scenes") renderScenes();
   if (view === "review") renderReview();
+  if (view === "transitions") renderTransitions();
   if (view === "library") renderLibrary(state.project.id);
   byId("workspace").focus();
 }
@@ -310,6 +312,220 @@ function renderReview() {
   if (!reviewScenes.length) root.append(el("p", "empty-state", "The review queue is empty."));
 }
 
+function demoTexture(gl, variant) {
+  const surface = document.createElement("canvas");
+  surface.width = 640;
+  surface.height = 360;
+  const context = surface.getContext("2d");
+  const gradient = context.createLinearGradient(0, 0, 640, 360);
+  if (variant === "from") {
+    gradient.addColorStop(0, "#162d42");
+    gradient.addColorStop(1, "#d45b35");
+  } else {
+    gradient.addColorStop(0, "#d4aa52");
+    gradient.addColorStop(1, "#244f3d");
+  }
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 640, 360);
+  context.fillStyle = "rgba(255,255,255,.12)";
+  context.beginPath();
+  context.arc(variant === "from" ? 175 : 465, 180, 110, 0, Math.PI * 2);
+  context.fill();
+  context.fillStyle = "rgba(255,255,255,.92)";
+  context.font = "800 92px system-ui";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(variant === "from" ? "A" : "B", variant === "from" ? 175 : 465, 180);
+  context.font = "600 18px system-ui";
+  context.fillText(variant === "from" ? "OUTGOING SHOT" : "INCOMING SHOT", 320, 320);
+
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, surface);
+  return texture;
+}
+
+function compileShader(gl, type, source) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    throw new Error(gl.getShaderInfoLog(shader) || "Shader compilation failed");
+  }
+  return shader;
+}
+
+async function startShaderPreview(canvas, transition) {
+  const gl = canvas.getContext("webgl", { alpha: false, antialias: true });
+  if (!gl) {
+    canvas.replaceWith(el("p", "preview-error", "WebGL is unavailable."));
+    return;
+  }
+  try {
+    const shaderCode = await fetch(transition.asset_url).then((response) => response.text());
+    const vertexSource = `
+      attribute vec2 position;
+      varying vec2 vUv;
+      void main() {
+        vUv = position * 0.5 + 0.5;
+        gl_Position = vec4(position, 0.0, 1.0);
+      }
+    `;
+    const fragmentSource = `
+      precision mediump float;
+      uniform sampler2D fromTexture;
+      uniform sampler2D toTexture;
+      uniform float progress;
+      uniform float ratio;
+      varying vec2 vUv;
+      vec4 getFromColor(vec2 uv) { return texture2D(fromTexture, uv); }
+      vec4 getToColor(vec2 uv) { return texture2D(toTexture, uv); }
+      ${shaderCode}
+      void main() { gl_FragColor = transition(vUv); }
+    `;
+    const program = gl.createProgram();
+    gl.attachShader(program, compileShader(gl, gl.VERTEX_SHADER, vertexSource));
+    gl.attachShader(program, compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource));
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+    gl.useProgram(program);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+    const position = gl.getAttribLocation(program, "position");
+    gl.enableVertexAttribArray(position);
+    gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+
+    const fromTexture = demoTexture(gl, "from");
+    const toTexture = demoTexture(gl, "to");
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, fromTexture);
+    gl.uniform1i(gl.getUniformLocation(program, "fromTexture"), 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, toTexture);
+    gl.uniform1i(gl.getUniformLocation(program, "toTexture"), 1);
+    gl.uniform1f(gl.getUniformLocation(program, "ratio"), canvas.width / canvas.height);
+    const progressLocation = gl.getUniformLocation(program, "progress");
+    const started = performance.now();
+    const duration = Math.max(250, transition.duration_ms);
+
+    function draw(now) {
+      if (!canvas.isConnected) return;
+      const cycle = duration + 1000;
+      const elapsed = (now - started) % cycle;
+      const progress = Math.max(0, Math.min(1, (elapsed - 350) / duration));
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.uniform1f(progressLocation, progress);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  } catch (error) {
+    const message = el("p", "preview-error", `Shader error: ${error.message}`);
+    canvas.replaceWith(message);
+  }
+}
+
+function transitionVisual(transition, large = false) {
+  const frame = el("div", large ? "transition-visual transition-visual-large" : "transition-visual");
+  if (transition.kind === "webm") {
+    const video = el("video");
+    video.src = transition.preview_url;
+    video.muted = true;
+    video.loop = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.controls = large;
+    frame.append(video);
+  } else {
+    const canvas = el("canvas");
+    canvas.width = large ? 960 : 640;
+    canvas.height = large ? 540 : 360;
+    frame.append(canvas);
+    startShaderPreview(canvas, transition);
+  }
+  const badge = el("span", "format-badge", transition.kind.toUpperCase());
+  frame.append(badge);
+  return frame;
+}
+
+function renderTransitions() {
+  const root = byId("workspace");
+  root.replaceChildren();
+  const heading = sectionHeading("TRANSITION BANK", "Transitions", "Preview a shared visual vocabulary and expose the same intent to production agents.");
+  heading.classList.add("page-heading");
+  root.append(heading);
+
+  const categories = new Map();
+  for (const transition of state.transitions) {
+    if (!categories.has(transition.category)) categories.set(transition.category, []);
+    categories.get(transition.category).push(transition);
+  }
+  for (const [category, transitions] of categories) {
+    const section = el("section", "transition-section");
+    section.append(sectionHeading("BANK", label(category), `${transitions.length} available`));
+    const grid = el("div", "transition-grid");
+    for (const transition of transitions) {
+      const card = el("article", "transition-card");
+      card.append(transitionVisual(transition));
+      const copy = el("div", "transition-card-copy");
+      const top = el("div", "transition-card-top");
+      top.append(el("strong", "", transition.name), el("span", `energy energy-${transition.energy}`, transition.energy));
+      copy.append(top, el("p", "", transition.description));
+      const tags = el("div", "tag-list");
+      transition.tags.slice(0, 4).forEach((tag) => tags.append(el("span", "tag", tag)));
+      copy.append(tags, button("Inspect and guide AI", () => renderTransitionDetail(transition.id), "quiet-button"));
+      card.append(copy);
+      grid.append(card);
+    }
+    section.append(grid);
+    root.append(section);
+  }
+}
+
+function guidanceList(title, values, tone) {
+  const panel = el("article", `guidance-list guidance-${tone}`);
+  panel.append(el("span", "eyebrow", title));
+  const list = el("ul");
+  values.forEach((value) => list.append(el("li", "", value)));
+  panel.append(list);
+  return panel;
+}
+
+function renderTransitionDetail(transitionId) {
+  const transition = state.transitions.find((item) => item.id === transitionId);
+  if (!transition) return;
+  state.currentView = "transition";
+  const root = byId("workspace");
+  root.replaceChildren();
+  const back = button("← Transition bank", () => setView("transitions"), "back-button");
+  const header = el("section", "transition-detail-header");
+  const copy = el("div");
+  const meta = el("div", "scene-header-meta");
+  meta.append(el("span", "scene-id", transition.kind.toUpperCase()), el("span", "status", label(transition.category)), el("span", "muted", `${transition.duration_ms} ms`));
+  copy.append(meta, el("h1", "", transition.name), el("p", "hero-logline", transition.description));
+  header.append(copy);
+  root.append(back, header, transitionVisual(transition, true));
+
+  const aiPanel = el("section", "panel ai-guidance-panel");
+  const aiHeading = sectionHeading("AGENT GUIDANCE", "How the AI should reason about it", "This text is part of the catalog, not inferred from the filename.");
+  aiPanel.append(aiHeading, el("blockquote", "", transition.guidance));
+  const facts = el("dl", "transition-facts");
+  for (const [name, value] of [["Energy", transition.energy], ["Motion", transition.motion], ["Asset role", transition.webm_role], ["Origin", transition.origin], ["License", transition.license]]) {
+    facts.append(el("dt", "", name), el("dd", "", label(value)));
+  }
+  aiPanel.append(facts);
+  const guidance = el("div", "guidance-columns");
+  guidance.append(guidanceList("USE WHEN", transition.use_when, "use"), guidanceList("AVOID WHEN", transition.avoid_when, "avoid"));
+  root.append(aiPanel, guidance);
+}
+
 function renderUnstructured() {
   const root = byId("workspace");
   root.replaceChildren();
@@ -404,15 +620,30 @@ async function runSearch(query) {
 }
 
 async function start() {
-  state.project = await api("/api/project");
-  state.production = await api("/api/production", { optional: true });
+  [state.project, state.production, state.transitions] = await Promise.all([
+    api("/api/project"),
+    api("/api/production", { optional: true }),
+    api("/api/transitions"),
+  ]);
   byId("project-name").textContent = state.production?.title || state.project.name;
   byId("project-root").textContent = state.project.root;
   byId("project-format").textContent = state.production?.format || "UNSTRUCTURED";
   byId("project-phase").textContent = label(state.production?.production?.current_phase || "Library only");
   byId("scene-nav-count").textContent = state.production?.metrics.total_scenes || 0;
   byId("review-nav-count").textContent = state.production?.metrics.attention_items || 0;
-  setView(state.production ? "overview" : "library");
+  byId("transition-nav-count").textContent = state.transitions.length;
+  const parameters = new URLSearchParams(window.location.search);
+  const requestedTransition = parameters.get("transition");
+  if (requestedTransition && state.transitions.some((item) => item.id === requestedTransition)) {
+    renderTransitionDetail(requestedTransition);
+    return;
+  }
+  const requestedView = parameters.get("view");
+  const availableViews = new Set(["overview", "scenes", "review", "transitions", "library"]);
+  const initialView = requestedView && availableViews.has(requestedView)
+    ? requestedView
+    : state.production ? "overview" : "library";
+  setView(initialView);
 }
 
 document.querySelectorAll("[data-view]").forEach((node) => node.addEventListener("click", () => setView(node.dataset.view)));

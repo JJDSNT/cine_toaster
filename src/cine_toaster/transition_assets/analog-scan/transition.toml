@@ -1,0 +1,24 @@
+schema_version = 1
+id = "analog-scan"
+name = "Analog Scan"
+kind = "webm"
+asset = "transition.webm"
+category = "reference"
+description = "A rendered reference transition in which an electronic scan replaces one source with another."
+guidance = "Use the WebM as visual reference for planning or AI direction. It is a baked preview, not yet a parameterized two-input effect."
+energy = "medium"
+motion = "left to right"
+duration_ms = 1600
+webm_role = "reference"
+tags = ["webm", "analog", "scan", "electronic", "reference"]
+use_when = [
+  "The transition can feel technological or diegetic",
+  "An AI agent needs a concrete motion reference",
+  "A signal, monitor, or transmission motivates the edit",
+]
+avoid_when = [
+  "The transition must accept arbitrary source frames at render time",
+  "The edit should be emotionally invisible",
+]
+license = "CC0-1.0"
+author = "Cine Toaster contributors"

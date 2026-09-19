@@ -1,0 +1,23 @@
+schema_version = 1
+id = "cross-dissolve"
+name = "Cross Dissolve"
+kind = "glsl"
+asset = "transition.glsl"
+category = "classic"
+description = "A neutral opacity blend from the outgoing shot into the incoming shot."
+guidance = "Use as invisible punctuation when time, place, or emotional emphasis shifts without calling attention to the edit."
+energy = "low"
+motion = "neutral"
+duration_ms = 1200
+tags = ["classic", "subtle", "temporal", "soft"]
+use_when = [
+  "The edit should feel continuous and calm",
+  "A passage of time needs gentle emphasis",
+  "Two compositions have compatible visual weight",
+]
+avoid_when = [
+  "The cut must feel abrupt or alarming",
+  "Overlapping high-contrast subjects create visual mud",
+]
+license = "CC0-1.0"
+author = "Cine Toaster contributors"

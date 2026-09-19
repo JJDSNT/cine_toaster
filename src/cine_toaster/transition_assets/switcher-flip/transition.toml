@@ -1,0 +1,23 @@
+schema_version = 1
+id = "switcher-flip"
+name = "Switcher Flip"
+kind = "glsl"
+asset = "transition.glsl"
+category = "dve"
+description = "The outgoing image compresses to an edge and the incoming image unfolds from the opposite side."
+guidance = "A digital video effect inspired by the exuberant switcher vocabulary of early desktop video. It signals a constructed, graphic edit."
+energy = "high"
+motion = "horizontal flip"
+duration_ms = 850
+tags = ["dve", "retro", "broadcast", "flip", "toaster-like"]
+use_when = [
+  "The edit should acknowledge the medium",
+  "A montage or program-within-the-film uses broadcast grammar",
+  "The two shots have a strong centered subject",
+]
+avoid_when = [
+  "Photoreal spatial continuity must be preserved",
+  "The scene depends on restrained dramatic tone",
+]
+license = "CC0-1.0"
+author = "Cine Toaster contributors"

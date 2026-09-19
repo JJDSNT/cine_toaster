@@ -114,6 +114,10 @@ Fonts, titles, and subtitles should be previewable directly over actual frames o
 
 Generated alternatives should support contact sheets, side-by-side comparison, A/B review, and direct selection wherever appropriate.
 
+Transition banks should preview both live GLSL effects and WebM references,
+with semantic guidance that filmmakers and AI agents can use when choosing
+editorial punctuation.
+
 AI may propose or generate alternatives, but the filmmaker remains responsible for the artistic choice.
 
 ## Current Scope
@@ -202,6 +206,11 @@ versioned template in `examples/demo-project`. The control room listens on
 `http://127.0.0.1:8787` by default. See
 [`docs/milestone-01-production-control-room.md`](docs/milestone-01-production-control-room.md)
 for the scope and project format.
+
+The **Transitions** room provides an application-level effect bank with live
+GLSL previews, WebM references, provenance, and AI-facing editorial guidance.
+See [`docs/transition-library.md`](docs/transition-library.md) for its open
+manifest and extension path.
 
 ## Inspiration
 

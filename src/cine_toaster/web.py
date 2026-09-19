@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from .index import ProjectIndex
 from .project import ProjectFormatError, load_production, load_scene
+from .transitions import list_transitions, public_transition, transition_asset_path
 
 
 ASSET_ROOT = Path(__file__).with_name("web_assets")
@@ -62,8 +63,7 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def _send_project_file(self, relative_path: str) -> None:
-        path = _safe_project_path(self.project_root, relative_path)
+    def _send_file(self, path: Path | None) -> None:
         if path is None or not path.is_file():
             self.send_error(HTTPStatus.NOT_FOUND)
             return
@@ -112,8 +112,46 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
                 self.wfile.write(chunk)
                 remaining -= len(chunk)
 
+    def _send_project_file(self, relative_path: str) -> None:
+        self._send_file(_safe_project_path(self.project_root, relative_path))
+
+    def _send_transition_file(self, relative_path: str) -> None:
+        parts = relative_path.split("/", 1)
+        if len(parts) != 2:
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        transition_id, filename = map(unquote, parts)
+        self._send_file(
+            transition_asset_path(transition_id, filename, self.project_root)
+        )
+
     def _handle_api(self, parsed) -> None:
         query = parse_qs(parsed.query)
+        if parsed.path == "/api/transitions":
+            self._send_json(
+                [
+                    public_transition(transition)
+                    for transition in list_transitions(self.project_root)
+                ]
+            )
+            return
+
+        if parsed.path == "/api/transition":
+            transition_id = query.get("id", [""])[0]
+            transition = next(
+                (
+                    item
+                    for item in list_transitions(self.project_root)
+                    if item["id"] == transition_id
+                ),
+                None,
+            )
+            if transition is None:
+                self._send_json({"error": "Transition not found"}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json(public_transition(transition))
+            return
+
         if parsed.path == "/api/production":
             try:
                 self._send_json(load_production(self.project_root))
@@ -190,6 +228,8 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             self._handle_api(parsed)
         elif parsed.path.startswith("/media/"):
             self._send_project_file(parsed.path.removeprefix("/media/"))
+        elif parsed.path.startswith("/transition-assets/"):
+            self._send_transition_file(parsed.path.removeprefix("/transition-assets/"))
         else:
             self.send_error(HTTPStatus.NOT_FOUND)
 

@@ -1,0 +1,23 @@
+schema_version = 1
+id = "diamond-wipe"
+name = "Diamond Wipe"
+kind = "glsl"
+asset = "transition.glsl"
+category = "geometric"
+description = "The incoming shot expands from the center as a softened diamond."
+guidance = "A conspicuous graphic transition with period-TV character. Treat it as a deliberate voice, not connective tissue."
+energy = "high"
+motion = "outward"
+duration_ms = 900
+tags = ["geometric", "retro", "centered", "playful", "toaster-like"]
+use_when = [
+  "The film intentionally invokes broadcast or retro-video language",
+  "The center of the incoming image contains the visual destination",
+  "A chapter change should be overt and playful",
+]
+avoid_when = [
+  "A dramatic performance should remain emotionally invisible",
+  "Important subjects sit near the incoming frame edges",
+]
+license = "CC0-1.0"
+author = "Cine Toaster contributors"
