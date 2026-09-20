@@ -26,38 +26,40 @@ Inspired by the pioneering spirit of the **Amiga Video Toaster**, the project br
 
 ## Architecture
 
-Cine Toaster is built around a shared **Project Core**. The GUI, CLI, API, and AI agents are different interfaces to the same canonical project state and production engine.
+Cine Toaster is built around a shared **Project Core**. The GUI, CLI, API, and
+production agents use the same application commands and canonical project
+state. Long-lived jobs, project registration, resources, and agent sessions
+belong to a headless Application Runtime rather than the visible UI.
 
 ~~~
-                ┌─────────┐
-                │   GUI   │
-                └────┬────┘
-                     │
-       ┌─────────────┼─────────────┐
-       │             │             │
-      CLI           API          Agents
-       │             │             │
-       └─────────────┼─────────────┘
-                     │
-              ┌──────▼──────┐
-              │ Project Core │
-              ├──────────────┤
-              │ State        │
-              │ Jobs         │
-              │ Automation   │
-              │ Human Gates  │
-              └──────┬───────┘
-                     │
-       ┌─────────────┼──────────────┐
-       │             │              │
-    ComfyUI        FFmpeg       MLT/Kdenlive
-       │
- Local / Remote GPU
+ GUI │ CLI │ API │ Production Agents
+              │
+       Application API
+ commands │ queries │ subscriptions
+              │
+      Application Runtime
+ projects │ jobs │ processes │ agent runtime
+              │
+         Project Core
+ scenes │ shots │ takes │ decisions │ human gates
+              │
+           Adapters
+ agents │ orchestration │ generation │ media │ UI protocols
+              │
+ Claude/Codex │ ComfyUI │ FFmpeg │ future systems
 ~~~
 
 Projects are intended to remain filesystem-based and human-readable whenever possible. Databases may be used for indexing or caching, but should not become the exclusive source of project state.
 
-Generation and production services are exposed through replaceable adapters, allowing models, providers, GPU infrastructure, and external filmmaking tools to evolve independently from the core.
+Generation and production services are exposed through distinct replaceable
+adapter categories, allowing models, providers, GPU infrastructure, and
+external filmmaking tools to evolve independently from the Core.
+
+The current headless runtime and CLI are implemented in Python. React/Vite and
+Tauri are strong incremental UI and desktop-shell candidates; they are not a
+reason to duplicate or rewrite Project Core behavior. See
+[`ai-context/architecture.md`](ai-context/architecture.md) and the accepted
+decisions in [`docs/architecture/`](docs/architecture/).
 
 ## Project Model
 
@@ -183,9 +185,10 @@ Early development.
 
 The initial focus is the Project Core, production workflow, visual decision tools, ComfyUI integration, automation, and human-in-the-loop review.
 
-## Current Development Milestone
+## Development Status
 
-The first executable milestone is a read-only **Production Control Room**. It
+The current codebase implements the first executable milestone: a read-only
+**Production Control Room**. It
 opens an external project and makes its creative and operational state
 navigable: production phases, scene progress, workflow gates, iterations,
 decisions, blockers, shots, and work waiting for human review.
@@ -206,6 +209,17 @@ versioned template in `examples/demo-project`. The control room listens on
 `http://127.0.0.1:8787` by default. See
 [`docs/milestone-01-production-control-room.md`](docs/milestone-01-production-control-room.md)
 for the scope and project format.
+
+The next milestone is the first canonical write: selecting a take through one
+shared domain command, with atomic filesystem persistence, revision conflicts,
+decision history, CLI/HTTP parity, and UI support. See
+[`docs/milestone-02-canonical-take-selection.md`](docs/milestone-02-canonical-take-selection.md).
+
+Current status, active work, next actions, risks, and validation are tracked in
+[`ai-context/project-status.md`](ai-context/project-status.md). The
+`ai-context/` directory is development memory for building Cine Toaster; it is
+separate from the runtime context and skills used by production agents to make
+films.
 
 The **Transitions** room provides an application-level effect bank with live
 GLSL previews, WebM references, provenance, and AI-facing editorial guidance.

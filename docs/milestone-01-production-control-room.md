@@ -1,5 +1,7 @@
 # Milestone 01: Production Control Room
 
+Status: implemented baseline
+
 The first Cine Toaster milestone answers an operational question: **where is
 the production, what needs attention, and what should happen next?**
 
@@ -89,3 +91,6 @@ operational model. It is not the center of the application.
 
 The first write operation should be a small, real creative decision—most
 likely selecting a take during review—not a general-purpose metadata editor.
+
+That follow-up is specified in
+[`milestone-02-canonical-take-selection.md`](milestone-02-canonical-take-selection.md).

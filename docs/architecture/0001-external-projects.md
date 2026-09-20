@@ -28,10 +28,20 @@ or, when `XDG_CACHE_HOME` is unset:
 The cache can always be deleted and reconstructed from the source directory.
 It is never the exclusive location of creative or production decisions.
 
+Machine-local operational state such as thumbnails, recent-project paths,
+process handles, job recovery records, and agent session handles should follow
+the same placement principle: use platform application data or cache locations,
+keyed by the stable project ID where relevant. Project-scoped does not imply
+stored inside the project directory.
+
+A project-local `.cinetoaster/` directory is not part of the default format.
+Introducing one requires a specific portability or collaboration use case and
+must preserve the rule that deleting it cannot destroy production state.
+
 ## Consequences
 
-- Moving a legacy project creates a new cache until a future project manifest
-  supplies a path-independent project ID.
+- A manifest project ID provides path-independent identity. Moving an
+  unstructured legacy project creates a new cache until it gains such an ID.
 - Search remains fast even for projects containing thousands of files.
 - Unstructured directories can still be inspected through the supporting file
   library without application-specific adapters.
