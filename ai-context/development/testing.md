@@ -28,7 +28,7 @@ or, in the configured environment:
 uv run --with pytest python -m pytest -q
 ```
 
-Both run the same 112 tests. The suite needs no network and no external binary.
+Both run the same 140 tests. The suite needs no network and no external binary.
 
 ## Current inventory
 
@@ -39,6 +39,7 @@ Both run the same 112 tests. The suite needs no network and no external binary.
 | `test_cli_takes.py` | CLI parity, JSON output, exit codes, `check` passing and failing |
 | `test_geometry.py` | geometry parsing, axis, eyeline height, eyeline direction, and sanity checks, including the cases that must produce no finding |
 | `test_assemblies.py` | version snapshots, verdicts and supersession, rollback semantics, refusal to restore a snapshotless or stale version, cut differences |
+| `test_providers.py` | graph patching, keyframe wiring, control resolution, video detection, and every branch of job persistence — all offline |
 | `test_knowledge.py` | frontmatter parsing, layer overrides, rejection of unknown checks and statuses, refuted records, provider claims, coverage arithmetic |
 | `test_project.py`, `test_index.py`, `test_scanner.py`, `test_application.py`, `test_transitions.py`, `test_web.py` | loading, indexing, classification, project identity, transitions, path safety |
 

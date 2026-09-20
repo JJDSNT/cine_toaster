@@ -37,6 +37,10 @@ tags:
 - `web.py` hosts HTTP queries, the command endpoint, the event stream, and
   media;
 - `cli.py` exposes the application entry point;
+- `providers/` is how things get made: `runpod.py` (credentials, transport,
+  persistent jobs), `comfyui.py` (graph patching), `ltx.py` (LTX 2.5
+  image-to-video). Only the data plane lives here; creating pods and volumes is
+  infrastructure work other tools already do;
 - `web_assets/` holds the browser UI: `ui.js` (shared primitives and the single
   command call), `compare.js` (the comparison room), `blockout.js` (the plan
   view), and `app.js` (rooms and navigation).

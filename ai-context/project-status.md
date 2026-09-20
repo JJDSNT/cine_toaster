@@ -70,7 +70,8 @@ Cine Toaster can currently:
 
 Cine Toaster cannot yet:
 
-- generate anything: there is no ComfyUI, RunPod, or other provider adapter;
+- run a generation from the interface: the providers exist but no command or job
+  calls them yet;
 - execute or recover background jobs;
 - persist the multi-project registry or expose project switching in the UI;
 - run project-scoped agents;
@@ -94,6 +95,7 @@ required are all deleted.
 - `CT-0009` — knowledge layer and the eyeline direction check (`done`).
 - `CT-0010` — closed decision loop, assembly versions, staleness (`done`).
 - `CT-0011` — one native format, read the production's YAML directly (`done`).
+- `CT-0012` — generation providers moved into the tool (`done`).
 
 ## Ready next
 
