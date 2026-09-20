@@ -25,6 +25,11 @@ two full normative copies.
 | `0003` | canonical project changes use shared commands | accepted |
 | `0004` | development agents and production agents are separate systems | accepted |
 | `0005` | projects are opened through locators and source adapters | accepted |
+| `0006` | authored files are never rewritten; runtime state lives beside them | accepted, amended by `0010` |
+| `0007` | scene geometry is authored, checkable project state | accepted |
+| `0008` | sequences are the unit a production reviews | accepted |
+| `0009` | accumulated knowledge is evidence-linked data, not documentation | accepted |
+| `0010` | one native format, and it is YAML; no import step | accepted |
 
 When a decision is proposed or superseded, update the ADR and this index in the
 same change. Work records link the decision that affected execution.

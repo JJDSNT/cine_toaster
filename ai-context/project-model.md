@@ -24,8 +24,8 @@ Application
   Project Manager | Jobs | Resources | Agent Runtime | Preferences
                          |
 Project Core
-  Project | Script | Scene | Shot | Take | Asset | Prompt
-  Decision | Human Gate | Workflow | Render
+  Project | Script | Sequence | Scene | Shot | Take | Asset | Prompt
+  Geometry | Decision | Human Gate | Workflow | Render
 ```
 
 Application state is not production truth. A project remains understandable and
@@ -45,24 +45,49 @@ portable without the Cine Toaster application database or caches.
 
 ```text
 project/
-  project.toml
+  project.yaml                    authored: identity, paths, sequences
   story/screenplay.fountain
-  world/characters/
-  world/locations/
-  scenes/<scene>/scene.toml
+  cenas/<scene>/decupagem.yaml    authored: direction, geography, shots
+  cenas/<scene>/state.json        runtime-owned: selections, decisions, versions
+  cenas/<scene>/trabalho/         the takes, as files
   assets/
-  workflows/
   renders/
-  edit/
 ```
 
-The current implementation stores workflow, shot summaries, decisions,
-blockers, and iteration summaries in one `scene.toml` per scene. This is a valid
-small-project format and should evolve through schema versions rather than a
-blind directory migration.
+There is one native format and no import step: the production's own breakdown is
+the scene file (ADR 0010). It holds direction, scene geometry, shots, open
+creative questions and blockers.
+
+Takes are not declared. They are discovered by reading the work directory, so
+the filesystem is the source of truth in the literal sense and no declaration
+can drift from it.
+
+A scene may exist in several variants. The project names the one in production;
+the others stay on disk as history without competing for the scene id.
+
+Authored files are never rewritten by the runtime. Committed decisions live in
+`state.json` beside them. See
+[`ADR 0006`](../docs/architecture/0006-authored-and-runtime-files.md).
 
 Large media remains in ordinary files. Canonical metadata records which media
 belongs to the production and why it was selected.
+
+## Sequences
+
+A sequence is an ordered run of scenes assembled and reviewed as one thing. It
+is declared in `project.toml`, owns no state of its own, and aggregates progress
+and open decisions from its scenes. It is the level at which a production says
+"this part works now". See
+[`ADR 0008`](../docs/architecture/0008-sequences-are-the-review-unit.md).
+
+## Scene geometry
+
+A scene may declare the measured room, where each subject stands, the fixed
+named camera positions, and the line of action. Shots reference a camera by id.
+This is authored state, checkable before generation, and drawable in the
+interface. Heights are optional and the axis is never inferred. See
+[`ADR 0007`](../docs/architecture/0007-scene-geometry-is-project-state.md) and
+[`docs/continuity-checks.md`](../docs/continuity-checks.md).
 
 ## Canonical production state
 
@@ -157,9 +182,14 @@ actor, timestamp, previous selection if any, and optional rationale. Selecting
 a different take creates a new decision or superseding record; it must not erase
 the historical fact without an explicit retention policy.
 
-The existing demo uses take counts rather than concrete take entities. The next
-milestone must introduce the smallest concrete representation required for real
-comparison and selection.
+Takes are concrete entities on the shot that owns them, each with an id, a
+status, optional media and poster references, a note, cost, and a namespaced
+provenance envelope the Core preserves without interpreting. A take with status
+`rejected` is not eligible for selection; the record of why it was rejected is
+the reason to keep it.
+
+Re-selecting the same take with no new rationale is a no-op rather than a fresh
+decision, so the history stays meaningful.
 
 ## Human gates
 

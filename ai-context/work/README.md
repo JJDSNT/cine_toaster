@@ -39,10 +39,15 @@ execution history and links to those destinations.
 
 ## Work queue
 
-- `CT-0002` — implement canonical take selection (`ready`)
+- Empty.
 
 ## Recently completed
 
+- `CT-0011` — one native format, read the production's YAML directly (`done`)
+- `CT-0010` — closed decision loop, assembly versions, staleness (`done`)
+- `CT-0009` — knowledge layer and the eyeline direction check (`done`)
+- `CT-0008` — scene geometry, continuity checks, sequences, live board (`done`)
+- `CT-0002` — implement canonical take selection (`done`)
 - `CT-0007` — prevent runtime projects entering the source repository (`done`)
 - `CT-0006` — add external project locators and the local Project Manager (`done`)
 - `CT-0005` — add the Amiga Demo Reel multi-project fixture (`done`)

@@ -71,15 +71,24 @@ as part of the change.
 
 ## Current state
 
-Cine Toaster currently has a small dependency-free Python runtime, a `toast`
-CLI, a local HTTP control room, a filesystem project loader, a disposable
-SQLite index, a vanilla browser UI, and a transition library. The current UI is
-read-only.
+Cine Toaster has a small dependency-free Python runtime, a `toast` CLI, a local
+HTTP control room, a filesystem project loader, a disposable SQLite index, a
+vanilla browser UI, and a transition library.
 
-The next milestone introduces the first canonical write: selecting a take. It
-must establish the shared command, validation, atomic persistence, decision
-record, and concurrency behavior that later GUI, CLI, API, and agent operations
-will reuse.
+The first canonical write is delivered. `select_take` and `clear_selection` run
+through one shared application command from Core, CLI, HTTP, and the browser,
+with validation, optimistic revisions, typed errors, atomic persistence, a
+durable decision record, and a post-commit event. The UI is no longer read-only:
+alternatives are compared side by side and a choice is committed with its
+rationale.
+
+Three concepts arrived with that slice and shape everything after it: authored
+files are never rewritten (`ADR 0006`), scene geometry is checkable project
+state (`ADR 0007`), and sequences are the unit a production reviews
+(`ADR 0008`).
+
+Nothing generates yet. There is no ComfyUI, RunPod, or other provider adapter,
+and no background job runtime.
 
 ## Execution memory
 

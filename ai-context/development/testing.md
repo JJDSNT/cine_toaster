@@ -19,11 +19,32 @@ tags:
 Run the repository suite with:
 
 ```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -v
+PYTHONPATH=src python3 -m unittest discover -s tests
 ```
 
-The project also supports its configured environment through `uv` when the
-local cache is writable.
+or, in the configured environment:
+
+```bash
+uv run --with pytest python -m pytest -q
+```
+
+Both run the same 112 tests. The suite needs no network and no external binary.
+
+## Current inventory
+
+| File | Covers |
+| --- | --- |
+| `test_commands.py` | commit, supersede, no-op repeat, stale revision, ineligible take, unknown resources, authored file untouched, unrelated state preserved, event on success only, atomic write, future schema version refused |
+| `test_http_commands.py` | HTTP reaches the same command; each domain error maps to its status code; static assets cannot escape the asset root |
+| `test_cli_takes.py` | CLI parity, JSON output, exit codes, `check` passing and failing |
+| `test_geometry.py` | geometry parsing, axis, eyeline height, eyeline direction, and sanity checks, including the cases that must produce no finding |
+| `test_assemblies.py` | version snapshots, verdicts and supersession, rollback semantics, refusal to restore a snapshotless or stale version, cut differences |
+| `test_knowledge.py` | frontmatter parsing, layer overrides, rejection of unknown checks and statuses, refuted records, provider claims, coverage arithmetic |
+| `test_project.py`, `test_index.py`, `test_scanner.py`, `test_application.py`, `test_transitions.py`, `test_web.py` | loading, indexing, classification, project identity, transitions, path safety |
+
+A check that must stay silent is as much a test as one that must fire. The
+geometry suite asserts both, because a continuity checker that reports a correct
+scene is worse than no checker.
 
 ## Test layers
 

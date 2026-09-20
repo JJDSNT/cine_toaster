@@ -31,7 +31,8 @@ work, and the next vertical slice without relying on chat history.
 
 ## Phase 1 — first canonical decision
 
-Status: ready under `CT-0002`.
+Status: delivered under `CT-0002`. Scene geometry, continuity checks,
+sequences, and the live board followed under `CT-0008`.
 
 - Introduce concrete take candidates for a reviewable shot.
 - Implement `select_take` through one application command.
@@ -39,8 +40,12 @@ Status: ready under `CT-0002`.
 - Expose the command through CLI, HTTP, and the existing review UI.
 - Record selection as a durable creative decision.
 
-Exit: GUI, CLI, and API prove one shared production mutation with conflict and
-failure tests.
+Exit: met. GUI, CLI, and API commit through one command, with conflict and
+failure tests across interfaces.
+
+One deviation from the original plan: the command writes a runtime-owned
+`state.json` rather than the authored `scene.toml`
+([`ADR 0006`](../../docs/architecture/0006-authored-and-runtime-files.md)).
 
 ## Phase 2 — application runtime and jobs
 
@@ -73,13 +78,21 @@ and recover from renderer reload without owning domain logic.
 
 ## Phase 4 — preview and comparison
 
-- Add real take assets and proxy strategy.
-- Measure linked playback, seek, stepping, A/B, and side-by-side comparison.
-- Choose the simplest playback stack that meets measured requirements.
-- Do not claim frame accuracy unless the spike proves it.
+Partly delivered ahead of order, because take selection is meaningless without
+something to look at. Side-by-side comparison with grouped play, pause, restart,
+and mute, plus per-take preview on hover, works today against real media served
+with range requests.
 
-Exit: a human can compare real alternatives and commit a selection through the
-same command established in Phase 1.
+Remaining:
+
+- a proxy strategy for large source media;
+- measured linked playback: seek, frame stepping, synchronization error;
+- choose the simplest playback stack that meets the measured requirement.
+
+Nothing here is frame-accurate and it must not be described as such until a
+spike measures it against known media and timecode.
+
+Exit: met for comparison and selection; open for frame-accurate playback.
 
 ## Phase 5 — first production agent
 

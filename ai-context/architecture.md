@@ -194,13 +194,29 @@ Require spikes before adoption:
 
 ## Current implementation map
 
-- `src/cine_toaster/project.py` loads the canonical operational project view.
+- `src/cine_toaster/project.py` reads the production's own YAML files directly --
+  there is no import step -- and overlays committed runtime state on authored
+  intent.
+- `src/cine_toaster/takes.py` discovers a shot's alternatives from the work
+  directory, including rejected ones and the reason in their filename.
+- `src/cine_toaster/commands.py` is the single write boundary. `select_take` and
+  `clear_selection` are reached identically by CLI, HTTP, and the browser.
+- `src/cine_toaster/state.py` owns revisions, selections, decision history, and
+  the atomic commit.
+- `src/cine_toaster/errors.py` defines the typed domain errors every interface
+  reports with the same code.
+- `src/cine_toaster/events.py` records committed events and tails them for live
+  interfaces.
+- `src/cine_toaster/geometry.py` parses scene geometry and runs static
+  continuity checks over it.
 - `src/cine_toaster/application.py` registers external local projects through
   locators and materialized workspaces in an initial in-memory Project Manager.
 - `src/cine_toaster/index.py` builds a disposable external SQLite index.
 - `src/cine_toaster/cli.py` provides the current headless entry point.
-- `src/cine_toaster/web.py` exposes read-only queries and constrained media.
-- `src/cine_toaster/web_assets/` is the current prototype UI.
+- `src/cine_toaster/web.py` exposes queries, `POST /api/commands`, the event
+  stream, and constrained media.
+- `src/cine_toaster/web_assets/` is the current UI, including the comparison
+  room and the plan-view blockout.
 - `src/cine_toaster/transitions.py` is an existing production adapter boundary.
 
 Preserve these working paths while extracting clearer domain and application

@@ -18,8 +18,9 @@ Last updated: 2026-09-20
 
 ## Current phase
 
-Ready to transition from the read-only prototype to the first canonical
-production write.
+The first canonical production write is delivered. Cine Toaster is no longer a
+read-only prototype: a human or an agent can compare registered alternatives and
+commit a decision through one shared command.
 
 ## Product state
 
@@ -32,6 +33,31 @@ Cine Toaster can currently:
 - present a read-only Production Control Room in the browser;
 - preview built-in and project transition assets;
 - operate through the `toast` CLI;
+- register concrete take alternatives per shot, with status, media, note, cost,
+  and preserved provider provenance;
+- commit a take selection through one shared command from Core, CLI, HTTP, or
+  the browser, with revisions, typed errors, atomic writes, and a durable
+  decision history;
+- compare alternatives side by side in the browser and record why one was
+  chosen;
+- read scene geometry and report continuity problems before anything is
+  generated (`toast check`);
+- draw a plan-view blockout of the set, the cameras, and the line of action;
+- group scenes into sequences and report progress at the level a production
+  actually reviews;
+- follow committed decisions live, including decisions made from another
+  terminal;
+- record every assembled version of a scene with the takes it was built from,
+  the author's verdict, and the reason, then roll selections back to any of
+  them and list what differs between two cuts;
+- read a production's own YAML breakdown directly, with no import step, and
+  discover a shot's alternatives — including rejected ones and why — by reading
+  the work directory;
+- record what a production learns as data with dates, evidence, and a link to
+  the check that enforces it, and report how much of it software actually
+  enforces (`toast knowledge`, `toast why`);
+- carry measured provider capability claims that a future generation adapter
+  will read;
 - list and instantiate two independently identified demo productions: The Last
   Signal and Amiga Demo Reel;
 - register multiple arbitrary external local projects simultaneously through an
@@ -44,8 +70,7 @@ Cine Toaster can currently:
 
 Cine Toaster cannot yet:
 
-- mutate production state through a domain command;
-- compare real generated take media and select a take from the UI;
+- generate anything: there is no ComfyUI, RunPod, or other provider adapter;
 - execute or recover background jobs;
 - persist the multi-project registry or expose project switching in the UI;
 - run project-scoped agents;
@@ -55,9 +80,28 @@ Cine Toaster cannot yet:
 
 - No implementation item is currently in `doing` state.
 
+## Closed: scene import
+
+There is no import step. Cine Toaster reads the production's own YAML where it
+lies, and takes are discovered from the work directory rather than declared
+(ADR 0010). The exporter, the generated scene files and the staleness check they
+required are all deleted.
+
+## Delivered
+
+- `CT-0002` — canonical take selection (`done`).
+- `CT-0008` — scene geometry, continuity checks, sequences, live board (`done`).
+- `CT-0009` — knowledge layer and the eyeline direction check (`done`).
+- `CT-0010` — closed decision loop, assembly versions, staleness (`done`).
+- `CT-0011` — one native format, read the production's YAML directly (`done`).
+
 ## Ready next
 
-- `CT-0002` — canonical take selection (`ready`).
+- Phase 2 — application runtime and jobs. The first job should be the one the
+  external production already needs: assemble a sequence from its selected takes
+  with FFmpeg, with progress and cancellation.
+- A generation adapter reading `[[geometry.cameras]]` as camera intent, so a
+  shot can be regenerated from the project rather than from a script.
 
 The recommended next implementation is `select_take`, not a frontend rewrite or
 agent integration. It establishes the mutation boundary that those interfaces

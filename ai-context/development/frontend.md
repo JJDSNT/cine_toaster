@@ -16,12 +16,21 @@ tags:
 
 ## Current UI
 
-The existing vanilla HTML, CSS, and JavaScript control room is a useful product
-prototype. It demonstrates production-oriented rooms, scene navigation, review
-queues, file browsing, media serving, and transition previews.
+The vanilla HTML, CSS, and JavaScript control room now covers production
+rooms, scene navigation, review queues, file browsing, media serving,
+transition previews, sequences, the comparison room, the continuity panel, the
+plan-view blockout, and a live activity feed driven by server-sent events.
 
-Preserve it until a React replacement reaches behavior parity for the migrated
-room. Do not pause the first canonical write merely to create a new frontend.
+It is organized as ES modules: `ui.js` holds the shared primitives and the one
+function that issues a command, `compare.js` the comparison room, `blockout.js`
+the plan view, `app.js` the rooms and navigation. A React migration inherits
+these boundaries rather than a single file.
+
+Every mutation goes through `runCommand` in `ui.js`. No component writes project
+files, and none is allowed to.
+
+Preserve this UI until a React replacement reaches behavior parity for the
+migrated room.
 
 ## Target direction
 
@@ -42,6 +51,9 @@ stays in the headless runtime.
 - Keep the current project and global background activity simultaneously
   visible where useful.
 - Make human gates actionable outside chat.
+- Show alternatives together, never one at a time, and keep the rejected ones
+  reachable with the reason they were rejected.
+- Report a conflict as a reload of newer state, never as a lost edit.
 - Keep agent navigation typed and optional through `Follow Agent`.
 - Display provider identity where operationally relevant without making it the
   domain concept shown to the user.

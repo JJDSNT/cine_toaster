@@ -53,13 +53,14 @@ tags:
 
 - Support the Python version declared in `pyproject.toml`.
 - Prefer standard-library solutions while the runtime remains small, but do not
-  contort important contracts merely to avoid a justified dependency.
+  contort important contracts merely to avoid a justified dependency. PyYAML is
+  the one such dependency so far, taken for the scene format (ADR 0010).
 - Use type annotations, focused immutable dataclasses where useful, and domain
   errors instead of unstructured strings across boundaries.
 - Keep filesystem writes atomic and path resolution constrained to the intended
   project or application-state root.
-- Preserve the dependency-free startup path unless a change explicitly updates
-  packaging and validation.
+- Keep the dependency list short and justified. Each addition names the contract
+  it protects.
 
 ## TypeScript and frontend
 

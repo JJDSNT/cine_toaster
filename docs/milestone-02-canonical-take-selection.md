@@ -1,5 +1,11 @@
 # Milestone 02: Canonical take selection
 
+Status: delivered. Implementation and validation are recorded in
+[`CT-0002`](../ai-context/work/CT-0002-canonical-take-selection.md). One
+acceptance criterion changed during delivery: the command writes a
+runtime-owned `state.json` rather than the authored `scene.toml`, for the
+reasons in [`ADR 0006`](architecture/0006-authored-and-runtime-files.md).
+
 The second milestone introduces Cine Toaster's first production-state write. A
 filmmaker compares registered alternatives for a shot and selects one take. The
 same operation is available through Core, CLI, HTTP, and the existing review UI.
