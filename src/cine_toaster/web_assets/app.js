@@ -1,58 +1,19 @@
+import { drawBlockout } from "./blockout.js";
+import { renderCompare } from "./compare.js";
+import { renderVersions } from "./versions.js";
+import { api, button, byId, el, label, metric, sectionHeading, statusPill, toast } from "./ui.js";
+
 const state = {
   project: null,
   production: null,
   transitions: [],
   currentView: "overview",
   libraryPath: null,
+  sceneId: null,
+  shotId: null,
+  events: [],
+  knowledge: null,
 };
-
-const byId = (id) => document.getElementById(id);
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-};
-
-async function api(path, { optional = false } = {}) {
-  const response = await fetch(path);
-  if (!response.ok) {
-    if (optional) return null;
-    throw new Error(`Request failed: ${response.status}`);
-  }
-  return response.json();
-}
-
-function label(value) {
-  return String(value || "").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function statusPill(status) {
-  return el("span", `status status-${status}`, label(status));
-}
-
-function metric(value, name, detail = "") {
-  const card = el("article", "metric-card");
-  card.append(el("strong", "metric-value", value), el("span", "metric-name", name));
-  if (detail) card.append(el("small", "metric-detail", detail));
-  return card;
-}
-
-function button(text, action, className = "quiet-button") {
-  const node = el("button", className, text);
-  node.type = "button";
-  node.addEventListener("click", action);
-  return node;
-}
-
-function sectionHeading(eyebrow, title, detail = "") {
-  const heading = el("div", "section-heading");
-  const copy = el("div");
-  copy.append(el("span", "eyebrow", eyebrow), el("h2", "", title));
-  if (detail) copy.append(el("p", "section-detail", detail));
-  heading.append(copy);
-  return heading;
-}
 
 function setView(view) {
   state.currentView = view;
@@ -60,10 +21,12 @@ function setView(view) {
     node.classList.toggle("active", node.dataset.view === view);
   });
   if (view === "overview") renderOverview();
+  if (view === "sequences") renderSequences();
   if (view === "scenes") renderScenes();
   if (view === "review") renderReview();
   if (view === "transitions") renderTransitions();
   if (view === "library") renderLibrary(state.project.id);
+  if (view === "knowledge") renderKnowledge();
   byId("workspace").focus();
 }
 
@@ -142,7 +105,36 @@ function renderOverview() {
   const stripHeading = sectionHeading("SCENES", "Production line", "Move through the film by creative unit, not by directory.");
   stripHeading.append(button("All scenes →", () => setView("scenes")));
   sceneStrip.append(stripHeading, compactSceneList(production.scenes));
-  root.append(hero, metrics, phases, columns, sceneStrip);
+  root.append(hero, metrics, phases, columns, sceneStrip, renderActivity());
+}
+
+// What has actually happened, newest first. Committed decisions only: this is
+// not a log of everything the software did.
+function renderActivity() {
+  const panel = el("section", "panel wide-panel");
+  panel.append(
+    sectionHeading("ACTIVITY", "Recent decisions", "Every committed choice, whoever made it."),
+  );
+  const list = el("div", "activity-list");
+  for (const event of state.events.slice(0, 12)) {
+    const payload = event.payload || {};
+    const row = payload.shot_id
+      ? button("", () => openCompare(payload.scene_id, payload.shot_id), "activity-row")
+      : el("div", "activity-row");
+    const when = String(event.occurred_at || "").slice(11, 19);
+    const headline = event.type === "take.cleared"
+      ? `${payload.shot_id} cleared`
+      : `${payload.shot_id} → ${payload.take_id}`;
+    row.append(
+      el("span", "activity-time", when),
+      el("strong", "", headline),
+      el("small", "muted", `${payload.actor?.id || "unknown"}${payload.rationale ? ` · ${payload.rationale}` : ""}`),
+    );
+    list.append(row);
+  }
+  if (!state.events.length) list.append(el("p", "empty-state", "No decisions recorded yet."));
+  panel.append(list);
+  return panel;
 }
 
 function sceneFocus(scene) {
@@ -169,6 +161,77 @@ function compactSceneList(scenes) {
     list.append(card);
   }
   return list;
+}
+
+// A sequence is what the production actually judges as finished or not: a run
+// of scenes assembled and reviewed together. Scenes hold the detail; this is
+// where someone says "this part works now".
+function renderSequences() {
+  if (!state.production) return renderUnstructured();
+  const root = byId("workspace");
+  root.replaceChildren();
+  const heading = sectionHeading(
+    "SEQUENCES",
+    "The film in the parts you review",
+    "Each sequence carries its own assembly and its own verdict.",
+  );
+  heading.classList.add("page-heading");
+  root.append(heading);
+
+  for (const sequence of state.production.sequences) {
+    const panel = el("section", "panel wide-panel");
+    const panelHeading = sectionHeading(
+      sequence.act || sequence.id.toUpperCase(),
+      sequence.label,
+      `${sequence.scene_count} scenes · ${Math.round(sequence.duration_seconds)}s`,
+    );
+    panel.append(panelHeading);
+
+    const facts = el("div", "sequence-facts");
+    facts.append(
+      metric(`${sequence.progress}%`, "Shots decided"),
+      metric(String(sequence.pending_shots), "Awaiting a choice"),
+      metric(String(sequence.open_findings), "Continuity notes"),
+    );
+    panel.append(facts);
+
+    if (sequence.render) {
+      const assembly = el("div", "sequence-assembly");
+      const video = el("video");
+      video.src = `/media/${sequence.render}`;
+      video.controls = true;
+      video.preload = "metadata";
+      assembly.append(video, el("small", "muted", sequence.render));
+      panel.append(assembly);
+    }
+
+    const list = el("div", "shot-list");
+    for (const sceneId of sequence.scene_ids) {
+      const scene = state.production.scenes.find((item) => item.id === sceneId);
+      if (!scene) continue;
+      const row = button("", () => renderScene(scene.id), "shot-row shot-row-open");
+      const copy = el("span", "shot-copy");
+      copy.append(el("b", "", scene.id), el("strong", "", scene.title));
+      row.append(
+        copy,
+        statusPill(scene.status),
+        el("span", "take-count", `${scene.pending_shots.length} open`),
+        el("strong", "selected-take", `${scene.progress}%`),
+      );
+      list.append(row);
+    }
+    panel.append(list);
+    root.append(panel);
+  }
+  if (!state.production.sequences.length) {
+    root.append(
+      el(
+        "p",
+        "empty-state",
+        "No sequences declared. Add [[sequences]] to project.toml to group scenes into reviewable parts.",
+      ),
+    );
+  }
 }
 
 function renderScenes() {
@@ -202,6 +265,8 @@ function renderScenes() {
 async function renderScene(sceneId) {
   const scene = await api(`/api/scene?id=${encodeURIComponent(sceneId)}`);
   state.currentView = "scene";
+  state.sceneId = sceneId;
+  state.shotId = null;
   document.querySelectorAll("[data-view]").forEach((node) => node.classList.remove("active"));
   const root = byId("workspace");
   root.replaceChildren();
@@ -235,25 +300,202 @@ async function renderScene(sceneId) {
   }
   root.append(workflowPanel);
 
+  const continuity = renderContinuity(scene);
+  if (continuity) root.append(continuity);
+
   const columns = el("section", "scene-columns");
   columns.append(renderShots(scene), renderDecisions(scene));
-  root.append(columns, renderIterations(scene));
+  root.append(columns);
+
+  root.append(renderVersions(scene, { onChanged: () => renderScene(sceneId) }));
+
+  const blockout = renderBlockout(scene);
+  if (blockout) root.append(blockout);
+  root.append(renderIterations(scene));
+}
+
+// Continuity problems are read from the scene geometry before anything is
+// generated, because they are cheap to fix on paper and expensive to fix in
+// finished shots.
+function renderContinuity(scene) {
+  if (!scene.findings.length) return null;
+  const panel = el("section", "panel wide-panel continuity-panel");
+  const errors = scene.findings.filter((finding) => finding.severity === "error").length;
+  panel.append(
+    sectionHeading(
+      "CONTINUITY",
+      errors ? `${errors} problem${errors === 1 ? "" : "s"} in the coverage` : "Worth a look",
+      "Checked against the scene geometry, before generation.",
+    ),
+  );
+  const list = el("div", "finding-list");
+  for (const finding of scene.findings) {
+    const card = el("article", `finding-card finding-${finding.severity}`);
+    card.append(statusPill(finding.severity === "error" ? "blocked" : "proposed"));
+    card.append(el("strong", "", label(finding.code)));
+    card.append(el("p", "", finding.message));
+    if (finding.shots.length) card.append(el("small", "muted", `Shots: ${finding.shots.join(", ")}`));
+    const practice = (state.knowledge?.practices || []).find((item) =>
+      item.enforced_by.includes(finding.code),
+    );
+    if (practice) {
+      const why = el("details", "finding-why");
+      const summary = el("summary", "", `Why this matters — ${practice.title}`);
+      why.append(summary, el("p", "", practice.body.split("\n\n")[0]));
+      if (practice.cost) why.append(el("small", "muted", `Cost when missed: ${practice.cost}`));
+      card.append(why);
+    }
+    list.append(card);
+  }
+  panel.append(list);
+  return panel;
+}
+
+// What the production has learned, and how much of it the software enforces.
+// The number that matters is the second one: a rule nobody checks is a rule
+// that depends on someone remembering it at the right moment.
+function renderKnowledge() {
+  const root = byId("workspace");
+  root.replaceChildren();
+  const knowledge = state.knowledge;
+  if (!knowledge) {
+    root.append(el("p", "empty-state", "No knowledge records are available for this project."));
+    return;
+  }
+  const report = knowledge.coverage;
+  const heading = sectionHeading(
+    "KNOWLEDGE",
+    "What we know, and what is enforced",
+    "A practice with no check behind it still depends on a person remembering.",
+  );
+  heading.classList.add("page-heading");
+  root.append(heading);
+
+  const facts = el("section", "sequence-facts");
+  facts.append(
+    metric(`${report.percentage}%`, "Practices enforced", `${report.enforced} of ${report.practices}`),
+    metric(String(report.unenforced.length), "Depend on a person"),
+    metric(`${report.measured_claims}/${report.claims}`, "Provider claims measured"),
+  );
+  root.append(facts);
+
+  const practicePanel = el("section", "panel wide-panel");
+  practicePanel.append(sectionHeading("PRACTICES", "Rules this production learned"));
+  for (const practice of knowledge.practices) {
+    const card = el("article", `finding-card finding-${practice.enforced ? "ok" : "warning"}`);
+    const head = el("div", "take-head");
+    head.append(
+      statusPill(practice.enforced ? "approved" : "waiting"),
+      el("strong", "", practice.title),
+      el("small", "muted", practice.domain),
+    );
+    card.append(head);
+    const why = el("details", "finding-why");
+    why.append(el("summary", "", practice.enforced
+      ? `Checked by ${practice.enforced_by.join(", ")}`
+      : "Not checked by anything yet"));
+    why.append(el("p", "", practice.body));
+    if (practice.cost) why.append(el("small", "muted", `Cost when missed: ${practice.cost}`));
+    if (practice.evidence.length) why.append(el("small", "muted", `Evidence: ${practice.evidence.join(", ")}`));
+    card.append(why);
+    practicePanel.append(card);
+  }
+  root.append(practicePanel);
+
+  for (const profile of knowledge.providers) {
+    const panel = el("section", "panel wide-panel");
+    panel.append(
+      sectionHeading(
+        "PROVIDER",
+        `${profile.title}${profile.version ? ` ${profile.version}` : ""}`,
+        profile.measured_with || "Measured on this production.",
+      ),
+    );
+    const list = el("div", "finding-list");
+    for (const claim of profile.claims) {
+      const card = el("article", `finding-card finding-${claim.impact === "high" ? "error" : "warning"}`);
+      const head = el("div", "take-head");
+      head.append(
+        statusPill(claim.status === "measured" ? "approved" : "proposed"),
+        el("small", "muted", claim.measured_on || ""),
+        el("small", "muted", `impact ${claim.impact}`),
+      );
+      card.append(head, el("p", "", claim.claim));
+      if (claim.workaround) card.append(el("small", "muted", `Do this instead: ${claim.workaround}`));
+      if (claim.evidence.length) card.append(el("small", "muted", `Evidence: ${claim.evidence.join(", ")}`));
+      list.append(card);
+    }
+    panel.append(list);
+    root.append(panel);
+  }
+}
+
+function renderBlockout(scene) {
+  const geometry = scene.geometry;
+  if (!geometry || !geometry.room) return null;
+  const panel = el("section", "panel wide-panel");
+  panel.append(
+    sectionHeading(
+      "BLOCKOUT",
+      "Where the cameras are",
+      "A plan of the set: subjects, fixed camera positions, and the line of action.",
+    ),
+  );
+  const canvas = el("canvas", "blockout-canvas");
+  panel.append(canvas);
+  const legend = el("div", "blockout-legend");
+  for (const camera of geometry.cameras) {
+    const shots = scene.shots.filter((shot) => shot.camera === camera.id).map((shot) => shot.id);
+    const item = el("span", "blockout-legend-item");
+    item.append(el("b", "", camera.id), el("small", "", camera.label));
+    if (shots.length) item.append(el("em", "", shots.join(", ")));
+    legend.append(item);
+  }
+  panel.append(legend);
+  // The canvas needs its measured width, so draw once it is in the document.
+  requestAnimationFrame(() => drawBlockout(canvas, geometry, { findings: scene.findings }));
+  return panel;
 }
 
 function renderShots(scene) {
   const panel = el("article", "panel");
-  panel.append(sectionHeading("SHOTS", `${scene.shots.length} planned shots`, "Selection state and available takes."));
+  panel.append(sectionHeading("SHOTS", `${scene.shots.length} planned shots`, "Open a shot to compare its alternatives."));
   const list = el("div", "shot-list");
   for (const shot of scene.shots) {
-    const row = el("div", "shot-row");
+    const row = shot.take_count
+      ? button("", () => openCompare(scene.id, shot.id), "shot-row shot-row-open")
+      : el("div", "shot-row");
     const copy = el("span", "shot-copy");
     copy.append(el("b", "", shot.id), el("strong", "", shot.label));
-    row.append(copy, statusPill(shot.status), el("span", "take-count", `${shot.takes} takes`), el("strong", "selected-take", shot.selected_take || "—"));
+    row.append(
+      copy,
+      statusPill(shot.status),
+      el("span", "take-count", `${shot.take_count} take${shot.take_count === 1 ? "" : "s"}`),
+      el("strong", "selected-take", shot.selected_take || "—"),
+    );
     list.append(row);
   }
   if (!scene.shots.length) list.append(el("p", "empty-state", "Shots have not been broken down yet."));
   panel.append(list);
   return panel;
+}
+
+async function openCompare(sceneId, shotId) {
+  const scene = await api(`/api/scene?id=${encodeURIComponent(sceneId)}`);
+  const shot = scene.shots.find((item) => item.id === shotId);
+  if (!shot) return renderScene(sceneId);
+  state.currentView = "compare";
+  state.sceneId = sceneId;
+  state.shotId = shotId;
+  document.querySelectorAll("[data-view]").forEach((node) => node.classList.remove("active"));
+  renderCompare(byId("workspace"), scene, shot, {
+    onBack: () => renderScene(sceneId),
+    onChanged: async () => {
+      state.production = await api("/api/production", { optional: true });
+      updateChrome();
+      await openCompare(sceneId, shotId);
+    },
+  });
 }
 
 function renderDecisions(scene) {
@@ -302,8 +544,13 @@ function renderReview() {
     for (const shot of scene.shots.filter((entry) => entry.status === "needs_review")) {
       const card = el("article", "review-card");
       const visual = el("div", "review-placeholder");
-      visual.append(el("span", "", shot.id), el("strong", "", `${shot.takes} candidates`));
-      card.append(visual, el("strong", "", shot.label), el("small", "", "No take selected"), button("Compare candidates", () => renderScene(scene.id), "primary-button"));
+      visual.append(el("span", "", shot.id), el("strong", "", `${shot.take_count} candidates`));
+      card.append(
+        visual,
+        el("strong", "", shot.label),
+        el("small", "", "No take selected"),
+        button("Compare candidates", () => openCompare(scene.id, shot.id), "primary-button"),
+      );
       cards.append(card);
     }
     panel.append(cards);
@@ -619,19 +866,63 @@ async function runSearch(query) {
   if (!results.length) root.append(el("p", "empty-state", "No matches."));
 }
 
-async function start() {
-  [state.project, state.production, state.transitions] = await Promise.all([
-    api("/api/project"),
-    api("/api/production", { optional: true }),
-    api("/api/transitions"),
-  ]);
+function updateChrome() {
   byId("project-name").textContent = state.production?.title || state.project.name;
   byId("project-root").textContent = state.project.root;
   byId("project-format").textContent = state.production?.format || "UNSTRUCTURED";
   byId("project-phase").textContent = label(state.production?.production?.current_phase || "Library only");
   byId("scene-nav-count").textContent = state.production?.metrics.total_scenes || 0;
-  byId("review-nav-count").textContent = state.production?.metrics.attention_items || 0;
+  byId("sequence-nav-count").textContent = state.production?.metrics.total_sequences || 0;
+  byId("knowledge-nav-count").textContent = state.knowledge?.coverage.practices || 0;
+  byId("review-nav-count").textContent = state.production?.metrics.pending_shots ?? state.production?.metrics.attention_items ?? 0;
   byId("transition-nav-count").textContent = state.transitions.length;
+}
+
+// A decision committed from the CLI, an agent, or a second window is the same
+// event as one made here, so the open interface follows it instead of going
+// stale.
+async function refreshFromEvent(event) {
+  state.events = [event, ...state.events].slice(0, 40);
+  state.production = await api("/api/production", { optional: true });
+  updateChrome();
+  if (state.currentView === "compare" && state.sceneId && state.shotId) {
+    await openCompare(state.sceneId, state.shotId);
+  } else if (state.currentView === "scene" && state.sceneId) {
+    await renderScene(state.sceneId);
+  } else if (state.currentView === "overview") {
+    renderOverview();
+  } else if (state.currentView === "review") {
+    renderReview();
+  }
+}
+
+function startEventStream() {
+  const source = new EventSource("/api/events/stream");
+  source.addEventListener("message", (message) => {
+    let event;
+    try {
+      event = JSON.parse(message.data);
+    } catch {
+      return;
+    }
+    refreshFromEvent(event).catch(() => {});
+  });
+  source.addEventListener("error", () => {
+    // EventSource reconnects on its own; the stream is capped server-side so a
+    // long session reconnects periodically by design.
+  });
+}
+
+async function start() {
+  [state.project, state.production, state.transitions, state.events] = await Promise.all([
+    api("/api/project"),
+    api("/api/production", { optional: true }),
+    api("/api/transitions"),
+    api("/api/events?limit=25", { optional: true }).then((value) => (value || []).reverse()),
+  ]);
+  state.knowledge = await api("/api/knowledge", { optional: true });
+  updateChrome();
+  startEventStream();
   const parameters = new URLSearchParams(window.location.search);
   const requestedTransition = parameters.get("transition");
   if (requestedTransition && state.transitions.some((item) => item.id === requestedTransition)) {
@@ -639,7 +930,17 @@ async function start() {
     return;
   }
   const requestedView = parameters.get("view");
-  const availableViews = new Set(["overview", "scenes", "review", "transitions", "library"]);
+  const availableViews = new Set(["overview", "sequences", "scenes", "review", "transitions", "library", "knowledge"]);
+  const requestedScene = parameters.get("scene");
+  const requestedShot = parameters.get("shot");
+  if (requestedScene && requestedShot) {
+    openCompare(requestedScene, requestedShot);
+    return;
+  }
+  if (requestedScene) {
+    renderScene(requestedScene);
+    return;
+  }
   const initialView = requestedView && availableViews.has(requestedView)
     ? requestedView
     : state.production ? "overview" : "library";

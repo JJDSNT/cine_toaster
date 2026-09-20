@@ -3,14 +3,24 @@ from __future__ import annotations
 import json
 import mimetypes
 import re
+import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
+from .commands import dispatch
+from .errors import CineToasterError, ValidationError
+from .events import read_events, tail_events
 from .index import ProjectIndex
+from .knowledge import coverage, load_practices, load_providers
 from .project import ProjectFormatError, load_production, load_scene
 from .transitions import list_transitions, public_transition, transition_asset_path
+
+
+MAX_COMMAND_BODY_BYTES = 64 * 1024
+STREAM_POLL_SECONDS = 0.5
+STREAM_MAX_SECONDS = 300
 
 
 ASSET_ROOT = Path(__file__).with_name("web_assets")
@@ -50,8 +60,9 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def _send_static(self, name: str) -> None:
-        path = ASSET_ROOT / name
-        if not path.is_file():
+        candidate = _safe_project_path(ASSET_ROOT, name)
+        path = candidate if candidate is not None else ASSET_ROOT / name
+        if candidate is None or not path.is_file():
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         payload = path.read_bytes()
@@ -125,6 +136,87 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             transition_asset_path(transition_id, filename, self.project_root)
         )
 
+    def _read_json_body(self) -> dict:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError as error:
+            raise ValidationError("Content-Length must be an integer") from error
+        if length <= 0:
+            raise ValidationError("A command needs a JSON body")
+        if length > MAX_COMMAND_BODY_BYTES:
+            raise ValidationError("Command body is too large")
+        raw = self.rfile.read(length)
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValidationError(f"Command body is not valid JSON: {error}") from error
+        if not isinstance(payload, dict):
+            raise ValidationError("A command body must be a JSON object")
+        return payload
+
+    def _handle_command(self) -> None:
+        """Run one application command.
+
+        The handler translates HTTP into a command call and back. It contains no
+        domain rules of its own, so the CLI and the browser cannot diverge.
+        """
+
+        try:
+            payload = self._read_json_body()
+            command_type = str(payload.get("command", "")).strip()
+            if not command_type:
+                raise ValidationError("A command name is required")
+            result = dispatch(self.project_root, command_type, payload)
+        except CineToasterError as error:
+            self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
+        except ProjectFormatError as error:
+            self._send_json(
+                {"error": {"code": "invalid_project", "message": str(error)}},
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+            )
+            return
+        self._send_json(result.public_dict())
+
+    def _stream_events(self, parsed) -> None:
+        """Push committed events to the browser so the board stays live.
+
+        The log is tailed from disk rather than from memory, so a selection made
+        from the CLI in another terminal shows up in the open interface too.
+        """
+
+        query = parse_qs(parsed.query)
+        try:
+            offset = int(query.get("offset", ["-1"])[0])
+        except ValueError:
+            offset = -1
+        if offset < 0:
+            _, offset = read_events(self.project_root)
+
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "close")
+        self.end_headers()
+
+        deadline = time.monotonic() + STREAM_MAX_SECONDS
+        try:
+            self.wfile.write(b": connected\n\n")
+            self.wfile.flush()
+            while time.monotonic() < deadline:
+                events, offset = read_events(self.project_root, offset=offset)
+                for event in events:
+                    payload = json.dumps(event, ensure_ascii=False)
+                    self.wfile.write(f"data: {payload}\n\n".encode("utf-8"))
+                if events:
+                    self.wfile.flush()
+                else:
+                    self.wfile.write(b": keep-alive\n\n")
+                    self.wfile.flush()
+                time.sleep(STREAM_POLL_SECONDS)
+        except (BrokenPipeError, ConnectionResetError):
+            return
+
     def _handle_api(self, parsed) -> None:
         query = parse_qs(parsed.query)
         if parsed.path == "/api/transitions":
@@ -177,6 +269,40 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             self._send_json(scene)
             return
 
+        if parsed.path == "/api/events":
+            try:
+                limit = int(query.get("limit", ["50"])[0])
+            except ValueError:
+                limit = 50
+            self._send_json(tail_events(self.project_root, limit=limit))
+            return
+
+        if parsed.path == "/api/findings":
+            try:
+                production = load_production(self.project_root)
+            except (FileNotFoundError, ProjectFormatError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json(
+                [
+                    {**finding, "scene_title": scene["title"]}
+                    for scene in production["scenes"]
+                    for finding in scene["findings"]
+                ]
+            )
+            return
+
+        if parsed.path == "/api/knowledge":
+            root = self.project_root
+            self._send_json(
+                {
+                    "coverage": coverage(root).public_dict(),
+                    "practices": [item.public_dict() for item in load_practices(root)],
+                    "providers": [item.public_dict() for item in load_providers(root)],
+                }
+            )
+            return
+
         if parsed.path == "/api/project":
             self._send_json(self.project_index.summary().public_dict())
             return
@@ -214,16 +340,29 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         self._send_json({"error": "Unknown endpoint"}, HTTPStatus.NOT_FOUND)
 
     def do_HEAD(self) -> None:  # noqa: N802
+        if urlparse(self.path).path == "/api/events/stream":
+            # A HEAD request must not open a long-lived stream.
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.end_headers()
+            return
         self.do_GET()
+
+    def do_POST(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/commands":
+            self._handle_command()
+            return
+        self.send_error(HTTPStatus.NOT_FOUND)
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         if parsed.path == "/":
             self._send_static("index.html")
-        elif parsed.path == "/static/app.js":
-            self._send_static("app.js")
-        elif parsed.path == "/static/style.css":
-            self._send_static("style.css")
+        elif parsed.path.startswith("/static/"):
+            self._send_static(parsed.path.removeprefix("/static/"))
+        elif parsed.path == "/api/events/stream":
+            self._stream_events(parsed)
         elif parsed.path.startswith("/api/"):
             self._handle_api(parsed)
         elif parsed.path.startswith("/media/"):
