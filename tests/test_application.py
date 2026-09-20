@@ -15,15 +15,14 @@ from cine_toaster.application import (
 
 def write_external_project(root: Path, project_id: str, title: str) -> None:
     root.mkdir(parents=True)
-    (root / "project.toml").write_text(
+    (root / "project.yaml").write_text(
         "\n".join(
             [
-                "schema_version = 1",
-                f'id = "{project_id}"',
-                f'title = "{title}"',
-                "",
-                "[paths]",
-                'scenes = "scenes"',
+                "schema_version: 1",
+                f"id: {project_id}",
+                f"titulo: {title}",
+                "caminhos:",
+                "  cenas: cenas",
             ]
         ),
         encoding="utf-8",

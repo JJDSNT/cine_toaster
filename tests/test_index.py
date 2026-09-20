@@ -15,12 +15,12 @@ class IndexTests(unittest.TestCase):
         base = Path(self.temporary.name)
         self.root = base / "project"
         self.cache = base / "cache"
-        (self.root / "scenes" / "010-opening").mkdir(parents=True)
-        (self.root / "project.toml").write_text(
-            'id = "demo"\ntitle = "Demo"\n', encoding="utf-8"
+        (self.root / "cenas" / "010-opening").mkdir(parents=True)
+        (self.root / "project.yaml").write_text(
+            "id: demo\ntitulo: Demo\n", encoding="utf-8"
         )
-        (self.root / "scenes" / "010-opening" / "scene.toml").write_text(
-            'id = "SC-010"\ntitle = "Opening"\nsummary = "Keep the eyeline right."\n',
+        (self.root / "cenas" / "010-opening" / "decupagem.yaml").write_text(
+            "cena: SC-010\ntitulo: Opening\nsituacao: Keep the eyeline right.\n",
             encoding="utf-8",
         )
         self.environment = patch.dict(os.environ, {"XDG_CACHE_HOME": str(self.cache)})

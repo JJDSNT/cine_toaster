@@ -90,7 +90,7 @@ class DemoCommandTests(unittest.TestCase):
                 )
 
             self.assertEqual(result, 0)
-            self.assertTrue((destination / "project.toml").is_file())
+            self.assertTrue((destination / "project.yaml").is_file())
 
 
 if __name__ == "__main__":
