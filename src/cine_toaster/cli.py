@@ -11,7 +11,8 @@ from .model import ProjectItem
 from .web import serve_project
 
 
-SOURCE_EXAMPLES = Path(__file__).parents[2] / "examples"
+SOURCE_REPOSITORY_ROOT = Path(__file__).parents[2]
+SOURCE_EXAMPLES = SOURCE_REPOSITORY_ROOT / "examples"
 PACKAGED_DEMO_PROJECTS = Path(__file__).with_name("demo_projects")
 DEFAULT_DEMO_TEMPLATE = "the-last-signal"
 DEMO_TEMPLATES = {
@@ -32,6 +33,21 @@ def demo_template_path(template_id: str) -> Path:
     template = DEMO_TEMPLATES[template_id]
     source = template["source"]
     return source if source.is_dir() else template["packaged"]
+
+
+def _source_checkout_root() -> Path | None:
+    root = SOURCE_REPOSITORY_ROOT.resolve()
+    if (root / ".git").exists() and (root / "pyproject.toml").is_file():
+        return root
+    return None
+
+
+def _is_within(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+    except ValueError:
+        return False
+    return True
 
 
 def _human_size(size: int) -> str:
@@ -150,6 +166,20 @@ def command_demo(args: argparse.Namespace) -> int:
     if destination.exists():
         print(f"Destination already exists: {destination}", file=sys.stderr)
         return 2
+    checkout = _source_checkout_root()
+    if (
+        checkout is not None
+        and _is_within(destination, checkout)
+        and not args.allow_inside_repository
+    ):
+        print(
+            "Refusing to create a runtime project inside the Cine Toaster "
+            f"source repository: {destination}\n"
+            "Choose a destination outside the checkout or pass "
+            "--allow-inside-repository for intentional fixture development.",
+            file=sys.stderr,
+        )
+        return 2
     template = DEMO_TEMPLATES[args.template]
     source = demo_template_path(args.template)
     if not source.is_dir():
@@ -219,6 +249,11 @@ def build_parser() -> argparse.ArgumentParser:
         dest="list_templates",
         action="store_true",
         help="List available demo templates",
+    )
+    demo_parser.add_argument(
+        "--allow-inside-repository",
+        action="store_true",
+        help="Allow intentional creation inside the Cine Toaster source checkout",
     )
     demo_parser.set_defaults(function=command_demo)
 

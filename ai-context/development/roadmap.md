@@ -46,7 +46,8 @@ failure tests.
 
 - Use The Last Signal and Amiga Demo Reel as independent fixtures for Project
   Manager identity, active-project switching, and job isolation tests.
-- Add Project Manager registration by stable project ID.
+- Extend the initial local Project Manager with a durable operational registry,
+  explicit relocation, and per-interface active-project selection.
 - Add a durable operational store outside project directories.
 - Implement a minimal FFmpeg job with progress, cancellation, reconciliation,
   and explicit result staging/adoption.
@@ -54,6 +55,10 @@ failure tests.
 
 Exit: background work survives navigation and renderer lifecycle according to
 the documented job contract.
+
+Foundation already delivered: local project locators, direct external-directory
+materialization, simultaneous in-memory registration, idempotent reopen, stable
+manifest identity after movement, and duplicate-ID conflict detection.
 
 ## Phase 3 — React and desktop shell
 

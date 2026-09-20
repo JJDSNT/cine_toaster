@@ -195,6 +195,8 @@ Require spikes before adoption:
 ## Current implementation map
 
 - `src/cine_toaster/project.py` loads the canonical operational project view.
+- `src/cine_toaster/application.py` registers external local projects through
+  locators and materialized workspaces in an initial in-memory Project Manager.
 - `src/cine_toaster/index.py` builds a disposable external SQLite index.
 - `src/cine_toaster/cli.py` provides the current headless entry point.
 - `src/cine_toaster/web.py` exposes read-only queries and constrained media.

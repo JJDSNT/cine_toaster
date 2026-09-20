@@ -78,6 +78,15 @@ tags:
 - Add fixtures and migration tests before requiring a new canonical field.
 - Preserve unknown namespaced provider provenance when reading and writing.
 
+## Repository and production separation
+
+- Runtime film projects live outside the Cine Toaster source checkout.
+- Built-in templates and intentional test fixtures are the only project-shaped
+  directories normally versioned with the application.
+- Use `--allow-inside-repository` only for deliberate fixture development.
+- A production may have its own independent Git repository; do not confuse that
+  repository with the Cine Toaster application repository.
+
 ## Dependencies
 
 - Do not add a library because it appears in an architecture candidate list.

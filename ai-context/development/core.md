@@ -18,6 +18,8 @@ tags:
 
 The Python package currently combines several early concerns:
 
+- `application.py` owns local project locators, materialization, and the initial
+  multi-project registry;
 - `project.py` loads the production manifest and scene manifests;
 - `model.py` defines index-facing data transfer objects;
 - `index.py` owns the disposable SQLite index;
@@ -65,6 +67,12 @@ to an interface session, not a module-level global.
 When multi-project support is introduced, APIs accept `project_id` and resolve
 it through the Project Manager. A stable manifest ID, not the filesystem path,
 is used to associate operational state.
+
+The initial in-memory manager implements this identity boundary for local
+projects. Persistence, recent-project history, source synchronization, file
+watching, and per-interface active selection remain Application Layer work.
+Storage-source behavior follows
+[`SPEC-0002`](../specs/SPEC-0002-project-sources.md).
 
 ## Events
 

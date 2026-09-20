@@ -24,6 +24,7 @@ two full normative copies.
 | `0002` | the application uses a headless runtime outside the renderer | accepted |
 | `0003` | canonical project changes use shared commands | accepted |
 | `0004` | development agents and production agents are separate systems | accepted |
+| `0005` | projects are opened through locators and source adapters | accepted |
 
 When a decision is proposed or superseded, update the ADR and this index in the
 same change. Work records link the decision that affected execution.

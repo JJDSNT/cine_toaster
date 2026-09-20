@@ -43,6 +43,8 @@ execution history and links to those destinations.
 
 ## Recently completed
 
+- `CT-0007` — prevent runtime projects entering the source repository (`done`)
+- `CT-0006` — add external project locators and the local Project Manager (`done`)
 - `CT-0005` — add the Amiga Demo Reel multi-project fixture (`done`)
 - `CT-0004` — specify scoped provider session bindings (`done`)
 - `CT-0003` — standardize `ai-context/` frontmatter (`done`)

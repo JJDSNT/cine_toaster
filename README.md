@@ -61,6 +61,12 @@ reason to duplicate or rewrite Project Core behavior. See
 [`ai-context/architecture.md`](ai-context/architecture.md) and the accepted
 decisions in [`docs/architecture/`](docs/architecture/).
 
+The Application Layer now includes an initial in-memory Project Manager. It can
+register multiple arbitrary local projects from unrelated paths, preserves
+manifest identity across moves, and rejects two open locations claiming the same
+project ID. Persisted recent projects, UI switching, jobs, and remote source
+synchronization remain future work.
+
 ## Project Model
 
 A Cine Toaster project is a self-contained, filesystem-based production.
@@ -168,6 +174,12 @@ toast find ~/cine-toaster-projects/the-last-signal "continuity"
 `toast demo DESTINATION` creates The Last Signal by default. Demo templates are
 independent productions with stable project IDs; list them with `toast demo
 --list` and select another with `--template`.
+
+Runtime productions belong outside the Cine Toaster source checkout. The demo
+command refuses an in-repository destination by default. The
+`--allow-inside-repository` override exists only for intentional fixture
+development; conventional local directories such as `/projects/` and
+`/local-projects/` are ignored as an additional safeguard.
 
 The intended operational vocabulary will grow from the same project core:
 

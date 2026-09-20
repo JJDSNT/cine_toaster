@@ -37,6 +37,7 @@ work is tracked separately under `ai-context/work/`.
 | ID | Contract | Status | Implementation |
 | --- | --- | --- | --- |
 | `SPEC-0001` | scoped production-agent threads and provider session bindings | accepted | planned |
+| `SPEC-0002` | project locators, sources, and materialized workspaces | accepted | partial |
 
 ## Rule
 
