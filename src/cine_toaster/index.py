@@ -19,10 +19,23 @@ def cache_root() -> Path:
     return base / "cine-toaster" / "projects"
 
 
-def index_path_for(root: Path) -> Path:
+def workspace_key(root: Path) -> str:
+    """Stable cache key for one project location.
+
+    Operational state is keyed by location rather than project id so a cache
+    can be built before any manifest is parsed.
+    """
+
     resolved = str(root.expanduser().resolve()).encode("utf-8")
-    key = hashlib.blake2s(resolved, digest_size=10).hexdigest()
-    return cache_root() / key / "index.sqlite"
+    return hashlib.blake2s(resolved, digest_size=10).hexdigest()
+
+
+def workspace_cache_dir(root: Path) -> Path:
+    return cache_root() / workspace_key(root)
+
+
+def index_path_for(root: Path) -> Path:
+    return workspace_cache_dir(root) / "index.sqlite"
 
 
 def _connect(path: Path, *, readonly: bool = False) -> sqlite3.Connection:

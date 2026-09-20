@@ -1,0 +1,12 @@
+schema_version: 1
+id: amiga-demo-reel
+titulo: Amiga Demo Reel
+formato: Demo reel · 90 seconds
+logline: A second production, used to prove that two projects stay independent.
+
+caminhos:
+  cenas: cenas
+
+producao:
+  fase: producao
+  cena_ativa: SC-020

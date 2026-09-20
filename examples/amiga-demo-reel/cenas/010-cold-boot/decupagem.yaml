@@ -1,0 +1,8 @@
+cena: SC-010
+ordem: 10
+titulo: Cold Boot
+planos:
+  - n: 1
+    tipo: preto
+    dur: 2
+    plano: Tela preta antes do boot.

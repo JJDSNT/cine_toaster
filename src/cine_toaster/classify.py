@@ -32,6 +32,7 @@ DOCUMENT_EXTENSIONS = {".epub", ".fdx", ".odt", ".pdf"}
 
 CATEGORY_KINDS = {
     "assets": "assets",
+    "cenas": "scenes",
     "characters": "characters",
     "docs": "documents",
     "edit": "edit",
@@ -79,18 +80,20 @@ def classify(relative_path: str, *, is_directory: bool) -> tuple[str, str | None
     if len(parts) == 1 and is_directory:
         return CATEGORY_KINDS.get(lower_parts[0], "directory"), None
 
-    if lower_parts[0] == "scenes":
+    if lower_parts[0] in {"scenes", "cenas"}:
         if len(parts) == 2 and is_directory:
             return "scene_directory", None
-        if "shots" in lower_parts:
+        if "trabalho" in lower_parts or "shots" in lower_parts:
             return ("shots", None) if is_directory else ("shot_asset", media_type)
-        if "iterations" in lower_parts:
-            return ("iterations", None) if is_directory else ("iteration_asset", media_type)
-        if path.name.lower() == "scene.toml":
-            return "scene_manifest", media_type
+        if "_tomadas" in lower_parts or "_descartados" in lower_parts:
+            return ("takes", None) if is_directory else ("take_asset", media_type)
 
-    if path.name.lower() == "project.toml":
+    if path.name.lower() == "decupagem.yaml":
+        return "scene_manifest", media_type
+    if path.name.lower() == "project.yaml":
         return "project_manifest", media_type
+    if path.name.lower() == "state.json":
+        return "scene_state", media_type
 
     if path.suffix.lower() == ".fountain":
         return "screenplay_document", media_type

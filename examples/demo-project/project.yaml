@@ -1,0 +1,21 @@
+# A Cine Toaster production is a directory of YAML the runtime reads directly.
+# There is no import step and no generated copy: these files are the production.
+schema_version: 1
+id: the-last-signal
+titulo: The Last Signal
+formato: Short film · 8 minutes
+logline: A lone radio astronomer hears a reply hidden inside the final broadcast from Earth.
+
+caminhos:
+  cenas: cenas
+  roteiro: story/screenplay.fountain
+
+producao:
+  fase: producao
+  cena_ativa: SC-030
+
+sequencias:
+  - id: the-reply
+    rotulo: The Reply
+    ato: Act II
+    cenas: ["SC-010", "SC-030"]

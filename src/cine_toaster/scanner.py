@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import os
-import tomllib
 from collections.abc import Iterator
 from pathlib import Path, PurePosixPath
+
+import yaml
 
 from .classify import TEXT_EXTENSIONS, classify
 from .model import ProjectItem
@@ -16,12 +17,13 @@ MAX_TEXT_BYTES = 2 * 1024 * 1024
 
 def project_id_for(root: Path) -> str:
     root = root.expanduser().resolve()
-    manifest = root / "project.toml"
+    manifest = root / "project.yaml"
     if manifest.is_file():
         try:
-            with manifest.open("rb") as handle:
-                project_id = tomllib.load(handle).get("id")
-        except (OSError, tomllib.TOMLDecodeError):
+            with manifest.open(encoding="utf-8") as handle:
+                document = yaml.safe_load(handle) or {}
+            project_id = document.get("id") if isinstance(document, dict) else None
+        except (OSError, yaml.YAMLError):
             project_id = None
         if project_id not in (None, ""):
             return str(project_id)
@@ -36,7 +38,7 @@ def item_id_for(project_id: str, relative_path: str) -> str:
 
 
 def detect_adapter(root: Path) -> str:
-    if (root / "project.toml").is_file():
+    if (root / "project.yaml").is_file():
         return "cine-toaster"
     return "generic"
 

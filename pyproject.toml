@@ -9,7 +9,10 @@ description = "Open, filesystem-first production environment for AI filmmaking"
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "Cine Toaster contributors" }]
-dependencies = []
+# The scene format is YAML: the production's breakdown is deeply nested and
+# carries prose, which TOML punishes. Conventions allow a justified dependency
+# rather than contorting an important contract to avoid one.
+dependencies = ["pyyaml>=6"]
 
 [project.scripts]
 toast = "cine_toaster.cli:main"
