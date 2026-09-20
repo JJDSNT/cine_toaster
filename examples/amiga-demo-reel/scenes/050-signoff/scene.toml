@@ -1,0 +1,40 @@
+id = "SC-050"
+order = 50
+title = "Sign-off Over the Grid Ocean"
+sequence = "Sequence 03 · Broadcast"
+status = "not_started"
+current_step = "script"
+iteration = 1
+duration_seconds = 26
+updated_at = "2026-09-15"
+summary = "The restored worlds fold into one emblem above a sunrise grid ocean."
+
+[[workflow]]
+id = "script"
+label = "Script"
+status = "waiting"
+[[workflow]]
+id = "breakdown"
+label = "Breakdown"
+status = "waiting"
+[[workflow]]
+id = "references"
+label = "References"
+status = "waiting"
+[[workflow]]
+id = "generation"
+label = "Generation"
+status = "waiting"
+[[workflow]]
+id = "review"
+label = "Review"
+status = "waiting"
+[[workflow]]
+id = "edit"
+label = "Edit"
+status = "waiting"
+
+[[decisions]]
+question = "Should the final emblem resolve cleanly or remain partially abstract?"
+status = "open"
+answer = ""

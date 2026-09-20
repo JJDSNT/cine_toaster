@@ -1,0 +1,11 @@
+id = "CHAR-001"
+name = "Nova"
+role = "Pixel pilot"
+status = "approved"
+description = "An optimistic explorer assembled from sharp pixels, mirrored fabric, and bands of electric color."
+
+continuity = [
+  "Cyan visor remains opaque until SC-040",
+  "Magenta stripe always crosses the left shoulder",
+  "Chrome flight disk appears from SC-020 through SC-030",
+]

@@ -18,9 +18,8 @@ toast = "cine_toaster.cli:main"
 packages = ["src/cine_toaster"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"src/cine_toaster/web_assets" = "cine_toaster/web_assets"
-"src/cine_toaster/transition_assets" = "cine_toaster/transition_assets"
-"examples/demo-project" = "cine_toaster/demo_project"
+"examples/demo-project" = "cine_toaster/demo_projects/the-last-signal"
+"examples/amiga-demo-reel" = "cine_toaster/demo_projects/amiga-demo-reel"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

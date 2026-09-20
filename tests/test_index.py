@@ -39,6 +39,7 @@ class IndexTests(unittest.TestCase):
         self.assertTrue(index_path_for(self.root).is_file())
         self.assertNotIn(self.root, index_path_for(self.root).parents)
         self.assertEqual(summary.adapter, "cine-toaster")
+        self.assertEqual(summary.id, "demo")
 
         index = ProjectIndex(self.root)
         matches = index.search("eyeline right")

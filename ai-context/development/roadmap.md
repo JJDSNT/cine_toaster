@@ -44,6 +44,8 @@ failure tests.
 
 ## Phase 2 — application runtime and jobs
 
+- Use The Last Signal and Amiga Demo Reel as independent fixtures for Project
+  Manager identity, active-project switching, and job isolation tests.
 - Add Project Manager registration by stable project ID.
 - Add a durable operational store outside project directories.
 - Implement a minimal FFmpeg job with progress, cancellation, reconciliation,

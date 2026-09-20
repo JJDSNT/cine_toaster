@@ -1,0 +1,10 @@
+id = "LOC-002"
+name = "Copper Sky"
+status = "in_review"
+description = "A layered horizon built from independently scrolling color bands, clouds, and wireframe islands."
+
+continuity = [
+  "Horizon remains below Nova's visor",
+  "Cloud layers move in three distinct parallax speeds",
+  "Violet background shifts to orange only at the end of SC-020",
+]

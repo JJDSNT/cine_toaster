@@ -32,6 +32,8 @@ Cine Toaster can currently:
 - present a read-only Production Control Room in the browser;
 - preview built-in and project transition assets;
 - operate through the `toast` CLI;
+- list and instantiate two independently identified demo productions: The Last
+  Signal and Amiga Demo Reel;
 - preserve project files as the production authority.
 
 Cine Toaster cannot yet:
@@ -57,6 +59,8 @@ will later consume.
 
 ## Recently completed
 
+- `CT-0005` — added Amiga Demo Reel, selectable demo templates, stable indexed
+  manifest identity, packaging coverage, and multi-project fixtures.
 - `CT-0004` — accepted the scoped agent-thread and provider-session contract.
 - `CT-0003` — standardized frontmatter across the development memory/tracker.
 - `CT-0001` — architecture, tracker, decision records, and development guidance.
@@ -77,11 +81,11 @@ will later consume.
 
 ## Validation baseline
 
-On 2026-09-20, the repository test suite passed 8 tests with:
+On 2026-09-20, the repository test suite passed 13 tests with:
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
-`git diff --check` also passed after the architecture consolidation. No product
-code or canonical project schema changed in `CT-0001`.
+The source distribution and wheel build successfully and the installed wheel can
+instantiate both demo templates. `git diff --check` also passed.

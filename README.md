@@ -157,11 +157,17 @@ toast
 Commands available in the current milestone:
 
 ~~~
+toast demo --list
 toast demo ~/cine-toaster-projects/the-last-signal
+toast demo ~/cine-toaster-projects/amiga-demo-reel --template amiga-demo-reel
 toast serve ~/cine-toaster-projects/the-last-signal
 toast index ~/cine-toaster-projects/the-last-signal
 toast find ~/cine-toaster-projects/the-last-signal "continuity"
 ~~~
+
+`toast demo DESTINATION` creates The Last Signal by default. Demo templates are
+independent productions with stable project IDs; list them with `toast demo
+--list` and select another with `--template`.
 
 The intended operational vocabulary will grow from the same project core:
 
@@ -204,9 +210,10 @@ uv run toast demo ~/cine-toaster-projects/the-last-signal
 uv run toast serve ~/cine-toaster-projects/the-last-signal
 ~~~
 
-The demo command creates a separate English-language production from the
-versioned template in `examples/demo-project`. The control room listens on
-`http://127.0.0.1:8787` by default. See
+The demo command creates a separate English-language production from a
+versioned template. The repository currently includes The Last Signal and
+Amiga Demo Reel, providing independent projects for multi-project development.
+The control room listens on `http://127.0.0.1:8787` by default. See
 [`docs/milestone-01-production-control-room.md`](docs/milestone-01-production-control-room.md)
 for the scope and project format.
 

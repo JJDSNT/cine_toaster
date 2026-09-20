@@ -11,11 +11,27 @@ from .model import ProjectItem
 from .web import serve_project
 
 
-SOURCE_DEMO_PROJECT = Path(__file__).parents[2] / "examples" / "demo-project"
-PACKAGED_DEMO_PROJECT = Path(__file__).with_name("demo_project")
-DEMO_PROJECT = (
-    SOURCE_DEMO_PROJECT if SOURCE_DEMO_PROJECT.is_dir() else PACKAGED_DEMO_PROJECT
-)
+SOURCE_EXAMPLES = Path(__file__).parents[2] / "examples"
+PACKAGED_DEMO_PROJECTS = Path(__file__).with_name("demo_projects")
+DEFAULT_DEMO_TEMPLATE = "the-last-signal"
+DEMO_TEMPLATES = {
+    "the-last-signal": {
+        "title": "The Last Signal",
+        "source": SOURCE_EXAMPLES / "demo-project",
+        "packaged": PACKAGED_DEMO_PROJECTS / "the-last-signal",
+    },
+    "amiga-demo-reel": {
+        "title": "Amiga Demo Reel",
+        "source": SOURCE_EXAMPLES / "amiga-demo-reel",
+        "packaged": PACKAGED_DEMO_PROJECTS / "amiga-demo-reel",
+    },
+}
+
+
+def demo_template_path(template_id: str) -> Path:
+    template = DEMO_TEMPLATES[template_id]
+    source = template["source"]
+    return source if source.is_dir() else template["packaged"]
 
 
 def _human_size(size: int) -> str:
@@ -120,15 +136,27 @@ def command_serve(args: argparse.Namespace) -> int:
 
 
 def command_demo(args: argparse.Namespace) -> int:
+    if args.list_templates:
+        for template_id, template in DEMO_TEMPLATES.items():
+            default = " (default)" if template_id == DEFAULT_DEMO_TEMPLATE else ""
+            print(f"{template_id}\t{template['title']}{default}")
+        return 0
+
+    if args.destination is None:
+        print("Destination is required unless --list is used.", file=sys.stderr)
+        return 2
+
     destination = args.destination.expanduser().resolve()
     if destination.exists():
         print(f"Destination already exists: {destination}", file=sys.stderr)
         return 2
-    if not DEMO_PROJECT.is_dir():
-        print(f"Demo project template is unavailable: {DEMO_PROJECT}", file=sys.stderr)
+    template = DEMO_TEMPLATES[args.template]
+    source = demo_template_path(args.template)
+    if not source.is_dir():
+        print(f"Demo project template is unavailable: {source}", file=sys.stderr)
         return 2
-    shutil.copytree(DEMO_PROJECT, destination)
-    print(f"Created demo production at {destination}")
+    shutil.copytree(source, destination)
+    print(f"Created {template['title']} demo production at {destination}")
     print(f"Open it with: toast serve {destination}")
     return 0
 
@@ -177,9 +205,21 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser.set_defaults(function=command_serve)
 
     demo_parser = subparsers.add_parser(
-        "demo", help="Copy the English demo production to an external directory"
+        "demo", help="List or copy a demo production to an external directory"
     )
-    demo_parser.add_argument("destination", type=Path)
+    demo_parser.add_argument("destination", type=Path, nargs="?")
+    demo_parser.add_argument(
+        "--template",
+        choices=tuple(DEMO_TEMPLATES),
+        default=DEFAULT_DEMO_TEMPLATE,
+        help=f"Demo template to copy (default: {DEFAULT_DEMO_TEMPLATE})",
+    )
+    demo_parser.add_argument(
+        "--list",
+        dest="list_templates",
+        action="store_true",
+        help="List available demo templates",
+    )
     demo_parser.set_defaults(function=command_demo)
 
     return parser

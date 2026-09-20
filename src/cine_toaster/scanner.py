@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import tomllib
 from collections.abc import Iterator
 from pathlib import Path, PurePosixPath
 
@@ -14,7 +15,18 @@ MAX_TEXT_BYTES = 2 * 1024 * 1024
 
 
 def project_id_for(root: Path) -> str:
-    normalized = str(root.resolve()).encode("utf-8")
+    root = root.expanduser().resolve()
+    manifest = root / "project.toml"
+    if manifest.is_file():
+        try:
+            with manifest.open("rb") as handle:
+                project_id = tomllib.load(handle).get("id")
+        except (OSError, tomllib.TOMLDecodeError):
+            project_id = None
+        if project_id not in (None, ""):
+            return str(project_id)
+
+    normalized = str(root).encode("utf-8")
     return "prj_" + hashlib.blake2s(normalized, digest_size=8).hexdigest()
 
 

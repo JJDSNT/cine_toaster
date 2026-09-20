@@ -1,0 +1,10 @@
+id = "LOC-001"
+name = "Workbench Atrium"
+status = "approved"
+description = "An endless black volume in which windows, icons, grids, and color planes become physical architecture."
+
+continuity = [
+  "The floor grid converges on the central cursor",
+  "No texture noise; edges remain deliberately graphic",
+  "The palette grows from monochrome to thirty-two colors across SC-010",
+]

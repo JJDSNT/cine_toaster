@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from cine_toaster.scanner import detect_adapter, scan_project
+from cine_toaster.scanner import detect_adapter, project_id_for, scan_project
 
 
 class ScannerTests(unittest.TestCase):
@@ -27,6 +27,14 @@ class ScannerTests(unittest.TestCase):
 
     def test_detects_cine_toaster_manifest(self) -> None:
         self.assertEqual(detect_adapter(self.root), "cine-toaster")
+        self.assertEqual(project_id_for(self.root), "demo")
+
+    def test_generic_directory_identity_remains_path_scoped(self) -> None:
+        generic = Path(self.temporary.name) / "generic"
+        generic.mkdir()
+
+        self.assertTrue(project_id_for(generic).startswith("prj_"))
+        self.assertNotEqual(project_id_for(generic), project_id_for(self.root))
 
     def test_classifies_open_project_structure(self) -> None:
         by_path = {item.relative_path: item for item in scan_project(self.root)}

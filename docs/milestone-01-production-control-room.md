@@ -54,21 +54,30 @@ One file per scene keeps a 120-scene production understandable, reduces merge
 conflicts, and prevents a single central manifest from becoming a fragile
 database substitute.
 
-## Demo production
+## Demo productions
 
 `examples/demo-project` is an English-language source template named **The Last
 Signal**. It contains six scenes at intentionally different stages: approved,
 in review, blocked, in breakdown, and not started.
 
-Create a distinct working project with:
+`examples/amiga-demo-reel` is a second independent source template named
+**Amiga Demo Reel**. It contains five scenes with distinct creative content and
+workflow state. Its stable project ID differs from The Last Signal and makes the
+pair suitable for Project Manager and multi-project isolation tests.
+
+List templates and create distinct working projects with:
 
 ```bash
+toast demo --list
 toast demo ~/cine-toaster-projects/the-last-signal
+toast demo ~/cine-toaster-projects/amiga-demo-reel --template amiga-demo-reel
 toast serve ~/cine-toaster-projects/the-last-signal
 ```
 
-The checked-in directory is a fixture and distributable template. Runtime
-projects remain external to the Cine Toaster repository.
+The checked-in directories are fixtures and distributable templates. Runtime
+projects remain external to the Cine Toaster repository. Two fixtures do not by
+themselves implement a multi-project runtime; they provide reproducible inputs
+for that work.
 
 ## Rooms, not one generic interface
 

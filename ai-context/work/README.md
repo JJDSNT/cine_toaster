@@ -43,6 +43,7 @@ execution history and links to those destinations.
 
 ## Recently completed
 
+- `CT-0005` — add the Amiga Demo Reel multi-project fixture (`done`)
 - `CT-0004` — specify scoped provider session bindings (`done`)
 - `CT-0003` — standardize `ai-context/` frontmatter (`done`)
 - `CT-0001` — consolidate the architecture and development context (`done`)

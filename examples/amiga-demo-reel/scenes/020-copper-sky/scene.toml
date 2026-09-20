@@ -1,0 +1,78 @@
+id = "SC-020"
+order = 20
+title = "Copper Sky"
+sequence = "Sequence 02 · Flight"
+status = "in_review"
+current_step = "review"
+iteration = 3
+duration_seconds = 42
+updated_at = "2026-09-20"
+summary = "Nova rides a chrome disk through bands of color and independently scrolling clouds."
+
+[[workflow]]
+id = "script"
+label = "Script"
+status = "approved"
+[[workflow]]
+id = "breakdown"
+label = "Breakdown"
+status = "approved"
+[[workflow]]
+id = "references"
+label = "References"
+status = "approved"
+[[workflow]]
+id = "generation"
+label = "Generation"
+status = "complete"
+note = "Three motion directions are ready"
+[[workflow]]
+id = "review"
+label = "Review"
+status = "active"
+note = "Select the flight profile and horizon treatment"
+[[workflow]]
+id = "edit"
+label = "Edit"
+status = "waiting"
+
+[[shots]]
+id = "SH-020-01"
+label = "Disk launch"
+status = "selected"
+takes = 3
+selected_take = "T02"
+
+[[shots]]
+id = "SH-020-02"
+label = "Parallax crossing"
+status = "needs_review"
+takes = 5
+selected_take = ""
+
+[[shots]]
+id = "SH-020-03"
+label = "Orange horizon turn"
+status = "needs_review"
+takes = 4
+selected_take = ""
+
+[[decisions]]
+question = "How literal should the raster-band reference feel?"
+status = "proposed"
+answer = "Keep visible bands, but let their motion follow Nova's acceleration."
+
+[[iterations]]
+id = "R01"
+result = "rejected"
+note = "Cloud motion looked like one flat plate."
+
+[[iterations]]
+id = "R02"
+result = "rejected"
+note = "Parallax improved, but the disk reflections flickered."
+
+[[iterations]]
+id = "R03"
+result = "review"
+note = "Reflection continuity is stable; compare horizon timing."

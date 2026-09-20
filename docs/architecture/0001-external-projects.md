@@ -40,8 +40,11 @@ must preserve the rule that deleting it cannot destroy production state.
 
 ## Consequences
 
-- A manifest project ID provides path-independent identity. Moving an
-  unstructured legacy project creates a new cache until it gains such an ID.
+- A manifest project ID provides path-independent production identity. The
+  disposable index location still uses a root-path fingerprint, so moving any
+  project creates a new cache while preserving the project's canonical ID.
+- An unstructured directory without a manifest receives a path-derived runtime
+  ID until it gains an explicit project manifest.
 - Search remains fast even for projects containing thousands of files.
 - Unstructured directories can still be inspected through the supporting file
   library without application-specific adapters.
