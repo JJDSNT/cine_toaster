@@ -384,6 +384,8 @@ manifest and extension path.
 
 Cine Toaster is inspired by the **Amiga Video Toaster** and by modern open-source AI filmmaking projects exploring generative production, visual directing, workflow orchestration, and automated film pipelines.
 
+https://github.com/calesthio/OpenMontage
+
 https://github.com/LudwigKienle/ai-video-production-editor
 
 https://github.com/vladimirvalcourt/kupkaprod-cinema-pipeline
