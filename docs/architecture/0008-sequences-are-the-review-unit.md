@@ -9,7 +9,7 @@ Status: accepted
 show a flat list and a whole-project percentage.
 
 That does not match how the work happens. Singular assembles consecutive scenes into one video and reviews it as a unit —
-`sequencias/genebra-1-01-a-1-04-v1.mp4` covers scenes 1-01 through 1-04 and is
+`sequences/geneva-1-01-to-1-04-v1.mp4` covers scenes 1-01 through 1-04 and is
 watched in one sitting. The verdict "this part works now" is given at that
 level, never at the level of the whole film and rarely at the level of one
 scene.
@@ -29,7 +29,7 @@ id = "genebra"
 label = "Genebra"
 act = "Arco I"
 scenes = ["1-01", "1-02", "1-03", "1-04"]
-render = "sequencias/genebra-1-01-a-1-04-v1.mp4"
+render = "sequences/geneva-1-01-to-1-04-v1.mp4"
 ```
 
 It owns an ordered list of scenes, an optional act label, and an optional

@@ -5,7 +5,7 @@ type: architecture
 status: accepted
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-09-20
+updated_at: 2026-09-22
 tags:
   - project-core
   - filesystem
@@ -47,9 +47,9 @@ portable without the Cine Toaster application database or caches.
 project/
   project.yaml                    authored: identity, paths, sequences
   story/screenplay.fountain
-  cenas/<scene>/decupagem.yaml    authored: direction, geography, shots
-  cenas/<scene>/state.json        runtime-owned: selections, decisions, versions
-  cenas/<scene>/trabalho/         the takes, as files
+  scenes/<scene>/scene.yaml       authored: direction, geography, shots
+  scenes/<scene>/state.json       runtime-owned: selections, decisions, versions
+  scenes/<scene>/work/            the takes, as files
   assets/
   renders/
 ```
@@ -71,6 +71,19 @@ Authored files are never rewritten by the runtime. Committed decisions live in
 
 Large media remains in ordinary files. Canonical metadata records which media
 belongs to the production and why it was selected.
+
+## Production-specific tooling
+
+Cine Toaster owns reusable filmmaking mechanisms; a project owns the creative
+values and automation specific to its film. Palettes, curves, masks, LUTs,
+shaders, scene geometry, and one-off scripts may therefore live with the
+production without becoming application defaults.
+
+Project presence alone never authorizes execution. Cine Toaster does not scan
+for or run arbitrary project code. A project asset is executable only through a
+constrained supported extension point, or through a future typed operation that
+declares its inputs, outputs, side effects, scope, and permissions. See
+[`docs/production-tooling.md`](../docs/production-tooling.md).
 
 ## Sequences
 

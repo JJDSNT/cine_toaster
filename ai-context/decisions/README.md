@@ -5,7 +5,7 @@ type: decision-index
 status: active
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-09-20
+updated_at: 2026-09-22
 tags:
   - decisions
   - adr
@@ -29,7 +29,10 @@ two full normative copies.
 | `0007` | scene geometry is authored, checkable project state | accepted |
 | `0008` | sequences are the unit a production reviews | accepted |
 | `0009` | accumulated knowledge is evidence-linked data, not documentation | accepted |
-| `0010` | one native format, and it is YAML; no import step | accepted |
+| `0010` | one native format, and it is YAML; no import step | accepted, amended by `0013` |
+| `0011` | reuse from copyleft sources is by reimplementation, not incorporation | accepted |
+| `0012` | recurring entities are declared at project level, not per scene | accepted |
+| `0013` | the schema is English; a production's language stays in its content | accepted |
 
 When a decision is proposed or superseded, update the ADR and this index in the
 same change. Work records link the decision that affected execution.

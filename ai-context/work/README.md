@@ -5,7 +5,7 @@ type: index
 status: active
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-09-20
+updated_at: 2026-09-22
 tags:
   - work
   - tracker
@@ -39,10 +39,16 @@ execution history and links to those destinations.
 
 ## Work queue
 
-- Empty.
+- `CT-0017` — SPEC-0004 slice and the Amiga reel (`doing`)
+- `CT-0015` — the `cast` entity: sheet, executable reference, and
+  generation lineage (`ready`, design accepted as `SPEC-0003`)
 
 ## Recently completed
 
+- `CT-0018` — install, doctor, offline narration, and a render (`done`)
+- `CT-0016` — English schema; legacy names behind one translation point (`done`)
+- `CT-0014` — evaluated OpenMontage; licence boundary recorded as ADR 0011 (`done`)
+- `CT-0013` — documented production-specific tooling with demo examples (`done`)
 - `CT-0012` — generation providers moved into the tool (`done`)
 - `CT-0011` — one native format, read the production's YAML directly (`done`)
 - `CT-0010` — closed decision loop, assembly versions, staleness (`done`)

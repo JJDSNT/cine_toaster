@@ -6,7 +6,7 @@ Status: accepted. Amends ADR 0006 and supersedes the export path added with it.
 
 Cine Toaster read a TOML scene file of its own. Singular, the production it is
 built for, keeps its breakdown in YAML. To bridge them an exporter generated a
-`scene.toml` beside each `decupagem.yaml`.
+`scene.toml` beside each authored breakdown.
 
 That was wrong, and the evidence was in the code we then had to write. A copy on
 disk drifts, so we added `scene_out_of_date` — a digest check whose only purpose
@@ -38,8 +38,8 @@ authored file is never rewritten, and everything the runtime commits lives
 beside it in JSON.
 
 **Takes are not declared.** They are files, discovered by reading the work
-directory. `trabalho/c04.mp4` is the clip in the cut, `_tomadas/c04-t11.mp4` a
-kept alternative, `_descartados/c04-lado-errado.mp4` a rejected one carrying its
+directory. `work/c04.mp4` is the clip in the cut, `_takes/c04-t11.mp4` a
+kept alternative, `_rejected/c04-wrong-side.mp4` a rejected one carrying its
 reason in its name. A declaration would be a second copy of something the
 filesystem already states, and second copies drift.
 
