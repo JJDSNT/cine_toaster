@@ -19,6 +19,13 @@ dependencies = ["pyyaml>=6"]
 # and the code says exactly what to install when one is missing.
 [project.optional-dependencies]
 media = ["numpy>=1.26", "pillow>=10", "opencv-python-headless>=4.10"]
+# Narration runs on the machine that is already there: no account, no key,
+# nothing sent anywhere. The voice model is downloaded once, into the film.
+audio = ["piper-tts>=1.8"]
+# Running a transition's own shader instead of an FFmpeg stand-in. Needs a GL
+# context, which is why it is not part of the ordinary install.
+gpu = ["moderngl>=5.10"]
+
 [project.scripts]
 toast = "cine_toaster.cli:main"
 

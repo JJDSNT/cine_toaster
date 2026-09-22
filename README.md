@@ -6,6 +6,111 @@ Cine Toaster aims to provide an integrated workspace for creating AI-assisted fi
 
 Inspired by the pioneering spirit of the **Amiga Video Toaster**, the project brings together modern generative tools, production automation, visual decision-making, and traditional filmmaking workflows into a single open environment.
 
+## Install and run
+
+Requires **Python 3.12+** and nothing else to read a production, decide
+between takes and check continuity. Everything that makes pixels or sound is an
+optional layer you add when you need it — see
+[Toward a complete studio](#toward-a-complete-studio).
+
+```bash
+git clone https://github.com/JJDSNT/cine_toaster.git
+cd cine_toaster
+make setup
+```
+
+`make setup` creates the environment, installs Cine Toaster, and finishes by
+telling you what works on your machine and what to type for what does not:
+
+```
+  ok      Python 3.12+           everything  (running 3.12.3)
+  ok      PyYAML                 reading a production
+  ok      Transition catalog     choosing an edit from a shared vocabulary  (4 built-in)
+  ok      Demo productions       seeing a production without having one
+  ok      Media libraries        drawing cards, grading, focus, relight
+  ok      FFmpeg                 encoding a render, mixing audio
+
+Ready, with everything installed.
+```
+
+Then create the two demo productions and open one:
+
+```bash
+make demo      # both productions in ~/cine-toaster-demos, then checks them
+make serve     # the control room, on the reel
+```
+
+A production is never created inside the checkout. `make demo DEMOS=~/somewhere`
+puts them wherever you want.
+
+| Command | What it does |
+|---|---|
+| `make setup` | install, then report what works |
+| `make demo` | create both demo productions and check them |
+| `make build` | speak the reel's narration and render it to an mp4 |
+| `make serve` | open the control room |
+| `make check` | continuity and schema findings |
+| `make test` | the full suite |
+| `toast doctor` | what works here, and how to fix what does not |
+
+### Build the reel
+
+```bash
+make build
+```
+
+This speaks the narration with an offline voice, draws each card from the look,
+cuts them together on the transitions the production chose, mixes the audio, and
+writes an mp4 into the production's `renders/`. It costs nothing and sends
+nothing anywhere.
+
+## The two demo productions
+
+**Amiga Demo Reel** — Cine Toaster is named after NewTek's Video Toaster, whose
+demo reel was a slideshow carried by its transitions. This is that: four cards,
+four transitions, one look, including a transition the production owns itself.
+It needs no API key.
+
+**The Last Signal** — a dramatic short with measured scene geometry, a declared
+line of action, several takes per shot, and the continuity findings that come
+out of them. It is the production the review and continuity rooms were built
+against.
+
+Neither is a fixture for the other. They are independent projects with their own
+identity, which is also what proves two productions can be open at once.
+
+## Toward a complete studio
+
+Cine Toaster is meant to grow into a full production environment, and the way it
+grows is by adopting the tools that already do each job well rather than
+reimplementing them. Nothing below is bundled: each is a layer you install when
+you want what it enables, and `toast doctor` always reports which are present.
+
+**In use today**
+
+| Tool | What it does here | Install |
+|---|---|---|
+| **FFmpeg / FFprobe** | encode a render, mix audio, verify the result is what it claims | `apt install ffmpeg` · `brew install ffmpeg` |
+| **Pillow · NumPy · OpenCV** | draw cards, grade, focus, relight | `uv sync --extra media` |
+| **Piper** | narration, offline and free, no account | `uv sync --extra audio` |
+
+**Next, and why**
+
+| Tool | What it will enable | Install |
+|---|---|---|
+| **SoX** | normalise, trim and shape a take's audio, which FFmpeg does clumsily | `apt install sox` · `brew install sox` |
+| **ModernGL** | run a transition's own GLSL shader instead of the FFmpeg stand-in it declares | `uv sync --extra gpu` |
+| **Blender** | 3D titles, set previsualisation, compositing passes | [blender.org](https://www.blender.org/download/) |
+| **faster-whisper** / whisper.cpp | subtitles, and reading source footage that arrives with no script | `pip install faster-whisper` |
+
+`toast doctor` lists these in a separate block marked *"Cine Toaster does not
+call these yet"*. A capability reported as working when nothing calls it would
+be a lie told by the one command whose whole job is to tell the truth.
+
+The principle is the one in [Goals](#goals): integrate established tools rather
+than rebuild them. A studio is not one program; it is a room where the right
+instruments are within reach and something keeps track of what was decided.
+
 ## Why this exists
 
 Cine Toaster is being built to finish a specific film: **Singular**, a feature
@@ -116,15 +221,15 @@ project/
 ├── project.yaml              # authored: identity, paths, sequences
 ├── story/
 │   └── screenplay.fountain
-├── cenas/
+├── scenes/
 │   └── 030-scene-name/
-│       ├── decupagem.yaml    # authored: direction, geography, shots
+│       ├── scene.yaml        # authored: direction, geography, shots
 │       ├── state.json        # runtime-owned: selections, decisions, versions
-│       └── trabalho/         # the takes, as files
+│       └── work/             # the takes, as files
 │           ├── c01.mp4               in the assembled cut
 │           ├── c01-longer-hold.mp4   another candidate
-│           ├── _tomadas/             takes kept for comparison
-│           └── _descartados/         rejected, with the reason in the name
+│           ├── _takes/               takes kept for comparison
+│           └── _rejected/            rejected, with the reason in the name
 ├── assets/
 ├── typography/
 ├── subtitles/
@@ -134,6 +239,13 @@ project/
 ~~~
 
 Human-readable project files describe the production state, while media and generated artifacts remain ordinary files.
+
+Productions may also keep their own scripts, LUTs, masks, curves, shaders, and
+other film-specific tools. Cine Toaster provides reusable mechanisms, while the
+production keeps its creative values explicit; project-derived values do not
+become application defaults. Project code is never discovered or executed
+implicitly. See [Production-specific tooling](docs/production-tooling.md) for
+the ownership test and examples from both demo productions.
 
 There is **one format and no import step**. The production's own breakdown is
 the scene file; Cine Toaster reads it where it lies. YAML rather than TOML
@@ -290,6 +402,7 @@ toast
 Commands available today:
 
 ~~~
+toast doctor                                     # what works here
 toast demo --list
 toast demo ~/productions/the-last-signal
 toast serve ~/productions/the-last-signal        # the control room

@@ -21,3 +21,10 @@ avoid_when = [
 ]
 license = "CC0-1.0"
 author = "Cine Toaster contributors"
+
+# How this item renders on each engine that can execute it. Declared by whoever
+# wrote the item, never inferred by the renderer: a substitution nobody chose
+# is a substitution nobody can argue with.
+[render]
+ffmpeg = "fade"
+ffmpeg_note = "A dissolve is exactly what the xfade fade mode does."

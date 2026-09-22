@@ -21,3 +21,10 @@ avoid_when = [
 ]
 license = "CC0-1.0"
 author = "Cine Toaster contributors"
+
+# How this item renders on each engine that can execute it. Declared by whoever
+# wrote the item, never inferred by the renderer: a substitution nobody chose
+# is a substitution nobody can argue with.
+[render]
+ffmpeg = "hlslice"
+ffmpeg_note = "The horizontal slice is the closest honest stand-in for the flip."

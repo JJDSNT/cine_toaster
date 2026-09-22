@@ -53,6 +53,24 @@ runtime filmmaking skill or production context.
 - Use `Agent Runtime` in technical documentation. `AI Crew` is optional product
   language and is not an architectural component.
 
+## Getting the repository running
+
+From a fresh clone:
+
+```bash
+make setup     # environment, install, and a capability report
+make demo      # both demo productions, outside the checkout, then checked
+make build     # narrate the reel and render it
+make test      # the full suite
+```
+
+`toast doctor` reports every capability with the exact command that installs
+what is missing, and separates what Cine Toaster uses from what it merely
+detects. Add a capability there when you add one that can be absent: a feature
+that fails at the moment it is used, rather than being reported before, is how
+a tool earns a reputation for being broken when it is merely incomplete. Never
+report a tool as working when nothing calls it.
+
 ## Validation
 
 Run the smallest relevant tests. The current repository-wide check is:
@@ -61,4 +79,8 @@ Run the smallest relevant tests. The current repository-wide check is:
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
-Code, comments, and repository documentation are written in English.
+Or `make test`, which uses the environment `make setup` created.
+
+Code, comments, and repository documentation are written in English. The schema
+is English too -- directory, file, field and enum names -- while a production's
+own content stays in the language of its film (ADR 0013).

@@ -288,6 +288,84 @@ def command_take_clear(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_build(args: argparse.Namespace) -> int:
+    """Render the production's composed shots into one watchable file."""
+
+    from .build import build
+
+    result = build(args.project, args.output)
+    if args.json:
+        print(json.dumps(result.public_dict(), indent=2))
+    else:
+        print(
+            f"Built {result.output}\n"
+            f"  {result.shots} shot(s), {result.transitions} transition(s), "
+            f"{result.duration_seconds:.1f}s, "
+            f"{'with audio' if result.audio else 'silent'}"
+        )
+    return 0
+
+
+def command_voice(args: argparse.Namespace) -> int:
+    """Speak the lines the production has already cast and placed."""
+
+    from .providers.piper import DEFAULT_VOICE, VOICES_DIRECTORY, PiperNarration
+
+    root = args.project.expanduser().resolve()
+    production = load_production(root)
+
+    pending: list[tuple[str, str, dict]] = []
+    for scene in production["scenes"]:
+        if args.scene and scene["id"] != args.scene:
+            continue
+        for shot in scene["shots"]:
+            for line in shot["lines"]:
+                target = (line.get("mix") or {}).get("file")
+                if not target:
+                    continue
+                pending.append((scene["id"], shot["id"], {**line, "target": target}))
+
+    if not pending:
+        print("No lines with a mix destination. Nothing to speak.")
+        return 0
+
+    narrator = PiperNarration(root / VOICES_DIRECTORY, args.voice or DEFAULT_VOICE)
+    made = 0
+    for scene_id, shot_id, line in pending:
+        destination = root / line["target"]
+        if destination.is_file() and not args.force:
+            print(f"  keep   {line['target']}  (exists; --force to remake)")
+            continue
+        if destination.suffix.lower() != ".wav":
+            print(
+                f"  refuse {line['target']}  "
+                f"offline narration writes WAV; declare a .wav file"
+            )
+            continue
+        text = line.get("en") or line.get("text") or ""
+        result = narrator.speak(text=text, output=destination)
+        made += 1
+        print(
+            f"  spoke  {scene_id} {shot_id}  {result.duration_seconds:.1f}s  "
+            f"{result.media.relative_to(root)}  [{result.model}]"
+        )
+    print(f"\n{made} line(s) spoken, {len(pending) - made} not made. Cost: $0.00, offline.")
+    return 0
+
+
+def command_doctor(args: argparse.Namespace) -> int:
+    """Say what works on this machine, and what to type for what does not."""
+
+    from . import doctor
+
+    capabilities = doctor.examine()
+    if args.json:
+        print(json.dumps([item.public_dict() for item in capabilities], indent=2))
+    else:
+        print(doctor.report(capabilities))
+    return 1 if doctor.blocked(capabilities) else 0
+
+
 def command_check(args: argparse.Namespace) -> int:
     """Read the scene grammar before anything is generated."""
 
@@ -644,6 +722,29 @@ def build_parser() -> argparse.ArgumentParser:
     check_parser.add_argument("--scene")
     check_parser.add_argument("--json", action="store_true")
     check_parser.set_defaults(function=command_check)
+
+    build_parser = subparsers.add_parser(
+        "build", help="Render the production's composed shots into a file"
+    )
+    build_parser.add_argument("project", type=Path)
+    build_parser.add_argument("--output", type=Path)
+    build_parser.add_argument("--json", action="store_true")
+    build_parser.set_defaults(function=command_build)
+
+    voice_parser = subparsers.add_parser(
+        "voice", help="Speak the production's lines with an offline voice"
+    )
+    voice_parser.add_argument("project", type=Path)
+    voice_parser.add_argument("--scene")
+    voice_parser.add_argument("--voice", help="Piper voice id; the default is unremarkable")
+    voice_parser.add_argument("--force", action="store_true", help="Remake existing audio")
+    voice_parser.set_defaults(function=command_voice)
+
+    doctor_parser = subparsers.add_parser(
+        "doctor", help="Report what works on this machine and how to fix what does not"
+    )
+    doctor_parser.add_argument("--json", action="store_true")
+    doctor_parser.set_defaults(function=command_doctor)
 
     events_parser = subparsers.add_parser("events", help="Show recorded production activity")
     events_parser.add_argument("project", type=Path)
