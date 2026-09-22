@@ -69,7 +69,13 @@ class ProjectTests(unittest.TestCase):
 
         self.assertEqual(last_signal["id"], "the-last-signal")
         self.assertEqual(amiga_reel["id"], "amiga-demo-reel")
-        self.assertEqual(amiga_reel["active_scene"]["id"], "SC-020")
+        # The reel lands on the scene that shows three transitions at once.
+        self.assertEqual(amiga_reel["active_scene"]["id"], "SC-030")
+        # Both productions use the id SC-030, and each resolves its own: a scene
+        # id is unique within a project, never across them.
+        self.assertEqual(last_signal["active_scene"]["id"], "SC-030")
+        self.assertEqual(last_signal["active_scene"]["title"], "Echo Chamber")
+        self.assertEqual(amiga_reel["active_scene"]["title"], "The Switcher")
 
 
 class VariantTests(unittest.TestCase):
@@ -82,18 +88,21 @@ class VariantTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name) / "production"
         shutil.copytree(DEMO_PROJECT, self.root)
-        variant = self.root / "cenas" / "030-echo-chamber" / "ltx"
+        variant = self.root / "scenes" / "030-echo-chamber" / "ltx"
         variant.mkdir()
-        (variant / "decupagem.yaml").write_text(
-            "cena: SC-030\nordem: 30\ntitulo: Echo Chamber (LTX)\nvariante: ltx\n"
-            "planos:\n  - n: 1\n    dur: 6\n    plano: Refeito para o LTX.\n",
+        (variant / "scene.yaml").write_text(
+            "scene: SC-030\norder: 30\ntitle: Echo Chamber (LTX)\nvariant: ltx\n"
+            "shots:\n  - n: 1\n    duration: 6\n    label: Reworked for LTX.\n",
             encoding="utf-8",
         )
 
     def declare_variant(self, name: str) -> None:
         manifest = self.root / "project.yaml"
         manifest.write_text(
-            manifest.read_text().replace("  cena_ativa: SC-030", f"  cena_ativa: SC-030\n  variante: {name}"),
+            manifest.read_text().replace(
+                "  active_scene: SC-030",
+                f"  active_scene: SC-030\n  variant: {name}",
+            ),
             encoding="utf-8",
         )
 

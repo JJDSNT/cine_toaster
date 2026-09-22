@@ -20,9 +20,9 @@ def write_external_project(root: Path, project_id: str, title: str) -> None:
             [
                 "schema_version: 1",
                 f"id: {project_id}",
-                f"titulo: {title}",
-                "caminhos:",
-                "  cenas: cenas",
+                f"title: {title}",
+                "paths:",
+                "  scenes: scenes",
             ]
         ),
         encoding="utf-8",

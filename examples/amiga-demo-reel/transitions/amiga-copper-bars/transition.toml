@@ -20,3 +20,10 @@ avoid_when = [
 ]
 license = "CC0-1.0"
 author = "Amiga Demo Reel production"
+
+# The shader is the real item. This is what an FFmpeg render uses instead, and
+# it is a declared approximation rather than an equivalent: the copper bars
+# need the shader.
+[render]
+ffmpeg = "wiperight"
+ffmpeg_note = "A right wipe keeps the horizontal sweep; the copper bars are lost."

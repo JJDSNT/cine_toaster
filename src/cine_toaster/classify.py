@@ -2,6 +2,14 @@ from __future__ import annotations
 
 from pathlib import PurePosixPath
 
+from .vocabulary import (
+    REJECTED_DIRECTORIES,
+    SCENE_DIRECTORIES,
+    SCENE_FILES,
+    TAKES_DIRECTORIES,
+    WORK_DIRECTORIES,
+)
+
 
 IMAGE_EXTENSIONS = {
     ".avif",
@@ -32,7 +40,8 @@ DOCUMENT_EXTENSIONS = {".epub", ".fdx", ".odt", ".pdf"}
 
 CATEGORY_KINDS = {
     "assets": "assets",
-    "cenas": "scenes",
+    "cenas": "scenes",  # legacy; see vocabulary.SCENE_DIRECTORIES
+    "scenes": "scenes",
     "characters": "characters",
     "docs": "documents",
     "edit": "edit",
@@ -80,15 +89,17 @@ def classify(relative_path: str, *, is_directory: bool) -> tuple[str, str | None
     if len(parts) == 1 and is_directory:
         return CATEGORY_KINDS.get(lower_parts[0], "directory"), None
 
-    if lower_parts[0] in {"scenes", "cenas"}:
+    if lower_parts[0] in set(SCENE_DIRECTORIES):
         if len(parts) == 2 and is_directory:
             return "scene_directory", None
-        if "trabalho" in lower_parts or "shots" in lower_parts:
+        if "shots" in lower_parts or set(WORK_DIRECTORIES) & set(lower_parts):
             return ("shots", None) if is_directory else ("shot_asset", media_type)
-        if "_tomadas" in lower_parts or "_descartados" in lower_parts:
+        if set(TAKES_DIRECTORIES) & set(lower_parts) or set(
+            REJECTED_DIRECTORIES
+        ) & set(lower_parts):
             return ("takes", None) if is_directory else ("take_asset", media_type)
 
-    if path.name.lower() == "decupagem.yaml":
+    if path.name.lower() in SCENE_FILES:
         return "scene_manifest", media_type
     if path.name.lower() == "project.yaml":
         return "project_manifest", media_type

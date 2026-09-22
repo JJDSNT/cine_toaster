@@ -18,7 +18,9 @@ CHECK_CODES = frozenset(
         "eyeline_height_flip",
         "eyeline_mismatch",
         "eyeline_subject_missing",
+        "shot_field_undeclared",
         "subjects_overlap",
+        "transition_unknown",
         "unknown_camera",
     }
 )

@@ -1,0 +1,38 @@
+# The visual contract every shot in this reel is made under.
+#
+# Declared once at project level rather than restated per scene: what must stay
+# consistent across scenes belongs to the project (ADR 0012).
+id: reel
+label: Copper Reel
+
+palette:
+  background: "#0b0b16"
+  copper: "#d98b3a"
+  ink: "#f2ead9"
+  accent: "#38b6a8"
+
+typography:
+  display: "condensed sans, wide tracking, uppercase"
+  body: "plain sans"
+
+# A runner and a check both read these. They are what makes a slideshow feel
+# paced instead of arbitrary.
+motion:
+  minimum_hold_seconds: 2.0
+  maximum_hold_seconds: 6.0
+  transition_duration_ms: 850
+  entrance: "hold, then cut on the transition -- never fade the card itself"
+
+audio:
+  voice: "even, unhurried, period demo-reel narration"
+  music_mood: "bright synth arpeggio, mid tempo"
+  ducking_db: -8
+
+generation:
+  consistency_anchors:
+    - "Copper bars read horizontally, never diagonally"
+    - "Ink on deep indigo; the accent is used once per card at most"
+
+rules:
+  - "Every card holds long enough to read aloud"
+  - "No two adjacent shots use the same transition"

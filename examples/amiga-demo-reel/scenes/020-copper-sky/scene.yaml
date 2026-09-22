@@ -1,0 +1,25 @@
+scene: SC-020
+order: 20
+title: Copper Sky
+sequence: The Reel
+summary: The production's own transition, doing the thing it was written for.
+
+direction: |
+  This is the card the signature transition exists for. Let it arrive on the
+  copper bars and hold; the transition is the content here.
+
+shots:
+  - n: 1
+    source: composed
+    engine: title
+    duration: 6
+    label: Copper bars sweep across the sky.
+    copper_phase: 0.25
+    text:
+      headline: COPPER SKY
+    transition:
+      id: amiga-copper-bars
+      duration_ms: 720
+      reason: >-
+        The reel deliberately foregrounds its copper-bar identity here, which is
+        exactly the catalog's use_when for this item.

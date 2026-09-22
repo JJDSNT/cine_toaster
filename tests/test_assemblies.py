@@ -43,7 +43,7 @@ class AssemblyTestCase(unittest.TestCase):
         return scene
 
     def state(self):
-        return load_scene_state(self.root / "cenas" / "030-echo-chamber", SCENE)
+        return load_scene_state(self.root / "scenes" / "030-echo-chamber", SCENE)
 
     def cut(self, version: str, **takes: str):
         for shot_id, take_id in takes.items():
@@ -184,7 +184,7 @@ class RestoreTests(AssemblyTestCase):
         self.cut("v1", **{SHOT_A: "CUT"})
         clear_selection(self.root, scene_id=SCENE, shot_id=SHOT_A, actor=self.actor)
         # A take is a file. Removing the file removes the take.
-        (self.root / "cenas" / "030-echo-chamber" / "trabalho" / "c01.mp4").unlink()
+        (self.root / "scenes" / "030-echo-chamber" / "work" / "c01.mp4").unlink()
         with self.assertRaises(ValidationError) as caught:
             restore_assembly(self.root, scene_id=SCENE, assembly_id="v1", actor=self.actor)
         self.assertIn("no longer exist", str(caught.exception))

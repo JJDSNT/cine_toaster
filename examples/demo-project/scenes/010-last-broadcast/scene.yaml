@@ -1,0 +1,14 @@
+scene: SC-010
+order: 10
+title: Last Broadcast
+sequence: Sequence 01
+summary: Waiting on the master images.
+
+shots:
+  - n: 1
+    kind: black
+    duration: 3
+    label: Black screen. Radio static.
+  - n: 2
+    duration: 8
+    label: Mara adjusts the receiver as the last broadcast ends.

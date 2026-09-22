@@ -1,12 +1,35 @@
+# The Amiga Demo Reel.
+#
+# Cine Toaster is named after NewTek's Video Toaster, whose demo reel was a
+# slideshow carried by its transitions. This is that reel, and every part of it
+# runs with no API key: the narration is offline Piper TTS, the cards are
+# composed rather than generated, the transitions come from the catalog.
 schema_version: 1
 id: amiga-demo-reel
-titulo: Amiga Demo Reel
-formato: Demo reel · 90 seconds
+title: Amiga Demo Reel
+format: Demo reel · 90 seconds
 logline: A second production, used to prove that two projects stay independent.
 
-caminhos:
-  cenas: cenas
+paths:
+  scenes: scenes
 
-producao:
-  fase: producao
-  cena_ativa: SC-020
+look: reel
+
+production:
+  phase: production
+  active_scene: SC-030
+
+# Fields this reel uses that the application has no opinion about. Declaring
+# them is how a production keeps its own vocabulary without the general schema
+# growing a field for it (SPEC-0004).
+shot_fields:
+  copper_phase:
+    label: Copper phase
+  scanline_rate:
+    label: Scanline rate
+
+sequences:
+  - id: the-reel
+    label: The Reel
+    act: One
+    scenes: ["SC-010", "SC-020", "SC-030", "SC-040"]

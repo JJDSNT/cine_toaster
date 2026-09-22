@@ -76,6 +76,9 @@ def _load_manifest(path: Path, origin: str) -> dict[str, Any]:
         "source": str(document.get("source", "")),
         "duration_ms": int(document.get("duration_ms", 1000)),
         "webm_role": str(document.get("webm_role", "preview")),
+        # How this item renders on each engine that can execute it,
+        # declared by the item rather than inferred by a renderer.
+        "render": dict(document.get("render", {})),
         "origin": origin,
         "asset": asset_name,
         "preview": preview_name or None,

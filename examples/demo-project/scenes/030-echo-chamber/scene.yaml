@@ -1,0 +1,77 @@
+scene: SC-030
+order: 30
+title: Echo Chamber
+sequence: Sequence 02 · The Reply
+summary: The station repeats a sentence Mara never transmitted.
+
+direction: |
+  Mara stays on the right of frame and the speaker stack on the left for the
+  whole scene. The room is only ever seen from the console side, so the reply
+  always arrives from off-screen left.
+
+# The plan of the scene. Metres, measured once.
+# `shots` on each camera says which shots it covers -- that is what the
+# continuity check reads.
+geography:
+  room: [6.0, 4.5, 3.2]
+  subjects:
+    - label: Mara Vale
+      id: MARA
+      x: 4.1
+      y: 2.2
+      eye_height: 1.18
+    - label: Speaker stack
+      id: SPEAKER
+      x: 1.2
+      y: 2.4
+      eye_height: 1.55
+  axis: [MARA, SPEAKER]
+  cameras:
+    - id: CAM-A
+      x: 3.4
+      y: 0.9
+      height: 1.05
+      target: [4.1, 2.2]
+      lens_mm: 50
+      shots: "3"
+      label: Console side, on Mara
+    - id: CAM-B
+      x: 2.2
+      y: 1.0
+      height: 1.05
+      target: [1.2, 2.4]
+      lens_mm: 35
+      shots: "1"
+      label: Console side, on the stack
+    - id: CAM-C
+      x: 2.9
+      y: 0.5
+      height: 1.35
+      target: [2.6, 2.3]
+      lens_mm: 28
+      shots: "2"
+      label: Two-shot
+
+shots:
+  - n: 1
+    duration: 6
+    label: The sleeping stack lights one channel at a time.
+    action: Channels light left to right; the stack reads as machinery waking.
+
+  - n: 2
+    duration: 9
+    label: Mara crosses the room and stops halfway.
+    action: She leaves the console and stops two steps short of the stack.
+
+  - n: 3
+    duration: 11
+    subject: MARA
+    looks_at: SPEAKER
+    label: Locked on Mara as the station repeats her words.
+    action: She does not move. A single blink on the second word, or none at all.
+
+decisions:
+  - question: How much of the sentence is intelligible on first listen?
+    proposal: ""
+  - question: Keep Mara in profile through the reply?
+    proposal: Use the profile; do not cut to an explanatory close-up.

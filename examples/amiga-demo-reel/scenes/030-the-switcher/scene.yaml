@@ -1,0 +1,47 @@
+scene: SC-030
+order: 30
+title: The Switcher
+sequence: The Reel
+summary: Three cards, three transitions, so the vocabulary is visible at once.
+
+direction: |
+  Each card arrives on a different transition and holds the same length, so the
+  only thing changing between them is the edit. No two adjacent shots share a
+  transition -- that rule is in the look.
+
+shots:
+  - n: 1
+    source: composed
+    engine: text
+    duration: 4
+    label: A cut that means nothing has changed but the subject.
+    scanline_rate: 60
+    text:
+      headline: CUT
+      body: No transition. The plainest edit there is.
+
+  - n: 2
+    source: composed
+    engine: text
+    duration: 4
+    label: A dissolve, for a shift that should not be noticed.
+    text:
+      headline: DISSOLVE
+      body: Invisible punctuation.
+    transition:
+      id: cross-dissolve
+      duration_ms: 1200
+      reason: Time moves without the edit calling attention to itself.
+
+  - n: 3
+    source: composed
+    engine: text
+    duration: 4
+    label: A wipe, for a change that should be overt.
+    text:
+      headline: WIPE
+      body: Graphic punctuation, on purpose.
+    transition:
+      id: diamond-wipe
+      duration_ms: 900
+      reason: A chapter change should be overt, which is the catalog's use_when.

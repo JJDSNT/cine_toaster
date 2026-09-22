@@ -5,22 +5,25 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .vocabulary import (
+    REJECTED_DIRECTORIES,
+    TAKES_DIRECTORIES,
+    WORK_DIRECTORIES,
+)
+
 
 # A shot's alternatives are files, discovered by reading the work directory.
 # Nothing declares them, because a declaration is a second copy of a truth the
 # filesystem already holds, and a second copy drifts.
 #
-#   trabalho/c04.mp4                        the clip currently in the cut
-#   trabalho/c04-pov.mp4                    another candidate
-#   trabalho/_tomadas/c04-t11.mp4           a take kept for comparison
-#   trabalho/_descartados/c04-lado-errado.mp4   rejected, and why
+#   work/c04.mp4                      the clip currently in the cut
+#   work/c04-pov.mp4                  another candidate
+#   work/_takes/c04-t11.mp4           a take kept for comparison
+#   work/_rejected/c04-wrong-side.mp4 rejected, and why
 #
 # The reason a take was rejected lives in its filename. That is where a
 # production naturally writes it, so that is where this reads it from.
 
-WORK_DIRECTORY = "trabalho"
-TAKES_DIRECTORY = "_tomadas"
-REJECTED_DIRECTORY = "_descartados"
 MEDIA_SUFFIXES = (".mp4", ".mov", ".webm", ".png", ".jpg", ".jpeg", ".webp")
 
 CURRENT_TAKE_ID = "CUT"
@@ -108,11 +111,12 @@ def discover(work_directory: Path, number: Any, *, relative_to: Path) -> list[Di
         if CURRENT_TAKE_ID in found:
             break
 
-    for directory, status in (
-        (work_directory, "candidate"),
-        (work_directory / TAKES_DIRECTORY, "candidate"),
-        (work_directory / REJECTED_DIRECTORY, "rejected"),
-    ):
+    searched: list[tuple[Path, str]] = [(work_directory, "candidate")]
+    for name in TAKES_DIRECTORIES:
+        searched.append((work_directory / name, "candidate"))
+    for name in REJECTED_DIRECTORIES:
+        searched.append((work_directory / name, "rejected"))
+    for directory, status in searched:
         if not directory.is_dir():
             continue
         for path in sorted(directory.iterdir()):
@@ -130,4 +134,9 @@ def discover(work_directory: Path, number: Any, *, relative_to: Path) -> list[Di
 def work_directory_for(scene_file: Path) -> Path:
     """Where a scene's generated media lives: beside its breakdown."""
 
-    return scene_file.parent / WORK_DIRECTORY
+    parent = scene_file.parent
+    for name in WORK_DIRECTORIES:
+        candidate = parent / name
+        if candidate.is_dir():
+            return candidate
+    return parent / WORK_DIRECTORIES[0]

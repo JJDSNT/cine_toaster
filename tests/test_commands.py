@@ -76,7 +76,7 @@ class SelectTakeTests(CommandTestCase):
 
         self.assertEqual(result.previous_take_id, "CUT")
         self.assertEqual(result.revision, 2)
-        state = load_scene_state(self.root / "cenas" / "030-echo-chamber", SCENE)
+        state = load_scene_state(self.root / "scenes" / "030-echo-chamber", SCENE)
         kinds = [entry["take_id"] for entry in state.decisions]
         self.assertEqual(kinds, ["CUT", "LONGER-HOLD"])
 
@@ -85,12 +85,12 @@ class SelectTakeTests(CommandTestCase):
         result = select_take(self.root, scene_id=SCENE, shot_id=SHOT, take_id="CUT", actor=DIRECTOR)
 
         self.assertEqual(result.revision, 1)
-        state = load_scene_state(self.root / "cenas" / "030-echo-chamber", SCENE)
+        state = load_scene_state(self.root / "scenes" / "030-echo-chamber", SCENE)
         self.assertEqual(len(state.decisions), 1)
 
     def test_stale_revision_is_rejected_and_changes_nothing(self) -> None:
         select_take(self.root, scene_id=SCENE, shot_id=SHOT, take_id="CUT", actor=DIRECTOR)
-        before = (self.root / "cenas" / "030-echo-chamber" / "state.json").read_text()
+        before = (self.root / "scenes" / "030-echo-chamber" / "state.json").read_text()
 
         with self.assertRaises(RevisionConflictError):
             select_take(
@@ -102,7 +102,7 @@ class SelectTakeTests(CommandTestCase):
                 expected_revision=0,
             )
 
-        after = (self.root / "cenas" / "030-echo-chamber" / "state.json").read_text()
+        after = (self.root / "scenes" / "030-echo-chamber" / "state.json").read_text()
         self.assertEqual(before, after)
         self.assertEqual(self.shot()["selected_take"], "CUT")
 
@@ -127,13 +127,13 @@ class SelectTakeTests(CommandTestCase):
             select_take(self.root, scene_id=SCENE, shot_id=SHOT, take_id="T99", actor=DIRECTOR)
 
     def test_authored_scene_file_is_never_rewritten(self) -> None:
-        authored = self.root / "cenas" / "030-echo-chamber" / "decupagem.yaml"
+        authored = self.root / "scenes" / "030-echo-chamber" / "scene.yaml"
         before = authored.read_text()
         select_take(self.root, scene_id=SCENE, shot_id=SHOT, take_id="HARD-CUT-IN", actor=DIRECTOR)
         self.assertEqual(authored.read_text(), before)
         # Comments and prose survive because nothing rewrites this file.
-        self.assertIn("# A planta da cena", before)
-        self.assertIn("direcao: |", before)
+        self.assertIn("# The plan of the scene", before)
+        self.assertIn("direction: |", before)
 
     def test_unrelated_scene_state_is_preserved(self) -> None:
         select_take(self.root, scene_id=SCENE, shot_id=SHOT, take_id="CUT", actor=DIRECTOR)
@@ -146,7 +146,7 @@ class ReadOnlySourceTests(CommandTestCase):
     """SPEC-0002: a read-only source is browsable, but a command must refuse."""
 
     def test_command_refuses_before_writing(self) -> None:
-        scene_directory = self.root / "cenas" / "030-echo-chamber"
+        scene_directory = self.root / "scenes" / "030-echo-chamber"
         original = scene_directory.stat().st_mode
         scene_directory.chmod(0o555)
         self.addCleanup(scene_directory.chmod, original)
@@ -232,14 +232,14 @@ class StateFileTests(CommandTestCase):
     def test_state_file_is_valid_json_with_a_schema_version(self) -> None:
         select_take(self.root, scene_id=SCENE, shot_id=SHOT, take_id="CUT", actor=DIRECTOR)
         document = json.loads(
-            (self.root / "cenas" / "030-echo-chamber" / "state.json").read_text(encoding="utf-8")
+            (self.root / "scenes" / "030-echo-chamber" / "state.json").read_text(encoding="utf-8")
         )
         self.assertEqual(document["schema_version"], 2)
         self.assertEqual(document["revision"], 1)
         self.assertEqual(document["selections"][SHOT]["take_id"], "CUT")
 
     def test_state_written_by_an_older_build_still_loads(self) -> None:
-        scene_directory = self.root / "cenas" / "030-echo-chamber"
+        scene_directory = self.root / "scenes" / "030-echo-chamber"
         (scene_directory / "state.json").write_text(
             json.dumps(
                 {
@@ -258,7 +258,7 @@ class StateFileTests(CommandTestCase):
         self.assertEqual(state.assemblies, [])
 
     def test_a_future_schema_version_is_refused(self) -> None:
-        scene_directory = self.root / "cenas" / "030-echo-chamber"
+        scene_directory = self.root / "scenes" / "030-echo-chamber"
         (scene_directory / "state.json").write_text(
             json.dumps({"schema_version": 99, "scene_id": SCENE}), encoding="utf-8"
         )
@@ -268,7 +268,7 @@ class StateFileTests(CommandTestCase):
 
     def test_no_temporary_file_is_left_behind(self) -> None:
         select_take(self.root, scene_id=SCENE, shot_id=SHOT, take_id="CUT", actor=DIRECTOR)
-        leftovers = list((self.root / "cenas" / "030-echo-chamber").glob(".state.json.tmp*"))
+        leftovers = list((self.root / "scenes" / "030-echo-chamber").glob(".state.json.tmp*"))
         self.assertEqual(leftovers, [])
 
 

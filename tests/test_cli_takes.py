@@ -81,7 +81,7 @@ class CliTakeTests(unittest.TestCase):
         self.assertIn("No continuity problems", out)
 
     def test_check_fails_when_a_camera_crosses_the_line(self) -> None:
-        scene_file = self.root / "cenas" / "030-echo-chamber" / "decupagem.yaml"
+        scene_file = self.root / "scenes" / "030-echo-chamber" / "scene.yaml"
         scene_file.write_text(
             scene_file.read_text().replace(
                 "      x: 2.9\n      y: 0.5",

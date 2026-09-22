@@ -1,0 +1,35 @@
+scene: SC-010
+order: 10
+title: Cold Boot
+sequence: The Reel
+summary: The reel opens on nothing, then says what it is.
+
+direction: |
+  Start from black long enough that the first word lands in silence. The boot
+  card arrives on a cut, not a dissolve -- the machine does not fade in.
+
+shots:
+  - n: 1
+    source: composed
+    engine: solid
+    duration: 2
+    label: Black.
+
+  - n: 2
+    source: composed
+    engine: title
+    duration: 6
+    label: The boot card names the reel.
+    text:
+      headline: CINE TOASTER
+      subhead: demo reel
+    lines:
+      - who: NARRATOR
+        text: "Cine Toaster. Four scenes, four transitions, one look."
+        delivery: even, unhurried
+        voice: piper/en_US-lessac-medium
+        mix: {file: sound/vo-open.wav, at: 0.0}
+    transition:
+      id: switcher-flip
+      duration_ms: 850
+      reason: The reel should announce that it is constructed, not observed.

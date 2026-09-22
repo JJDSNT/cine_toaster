@@ -11,14 +11,14 @@ class ScannerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name) / "production"
-        (self.root / "cenas" / "030-echo" / "trabalho").mkdir(parents=True)
+        (self.root / "scenes" / "030-echo" / "work").mkdir(parents=True)
         (self.root / "project.yaml").write_text(
-            "id: demo\ntitulo: Demo\n", encoding="utf-8"
+            "id: demo\ntitle: Demo\n", encoding="utf-8"
         )
-        (self.root / "cenas" / "030-echo" / "decupagem.yaml").write_text(
-            "cena: SC-030\ntitulo: Echo\n", encoding="utf-8"
+        (self.root / "scenes" / "030-echo" / "scene.yaml").write_text(
+            "scene: SC-030\ntitle: Echo\n", encoding="utf-8"
         )
-        (self.root / "cenas" / "030-echo" / "trabalho" / "c03.mp4").write_bytes(b"video")
+        (self.root / "scenes" / "030-echo" / "work" / "c03.mp4").write_bytes(b"video")
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -37,13 +37,13 @@ class ScannerTests(unittest.TestCase):
     def test_classifies_open_project_structure(self) -> None:
         by_path = {item.relative_path: item for item in scan_project(self.root)}
         self.assertEqual(by_path["project.yaml"].kind, "project_manifest")
-        self.assertEqual(by_path["cenas/030-echo"].kind, "scene_directory")
+        self.assertEqual(by_path["scenes/030-echo"].kind, "scene_directory")
         self.assertEqual(
-            by_path["cenas/030-echo/decupagem.yaml"].kind,
+            by_path["scenes/030-echo/scene.yaml"].kind,
             "scene_manifest",
         )
         self.assertEqual(
-            by_path["cenas/030-echo/trabalho/c03.mp4"].kind,
+            by_path["scenes/030-echo/work/c03.mp4"].kind,
             "shot_asset",
         )
 
