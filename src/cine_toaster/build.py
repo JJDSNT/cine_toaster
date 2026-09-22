@@ -29,6 +29,7 @@ from .transitions import list_transitions
 
 
 RENDERS_DIRECTORY = "renders"
+STILLS_DIRECTORY = "stills"
 WIDTH, HEIGHT, FPS = 1280, 720, 30
 
 
@@ -53,6 +54,7 @@ class BuildResult:
     transitions: int
     duration_seconds: float
     audio: bool
+    stills: int = 0
 
     def public_dict(self) -> dict[str, Any]:
         return {
@@ -61,6 +63,7 @@ class BuildResult:
             "transitions": self.transitions,
             "duration_seconds": self.duration_seconds,
             "audio": self.audio,
+            "stills": self.stills,
         }
 
 
@@ -204,11 +207,21 @@ def build(root: Path, output: Path | None = None) -> BuildResult:
     work.mkdir(parents=True)
 
     segments: list[Path] = []
+    stills: list[Path] = []
     transitions: list[tuple[str, float] | None] = []
     durations: list[float] = []
 
-    for index, (_scene, shot) in enumerate(pairs):
-        card = draw_card(shot, looks.get(shot.get("look") or ""), work / f"{index:03d}.png")
+    for index, (scene, shot) in enumerate(pairs):
+        # The card is kept, not discarded with the scratch directory. Without
+        # it a composed scene is text on a screen: there is no take to look at,
+        # so the frame the tool drew is the only visual feedback there is.
+        stills_directory = root / STILLS_DIRECTORY / scene["id"]
+        stills_directory.mkdir(parents=True, exist_ok=True)
+        card = draw_card(
+            shot,
+            looks.get(shot.get("look") or ""),
+            stills_directory / f"{shot['id']}.png",
+        )
         seconds = float(shot.get("duration_seconds") or 2.0)
         segment = work / f"{index:03d}.mp4"
         _run(
@@ -222,6 +235,7 @@ def build(root: Path, output: Path | None = None) -> BuildResult:
             f"Encoding shot {shot['id']}",
         )
         segments.append(segment)
+        stills.append(card)
         durations.append(seconds)
         transitions.append(_transition_for(shot, catalog) if index else None)
 
@@ -253,6 +267,7 @@ def build(root: Path, output: Path | None = None) -> BuildResult:
         transitions=sum(1 for item in transitions if item),
         duration_seconds=_probe_seconds(destination),
         audio=bool(audio),
+        stills=len(stills),
     )
 
 

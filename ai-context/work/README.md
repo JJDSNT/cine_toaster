@@ -45,6 +45,7 @@ execution history and links to those destinations.
 
 ## Recently completed
 
+- `CT-0019` — two halves of the interface, and an address for each room (`done`)
 - `CT-0018` — install, doctor, offline narration, and a render (`done`)
 - `CT-0016` — English schema; legacy names behind one translation point (`done`)
 - `CT-0014` — evaluated OpenMontage; licence boundary recorded as ADR 0011 (`done`)

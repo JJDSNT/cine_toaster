@@ -24,24 +24,34 @@
 
     <div class="app-shell">
       <aside class="sidebar">
-        <div class="sidebar-title">Control room</div>
-        <nav class="module-navigation" aria-label="Production workspaces">
-          <button type="button" data-view="overview" class="active"><span>OV</span><strong>Overview</strong></button>
+        <button type="button" data-view="overview" class="workspace-home active">
+          <span>OV</span><strong>Overview</strong>
+        </button>
+
+        <!-- Two halves of the same production. One asks "what is this scene?",
+             the other "is this shot good?". Separate rooms because attention is
+             what they divide, not data. -->
+        <div class="sidebar-title">Writing</div>
+        <nav class="module-navigation" aria-label="Writing rooms">
+          <button type="button" data-view="script"><span>SR</span><strong>Script</strong></button>
+          <button type="button" data-view="storyboard"><span>SB</span><strong>Storyboard</strong><em id="storyboard-nav-count">0</em></button>
+          <button type="button" data-view="dialogue"><span>DL</span><strong>Dialogue</strong><em id="dialogue-nav-count">0</em></button>
+        </nav>
+
+        <div class="sidebar-title">Production</div>
+        <nav class="module-navigation" aria-label="Production rooms">
           <button type="button" data-view="sequences"><span>SQ</span><strong>Sequences</strong><em id="sequence-nav-count">0</em></button>
           <button type="button" data-view="scenes"><span>SC</span><strong>Scenes</strong><em id="scene-nav-count">0</em></button>
           <button type="button" data-view="review"><span>RV</span><strong>Review</strong><em id="review-nav-count">0</em></button>
+          <button type="button" data-view="cut"><span>CT</span><strong>Cut</strong><em id="cut-nav-count">0</em></button>
+        </nav>
+
+        <div class="sidebar-title secondary">Reference</div>
+        <nav class="module-navigation" aria-label="Reference rooms">
           <button type="button" data-view="transitions"><span>TR</span><strong>Transitions</strong><em id="transition-nav-count">0</em></button>
           <button type="button" data-view="library"><span>LB</span><strong>Library</strong></button>
           <button type="button" data-view="knowledge"><span>KN</span><strong>Knowledge</strong><em id="knowledge-nav-count">0</em></button>
         </nav>
-
-        <div class="sidebar-title secondary">Production rooms</div>
-        <div class="future-navigation">
-          <span><b>ST</b> Story <small>planned</small></span>
-          <span><b>WD</b> World <small>planned</small></span>
-          <span><b>ED</b> Edit <small>planned</small></span>
-          <span><b>JB</b> Jobs <small>planned</small></span>
-        </div>
 
         <div class="sidebar-foot">
           <span class="live-dot"></span>

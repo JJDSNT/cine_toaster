@@ -349,6 +349,10 @@ def _load_scene(
         if isinstance(item, dict)
     ]
 
+    stills = discover_stills(root, scene_id)
+    for shot in shots:
+        shot["still"] = stills.get(shot["id"], "")
+
     scene_look = vtext(document, "look")
     for shot in shots:
         value, level = resolve_look(
@@ -640,6 +644,55 @@ def _load_sequences(
     return sequences
 
 
+RENDERS_DIRECTORY = "renders"
+STILLS_DIRECTORY = "stills"
+RENDER_SUFFIXES = (".mp4", ".mov", ".webm")
+STILL_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp")
+
+
+def discover_renders(root: Path) -> list[dict[str, Any]]:
+    """Assembled files found in `renders/`, newest first.
+
+    Nothing declares them, for the same reason nothing declares a take: a
+    declaration is a second copy of a truth the filesystem already holds, and a
+    second copy drifts. A render that exists is a render the interface shows.
+    """
+
+    directory = root / RENDERS_DIRECTORY
+    if not directory.is_dir():
+        return []
+    found = []
+    for path in directory.iterdir():
+        if not path.is_file() or path.suffix.lower() not in RENDER_SUFFIXES:
+            continue
+        stat = path.stat()
+        found.append(
+            {
+                "name": path.stem,
+                "path": path.relative_to(root).as_posix(),
+                "size_bytes": stat.st_size,
+                "modified_at": stat.st_mtime,
+            }
+        )
+    return sorted(found, key=lambda item: item["modified_at"], reverse=True)
+
+
+def discover_stills(root: Path, scene_id: str) -> dict[str, str]:
+    """Frames drawn for a scene's shots, by shot id.
+
+    A composed shot has no take, so without these a scene is text on a screen.
+    """
+
+    directory = root / STILLS_DIRECTORY / scene_id
+    if not directory.is_dir():
+        return {}
+    stills: dict[str, str] = {}
+    for path in sorted(directory.iterdir()):
+        if path.is_file() and path.suffix.lower() in STILL_SUFFIXES:
+            stills[path.stem] = path.relative_to(root).as_posix()
+    return stills
+
+
 def _declared_shot_fields(manifest: dict[str, Any]) -> dict[str, str]:
     """Shot keys this production declares, with the label it wants shown.
 
@@ -660,6 +713,19 @@ def _declared_shot_fields(manifest: dict[str, Any]) -> dict[str, str]:
         for name in raw:
             declared[str(name)] = str(name)
     return declared
+
+
+def _script_path(manifest: dict[str, Any], root: Path) -> str:
+    """The screenplay, if the production points at one that exists."""
+
+    paths = field(manifest, "paths") or {}
+    declared = vtext(paths, "script")
+    if declared and (root / declared).is_file():
+        return declared
+    for candidate in sorted(root.glob("**/*.fountain")):
+        if candidate.is_file():
+            return candidate.relative_to(root).as_posix()
+    return ""
 
 
 def load_production(root: Path) -> dict[str, Any]:
@@ -727,6 +793,8 @@ def load_production(root: Path) -> dict[str, Any]:
         "format": vtext(manifest, "format") or "Film",
         "logline": _text(manifest.get("logline")),
         "look": project_look,
+        "renders": discover_renders(root),
+        "script_path": _script_path(manifest, root),
         "looks": {name: look.public_dict() for name, look in load_looks(root).items()},
         "production": production,
         "phases": field(manifest, "phases") or [],
@@ -754,3 +822,94 @@ def load_production(root: Path) -> dict[str, Any]:
 def load_scene(root: Path, scene_id: str) -> dict[str, Any] | None:
     production = load_production(root)
     return next((scene for scene in production["scenes"] if scene["id"] == scene_id), None)
+
+
+def writing_room(root: Path) -> dict[str, Any]:
+    """Everything the writing side of the production needs, in one read.
+
+    The interface has two halves. One asks "is this shot good?" and reads
+    takes, geometry and decisions. This one asks "what is this scene?" and
+    reads the screenplay, the frames, and who says what. They were never
+    separable in the data; they are separable in attention, which is why they
+    are separate rooms.
+    """
+
+    root = Path(root).expanduser().resolve()
+    production = load_production(root)
+
+    screenplay = ""
+    if production["script_path"]:
+        try:
+            screenplay = (root / production["script_path"]).read_text(encoding="utf-8")
+        except OSError:
+            screenplay = ""
+
+    scenes: list[dict[str, Any]] = []
+    speakers: dict[str, dict[str, Any]] = {}
+    for scene in production["scenes"]:
+        frames = []
+        lines = []
+        for shot in scene["shots"]:
+            frames.append(
+                {
+                    "shot_id": shot["id"],
+                    "label": shot["label"],
+                    "still": shot.get("still", ""),
+                    "source": shot["source"],
+                    "engine": shot["engine"],
+                    "duration_seconds": shot["duration_seconds"],
+                    "transition": shot.get("transition"),
+                    "take_count": shot["take_count"],
+                }
+            )
+            for line in shot["lines"]:
+                entry = {**line, "scene_id": scene["id"], "shot_id": shot["id"]}
+                lines.append(entry)
+                who = line["who"] or "UNATTRIBUTED"
+                speaker = speakers.setdefault(who, {"who": who, "lines": 0, "scenes": set()})
+                speaker["lines"] += 1
+                speaker["scenes"].add(scene["id"])
+        scenes.append(
+            {
+                "id": scene["id"],
+                "title": scene["title"],
+                "sequence": scene["sequence"],
+                "summary": scene["summary"],
+                "direction": scene["direction"],
+                "look": scene["look"],
+                "duration_seconds": scene["duration_seconds"],
+                "frames": frames,
+                "lines": lines,
+                "decisions": scene["decisions"],
+                "open_questions": [
+                    item for item in scene["decisions"] if not item.get("answer")
+                ],
+            }
+        )
+
+    cast = sorted(
+        (
+            {"who": item["who"], "lines": item["lines"], "scenes": sorted(item["scenes"])}
+            for item in speakers.values()
+        ),
+        key=lambda item: (-item["lines"], item["who"]),
+    )
+
+    return {
+        "id": production["id"],
+        "title": production["title"],
+        "logline": production["logline"],
+        "script_path": production["script_path"],
+        "screenplay": screenplay,
+        "scenes": scenes,
+        "cast": cast,
+        "renders": production["renders"],
+        "counts": {
+            "scenes": len(scenes),
+            "frames": sum(len(scene["frames"]) for scene in scenes),
+            "stills": sum(1 for scene in scenes for f in scene["frames"] if f["still"]),
+            "lines": sum(len(scene["lines"]) for scene in scenes),
+            "speakers": len(cast),
+            "open_questions": sum(len(scene["open_questions"]) for scene in scenes),
+        },
+    }

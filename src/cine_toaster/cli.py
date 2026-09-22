@@ -301,7 +301,8 @@ def command_build(args: argparse.Namespace) -> int:
             f"Built {result.output}\n"
             f"  {result.shots} shot(s), {result.transitions} transition(s), "
             f"{result.duration_seconds:.1f}s, "
-            f"{'with audio' if result.audio else 'silent'}"
+            f"{'with audio' if result.audio else 'silent'}\n"
+            f"  {result.stills} still(s) kept for the storyboard"
         )
     return 0
 

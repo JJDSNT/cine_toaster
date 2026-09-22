@@ -84,6 +84,12 @@ class BuildTests(unittest.TestCase):
             self.assertFalse(result.audio)
             self.assertEqual(result.output.parent.name, "renders")
 
+            # The cards are kept: a composed shot has no take, so the frame the
+            # tool drew is the only visual feedback the scene can have.
+            self.assertEqual(result.stills, 7)
+            self.assertTrue((root / "stills" / "SC-020" / "P1.png").is_file())
+            self.assertFalse((root / "renders" / ".work").exists())
+
     def test_a_production_with_no_composed_shots_is_refused(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)

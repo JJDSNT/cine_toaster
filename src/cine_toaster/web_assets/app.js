@@ -13,21 +13,73 @@ const state = {
   shotId: null,
   events: [],
   knowledge: null,
+  writing: null,
 };
 
-function setView(view) {
-  state.currentView = view;
+const ROOMS = new Set([
+  "overview", "script", "storyboard", "dialogue",
+  "sequences", "scenes", "review", "cut",
+  "transitions", "library", "knowledge",
+]);
+
+/** Write where we are into the address bar.
+ *
+ * Without this the back button leaves the application, a reload loses the
+ * room, and a scene cannot be sent to anyone. The app already read `view`,
+ * `scene` and `shot` from the URL on boot; it simply never wrote them.
+ */
+function addressFor({ view, scene, shot }) {
+  const parameters = new URLSearchParams();
+  if (shot && scene) {
+    parameters.set("scene", scene);
+    parameters.set("shot", shot);
+  } else if (scene) {
+    parameters.set("scene", scene);
+  } else if (view && view !== "overview") {
+    parameters.set("view", view);
+  }
+  const query = parameters.toString();
+  return query ? `?${query}` : window.location.pathname;
+}
+
+function remember({ view, scene = null, shot = null }, { replace = false } = {}) {
+  const address = addressFor({ view, scene, shot });
+  const entry = { view, scene, shot };
+  if (replace || window.location.search === new URL(address, window.location.href).search) {
+    window.history.replaceState(entry, "", address);
+  } else {
+    window.history.pushState(entry, "", address);
+  }
+}
+
+function highlight(view) {
   document.querySelectorAll("[data-view]").forEach((node) => {
     node.classList.toggle("active", node.dataset.view === view);
   });
+}
+
+function draw(view) {
   if (view === "overview") renderOverview();
-  if (view === "sequences") renderSequences();
-  if (view === "scenes") renderScenes();
-  if (view === "review") renderReview();
-  if (view === "transitions") renderTransitions();
-  if (view === "library") renderLibrary(state.project.id);
-  if (view === "knowledge") renderKnowledge();
+  else if (view === "script") renderScript();
+  else if (view === "storyboard") renderStoryboard();
+  else if (view === "dialogue") renderDialogue();
+  else if (view === "sequences") renderSequences();
+  else if (view === "scenes") renderScenes();
+  else if (view === "review") renderReview();
+  else if (view === "cut") renderCut();
+  else if (view === "transitions") renderTransitions();
+  else if (view === "library") renderLibrary(state.project.id);
+  else if (view === "knowledge") renderKnowledge();
   byId("workspace").focus();
+}
+
+function setView(view, { record = true } = {}) {
+  state.currentView = view;
+  state.sceneId = null;
+  state.shotId = null;
+  highlight(view);
+  if (record) remember({ view });
+  draw(view);
 }
 
 function phaseRail(phases) {
@@ -262,12 +314,13 @@ function renderScenes() {
   root.append(table);
 }
 
-async function renderScene(sceneId) {
+async function renderScene(sceneId, { record = true } = {}) {
   const scene = await api(`/api/scene?id=${encodeURIComponent(sceneId)}`);
   state.currentView = "scene";
   state.sceneId = sceneId;
   state.shotId = null;
-  document.querySelectorAll("[data-view]").forEach((node) => node.classList.remove("active"));
+  highlight(null);
+  if (record) remember({ view: "scene", scene: sceneId });
   const root = byId("workspace");
   root.replaceChildren();
 
@@ -480,14 +533,15 @@ function renderShots(scene) {
   return panel;
 }
 
-async function openCompare(sceneId, shotId) {
+async function openCompare(sceneId, shotId, { record = true } = {}) {
   const scene = await api(`/api/scene?id=${encodeURIComponent(sceneId)}`);
   const shot = scene.shots.find((item) => item.id === shotId);
   if (!shot) return renderScene(sceneId);
   state.currentView = "compare";
   state.sceneId = sceneId;
   state.shotId = shotId;
-  document.querySelectorAll("[data-view]").forEach((node) => node.classList.remove("active"));
+  highlight(null);
+  if (record) remember({ view: "compare", scene: sceneId, shot: shotId });
   renderCompare(byId("workspace"), scene, shot, {
     onBack: () => renderScene(sceneId),
     onChanged: async () => {
@@ -786,6 +840,259 @@ function renderUnstructured() {
   root.append(panel);
 }
 
+
+// ---- Writing: what is this scene? -------------------------------------------
+
+async function writing() {
+  if (!state.writing) state.writing = await api("/api/writing", { optional: true });
+  return state.writing;
+}
+
+function emptyRoom(root, title, explanation) {
+  const panel = el("section", "panel");
+  panel.append(sectionHeading("NOTHING HERE YET", title, explanation));
+  root.append(panel);
+}
+
+async function renderScript() {
+  const root = byId("workspace");
+  root.replaceChildren();
+  const data = await writing();
+  if (!data) return renderUnstructured();
+
+  const header = el("section", "scene-header");
+  const copy = el("div");
+  copy.append(
+    el("span", "eyebrow", "SCRIPT"),
+    el("h1", "", data.title),
+    el("p", "hero-logline", data.logline || ""),
+  );
+  const facts = el("div", "scene-facts");
+  facts.append(
+    metric(String(data.counts.scenes), "Scenes"),
+    metric(String(data.counts.lines), "Spoken lines"),
+    metric(String(data.counts.open_questions), "Open questions"),
+  );
+  header.append(copy, facts);
+  root.append(header);
+
+  if (data.screenplay) {
+    const panel = el("section", "panel wide-panel");
+    panel.append(sectionHeading("SCREENPLAY", data.script_path, "The authored file, as written."));
+    const page = el("pre", "screenplay-page");
+    page.textContent = data.screenplay;
+    panel.append(page);
+    root.append(panel);
+  } else {
+    emptyRoom(
+      root,
+      "This production has no screenplay file",
+      "Point `paths.script` at one in project.yaml, or add a .fountain file. " +
+        "The scene direction below is what the production says instead.",
+    );
+  }
+
+  const scenes = el("section", "panel wide-panel");
+  scenes.append(sectionHeading("DIRECTION", "What each scene is", "Scene summaries and the direction written for them."));
+  const list = el("div", "script-scenes");
+  for (const scene of data.scenes) {
+    const card = el("article", "script-scene");
+    const head = el("div", "script-scene-head");
+    head.append(el("span", "scene-id", scene.id), el("strong", "", scene.title));
+    if (scene.sequence) head.append(el("span", "muted", scene.sequence));
+    card.append(head);
+    if (scene.summary) card.append(el("p", "", scene.summary));
+    if (scene.direction) {
+      const direction = el("blockquote", "scene-direction");
+      direction.textContent = scene.direction;
+      card.append(direction);
+    }
+    for (const question of scene.open_questions) {
+      card.append(el("p", "open-question", `Open: ${question.question}`));
+    }
+    card.append(button("Open scene →", () => renderScene(scene.id), "quiet-button"));
+    list.append(card);
+  }
+  scenes.append(list);
+  root.append(scenes);
+}
+
+async function renderStoryboard() {
+  const root = byId("workspace");
+  root.replaceChildren();
+  const data = await writing();
+  if (!data) return renderUnstructured();
+
+  const header = el("section", "scene-header");
+  const copy = el("div");
+  copy.append(el("span", "eyebrow", "STORYBOARD"), el("h1", "", "Every frame, in order"));
+  const facts = el("div", "scene-facts");
+  facts.append(
+    metric(String(data.counts.frames), "Frames"),
+    metric(String(data.counts.stills), "Drawn"),
+    metric(String(data.counts.scenes), "Scenes"),
+  );
+  header.append(copy, facts);
+  root.append(header);
+
+  if (!data.counts.stills) {
+    emptyRoom(
+      root,
+      "No frames have been drawn yet",
+      "Composed shots get their still from `toast build`; generated shots get " +
+        "theirs from a take. Until then a scene is text on a screen.",
+    );
+  }
+
+  for (const scene of data.scenes) {
+    const panel = el("section", "panel wide-panel");
+    panel.append(sectionHeading(scene.id, scene.title, scene.summary || ""));
+    const strip = el("div", "filmstrip");
+    for (const frame of scene.frames) {
+      const card = el("article", "filmstrip-card");
+      const frameBox = el("div", "filmstrip-frame");
+      if (frame.still) {
+        const image = el("img");
+        image.src = `/media/${frame.still}`;
+        image.alt = frame.label;
+        image.loading = "lazy";
+        frameBox.append(image);
+      } else {
+        frameBox.append(el("span", "filmstrip-blank", frame.take_count ? "take" : "not drawn"));
+      }
+      card.append(frameBox);
+      const meta = el("div", "filmstrip-meta");
+      meta.append(el("strong", "", frame.shot_id), el("span", "muted", `${frame.duration_seconds}s`));
+      card.append(meta, el("p", "", frame.label));
+      if (frame.transition) {
+        card.append(el("small", "filmstrip-transition", `↳ ${frame.transition.id}`));
+      }
+      card.addEventListener("click", () => renderScene(scene.id));
+      strip.append(card);
+    }
+    panel.append(strip);
+    root.append(panel);
+  }
+}
+
+async function renderDialogue() {
+  const root = byId("workspace");
+  root.replaceChildren();
+  const data = await writing();
+  if (!data) return renderUnstructured();
+
+  const header = el("section", "scene-header");
+  const copy = el("div");
+  copy.append(el("span", "eyebrow", "DIALOGUE"), el("h1", "", "Who says what"));
+  const facts = el("div", "scene-facts");
+  facts.append(
+    metric(String(data.counts.lines), "Lines"),
+    metric(String(data.counts.speakers), "Speakers"),
+  );
+  header.append(copy, facts);
+  root.append(header);
+
+  if (!data.counts.lines) {
+    emptyRoom(
+      root,
+      "Nobody speaks in this production yet",
+      "A shot carries `lines`, each with who says it, how, and where it sits in the mix.",
+    );
+    return;
+  }
+
+  const castPanel = el("section", "panel");
+  castPanel.append(sectionHeading("CAST", "Voices in this production", "Counted from the lines themselves."));
+  const castList = el("div", "cast-list");
+  for (const member of data.cast) {
+    const card = el("article", "cast-card");
+    card.append(
+      el("strong", "", member.who),
+      el("span", "muted", `${member.lines} line(s) · ${member.scenes.join(", ")}`),
+    );
+    castList.append(card);
+  }
+  castPanel.append(castList);
+  root.append(castPanel);
+
+  for (const scene of data.scenes) {
+    if (!scene.lines.length) continue;
+    const panel = el("section", "panel wide-panel");
+    panel.append(sectionHeading(scene.id, scene.title, ""));
+    const sheet = el("div", "dialogue-sheet");
+    for (const line of scene.lines) {
+      const entry = el("article", "dialogue-line");
+      entry.append(el("strong", "dialogue-who", line.who || "—"));
+      if (line.delivery) entry.append(el("em", "dialogue-delivery", `(${line.delivery})`));
+      entry.append(el("p", "dialogue-text", line.text || line.en || ""));
+      if (line.en && line.text && line.en !== line.text) {
+        entry.append(el("p", "dialogue-alt", line.en));
+      }
+      const meta = [];
+      if (line.voice) meta.push(line.voice);
+      if (line.mix && line.mix.file) meta.push(line.mix.file);
+      if (meta.length) entry.append(el("small", "muted", meta.join(" · ")));
+      sheet.append(entry);
+    }
+    panel.append(sheet);
+    root.append(panel);
+  }
+}
+
+// ---- Production: is this good? ----------------------------------------------
+
+async function renderCut() {
+  const root = byId("workspace");
+  root.replaceChildren();
+  const production = state.production;
+  if (!production) return renderUnstructured();
+
+  const header = el("section", "scene-header");
+  const copy = el("div");
+  copy.append(el("span", "eyebrow", "CUT"), el("h1", "", "What has been assembled"));
+  const facts = el("div", "scene-facts");
+  facts.append(
+    metric(String((production.renders || []).length), "Renders"),
+    metric(String(production.sequences.length), "Sequences"),
+  );
+  header.append(copy, facts);
+  root.append(header);
+
+  const renders = production.renders || [];
+  if (!renders.length) {
+    emptyRoom(
+      root,
+      "Nothing has been assembled yet",
+      "`toast build` writes into the production's renders/ directory. Anything " +
+        "found there appears here; nothing has to be declared.",
+    );
+  }
+
+  for (const render of renders) {
+    const panel = el("section", "panel wide-panel");
+    panel.append(sectionHeading("ASSEMBLED", render.name, render.path));
+    const video = el("video");
+    video.src = `/media/${render.path}`;
+    video.controls = true;
+    video.preload = "metadata";
+    panel.append(video);
+    panel.append(el("small", "muted", `${Math.round(render.size_bytes / 1024)} KB`));
+    root.append(panel);
+  }
+
+  for (const sequence of production.sequences) {
+    if (!sequence.render) continue;
+    const panel = el("section", "panel wide-panel");
+    panel.append(sectionHeading("SEQUENCE", sequence.label, sequence.render));
+    const video = el("video");
+    video.src = `/media/${sequence.render}`;
+    video.controls = true;
+    video.preload = "metadata";
+    panel.append(video);
+    root.append(panel);
+  }
+}
+
 function humanSize(bytes) {
   let value = Number(bytes || 0);
   for (const unit of ["B", "KiB", "MiB", "GiB", "TiB"]) {
@@ -876,6 +1183,10 @@ function updateChrome() {
   byId("knowledge-nav-count").textContent = state.knowledge?.coverage.practices || 0;
   byId("review-nav-count").textContent = state.production?.metrics.pending_shots ?? state.production?.metrics.attention_items ?? 0;
   byId("transition-nav-count").textContent = state.transitions.length;
+  byId("cut-nav-count").textContent = (state.production?.renders || []).length;
+  const writingCounts = state.writing?.counts;
+  byId("storyboard-nav-count").textContent = writingCounts?.frames ?? 0;
+  byId("dialogue-nav-count").textContent = writingCounts?.lines ?? 0;
 }
 
 // A decision committed from the CLI, an agent, or a second window is the same
@@ -929,24 +1240,37 @@ async function start() {
     renderTransitionDetail(requestedTransition);
     return;
   }
-  const requestedView = parameters.get("view");
-  const availableViews = new Set(["overview", "sequences", "scenes", "review", "transitions", "library", "knowledge"]);
-  const requestedScene = parameters.get("scene");
-  const requestedShot = parameters.get("shot");
-  if (requestedScene && requestedShot) {
-    openCompare(requestedScene, requestedShot);
-    return;
-  }
-  if (requestedScene) {
-    renderScene(requestedScene);
-    return;
-  }
-  const initialView = requestedView && availableViews.has(requestedView)
-    ? requestedView
-    : state.production ? "overview" : "library";
-  setView(initialView);
+  showAddress({ replace: true });
 }
 
+/** Render whatever the address bar currently says. */
+function showAddress({ replace = false } = {}) {
+  const parameters = new URLSearchParams(window.location.search);
+  const scene = parameters.get("scene");
+  const shot = parameters.get("shot");
+  if (scene && shot) {
+    openCompare(scene, shot, { record: false });
+    remember({ view: "compare", scene, shot }, { replace: true });
+    return;
+  }
+  if (scene) {
+    renderScene(scene, { record: false });
+    remember({ view: "scene", scene }, { replace: true });
+    return;
+  }
+  const requested = parameters.get("view");
+  const view = requested && ROOMS.has(requested)
+    ? requested
+    : state.production ? "overview" : "library";
+  state.currentView = view;
+  state.sceneId = null;
+  state.shotId = null;
+  highlight(view);
+  remember({ view }, { replace: true });
+  draw(view);
+}
+
+window.addEventListener("popstate", () => showAddress({ replace: true }));
 document.querySelectorAll("[data-view]").forEach((node) => node.addEventListener("click", () => setView(node.dataset.view)));
 byId("quick-find").addEventListener("click", () => { byId("find-dialog").showModal(); byId("search-input").focus(); });
 byId("find-close").addEventListener("click", () => byId("find-dialog").close());

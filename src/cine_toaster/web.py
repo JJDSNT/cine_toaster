@@ -14,7 +14,7 @@ from .errors import CineToasterError, ValidationError
 from .events import read_events, tail_events
 from .index import ProjectIndex
 from .knowledge import coverage, load_practices, load_providers
-from .project import ProjectFormatError, load_production, load_scene
+from .project import ProjectFormatError, load_production, load_scene, writing_room
 from .transitions import list_transitions, public_transition, transition_asset_path
 
 
@@ -290,6 +290,10 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
                     for finding in scene["findings"]
                 ]
             )
+            return
+
+        if parsed.path == "/api/writing":
+            self._send_json(writing_room(self.project_root))
             return
 
         if parsed.path == "/api/knowledge":
