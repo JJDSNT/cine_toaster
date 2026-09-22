@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from cine_toaster.transitions import (
     list_transitions,
@@ -37,6 +38,18 @@ class TransitionTests(unittest.TestCase):
         self.assertIsNone(
             transition_asset_path("cross-dissolve", "transition.toml")
         )
+
+    def test_loads_a_production_owned_transition_from_the_amiga_demo(self) -> None:
+        project = Path(__file__).parents[1] / "examples" / "amiga-demo-reel"
+        transition = next(
+            item
+            for item in list_transitions(project)
+            if item["id"] == "amiga-copper-bars"
+        )
+
+        self.assertEqual(transition["origin"], "project")
+        self.assertEqual(transition["category"], "production")
+        self.assertTrue(transition["asset_path"].is_file())
 
 
 if __name__ == "__main__":

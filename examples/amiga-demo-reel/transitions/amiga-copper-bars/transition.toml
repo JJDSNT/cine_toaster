@@ -1,0 +1,22 @@
+schema_version = 1
+id = "amiga-copper-bars"
+name = "Amiga Copper Bars"
+kind = "glsl"
+asset = "transition.glsl"
+category = "production"
+description = "Copper-coloured raster bars sweep the incoming image over the outgoing shot."
+guidance = "A signature transition for this demo reel, not a neutral editorial default."
+energy = "high"
+motion = "horizontal sweep"
+duration_ms = 720
+tags = ["amiga", "copper", "raster-bars", "project-specific"]
+use_when = [
+  "The reel deliberately foregrounds its copper-bar visual identity",
+  "A transition should behave like part of the demo rather than invisible editing",
+]
+avoid_when = [
+  "The edit should be transparent",
+  "The copper accent conflicts with the incoming shot",
+]
+license = "CC0-1.0"
+author = "Amiga Demo Reel production"

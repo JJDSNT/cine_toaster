@@ -75,6 +75,12 @@ Later catalogs override earlier items with the same ID. This permits project
 pinning and customization without modifying application code. All asset paths
 are constrained to their transition directory.
 
+`examples/amiga-demo-reel/transitions/amiga-copper-bars/` is a working example
+of the third catalog. Its film-specific colour, pattern, and editorial purpose
+stay with the production while Cine Toaster owns only the loader and shader
+contract. See [Production-specific tooling](production-tooling.md) for the
+general ownership rule.
+
 ## Current boundary
 
 The first implementation is a preview and guidance bank. It executes GLSL live

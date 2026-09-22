@@ -66,6 +66,9 @@ Cine Toaster can currently:
   IDs opened from different locations;
 - prevent `toast demo` from creating runtime productions inside the application
   source checkout unless an explicit fixture-development override is supplied;
+- distinguish reusable Cine Toaster mechanisms from production-owned creative
+  values and one-off tools, demonstrated by a working project-local transition
+  in Amiga Demo Reel and the no-extension case in The Last Signal;
 - preserve project files as the production authority.
 
 Cine Toaster cannot yet:
@@ -90,6 +93,7 @@ required are all deleted.
 
 ## Delivered
 
+- `CT-0013` — production-specific tooling boundary and demo examples (`done`).
 - `CT-0002` — canonical take selection (`done`).
 - `CT-0008` — scene geometry, continuity checks, sequences, live board (`done`).
 - `CT-0009` — knowledge layer and the eyeline direction check (`done`).
@@ -133,11 +137,12 @@ will later consume.
 - adopting CopilotKit, an orchestrator, or a media UI library before its boundary
   is proven by a spike;
 - losing generation reproducibility by discarding provider provenance;
+- hiding one film's creative values inside application defaults;
 - claiming frame accuracy before measuring it.
 
 ## Validation baseline
 
-On 2026-09-20, the repository test suite passed 20 tests with:
+On 2026-09-20, the repository test suite passed 141 tests with:
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v
