@@ -109,8 +109,10 @@ decision, and continue from the committed result without bypassing permissions.
 
 ## Later evaluation
 
+- Okay Wannabe's production-stage UI and a node-based visual editor for clip
+  transitions (`CT-0020`);
 - ComfyUI local and remote generation adapters;
-- screenplay editor architecture;
+- Fountain screenplay editing and Final Draft FDX interchange (`CT-0021`);
 - external orchestrators such as LangGraph or ADK;
 - MLT/Kdenlive exchange and timeline integration;
 - detached workers and execution across full application exit or machine

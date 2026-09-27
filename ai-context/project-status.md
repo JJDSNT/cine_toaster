@@ -14,7 +14,7 @@ tags:
 
 # Project status
 
-Last updated: 2026-09-20
+Last updated: 2026-09-27
 
 ## Current phase
 
@@ -82,7 +82,13 @@ Cine Toaster cannot yet:
 
 ## Active work
 
-- No implementation item is currently in `doing` state.
+- `CT-0017` is in `doing` for the production schema and Amiga reel.
+- `CT-0015` is ready for cast entities and reference lineage.
+- `CT-0021` is ready to evaluate Fountain editing components and Final Draft
+  FDX interchange. Current screenplay support is read-only raw-text display.
+- `CT-0020` records a future UI evaluation: Okay Wannabe as a production-stage
+  reference and a node-based way to guide clip transitions. No interface or
+  schema choice has been made.
 
 ## Closed: scene import
 

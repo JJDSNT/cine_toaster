@@ -74,5 +74,15 @@ navigation rather than generic text editing. Before selecting a preview engine,
 measure synchronization, seeking, frame stepping, A/B switching, CPU/GPU use,
 and behavior with representative proxies.
 
+The Script room currently displays Fountain source without parsing or editing
+it. Evaluate reusable Fountain editing components and FDX interchange against
+real scripts before expanding support; see
+[`CT-0021`](../work/CT-0021-screenplay-tooling-evaluation.md).
+
+Evaluate [Okay Wannabe](https://okaywannabe.com/) as a reference for navigation
+through filmmaking stages, and a ComfyUI-like node interface for guiding clip
+transitions. The evaluation and its acceptance questions are tracked in
+[`CT-0020`](../work/CT-0020-interface-reference-and-transition-graph.md).
+
 Do not describe browser playback as frame-accurate until measured against known
 media and timecode.

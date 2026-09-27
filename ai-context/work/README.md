@@ -39,6 +39,10 @@ execution history and links to those destinations.
 
 ## Work queue
 
+- `CT-0021` — evaluate Fountain screenplay tools and Final Draft FDX
+  interchange (`ready`)
+- `CT-0020` — evaluate Okay Wannabe's UI and a visual graph for transitions
+  between clips (`ready`)
 - `CT-0017` — SPEC-0004 slice and the Amiga reel (`doing`)
 - `CT-0015` — the `cast` entity: sheet, executable reference, and
   generation lineage (`ready`, design accepted as `SPEC-0003`)
