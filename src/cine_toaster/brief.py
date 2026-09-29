@@ -39,7 +39,8 @@ SHOT_SIZES = (
 SENSOR_HEIGHT_MM = 36.0 * 9 / 16
 
 CUT_NAMES = {"hard": "Hard cut", "match": "Match cut", "action": "Cut on action", "j": "J-cut",
-             "l": "L-cut", "smash": "Smash cut", "jump": "Jump cut"}
+             "l": "L-cut", "smash": "Smash cut", "jump": "Jump cut",
+             "continuation": "Continuation of the previous shot (next generation, no visible cut)"}
 
 #: SceneFlow's cue types, by the tag that produced the text.
 _CUE_TYPES = {"CAM": "camera", "BLOCK": "shot", "ACT": "action", "DIAL": "dialogue",

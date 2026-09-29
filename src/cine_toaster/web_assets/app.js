@@ -1460,7 +1460,7 @@ async function renderDialogue() {
 
 const CUT_NAMES = {
   hard: "Hard cut", match: "Match cut", action: "Cut on action", j: "J-cut",
-  l: "L-cut", smash: "Smash cut", jump: "Jump cut",
+  l: "L-cut", smash: "Smash cut", jump: "Jump cut", continuation: "Continuation",
 };
 
 function renderJoins(scene) {

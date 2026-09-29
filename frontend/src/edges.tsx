@@ -5,7 +5,7 @@ export type CutEdge = Edge<CutData & Record<string, unknown>, "cut">;
 
 export const CUT_NAMES: Record<string, string> = {
   hard: "Cut", match: "Match cut", action: "Cut on action", j: "J-cut",
-  l: "L-cut", smash: "Smash cut", jump: "Jump cut",
+  l: "L-cut", smash: "Smash cut", jump: "Jump cut", continuation: "Continuation",
 };
 
 // A cut is the edge between two shots: what kind it is, what it passes

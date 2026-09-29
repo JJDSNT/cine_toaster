@@ -40,6 +40,7 @@ command can gate a generation run.
 | `jump_cut_undeclared` | warning | Two adjacent shots see the same subject from under 30° apart, at nearly the same size and screen place. It reads as a jump; declare `type: jump` if meant. |
 | `chain_pose_mismatch` | warning | A shot chains the previous last frame, but its camera or a subject starts somewhere else. |
 | `split_edit_without_sound` | warning | An L-cut whose outgoing shot ends on no dialogue, or a J-cut whose incoming shot starts on none. Judged only when the scene is linked to a screenplay. |
+| `continuation_unchained` | advice | A shot split across generations (`cut: {type: continuation}`) that does not open on the previous part's last frame. |
 | `transition_reason_missing` | advice | A catalog transition without a `reason`. |
 
 ## Movement within a shot
@@ -116,7 +117,7 @@ scenes belong to the sequence and are not checked here.
 shots:
   - n: 3
     cut:
-      type: j               # hard | match | action | j | l | smash | jump
+      type: j               # hard | match | action | j | l | smash | jump | continuation
       chain: frame          # this shot starts on the previous last frame
       reason: We hear the stack speak before we see her hear it.
 ```

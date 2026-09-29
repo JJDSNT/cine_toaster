@@ -14,7 +14,7 @@ from typing import Any
 from .geometry import Finding, SceneGeometry
 from .movement import MOVE_EPSILON_M, Pose, ShotMotion
 
-CUT_TYPES = ("hard", "match", "action", "j", "l", "smash", "jump")
+CUT_TYPES = ("hard", "match", "action", "j", "l", "smash", "jump", "continuation")
 CHAINS = ("frame",)
 
 #: Two setups closer than this around the subject read as the same setup.
@@ -117,7 +117,9 @@ def scene_cuts(
         declared_before, declared_after = _declared_subjects(before), _declared_subjects(after)
         different_subjects = bool(declared_before and declared_after and not declared_before & declared_after)
 
-        if exit_pose and entry_pose and cut_type != "jump" and not different_subjects:
+        # A continuation is one shot carried across a generation boundary: the
+        # same setup on both sides is the point, not a jump.
+        if exit_pose and entry_pose and cut_type not in ("jump", "continuation") and not different_subjects:
             exit_angles = {s: a for s, _, a in out.framed(at="end")}
             entry_angles = {s: a for s, _, a in into.framed(at="start")}
             for subject_id in sorted(exit_angles.keys() & entry_angles.keys()):
@@ -151,6 +153,11 @@ def scene_cuts(
                     f"{after['id']} chains {before['id']}'s last frame, but "
                     + ("its camera starts somewhere else" if not _same_pose(exit_pose, entry_pose) else "a subject is not where that frame left them")
                     + ". The generator would be handed a first frame from another setup."))
+
+        if cut_type == "continuation" and chain != "frame":
+            pair.append(_finding("continuation_unchained", "advice", scene_id, before, after,
+                f"{after['id']} continues {before['id']} but does not open on its last frame. "
+                f"Declare chain: frame, or the generator starts the continuation from nothing."))
 
         if cut_type in ("l", "j") and screenplay_linked:
             edge = _edge_unit(before, last=True) if cut_type == "l" else _edge_unit(after, last=False)

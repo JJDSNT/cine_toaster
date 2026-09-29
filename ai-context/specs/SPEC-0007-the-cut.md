@@ -39,7 +39,7 @@ convention: a shot's `transition` is already the join *into* that shot, and
 shots:
   - n: 3
     cut:
-      type: match          # hard (default) | match | action | j | l | smash | jump
+      type: match          # hard (default) | match | action | j | l | smash | jump | continuation
       chain: frame         # optional: this shot's first frame is the previous last frame
       reason: The stack's light becomes Mara's eye.
     transition: {id: dissolve, duration_ms: 600, reason: "..."}   # unchanged (SPEC-0004)
@@ -70,6 +70,7 @@ The record is derived and read-only. Only `cut` is authored.
 | `jump_cut_undeclared` | warning | A and B frame the same subject from nearly the same place: less than 30° apart around the subject, with less than 1.4× change in framing width. It reads as a jump; declare `type: jump` if that is the intent. |
 | `chain_pose_mismatch` | warning | `chain: frame` asks B to start on A's last frame, but B's start camera or a framed subject differs from A's end. The generator would receive a first frame from another camera. |
 | `split_edit_without_sound` | warning | An `l` cut, where A's sound runs over B, while A ends on no dialogue; or a `j` cut, where B's sound leads, while B starts on no dialogue. Uses SPEC-0006 coverage. It is skipped when the scene is not linked to a screenplay. |
+| `continuation_unchained` | advice | A `continuation` that does not declare `chain: frame`. The second part of a split shot must open on the first part's last frame, or the seam shows. |
 | `transition_reason_missing` | advice | A transition has no `reason`. SPEC-0004 requires one, because a choice without a reason cannot be reviewed. |
 
 `cut_screen_flip` (SPEC-0005) remains the screen-side check across a cut, and
@@ -85,6 +86,27 @@ the record lists it with the others.
   cut, with its findings.
 - The demo declares at least one non-hard cut. Both demos still pass
   `toast check`.
+
+# Amendment: continuation (2026-09-29, CT-0035)
+
+`type: continuation` joins two parts of **one** shot that was split across
+generations, because a model renders a few seconds at a time. Found on
+SINGULAR 3-01 P3a→P3b ("exact continuation … from its last frame").
+
+- It is not an editorial cut. The jump check is skipped: the same setup on
+  both sides is intended.
+- It expects `chain: frame`. Without it, `continuation_unchained` (advice)
+  is reported. With it, `chain_pose_mismatch` still catches a continuation
+  from another setup.
+- This is the first real-data form of the generation-unit question
+  (CT-0022 step 4): continuations are how one shot spans several
+  generations.
+
+**Trim is not a cut.** SINGULAR's legacy `corte` means a trim: handles
+`{antes, depois}` and in/out points `{inicio, fim}`. It must never be read as
+this spec's `cut`. A `trim` field is decided as a separate record, and will be
+specified when the assembly of generated takes exists, since that is the
+first thing that would read it.
 
 # Implementation notes
 

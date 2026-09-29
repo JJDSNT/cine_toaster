@@ -72,6 +72,20 @@ class CheckTests(unittest.TestCase):
         same = [{"id": "P1", "camera": "FRONT", "subject": "A"}, {"id": "P2", "camera": "FRONT-NUDGE", "subject": "A"}]
         self.assertEqual(codes(run(same)[1]), ["jump_cut_undeclared"])
 
+    def test_a_continuation_is_not_judged_as_a_jump(self):
+        shots = [{"id": "P1", "camera": "FRONT"}, {"id": "P2", "camera": "FRONT", "cut": {"type": "continuation", "chain": "frame"}}]
+        self.assertEqual(run(shots)[1], [])
+
+    def test_a_continuation_should_open_on_the_last_frame(self):
+        shots = [{"id": "P1", "camera": "FRONT"}, {"id": "P2", "camera": "FRONT", "cut": {"type": "continuation"}}]
+        findings = run(shots)[1]
+        self.assertEqual(codes(findings), ["continuation_unchained"])
+        self.assertEqual(findings[0].severity, "advice")
+
+    def test_a_continuation_from_another_setup_is_still_caught(self):
+        shots = [{"id": "P1", "camera": "FRONT"}, {"id": "P2", "camera": "SIDE", "cut": {"type": "continuation", "chain": "frame"}}]
+        self.assertEqual(codes(run(shots)[1]), ["chain_pose_mismatch"])
+
     def test_declared_jump_passes(self):
         _, findings = run([{"id": "P1", "camera": "FRONT"}, {"id": "P2", "camera": "FRONT-NUDGE", "cut": {"type": "jump"}}])
         self.assertEqual(findings, [])
