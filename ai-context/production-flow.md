@@ -40,7 +40,7 @@ versions.
 | Step | What exists | What is missing |
 | --- | --- | --- |
 | Master images | Discovered stills; the storyboard's best picture per shot | Generating them from blocking frame, cast and look (CT-0025 step 4, SPEC-0003) |
-| Clips | Takes per shot, as versions (`c02.mp4`, `_takes/`, `_rejected/`); `select_take`; comparison | Generation in blocks (CT-0037), content-based slicing into per-shot takes, and a generation adapter |
+| Clips | Takes per shot, as versions (`c02.mp4`, `_takes/`, `_rejected/`); `select_take`; comparison; **blocks and content-based slicing into takes with lineage** (CT-0037) | The generation adapter itself (needs a budget) |
 | Cuts and scene assembly | Cut records; **scene assembly from the chosen takes as kept versions** (`toast assemble`, versions panel); verdicts; restore | Transitions and J/L cuts in the assembly; speech-aware trims |
 | Sequences | Sequences declared in the manifest | Sequence assembly from approved scene versions, as versions |
 

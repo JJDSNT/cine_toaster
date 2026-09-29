@@ -647,3 +647,79 @@ def _adopted_assemble(job: dict[str, Any], placed: list[str]) -> None:
 
 register(JobKind("assemble", _validate_assemble, _run_assemble, _adopted_assemble))
 
+
+def _block_context(root: Path, scene_id: str, block_id: str):
+    from .blocks import scene_blocks
+    from .project import load_scene
+    from .takes import work_directory_for
+
+    scene = load_scene(root, scene_id)
+    if scene is None:
+        raise ValidationError(f"No scene {scene_id!r}")
+    work = work_directory_for(root / scene["file"])
+    block = next((item for item in scene_blocks(scene, work, root) if item.id == block_id), None)
+    if block is None:
+        raise ValidationError(f"{scene_id} has no block {block_id!r}")
+    return scene, work, block
+
+
+def _validate_slice(root: Path, params: dict[str, Any]) -> dict[str, Any]:
+    scene_id, block_id = str(params.get("scene", "")).strip(), str(params.get("block", "")).strip()
+    _, work, block = _block_context(root, scene_id, block_id)
+    if not block.clip:
+        raise ValidationError(f"Block {block_id} of {scene_id} has no clip (expected b{block_id}.mp4 in {work.name}/)")
+    if not block.contiguous:
+        raise ValidationError(f"Block {block_id} of {scene_id} is not a run of consecutive shots")
+    return {"scene": scene_id, "block": block_id}
+
+
+def _run_slice(context: JobContext) -> dict[str, Any]:
+    """Find where each shot starts in the block's clip, and cut one take per shot."""
+
+    from .blocks import clip_info, decide, reference_picture
+    from .takes import TAKES_DIRECTORIES, shot_key
+
+    root = context.project_root
+    scene, work, block = _block_context(root, context.params["scene"], context.params["block"])
+    clip = root / block.clip
+    length, fps = clip_info(clip)
+    shots = {shot["id"]: shot for shot in scene["shots"]}
+    references = [reference_picture(work, root, scene, shots[shot_id]) for shot_id in block.shots]
+    context.progress(0.05, "Finding the cuts")
+    slicing = decide(clip, block.durations, references, fps)
+    ffmpeg = shutil.which("ffmpeg")
+    ends = slicing.starts[1:] + [round(length * fps)]
+    takes_dir = work / TAKES_DIRECTORIES[0]
+    files, slices = [], []
+    for index, (shot_id, start, end) in enumerate(zip(block.shots, slicing.starts, ends)):
+        number = shot_key(shots[shot_id]["number"])
+        digits = "".join(ch for ch in number if ch.isdigit())
+        stem = f"c{int(digits):02d}{number[len(digits):]}" if digits else f"c{number}"
+        slug, attempt = f"block-{block.id}", 1
+        while (takes_dir / f"{stem}-{slug}.mp4").exists():
+            attempt += 1
+            slug = f"block-{block.id}-{attempt}"
+        name = f"{stem}-{slug}.mp4"
+        context.run_process(
+            [ffmpeg, "-y", "-loglevel", "error", "-ss", f"{start / fps:.4f}", "-to", f"{end / fps:.4f}", "-i", str(clip),
+             "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p", "-c:a", "aac", str(context.staging / name)],
+            expected_seconds=(end - start) / fps, message=f"Cutting {shot_id}",
+            span=(0.1 + 0.85 * index / len(block.shots), 0.1 + 0.85 * (index + 1) / len(block.shots)),
+        )
+        provenance = {
+            "kind": "block-slice", "block": block.id, "clip": block.clip, "frames": [start, end],
+            "seconds": [round(start / fps, 3), round(end / fps, 3)], "method": slicing.method,
+            "detected": slicing.detected, "requested": slicing.requested, "note": slicing.note,
+            "reference": references[index].relative_to(root).as_posix() if references[index] else "",
+            "job": context.job_id,
+        }
+        (context.staging / f"{name}.provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
+        destination = (takes_dir / name).relative_to(root).as_posix()
+        files += [{"staged": name, "destination": destination},
+                  {"staged": f"{name}.provenance.json", "destination": destination + ".provenance.json"}]
+        slices.append({"shot": shot_id, "take": slug.upper(), "seconds": provenance["seconds"]})
+    return {"files": files, "summary": {"block": block.id, "method": slicing.method, "note": slicing.note, "slices": slices}}
+
+
+register(JobKind("slice_block", _validate_slice, _run_slice))
+

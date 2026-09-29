@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -36,6 +38,7 @@ class DiscoveredTake:
     status: str
     media: str
     note: str
+    provenance: dict[str, Any] | None = None
 
     def public_dict(self) -> dict[str, Any]:
         return {
@@ -48,7 +51,7 @@ class DiscoveredTake:
             "duration_seconds": 0.0,
             "cost_usd": 0.0,
             "created_at": "",
-            "provenance": {},
+            "provenance": dict(self.provenance or {}),
             "selectable": self.status != "rejected",
         }
 
@@ -100,6 +103,7 @@ def discover(work_directory: Path, number: Any, *, relative_to: Path) -> list[Di
             status=status,
             media=path.relative_to(relative_to).as_posix(),
             note=note,
+            provenance=read_provenance(path),
         )
 
     for stem in sorted(stems):
@@ -129,6 +133,22 @@ def discover(work_directory: Path, number: Any, *, relative_to: Path) -> list[Di
                     break
 
     return sorted(found.values(), key=lambda take: (take.status == "rejected", take.id))
+
+
+PROVENANCE_SUFFIX = ".provenance.json"
+
+
+def read_provenance(media: Path) -> dict[str, Any]:
+    """Where a take came from, when something recorded it beside the file."""
+
+    sidecar = media.with_name(media.name + PROVENANCE_SUFFIX)
+    if not sidecar.is_file():
+        return {}
+    try:
+        value = json.loads(sidecar.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
 
 
 def work_directory_for(scene_file: Path) -> Path:

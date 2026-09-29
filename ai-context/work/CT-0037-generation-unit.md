@@ -2,7 +2,7 @@
 id: CT-0037
 title: The generation unit — evidence from SINGULAR's pipeline (plan step 9)
 type: work
-status: ready
+status: doing
 owner: development agent
 created_at: 2026-09-29
 updated_at: 2026-09-29
@@ -58,9 +58,51 @@ generation). SINGULAR's own pipeline has already answered it in practice
 4. The first generation adapter wraps the existing endpoint through the
    jobs runtime (SPEC-0008), with cost shown before a run.
 
+# Done: blocks and slicing, at no cost (2026-09-29)
+
+- **Core fields.**
+  - `block`: shots made in one generation.
+  - `generated_seconds`: how long a generation is asked to be. This is
+    distinct from `duration`, the edit length. In SINGULAR, `seg` is the
+    generation length and `dur` is the edit length. An earlier mapping of
+    `seg` to `duration` was wrong and has been corrected.
+  - `trim`.
+  - The scene payload lists its `blocks` (shots, generation lengths, clip,
+    contiguity). `block_not_contiguous` (warning) has a practice.
+- **`blocks.py`, reimplemented from the description above** (not copied):
+  - detects the clip's real cuts, ignoring the first 0.35 s, where a
+    generation eases out of its still frame;
+  - assigns stretches to shots in order by 32×18 picture signatures against
+    each shot's reference picture: its still, `p<n>.png`, or the image of the
+    shot or master it is made from (`pmA.png`);
+  - without pictures, trusts one detected cut per shot; otherwise it falls
+    back to the requested cuts, and says so.
+- **Job kind `slice_block`.** Each slice becomes a take
+  `_takes/c<nn>-block-<id>.mp4`, and existing takes are never replaced. A
+  `.provenance.json` beside it records the block, clip, frames, method and
+  job. Take discovery now reads that provenance.
+- **Interfaces.** `toast slice <project> <scene> <block> [--dry-run]`, and a
+  Blocks panel in the scene room (clip and "Slice into takes").
+- **SINGULAR** maps `bloco` to `block` and `seg` to `generated_seconds`
+  (commits in its git).
+
+**Validation on SINGULAR** (on a copy): all six blocks with clips slice
+exactly where SINGULAR's own tool did.
+
+| Block | Method | Slices (s) | SINGULAR's own takes |
+| --- | --- | --- | --- |
+| 1-03 b4 | detected | 4.917 / 6.125 | `c08` 4.917, `c09` 6.125 |
+| 1-03 b5 | detected | 4.833 / 9.208 | `c10` 4.833, `c11` 9.208 |
+| 1-03 b1 | detected | 10.833 / 6.208 | `c02` 10.833, `c03` 6.208 |
+| 1-03 b2 | requested (no cut found) | 11.0 / 5.04 | `c04` 11.0 |
+| 1-02A b1 | content (extra cut merged; P10 returns to P8's face) | 3.792 / 4.125 / 11.125 | `c08`, `c09`, `c10` identical |
+| 1-02A b2 | content | 4.5 / 9.542 | `c11` 4.5, `c12` 9.542 |
+
+Tests: `tests/test_blocks.py` (9 tests), including a synthetic clip with an
+extra cut and a returning shot.
+
 # Open questions
 
-- Whether `block` becomes a core shot field. SINGULAR could map its `bloco`
-  with `maps_to` (CT-0035).
+- ~~Whether `block` becomes a core shot field~~ decided: it is.
 - Spending: every run costs money on RunPod. Test runs need the user's
   approval and a budget.

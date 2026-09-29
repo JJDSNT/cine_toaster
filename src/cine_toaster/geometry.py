@@ -16,6 +16,7 @@ CHECK_CODES = frozenset(
         "axis_subject_missing",
         "camera_outside_room",
         "chain_pose_mismatch",
+        "block_not_contiguous",
         "continuation_unchained",
         "cut_type_unknown",
         "cut_screen_flip",

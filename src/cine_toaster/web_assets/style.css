@@ -596,3 +596,10 @@ dialog::backdrop { background: #000b; }
 .job-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .module-navigation .nav-link { color: inherit; text-decoration: none; }
 .screenplay-edit { display: inline-block; margin: 0 0 12px; text-decoration: none; }
+
+/* --- Generation blocks (CT-0037) ----------------------------------------- */
+.block-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.block-card { border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: grid; gap: 8px; }
+.block-card.warning { border-color: #e7b75c; }
+.block-card video { width: 100%; border-radius: 6px; background: #000; }
+.block-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }

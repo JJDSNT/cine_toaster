@@ -10,6 +10,7 @@ from .errors import ResourceNotFoundError, ValidationError
 from .geometry import Finding, check_geometry, parse_geometry
 from .movement import check_movement, shot_motions
 from . import screenplay as script_model
+from .blocks import scene_blocks
 from .cuts import scene_cuts
 from .looks import load_looks, resolve as resolve_look
 from .state import SceneState, load_scene_state
@@ -163,7 +164,11 @@ def _load_shots(
                 "subject": vtext(raw, "subject"),
                 "looks_at": vtext(raw, "looks_at"),
                 "description": vtext(raw, "action"),
-                "duration_seconds": float(field(raw, "duration") or 0),
+                # How long the shot plays in the cut; without one, the length of its
+                # generation is the best estimate there is.
+                "duration_seconds": float(field(raw, "duration") or field(raw, "generated_seconds") or 0),
+                # How long a generation is asked to be (CT-0037): not the edit length.
+                "generated_seconds": float(field(raw, "generated_seconds") or 0),
                 "look": vtext(raw, "look"),
                 "from": _lineage(raw),
                 "variant": vtext(raw, "variant"),
@@ -180,6 +185,9 @@ def _load_shots(
                 "motion": None,
                 "covers": field(raw, "covers"),
                 "cut": field(raw, "cut") if isinstance(field(raw, "cut"), dict) else None,
+                # CT-0037: shots made together in one generation share a block.
+                "block": _text(field(raw, "block")),
+                "trim": field(raw, "trim") if isinstance(field(raw, "trim"), dict) else None,
                 "script": None,
                 "authored_status": "",
                 "authored_selected_take": "",
@@ -390,6 +398,14 @@ def _load_scene(
         earlier=findings,
     )
     findings.extend(finding.public_dict() for finding in cut_findings)
+    blocks = scene_blocks({"shots": shots}, work_directory_for(path), root)
+    for block in blocks:
+        if not block.contiguous:
+            findings.append(Finding(
+                code="block_not_contiguous", severity="warning", scene_id=scene_id, shots=tuple(block.shots),
+                message=(f"Block {block.id} holds {', '.join(block.shots)}, which are not consecutive. "
+                         f"A generation makes one continuous run of shots; the shots between would be cut out of it."),
+            ).public_dict())
 
     decisions = [
         {
@@ -444,6 +460,7 @@ def _load_scene(
         "geometry": geometry.public_dict(),
         "script": script_link,
         "cuts": cuts,
+        "blocks": [block.public_dict() for block in blocks],
         "findings": findings,
         "decision_log": list(reversed(state.decisions)),
         "pending_shots": pending_shots,

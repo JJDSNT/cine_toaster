@@ -162,10 +162,10 @@ canvas at `/canvas/`. Step 8 is done: the screenplay editor (ADR 0016, amending 
 `/app/script.html`. SINGULAR was validated read-only (CT-0035), and several
 fixes and a SPEC-0007 amendment (continuation) came from it. The flow is framed in two phases (`production-flow.md`): fitting the
 screenplay and storyboard, then producing what was defined, with versions.
-Scene assembly from the chosen takes now makes kept versions (CT-0038). The
-next actions, in order:
+Scene assembly from the chosen takes now makes kept versions (CT-0038). Generation blocks and content-based slicing into takes are done (CT-0037);
+they match SINGULAR's own slicing on all six blocks. The next actions, in
+order:
 
-- slicing existing block clips into per-shot takes (CT-0037), at no cost;
 - sequence assembly;
 - the generation adapter, which needs a spending budget from the user.
 

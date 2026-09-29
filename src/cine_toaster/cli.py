@@ -374,6 +374,29 @@ def command_assemble(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_slice(args: argparse.Namespace) -> int:
+    """Slice a block's clip into one take per shot, by where the model really cut (CT-0037)."""
+
+    from .jobs import JobManager
+
+    manager = JobManager()
+    try:
+        job = manager.wait(manager.submit("slice_block", args.project, {"scene": args.scene, "block": args.block})["id"])
+        if job["state"] != "succeeded":
+            print(f"slice {job['state']}: {job.get('error') or job['message']}  (job {job['id']})", file=sys.stderr)
+            return 1
+        if not args.dry_run:
+            job = manager.adopt(job["id"])
+    finally:
+        manager.shutdown()
+    summary = job["result"]["summary"]
+    print(f"{args.scene} block {summary['block']}: cuts {summary['method']}" + (f" ({summary['note']})" if summary["note"] else ""))
+    for item in summary["slices"]:
+        print(f"  {item['shot']:5} take {item['take']:12} {item['seconds'][0]:.3f}–{item['seconds'][1]:.3f} s")
+    print("  (not adopted: --dry-run)" if args.dry_run else "  adopted as takes; choose between them in the control room")
+    return 0
+
+
 def command_jobs(args: argparse.Namespace) -> int:
     """Background work: list, inspect, cancel, retry, adopt (SPEC-0008)."""
 
@@ -1062,6 +1085,15 @@ def build_parser() -> argparse.ArgumentParser:
     assemble_parser.add_argument("--version", help="default: the next free v<n>")
     assemble_parser.add_argument("--summary", help="what changed in this version")
     assemble_parser.set_defaults(function=command_assemble)
+
+    slice_parser = subparsers.add_parser(
+        "slice", help="Slice a generation block's clip into one take per shot"
+    )
+    slice_parser.add_argument("project", type=Path)
+    slice_parser.add_argument("scene")
+    slice_parser.add_argument("block")
+    slice_parser.add_argument("--dry-run", action="store_true", help="find and cut, but do not adopt the takes")
+    slice_parser.set_defaults(function=command_slice)
 
     jobs_parser = subparsers.add_parser("jobs", help="Background work: list, show, cancel, retry, adopt")
     jobs_actions = jobs_parser.add_subparsers(dest="jobs_command", required=True)

@@ -360,6 +360,8 @@ async function renderScene(sceneId, { record = true } = {}) {
   columns.append(renderShots(scene), renderDecisions(scene));
   root.append(columns);
 
+  const blocks = renderBlocks(scene);
+  if (blocks) root.append(blocks);
   root.append(renderVersions(scene, { onChanged: () => renderScene(sceneId) }));
 
   const blockout = renderBlockout(scene);
@@ -1459,6 +1461,51 @@ async function renderDialogue() {
 }
 
 // ---- Production: is this good? ----------------------------------------------
+
+// Generation blocks (CT-0037): shots made together in one generation, and the
+// clip that came back. Slicing finds where the model really cut and turns each
+// stretch into a take of its shot, kept beside the others.
+function renderBlocks(scene) {
+  const blocks = scene.blocks || [];
+  if (!blocks.length) return null;
+  const panel = el("section", "panel wide-panel");
+  panel.append(sectionHeading(
+    "BLOCKS",
+    "Shots generated together",
+    "Each block is one generation. Slicing its clip gives every shot a new take, cut where the model really cut.",
+  ));
+  const list = el("div", "block-list");
+  for (const block of blocks) {
+    const card = el("article", `block-card ${block.contiguous ? "" : "warning"}`);
+    const head = el("div", "block-head");
+    head.append(el("strong", "", `Block ${block.id}`), el("span", "muted", `${block.shots.join(" · ")} · ${block.duration}s`));
+    card.append(head);
+    if (block.clip) {
+      const video = el("video");
+      video.src = `/media/${block.clip}`;
+      video.controls = true;
+      video.preload = "metadata";
+      card.append(video);
+      const slice = button("Slice into takes", async () => {
+        slice.disabled = true;
+        try {
+          await startJob("slice_block", { scene: scene.id, block: block.id });
+        } catch (error) {
+          alert(error.message);
+        } finally {
+          slice.disabled = false;
+        }
+      }, "quiet-button");
+      card.append(slice);
+    } else {
+      card.append(el("p", "muted", `No clip yet (b${block.id}.mp4 in the scene's work folder).`));
+    }
+    if (!block.contiguous) card.append(el("p", "join-finding warning", "These shots are not consecutive in the cut."));
+    list.append(card);
+  }
+  panel.append(list);
+  return panel;
+}
 
 const CUT_NAMES = {
   hard: "Hard cut", match: "Match cut", action: "Cut on action", j: "J-cut",

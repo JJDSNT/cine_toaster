@@ -167,6 +167,9 @@ CORE_SHOT_FIELDS: frozenset[str] = frozenset(
         "covers",
         # SPEC-0007: how this shot is entered from the previous one.
         "cut",
+        "block",
+        "generated_seconds",
+        "trim",
     }
 )
 
