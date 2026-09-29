@@ -89,10 +89,12 @@ Cine Toaster cannot yet:
 - `CT-0020` records a future UI evaluation: Okay Wannabe as a production-stage
   reference and a node-based way to guide clip transitions. No interface or
   schema choice has been made.
-- `CT-0022` is ready: camera movement and cuts between clips are the main
+- `CT-0022` is in `doing`: camera movement and cuts between clips are the main
   production pain. External references are screened and ranked in
-  `references.md`. The graph view follows Arcads' production canvas, not
-  ComfyUI.
+  `references.md`, and the SceneFlow spike is done. Briefs can be derived from
+  records, including screen sides from geometry. The gaps are subject and
+  camera movement within a shot and a shot's exit state. Demo SC-030 contains
+  a P2→P3 position jump that `toast check` cannot see yet.
 
 ## Closed: scene import
 

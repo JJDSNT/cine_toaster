@@ -40,7 +40,7 @@ execution history and links to those destinations.
 ## Work queue
 
 - `CT-0022` — camera movement, cuts between clips, and an Arcads-style
-  graph; external references screened (`ready`)
+  graph; SceneFlow spike done (`doing`)
 - `CT-0021` — evaluate Fountain screenplay tools and Final Draft FDX
   interchange (`ready`)
 - `CT-0020` — evaluate Okay Wannabe's UI and a visual graph for transitions
