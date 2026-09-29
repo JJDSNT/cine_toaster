@@ -112,8 +112,9 @@ def _references(raw: Any, base: Path, root: Path, problems: list[str], where: st
         role = str(item.get("role") or "supporting")
         if kind not in REFERENCE_KINDS:
             problems.append(f"{where}: reference kind {kind!r} is not one of {', '.join(REFERENCE_KINDS)}")
-        path = base / str(item["path"])
-        references.append(Reference(path.relative_to(root).as_posix() if path.is_relative_to(root) else str(item["path"]),
+        path = (base / str(item["path"])).resolve()
+        inside = path.is_relative_to(root.resolve())
+        references.append(Reference(path.relative_to(root.resolve()).as_posix() if inside else str(item["path"]),
                                     kind, role, path.is_file(), _digest(path)))
     for kind in REFERENCE_KINDS:
         masters = [ref for ref in references if ref.kind == kind and ref.role == "master"]

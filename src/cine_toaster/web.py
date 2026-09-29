@@ -322,6 +322,31 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             self._send_json(review)
             return
 
+        if parsed.path in ("/api/pictures", "/api/picture-plan"):
+            # Master pictures made by editing a source with the cast (CT-0037).
+            from . import spend
+            from .jobs import _picture_plan
+            from .pictures import scene_pictures
+
+            scene_id = query.get("scene", [""])[0]
+            try:
+                if parsed.path == "/api/pictures":
+                    production = cached_production(self.project_root)
+                    scene = next((item for item in production["scenes"] if item["id"] == scene_id), None)
+                    if scene is None:
+                        self._send_json({"error": "Scene not found"}, HTTPStatus.NOT_FOUND)
+                        return
+                    self._send_json(scene_pictures(self.project_root, scene))
+                    return
+                plan, _, _ = _picture_plan(self.project_root, {"scene": scene_id, "shot": query.get("shot", [""])[0]})
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+                return
+            ledger = spend.load()
+            self._send_json({**plan.public_dict(self.project_root), "spent_usd": spend.spent(ledger),
+                             "limit_usd": float(ledger.get("limit_usd") or 0)})
+            return
+
         if parsed.path == "/api/generation-plan":
             # What a block's generation would send and cost, before anyone pays (CT-0037).
             from . import spend

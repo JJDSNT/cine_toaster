@@ -465,6 +465,55 @@ def command_generate(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_picture(args: argparse.Namespace) -> int:
+    """A master picture made by editing its source with the cast, within the budget."""
+
+    from . import spend
+    from .jobs import _picture_plan
+    from .providers.runpod import load_credentials
+
+    root = Path(args.project).expanduser().resolve()
+    if args.env_file:
+        load_credentials(Path(args.env_file).expanduser())  # never printed
+    plan, _, _ = _picture_plan(root, {"scene": args.scene, "shot": args.shot, "seed": args.seed})
+    if args.json and args.dry_run:
+        print(json.dumps(plan.public_dict(root), indent=2, ensure_ascii=False))
+        return 0
+    from .pictures import relative
+
+    print(f"{plan.scene} {plan.shot}: edit {relative(root, plan.source)} at {plan.size[0]}x{plan.size[1]}, seed {plan.seed}")
+    for ref in plan.references:
+        print(f"  identity: {ref['member']}" + (f" ({ref['variant']})" if ref["variant"] else "")
+              + f" from {relative(root, ref['path'])}")
+    for note in plan.notes:
+        print(f"  note: {note}")
+    print(f"  estimate US$ {plan.estimate_usd:.3f}; spent US$ {spend.spent():.2f} of US$ {spend.load().get('limit_usd') or 0:.2f}")
+    print("\n" + plan.prompt + "\n")
+    if args.dry_run:
+        print("Nothing was sent (--dry-run).")
+        return 0
+    from .jobs import JobManager
+
+    manager = JobManager()
+    try:
+        job = manager.submit("derive_picture", root, {"scene": plan.scene, "shot": plan.shot, "seed": plan.seed})
+        try:
+            job = manager.wait(job["id"])
+        except KeyboardInterrupt:
+            manager.cancel(job["id"])
+            job = manager.wait(job["id"])
+        if job["state"] != "succeeded":
+            print(f"picture {job['state']}: {job.get('error') or job['message']}  (job {job['id']})", file=sys.stderr)
+            return 1
+        job = manager.adopt(job["id"])
+    finally:
+        manager.shutdown()
+    summary = job["result"]["summary"]
+    print(f"Made {summary['picture']} for US$ {summary['cost_usd']:.3f}; edges kept from the source: "
+          f"{summary['edge_score']} (under 17: recomposed). A moved subject can still score well: look at it.")
+    return 0
+
+
 def command_revoice(args: argparse.Namespace) -> int:
     """A take's speech in the cast member's own voice, as a new take (CT-0040)."""
 
@@ -1299,6 +1348,17 @@ def build_parser() -> argparse.ArgumentParser:
     costs_parser.add_argument("project", type=Path)
     costs_parser.add_argument("--json", action="store_true")
     costs_parser.set_defaults(function=command_costs)
+
+    picture_parser = subparsers.add_parser(
+        "picture", help="Make a master picture by editing its source (a render) with the cast, as a new version")
+    picture_parser.add_argument("project", type=Path)
+    picture_parser.add_argument("scene")
+    picture_parser.add_argument("shot")
+    picture_parser.add_argument("--seed", type=int, default=1)
+    picture_parser.add_argument("--dry-run", action="store_true", help="show the source, the faces and the prompt; send nothing")
+    picture_parser.add_argument("--json", action="store_true", help="with --dry-run, the plan as JSON")
+    picture_parser.add_argument("--env-file", help="read RUNPOD_API_KEY and RUNPOD_QWEN_ENDPOINT_ID from this file")
+    picture_parser.set_defaults(function=command_picture)
 
     voice_convert = subparsers.add_parser(
         "revoice", help="A take's speech in the cast member's own voice, as a new take (the room is kept)")

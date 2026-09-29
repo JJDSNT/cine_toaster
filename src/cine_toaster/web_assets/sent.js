@@ -105,6 +105,56 @@ function generation(record, { plan = false } = {}) {
   return view;
 }
 
+// A picture repainted by an editor: what it edited, whose faces, and the words.
+function derivation(record, { plan = false } = {}) {
+  const view = el("div", "sent-view");
+  const score = record.edge_score;
+  const row = facts([
+    ["Model", record.model],
+    ["Size", record.width ? `${record.width}×${record.height}` : ""],
+    ["Seed", record.seed],
+    [plan ? "Estimate" : "Estimated", money(record.estimate_usd)],
+    ["Cost", plan ? "" : money(record.cost_usd)],
+    ["GPU", gpuSeconds(record.job)],
+    ["Edges kept", score != null ? `${score}${score < 17 ? " (recomposed)" : ""}` : ""],
+    ["Budget", plan && record.limit_usd != null
+      ? (record.limit_usd ? `US$ ${record.spent_usd.toFixed(2)} of ${record.limit_usd.toFixed(2)} spent` : "not set")
+      : ""],
+  ]);
+  if (row) view.append(row);
+  const strip = el("div", "sent-pictures");
+  const figure = (path, title, detail, digest) => {
+    const card = el("figure", "sent-picture");
+    const image = el("img");
+    image.src = media(path);
+    image.alt = path;
+    const caption = el("figcaption");
+    caption.append(el("strong", "", title), el("span", "", detail),
+      el("small", "", path.split("/").pop() + (digest ? ` · ${digest}` : "")));
+    card.append(image, caption);
+    return card;
+  };
+  if (record.source) strip.append(figure(record.source.path, "Image 1: edited", "its geometry is kept", record.source.digest));
+  (record.references || []).forEach((ref, index) => strip.append(figure(ref.path, `Image ${index + 2}: identity`,
+    `${ref.member}${ref.variant ? ` (${ref.variant})` : ""}`, ref.digest)));
+  if (strip.childElementCount) view.append(strip);
+  if (record.request) {
+    const box = el("div", "sent-prompt");
+    const asked = el("p", "sent-section");
+    asked.append(el("span", "sent-shot", "Asked for"), el("span", "", record.request));
+    box.append(asked);
+    const full = el("details", "sent-details");
+    full.append(el("summary", "", "The whole prompt, with the geometry clauses"), el("p", "sent-whole", record.prompt || ""));
+    box.append(full);
+    view.append(box);
+  }
+  if (!plan && score != null) {
+    view.append(el("p", "muted", "The edge score catches a recomposed frame, not a subject that moved: look before approving."));
+  }
+  for (const note of record.notes || []) view.append(el("p", "join-finding warning", note));
+  return view;
+}
+
 function outside(job) {
   const view = el("div", "sent-view");
   view.append(el("p", "muted", "Made outside Cine Toaster: the platform's job is recorded, what was sent to the model is not."));
@@ -147,6 +197,9 @@ function revoice(record) {
 // The view for any record; null when nothing was recorded.
 export function sentView(record, { plan = false } = {}) {
   if (!record || !Object.keys(record).length) return null;
+  if (record.kind === "picture-derivation" || (plan && record.source && record.references)) {
+    return derivation(record, { plan });
+  }
   if (plan || record.kind === "block-generation") return generation(record, { plan });
   if (record.kind === "block-slice") return slice(record);
   if (record.kind === "voice-conversion") return revoice(record);
@@ -156,7 +209,7 @@ export function sentView(record, { plan = false } = {}) {
 
 function viewable(record) {
   if (!record || !Object.keys(record).length) return false;
-  if (["block-generation", "block-slice", "voice-conversion"].includes(record.kind)) return true;
+  if (["block-generation", "block-slice", "voice-conversion", "picture-derivation"].includes(record.kind)) return true;
   return Boolean(record.job) && Object.keys(record).length === 1;
 }
 

@@ -1,3 +1,35 @@
+# Generating
+
+## Master pictures
+
+A master picture is made by **editing** another picture, usually a render
+of the 3D set, with the cast's faces. It is not generated from words: the
+render decides where everything is, and the cast sheets decide who.
+
+```yaml
+- n: mA
+  derive:
+    from: rA                   # a shot or master whose picture is edited, or a file
+    with: [CLAIRE]             # whose face; the scene's `cast` picks the variant
+    request: The head on the pillow becomes the young woman in image 2, ...
+```
+
+```bash
+toast picture <project> 1-02A Pma --dry-run          # the source, the faces, the prompt, the estimate
+toast picture <project> 1-02A Pma --env-file ~/.env  # one paid edit -> work/pmA-1.png, beside pmA.png
+```
+
+The editor is told that image 1 alone decides the geometry. References are
+padded to the frame's proportion, and the size follows the source (see the
+`qwen-image-edit` knowledge profile for why). Each version records its
+source and faces with digests, the request, the prompt, the seed, the cost,
+and an **edge score**: the edges kept from the source.
+
+A score under 17 means the frame was recomposed. A good score does not
+prove the people stayed where the render put them, so look before using a
+picture. The scene's **Pictures** panel shows every version, what it was
+made from, and what a new edit would be given.
+
 # Generating a block
 
 A **block** is a run of consecutive shots made in one generation

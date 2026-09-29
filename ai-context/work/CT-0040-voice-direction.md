@@ -178,8 +178,10 @@ profile `chatterbox-vc` (7 claims).
 
 Remaining:
 
-- the author listening. That decides whether the delivery (Kael weak in
-  3-01) survives;
+- the author listening, deferred at the author's request (2026-09-29).
+  They will judge whether Kael's converted voice in 3-01 still sounds ill
+  or has become healthy. Until then, conversion is not applied where the
+  state of the voice matters. Noted in `singular/docs/SINGULAR-CINE-TOASTER.md`;
 - converting per speaker in two-speaker takes, which needs diarization;
 - a control-room action;
 - applying conversion inside `assemble` rather than as a take.

@@ -199,6 +199,7 @@ def _load_shots(
                 # CT-0037: shots made together in one generation share a block.
                 "block": _text(field(raw, "block")),
                 "trim": field(raw, "trim") if isinstance(field(raw, "trim"), dict) else None,
+                "derive": _derive(field(raw, "derive")),
                 "script": None,
                 "authored_status": "",
                 "authored_selected_take": "",
@@ -228,17 +229,37 @@ def _lineage(raw: dict[str, Any]) -> list[dict[str, Any]]:
     """
 
     entries: list[dict[str, Any]] = []
-    for name in ("from", *LEGACY_KEYS["from"]):
+    for name in ("from", "derive", *LEGACY_KEYS["from"]):
         value = raw.get(name)
         if value in (None, "", [], {}):
             continue
         items = value if isinstance(value, list) else [value]
         for item in items:
             if isinstance(item, dict):
-                entries.append({"ref": _text(item.get("ref") or item.get("id")), **item})
+                # A derivation names its source as `from` (legacy `deriva`: `de`).
+                ref = item.get("ref") or item.get("id") or item.get("from") or item.get("de")
+                entries.append({"ref": _text(ref), **item})
             else:
                 entries.append({"ref": _text(item), "relation": name if name != "from" else ""})
     return entries
+
+
+def _derive(value: Any) -> dict[str, Any] | None:
+    """A picture made by editing another: `{from, with, request}`.
+
+    `from` is the shot, master or file whose picture is edited (its geometry
+    and framing are kept); `with` names the cast whose references lend
+    identity; `request` says what the surfaces become.
+    """
+
+    if not isinstance(value, dict):
+        return None
+    cast = value.get("with") or []
+    return {
+        "from": _text(value.get("from")),
+        "with": [_text(item) for item in (cast if isinstance(cast, list) else [cast])],
+        "request": " ".join(_text(value.get("request")).split()),
+    }
 
 
 def _notes(raw: dict[str, Any]) -> list[str]:

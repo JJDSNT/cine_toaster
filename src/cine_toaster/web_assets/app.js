@@ -503,6 +503,8 @@ async function renderScene(sceneId, { record = true } = {}) {
   columns.append(renderShots(scene), renderDecisions(scene));
   root.append(columns);
 
+  // Master pictures come before the blocks that animate them.
+  if (scene.shots.some((shot) => shot.derive)) root.append(renderPictures(scene));
   const blocks = renderBlocks(scene);
   if (blocks) root.append(blocks);
   root.append(renderVersions(scene, { onChanged: () => renderScene(sceneId) }));
@@ -1608,6 +1610,88 @@ async function renderDialogue() {
 // Generation blocks (CT-0037): shots made together in one generation, and the
 // clip that came back. Slicing finds where the model really cut and turns each
 // stretch into a take of its shot, kept beside the others.
+// Master pictures made by editing a source -- a render of the 3D set -- with
+// the cast's faces. Every edit is a version beside the picture; each shows
+// what it was made from, and a new one is sent from the view of what it
+// would be given.
+function renderPictures(scene) {
+  const panel = el("section", "panel wide-panel");
+  panel.append(sectionHeading(
+    "PICTURES",
+    "Master pictures",
+    "Each is an edit of its source with the cast's faces. Versions are kept; nothing replaces the picture in use.",
+  ));
+  const list = el("div", "block-list");
+  panel.append(list);
+  api(`/api/pictures?scene=${encodeURIComponent(scene.id)}`).then((pictures) => {
+    for (const picture of pictures) list.append(pictureCard(scene, picture));
+  }).catch((error) => list.append(el("p", "join-finding warning", error.message)));
+  return panel;
+}
+
+function pictureCard(scene, picture) {
+  const card = el("article", "block-card");
+  const head = el("div", "block-head");
+  head.append(el("strong", "", picture.number), el("span", "muted", picture.label));
+  card.append(head);
+  const versions = picture.versions;
+  const image = el("img", "picture-version");
+  const sent = el("div", "block-sent");
+  let chosen = versions[0];
+  const show = (version) => {
+    chosen = version;
+    image.src = `/media/${version ? version.path : picture.source}`;
+    const details = version ? sentDetails(version.record, `What ${version.path.split("/").pop()} was made from`) : null;
+    sent.replaceChildren(...(details ? [details] : []));
+  };
+  card.append(image);
+  if (!versions.length) card.append(el("p", "muted", `No picture yet; its source is ${picture.source || "missing"}.`));
+  if (versions.length > 1) {
+    const row = el("div", "block-versions");
+    for (const version of versions) {
+      const name = version.path.split("/").pop().replace(/\.[^.]+$/, "");
+      const pick = button(name, () => {
+        show(version);
+        row.querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === pick));
+      }, `quiet-button ${version === chosen ? "active" : ""}`);
+      row.append(pick);
+    }
+    card.append(row);
+  }
+  show(chosen);
+  const planned = el("div", "block-plan");
+  const open = button("What would be sent…", async () => {
+    open.disabled = true;
+    try {
+      const query = new URLSearchParams({ scene: scene.id, shot: picture.shot });
+      const plan = await api(`/api/picture-plan?${query}`);
+      const view = el("div", "sent-plan");
+      view.append(el("h4", "", `${picture.number}: what the editor would be given`), sentView(plan, { plan: true }));
+      const actions = el("div", "take-actions");
+      const send = button(plan.limit_usd ? `Send (≈ US$ ${plan.estimate_usd.toFixed(2)})` : "Send (no budget set)", async () => {
+        send.disabled = true;
+        try {
+          await startJob("derive_picture", { scene: scene.id, shot: picture.shot });
+          planned.replaceChildren(el("p", "muted", "Sent. Progress is in the jobs tray; adopt the result to see it here."));
+        } catch (error) {
+          alert(error.message);
+          send.disabled = false;
+        }
+      }, "primary-button");
+      send.disabled = !plan.limit_usd;
+      actions.append(send, button("Close", () => planned.replaceChildren()));
+      view.append(actions);
+      planned.replaceChildren(view);
+    } catch (error) {
+      planned.replaceChildren(el("p", "join-finding warning", error.message));
+    } finally {
+      open.disabled = false;
+    }
+  }, "quiet-button");
+  card.append(sent, open, planned);
+  return card;
+}
+
 function renderBlocks(scene) {
   const blocks = scene.blocks || [];
   if (!blocks.length) return null;

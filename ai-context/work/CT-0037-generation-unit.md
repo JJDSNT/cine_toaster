@@ -202,6 +202,48 @@ Checked with headless screenshots on the SINGULAR copy: the 1-02A block 2
 plan and `b2-1`'s record, the 3-01 P13 `VOICE` take, and the 1-02A P12
 `BLOCK-2V1` slice.
 
+**Master pictures** (2026-09-29): the "blocking frame → master image →
+video" leg, from SINGULAR's `deriva` (`cena.py derivar`).
+
+- **Core shot field** `derive: {from, with, request}`. SINGULAR maps it
+  with `deriva: {maps_to: derive, keys: {de: from, com: with, pedido:
+  request}}`. Lineage also reads a derivation's `from`/`de`.
+- **`pictures.py`.**
+  - Resolves the source: a file, or the picture of the shot or master
+    named, following a render's file entry.
+  - Takes each cast face master in the variant the scene's `cast` chose.
+  - Names versions after the picture on disk (`pmA` → `pmA-1`), falling
+    back to `p08`.
+  - `scene_pictures` feeds `/api/pictures`.
+- **`providers/qwen_edit.py`.** It carries SINGULAR's measured geometry,
+  identity and self-check clauses verbatim, grey padding to the frame's
+  proportion, and size from the source. It computes an edge score.
+- **Job kind `derive_picture`.** Budget checked twice, spend recorded
+  whatever the outcome, version with `.job.json` and `.provenance.json`.
+  The cancellable transport and spend recording are now shared with
+  `generate_block` (`_paid_transport`, `_record_spend`).
+- **Interfaces.**
+  - CLI `toast picture`.
+  - The **Pictures** panel in the scene room, before Blocks: versions,
+    "What … was made from", and "What would be sent…" with Send.
+  - `/api/picture-plan`.
+  - `sent.js` renders `picture-derivation`.
+- **Knowledge.** Profile `qwen-image-edit`, with 7 claims.
+- **Fix.** Cast reference paths are normalised (`cast/x/../../elenco` →
+  `elenco`).
+
+**Real run on the SINGULAR copy.** 1-02A mA, from `A-final.png` with
+`claire_doente`, became `pmA-1.png`. It cost US$ 0.024 (33 s running,
+21 s queued) and scored 20.98 on edges. All 10 derived masters of 1-02A
+are recognised, including chains (mIa from pmI).
+
+**Finding.** Both SINGULAR's approved `pmA.png` (22.2) and the new edit
+moved Claire's head from where the render puts it. The edge score does not
+catch a moved subject. So approval by a person is needed, which is plan
+step 10's gate.
+
+Tests: `tests/test_pictures.py` (3 tests).
+
 Remaining:
 
 - SINGULAR's `guia_no_corte` and `forca_corte` per-shot options;

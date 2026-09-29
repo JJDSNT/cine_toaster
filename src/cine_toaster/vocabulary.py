@@ -172,6 +172,8 @@ CORE_SHOT_FIELDS: frozenset[str] = frozenset(
         "level_db",
         "picture",
         "trim",
+        # A picture made by editing another (a render, a plate) with cast references.
+        "derive",
     }
 )
 
