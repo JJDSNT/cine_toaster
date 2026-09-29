@@ -13,7 +13,10 @@ export async function api(path, { optional = false } = {}) {
   const response = await fetch(path);
   if (!response.ok) {
     if (optional) return null;
-    throw new Error(`Request failed: ${response.status}`);
+    // The runtime explains what went wrong; say that, not only the status.
+    const body = await response.json().catch(() => ({}));
+    const reason = typeof body.error === "object" ? body.error.message : body.error;
+    throw new Error(reason || `Request failed: ${response.status}`);
   }
   return response.json();
 }

@@ -135,6 +135,10 @@ The user approved a US$ 2 ceiling for test runs.
     `BLOCK-<id>V<n>`.
   - The Blocks panel lets you switch between versions and slices the one
     shown.
+- **Control room.** "Generate a new version…" on a block reads
+  `/api/generation-plan` (the plan, the estimate, spent and limit) and asks
+  for confirmation before starting the job. API errors now show the
+  runtime's message, not only the status.
 - **CLI.**
   - `toast budget [set <usd>]`;
   - `toast generate <project> <scene> <block> [--seed] [--dry-run [--json]] [--env-file]`;
@@ -159,8 +163,6 @@ The user approved a US$ 2 ceiling for test runs.
 
 Remaining:
 
-- starting a generation from the control room (it needs a plan endpoint to
-  show the estimate before confirming);
 - SINGULAR's `guia_no_corte` and `forca_corte` per-shot options;
 - resuming a remote job after the process dies (a retry is a new
   submission).

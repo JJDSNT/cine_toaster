@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 import re
 import threading
 import time
@@ -319,6 +320,23 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": "That shot has no take with a video"}, HTTPStatus.NOT_FOUND)
                 return
             self._send_json(review)
+            return
+
+        if parsed.path == "/api/generation-plan":
+            # What a block's generation would send and cost, before anyone pays (CT-0037).
+            from . import spend
+            from .generation import hourly_rate, plan_block
+
+            try:
+                plan = plan_block(self.project_root, cached_production(self.project_root),
+                                  query.get("scene", [""])[0], query.get("block", [""])[0],
+                                  rate=hourly_rate(self.project_root, os.environ.get("RUNPOD_LTX_ENDPOINT_ID", "")))
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+                return
+            ledger = spend.load()
+            self._send_json({**plan.public_dict(self.project_root), "spent_usd": spend.spent(ledger),
+                             "limit_usd": float(ledger.get("limit_usd") or 0)})
             return
 
         if parsed.path == "/api/screenplay":

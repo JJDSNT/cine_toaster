@@ -80,9 +80,6 @@ Cine Toaster can currently:
 
 Cine Toaster cannot yet:
 
-- start a generation from the control room: `toast generate` runs one block
-  within an enforced budget (CT-0037), but the interface only shows and slices
-  the versions;
 - execute or recover background jobs;
 - persist the multi-project registry or expose project switching in the UI;
 - run project-scoped agents;
@@ -172,8 +169,8 @@ remains:
   `docs/SINGULAR-CINE-TOASTER.md`, to take up when the user returns to it;
 - voice direction (CT-0040);
 - the generation adapter is done, with a US$ 2 ceiling the user approved
-  (`toast budget`, `toast generate`, versions `b<id>-<n>`; CT-0037). Next:
-  generation from the control room, and the TTS/voice spike (CT-0040).
+  (`toast budget`, `toast generate`, versions `b<id>-<n>`; CT-0037). The control room
+  starts one after showing the estimate. Next: the TTS/voice spike (CT-0040).
 
 Earlier notes:
 

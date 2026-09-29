@@ -1660,11 +1660,35 @@ function renderBlocks(scene) {
     } else {
       card.append(el("p", "muted", `No clip yet (b${block.id}.mp4 in the scene's work folder).`));
     }
+    if (block.contiguous) card.append(generateButton(scene, block));
     if (!block.contiguous) card.append(el("p", "join-finding warning", "These shots are not consecutive in the cut."));
     list.append(card);
   }
   panel.append(list);
   return panel;
+}
+
+// A paid generation of the block: the plan, the estimate and the budget are
+// shown before anything is sent, and the job refuses what the budget cannot pay.
+function generateButton(scene, block) {
+  const start = button("Generate a new version…", async () => {
+    start.disabled = true;
+    try {
+      const query = new URLSearchParams({ scene: scene.id, block: block.id });
+      const plan = await api(`/api/generation-plan?${query}`);
+      const money = plan.limit_usd
+        ? `Estimated US$ ${plan.estimate_usd.toFixed(3)}; US$ ${plan.spent_usd.toFixed(2)} of US$ ${plan.limit_usd.toFixed(2)} spent.`
+        : "No budget is set (toast budget set <usd>), so this will be refused.";
+      const notes = plan.notes.length ? `\n\n${plan.notes.join("\n")}` : "";
+      const message = `Generate block ${plan.block} (${plan.shots.join(", ")}, ${plan.seconds} s)?\n\n${money}${notes}\n\n${plan.prompt}`;
+      if (confirm(message)) await startJob("generate_block", { scene: scene.id, block: block.id });
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      start.disabled = false;
+    }
+  }, "quiet-button");
+  return start;
 }
 
 const CUT_NAMES = {

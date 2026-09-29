@@ -51,7 +51,8 @@ A generation never replaces the production's own clip. It becomes
 - `.provenance.json`: the plan, the guides with their digests, the prompt,
   the seed, the cost and the job.
 
-The Blocks panel shows every version of the block. Slicing a version gives
+The Blocks panel shows every version of the block. **Generate a new version…** shows the
+plan, the estimate and the budget, and asks before sending. Slicing a version gives
 takes named `BLOCK-<id>V<n>`, each carrying the generation's record.
 
 Credentials are read from the environment, or from `--env-file`. Neither is

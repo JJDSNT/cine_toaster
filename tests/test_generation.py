@@ -161,6 +161,33 @@ class GenerateBlockTests(unittest.TestCase):
         self.assertEqual(sliced["state"], "succeeded", sliced["error"])
         self.assertTrue(all(item["take"].startswith("BLOCK-AV1") for item in sliced["result"]["summary"]["slices"]))
 
+    def test_the_control_room_sees_the_plan_before_paying(self) -> None:
+        import threading
+        import urllib.error
+        import urllib.request
+        from http.server import ThreadingHTTPServer
+
+        from cine_toaster.index import ProjectIndex, build_index
+        from cine_toaster.web import ProjectBrowserHandler
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), ProjectBrowserHandler)
+        build_index(self.root)
+        server.project_index = ProjectIndex(self.root)
+        server.project_root = self.root.resolve()
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(lambda: (server.shutdown(), server.server_close(), thread.join(5)))
+        base = f"http://127.0.0.1:{server.server_address[1]}/api/generation-plan"
+        spend.set_limit(2)
+        with urllib.request.urlopen(f"{base}?scene=SC-030&block=A", timeout=30) as response:
+            plan = json.loads(response.read())
+        self.assertEqual((plan["seconds"], plan["limit_usd"], plan["spent_usd"]), (20, 2.0, 0.0))
+        self.assertTrue(plan["image"].endswith("work/p02.png"))
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(f"{base}?scene=SC-030&block=Z", timeout=30)
+        self.assertEqual(caught.exception.code, 422)
+        self.assertIn("no block", json.loads(caught.exception.read())["error"]["message"])
+
 
 if __name__ == "__main__":
     unittest.main()
