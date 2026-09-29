@@ -156,8 +156,10 @@ local-video review (`docs/brief.md`). Step 4b, light previs (`CT-0029`), is
 done too, and so is step 5, Final Draft interchange (ADR 0014: import to a new
 Fountain file with a loss report, export a derived `.fdx`). The next action is
 step 6, the jobs runtime, which is now done too (SPEC-0008: durable store,
-previs and build as jobs, cancel, reconcile, retry, adopt, jobs tray). The
-next action is step 7, the React stack decision and a read-only canvas.
+previs and build as jobs, cancel, reconcile, retry, adopt, jobs tray). Step 7
+is done: React 19 + Vite + React Flow (ADR 0015), with a read-only production
+canvas at `/canvas/`. The next action is step 8, the screenplay editor, which
+first needs the ADR 0006 amendment.
 
 Earlier notes:
 

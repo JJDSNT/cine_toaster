@@ -51,6 +51,7 @@ puts them wherever you want.
 | `make serve` | open the control room |
 | `make check` | continuity and schema findings |
 | `make test` | the full suite |
+| `make ui` | build the production canvas at `/canvas/` (needs Node 20+; see [docs/canvas.md](docs/canvas.md)) |
 | `toast doctor` | what works here, and how to fix what does not |
 
 ### Build the reel

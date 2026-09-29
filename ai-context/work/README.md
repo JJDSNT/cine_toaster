@@ -70,6 +70,8 @@ The order of work is the ordered plan in
 
 ## Recently completed
 
+- `CT-0034` — React stack (ADR 0015) and the read-only production canvas
+  (`done`)
 - `CT-0033` — spike: CopilotKit on React 19 + Vite + React Flow with the Python
   agent over AG-UI; the open path needs the Node Copilot Runtime (`done`)
 - `CT-0032` — jobs runtime: durable store, previs and build jobs, cancel,

@@ -35,6 +35,8 @@ toast = "cine_toaster.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cine_toaster"]
+# The built canvas is ignored by git but belongs in the wheel (`make ui` first).
+artifacts = ["src/cine_toaster/web_assets/canvas/**"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "examples/demo-project" = "cine_toaster/demo_projects/the-last-signal"

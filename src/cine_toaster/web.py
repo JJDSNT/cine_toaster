@@ -76,6 +76,31 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def _send_canvas(self, name: str) -> None:
+        """The React canvas, built by `make ui` into the package (ADR 0015)."""
+
+        root = ASSET_ROOT / "canvas"
+        if not (root / "index.html").is_file():
+            payload = (b"<!doctype html><meta charset=utf-8><body style='font:14px system-ui;padding:2em'>"
+                       b"<h1>The canvas is not built</h1><p>Run <code>make ui</code> (needs Node 20+). "
+                       b"<code>toast doctor</code> reports it.</p>")
+            self.send_response(HTTPStatus.NOT_FOUND)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+        candidate = _safe_project_path(root, name)
+        if candidate is None or not candidate.is_file():
+            candidate = root / "index.html"  # client-side routes fall back to the app
+        payload = candidate.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", mimetypes.guess_type(candidate.name)[0] or "application/octet-stream")
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Cache-Control", "no-cache" if candidate.name == "index.html" else "public, max-age=31536000, immutable")
+        self.end_headers()
+        self.wfile.write(payload)
+
     def _send_file(self, path: Path | None) -> None:
         if path is None or not path.is_file():
             self.send_error(HTTPStatus.NOT_FOUND)
@@ -295,6 +320,16 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             self._send_json(review)
             return
 
+        if parsed.path == "/api/graph":
+            # The production canvas: records as nodes and edges, no positions (plan step 7).
+            from .graph import load_graph
+
+            try:
+                self._send_json(load_graph(self.project_root))
+            except (FileNotFoundError, ProjectFormatError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
+            return
+
         if parsed.path == "/api/previs":
             # The shot as a light animatic, sampled from the blocking frame
             # over its duration (CT-0029). Derived on request, never stored.
@@ -502,6 +537,8 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/":
             self._send_static("index.html")
+        elif parsed.path in ("/canvas", "/canvas/") or parsed.path.startswith("/canvas/"):
+            self._send_canvas(parsed.path.removeprefix("/canvas").lstrip("/") or "index.html")
         elif parsed.path.startswith("/static/"):
             self._send_static(parsed.path.removeprefix("/static/"))
         elif parsed.path == "/api/events/stream":

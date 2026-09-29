@@ -58,13 +58,13 @@ kbd { margin-left: 12px; padding: 1px 6px; border: 1px solid #454c4f; border-rad
 .sidebar-title { padding: 0 9px 10px; }
 .sidebar-title.secondary { margin-top: 28px; }
 .module-navigation { display: flex; flex-direction: column; gap: 3px; }
-.module-navigation button {
+.module-navigation button, .module-navigation .nav-link {
   display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 9px; width: 100%;
   border: 0; background: transparent; padding: 10px 9px; border-radius: 7px; text-align: left; cursor: pointer;
 }
-.module-navigation button:hover { background: var(--surface-3); }
+.module-navigation button:hover, .module-navigation .nav-link:hover { background: var(--surface-3); }
 .module-navigation button.active { background: var(--accent-soft); }
-.module-navigation button span { color: var(--accent); font-size: 9px; font-weight: 900; letter-spacing: .08em; }
+.module-navigation button span, .module-navigation .nav-link span { color: var(--accent); font-size: 9px; font-weight: 900; letter-spacing: .08em; }
 .module-navigation button em { min-width: 21px; padding: 2px 6px; border-radius: 99px; background: #303638; color: var(--muted); font-size: 10px; font-style: normal; text-align: center; }
 .future-navigation { display: flex; flex-direction: column; gap: 2px; }
 .future-navigation > span { display: grid; grid-template-columns: 30px 1fr auto; gap: 9px; padding: 9px; color: #686f71; font-size: 13px; }
@@ -594,3 +594,4 @@ dialog::backdrop { background: #000b; }
 .job-bar { height: 4px; background: #ffffff14; border-radius: 2px; overflow: hidden; }
 .job-bar span { display: block; height: 100%; background: var(--accent); transition: width .3s; }
 .job-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.module-navigation .nav-link { color: inherit; text-decoration: none; }

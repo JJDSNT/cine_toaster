@@ -1,0 +1,150 @@
+"""The production canvas: records projected as nodes and edges (plan step 7).
+
+The canvas is a **view** of project records, never a file of its own
+(CT-0022, CT-0023). This module builds that view: scenes, shots and takes as
+nodes, and cuts, take membership and scene order as edges. It carries no
+positions. Where a card sits on screen is a presentation choice, made by the
+interface's automatic layout.
+
+Being in the core rather than in the interface, the same projection serves
+the canvas, the CLI and, later, agents.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from .project import load_production
+
+#: What a shot shows on its card, most finished first.
+PICTURE_LEVELS = ("still", "take", "blocking", "none")
+
+
+def _picture(scene: dict[str, Any], shot: dict[str, Any]) -> dict[str, Any]:
+    """The best picture a shot has, and which storyboard level it is (CT-0025)."""
+
+    if shot.get("still"):
+        return {"level": "still", "image": f"/media/{shot['still']}"}
+    takes = shot.get("takes") or []
+    chosen = next((take for take in takes if take.get("selected")), None)
+    if chosen and chosen.get("poster"):
+        return {"level": "take", "image": f"/media/{chosen['poster']}"}
+    if chosen and chosen.get("media"):
+        return {"level": "take", "video": f"/media/{chosen['media']}"}
+    if ((shot.get("motion") or {}).get("start") or {}).get("camera"):
+        return {"level": "blocking",
+                "image": f"/api/blocking-frame?scene={scene['id']}&shot={shot['id']}&at=start"}
+    return {"level": "none"}
+
+
+def _severity(findings: list[dict[str, Any]]) -> str:
+    severities = {finding.get("severity") for finding in findings}
+    for level in ("error", "warning", "advice"):
+        if level in severities:
+            return level
+    return ""
+
+
+def production_graph(production: dict[str, Any]) -> dict[str, Any]:
+    """Nodes and edges for a loaded production (`load_production`'s dict)."""
+
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+    previous_last: str | None = None
+    previous_scene: str | None = None
+
+    for scene_index, scene in enumerate(production["scenes"]):
+        scene_node = f"scene:{scene['id']}"
+        nodes.append({
+            "id": scene_node,
+            "type": "scene",
+            "scene": scene["id"],
+            "data": {
+                "scene": scene["id"], "title": scene["title"], "order": scene_index,
+                "sequence": scene.get("sequence") or "", "status": scene.get("status") or "",
+                "findings": len(scene.get("findings") or []),
+                "severity": _severity(scene.get("findings") or []),
+            },
+        })
+        shot_findings: dict[str, list[dict[str, Any]]] = {}
+        for finding in scene.get("findings") or []:
+            for shot_id in finding.get("shots") or []:
+                shot_findings.setdefault(shot_id, []).append(finding)
+
+        shot_nodes: list[str] = []
+        for shot_index, shot in enumerate(scene["shots"]):
+            node_id = f"shot:{scene['id']}/{shot['id']}"
+            shot_nodes.append(node_id)
+            script = shot.get("script") or {}
+            motion = shot.get("motion") or {}
+            found = shot_findings.get(shot["id"], [])
+            nodes.append({
+                "id": node_id,
+                "type": "shot",
+                "scene": scene["id"],
+                "data": {
+                    "scene": scene["id"], "shot": shot["id"], "order": shot_index,
+                    "label": shot.get("label") or "", "camera": shot.get("camera") or "",
+                    "duration_seconds": shot.get("duration_seconds") or 0,
+                    "status": shot.get("status") or "", "source": shot.get("source") or "",
+                    "selected_take": shot.get("selected_take") or "",
+                    "takes": len(shot.get("takes") or []),
+                    "speakers": sorted({line["who"] for line in script.get("dialogue") or []}),
+                    "move": motion.get("kind") or "",
+                    "walks": bool(motion.get("moved_subjects")),
+                    "picture": _picture(scene, shot),
+                    "findings": len(found), "severity": _severity(found),
+                },
+            })
+            for take in shot.get("takes") or []:
+                take_id = f"take:{scene['id']}/{shot['id']}/{take['id']}"
+                nodes.append({
+                    "id": take_id,
+                    "type": "take",
+                    "scene": scene["id"],
+                    "data": {
+                        "scene": scene["id"], "shot": shot["id"], "take": take["id"],
+                        "label": take.get("label") or take["id"], "status": take.get("status") or "",
+                        "selected": bool(take.get("selected")),
+                        "media": f"/media/{take['media']}" if take.get("media") else "",
+                        "poster": f"/media/{take['poster']}" if take.get("poster") else "",
+                    },
+                })
+                edges.append({"id": f"of:{take_id}", "type": "take", "source": node_id, "target": take_id,
+                              "data": {"selected": bool(take.get("selected"))}})
+
+        # Within a scene every join is a cut record (SPEC-0007).
+        by_pair = {(cut["from"], cut["to"]): cut for cut in scene.get("cuts") or []}
+        for (before, after) in zip(scene["shots"], scene["shots"][1:]):
+            cut = by_pair.get((before["id"], after["id"]), {"type": "hard", "findings": []})
+            transition = cut.get("transition") or {}
+            edges.append({
+                "id": f"cut:{scene['id']}/{before['id']}-{after['id']}",
+                "type": "cut",
+                "source": f"shot:{scene['id']}/{before['id']}",
+                "target": f"shot:{scene['id']}/{after['id']}",
+                "data": {
+                    "cut": cut.get("type", "hard"), "chain": cut.get("chain") or "",
+                    "reason": cut.get("reason") or "", "transition": transition.get("id") or "",
+                    "findings": [finding["code"] for finding in cut.get("findings") or []],
+                    "severity": _severity(cut.get("findings") or []),
+                },
+            })
+        # Between scenes the join belongs to the sequence and is not checked yet.
+        if previous_last and shot_nodes:
+            edges.append({
+                "id": f"next:{previous_scene}-{scene['id']}",
+                "type": "scene-order", "source": previous_last, "target": shot_nodes[0], "data": {},
+            })
+        if shot_nodes:
+            previous_last, previous_scene = shot_nodes[-1], scene["id"]
+
+    return {
+        "production": {"id": production["id"], "title": production["title"]},
+        "nodes": nodes,
+        "edges": edges,
+    }
+
+
+def load_graph(root) -> dict[str, Any]:
+    return production_graph(load_production(root))

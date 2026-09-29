@@ -223,6 +223,19 @@ def _moderngl() -> Capability:
     )
 
 
+def _canvas() -> Capability:
+    built = (Path(__file__).with_name("web_assets") / "canvas" / "index.html").is_file()
+    node = _binary("npm")
+    return Capability(
+        name="Production canvas",
+        what_it_enables="the read-only canvas of scenes, shots, takes and cuts at /canvas/ (ADR 0015)",
+        required=False,
+        status=OK if built else MISSING,
+        detail="built" if built else ("Node is installed" if node else ""),
+        remedy="" if built else ("make ui" if node else "install Node 20+ (https://nodejs.org), then: make ui"),
+    )
+
+
 def _gl_transitions() -> Capability:
     from .transitions import list_transitions, upstream_root
 
@@ -259,6 +272,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _yaml,
     _transitions,
     _gl_transitions,
+    _canvas,
     _demos,
     _media,
     _piper,

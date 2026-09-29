@@ -12,7 +12,7 @@ RUN = $(VENV)/bin/python
 TOAST = $(VENV)/bin/toast
 
 .DEFAULT_GOAL := setup
-.PHONY: setup environment submodules install install-media install-audio install-gpu test check demo doctor serve clean help voice build
+.PHONY: ui ui-test setup environment submodules install install-media install-audio install-gpu test check demo doctor serve clean help voice build
 
 help:
 	@echo "make setup     install and report what works"
@@ -21,6 +21,7 @@ help:
 	@echo "make serve     open the control room on the reel"
 	@echo "make check     continuity and schema findings for the demos"
 	@echo "make test      the full suite"
+	@echo "make ui        build the production canvas (needs Node 20+)"
 	@echo "make doctor    what works on this machine, and how to fix what does not"
 
 # ---- Setup ----
@@ -69,7 +70,24 @@ install-gpu: install
 	@echo "==> Installing the gpu extra (transitions run their own shaders)"
 	@$(RUN) -m pip install --quiet -e '.[gpu]'
 
-setup: install-media install-audio install-gpu
+# The canvas is React (ADR 0015). Node is needed to build it, never to run
+# Cine Toaster: the build lands in the package and the runtime serves it.
+ui:
+	@if command -v npm >/dev/null 2>&1; then \
+		echo "==> Building the production canvas"; \
+		cd frontend && SCARF_ANALYTICS=false npm ci --no-audit --no-fund --loglevel=error && npm run build --silent; \
+	else \
+		echo "Node is not installed: the canvas is skipped. Install Node 20+ and run make ui."; \
+	fi
+
+ui-test:
+	@if command -v npm >/dev/null 2>&1 && [ -d frontend/node_modules ]; then \
+		cd frontend && npm run typecheck --silent && npm test --silent; \
+	else \
+		echo "Skipping the canvas tests: run make ui first."; \
+	fi
+
+setup: install-media install-audio install-gpu ui
 	@$(TOAST) doctor
 	@echo "Next:  make demo    then    make serve"
 
@@ -106,6 +124,7 @@ build: install-media install-audio
 
 test: install
 	@PYTHONPATH=src $(RUN) -m unittest discover -s tests
+	@$(MAKE) --no-print-directory ui-test
 
 clean:
 	@$(RUN) -c "import pathlib, shutil; [shutil.rmtree(p) for p in pathlib.Path('.').rglob('__pycache__') if '$(VENV)' not in str(p)]" 2>/dev/null || true
