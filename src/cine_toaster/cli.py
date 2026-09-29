@@ -465,6 +465,39 @@ def command_generate(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_revoice(args: argparse.Namespace) -> int:
+    """A take's speech in the cast member's own voice, as a new take (CT-0040)."""
+
+    from .jobs import JobManager
+    from .voice import plan_conversion
+
+    root = Path(args.project).expanduser().resolve()
+    plan = plan_conversion(root, load_production(root), args.scene, args.shot, args.take or "")
+    print(f"{plan.scene} {plan.shot} take {plan.take}: {plan.speaker}'s voice -> {plan.reference.relative_to(root)}")
+    if args.dry_run:
+        print("Nothing was converted (--dry-run).")
+        return 0
+    manager = JobManager()
+    try:
+        job = manager.submit("convert_voice", root, {"scene": plan.scene, "shot": plan.shot, "take": plan.take})
+        try:
+            job = manager.wait(job["id"])
+        except KeyboardInterrupt:
+            manager.cancel(job["id"])
+            job = manager.wait(job["id"])
+        if job["state"] != "succeeded":
+            print(f"voice {job['state']}: {job.get('error') or job['message']}  (job {job['id']})", file=sys.stderr)
+            return 1
+        job = manager.adopt(job["id"])
+    finally:
+        manager.shutdown()
+    summary = job["result"]["summary"]
+    similarity = summary.get("similarity") or {}
+    print(f"Made {summary['media']}"
+          + (f"; likeness to the reference {similarity['before']} -> {similarity['after']}" if similarity else ""))
+    return 0
+
+
 def command_assemble_sequence(args: argparse.Namespace) -> int:
     """Assemble a new version of a sequence from its scenes' versions, as a job."""
 
@@ -1266,6 +1299,15 @@ def build_parser() -> argparse.ArgumentParser:
     costs_parser.add_argument("project", type=Path)
     costs_parser.add_argument("--json", action="store_true")
     costs_parser.set_defaults(function=command_costs)
+
+    voice_convert = subparsers.add_parser(
+        "revoice", help="A take's speech in the cast member's own voice, as a new take (the room is kept)")
+    voice_convert.add_argument("project", type=Path)
+    voice_convert.add_argument("scene")
+    voice_convert.add_argument("shot")
+    voice_convert.add_argument("--take", help="which take (default: the selected one, else the first)")
+    voice_convert.add_argument("--dry-run", action="store_true", help="say whose voice and which recording; convert nothing")
+    voice_convert.set_defaults(function=command_revoice)
 
     budget_parser = subparsers.add_parser("budget", help="What paid generation may spend, and has spent")
     budget_parser.add_argument("--json", action="store_true")

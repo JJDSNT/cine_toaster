@@ -167,10 +167,12 @@ remains:
 
 - SINGULAR's direction and production decisions are recorded in its own
   `docs/SINGULAR-CINE-TOASTER.md`, to take up when the user returns to it;
-- voice direction (CT-0040);
 - the generation adapter is done, with a US$ 2 ceiling the user approved
   (`toast budget`, `toast generate`, versions `b<id>-<n>`; CT-0037). The control room
-  starts one after showing the estimate. Next: the TTS/voice spike (CT-0040).
+  starts one after showing the estimate. The voice spike is done too:
+  `toast revoice` converts a take's speech to the cast member's recording, the
+  room kept, as a new take (CT-0040). Next: the author listens to
+  `singular/cenas/1-02/ltx/teste-conversao-voz/comparacao-voz-kael.mp4`.
 
 Earlier notes:
 

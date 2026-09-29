@@ -251,6 +251,20 @@ def _gl_transitions() -> Capability:
     )
 
 
+def _voice() -> Capability:
+    from .voice import voice_unavailable_reason
+
+    reason = voice_unavailable_reason()
+    return Capability(
+        name="Voice conversion",
+        what_it_enables="a take's speech in the cast member's own voice, the room kept (`toast revoice`, CT-0040)",
+        required=False,
+        status=OK if not reason else MISSING,
+        detail=reason,
+        remedy="" if not reason else "make install-voice   (a separate environment: its engines pin their own torch)",
+    )
+
+
 def _whisper() -> Capability:
     path = _binary("whisper-cli") or _binary("whisper-cpp") or _binary("main")
     ok = bool(path) or _module("faster_whisper")
@@ -278,6 +292,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _piper,
     _ffmpeg,
     _ffprobe,
+    _voice,
     # Detected, not yet used. See `report`.
     _sox,
     _blender,

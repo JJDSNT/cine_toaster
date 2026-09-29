@@ -925,3 +925,67 @@ def _run_generate(context: JobContext) -> dict[str, Any]:
 
 
 register(JobKind("generate_block", _validate_generate, _run_generate))
+
+
+# --- converting a take's voice -------------------------------------------------
+
+
+def _voice_plan(root: Path, params: dict[str, Any]):
+    from .project import load_production
+    from .voice import plan_conversion
+
+    return plan_conversion(root, load_production(root), str(params.get("scene", "")).strip(),
+                           str(params.get("shot", "")).strip(), str(params.get("take", "") or "").strip())
+
+
+def _validate_voice(root: Path, params: dict[str, Any]) -> dict[str, Any]:
+    from .voice import voice_python
+
+    plan = _voice_plan(root, params)
+    if voice_python() is None:
+        raise ValidationError("Voice conversion needs its own environment: make install-voice "
+                              "(or set CINE_TOASTER_VOICE_PYTHON)")
+    return {"scene": plan.scene, "shot": plan.shot, "take": plan.take}
+
+
+def _run_voice(context: JobContext) -> dict[str, Any]:
+    """The take's speech in the cast member's voice, as a new take beside it."""
+
+    from .takes import REJECTED_DIRECTORIES, TAKES_DIRECTORIES
+    from .voice import WORKER, mux_command, voice_python
+
+    root = context.project_root
+    plan = _voice_plan(root, context.params)
+    python = voice_python()
+    if python is None:
+        raise ValidationError("The voice environment is gone (make install-voice)")
+    work = context.staging / "voice-work"
+    audio, report = context.staging / "voice.wav", context.staging / "voice-report.json"
+    context.progress(0.02, f"Separating and converting {plan.speaker}'s voice")
+    context.run_process([str(python), str(WORKER), str(plan.media), str(plan.reference), str(audio), str(work), str(report)],
+                        message=f"Converting {plan.speaker}'s voice", span=(0.02, 0.9))
+    # A converted take sits with the takes, even when its source is the cut's own or a rejected one.
+    work_dir = plan.media.parent
+    if work_dir.name in (*TAKES_DIRECTORIES, *REJECTED_DIRECTORIES):
+        work_dir = work_dir.parent
+    takes_dir = work_dir / TAKES_DIRECTORIES[0]
+    stem, attempt = f"{plan.media.stem}-voice", 1
+    while (takes_dir / f"{stem}.mp4").exists():
+        attempt += 1
+        stem = f"{plan.media.stem}-voice-{attempt}"
+    name = f"{stem}.mp4"
+    context.run_process(mux_command(plan.media, audio, context.staging / name), message="Putting the voice under the picture",
+                        span=(0.9, 1.0))
+    shutil.rmtree(work, ignore_errors=True)
+    measured = json.loads(report.read_text(encoding="utf-8")) if report.is_file() else {}
+    provenance = {"kind": "voice-conversion", **plan.public_dict(root), "from_take": plan.take, **measured,
+                  "job": context.job_id}
+    (context.staging / f"{name}.provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
+    destination = (takes_dir / name).relative_to(root).as_posix()
+    return {"files": [{"staged": name, "destination": destination},
+                      {"staged": f"{name}.provenance.json", "destination": destination + ".provenance.json"}],
+            "summary": {"scene": plan.scene, "shot": plan.shot, "from_take": plan.take, "file": name,
+                        "media": destination, "similarity": measured.get("similarity")}}
+
+
+register(JobKind("convert_voice", _validate_voice, _run_voice))

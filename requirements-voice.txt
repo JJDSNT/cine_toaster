@@ -1,0 +1,11 @@
+# The voice environment (CT-0040): `make install-voice` puts it in .venv-voice.
+# Separate from the main one because these engines pin their own numpy, torch
+# and transformers. All permissive: Chatterbox and Perth MIT, Demucs MIT,
+# Resemblyzer Apache-2.0. CPU wheels are enough: 5 s of CPU per second of speech.
+--extra-index-url https://download.pytorch.org/whl/cpu
+chatterbox-tts==0.1.7
+demucs==4.1.0
+resemblyzer==0.1.4
+soundfile>=0.12
+# webrtcvad (via resemblyzer) still imports pkg_resources.
+setuptools<80

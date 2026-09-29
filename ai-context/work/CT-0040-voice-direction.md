@@ -112,10 +112,82 @@ The production payload carries `cast[*].appearances`, and voice recordings are
 project-relative. Validated with a headless screenshot on a demo copy that has
 a variant and a recording, and an appearances test. Full suite: 399 OK.
 
+# Done: voice conversion, the spike and the feature (2026-09-29)
+
+**Spike.** Local and on CPU, so it cost nothing. The candidates were
+checked for licences first (ADR 0011):
+
+| Tool | Role | Licence |
+| --- | --- | --- |
+| Chatterbox VC 0.1.7 | conversion | MIT, code and weights |
+| Demucs 4.1 | separation | MIT |
+| Resemblyzer | likeness | Apache-2.0 |
+| faster-whisper | word checks | MIT |
+
+XTTS and F5-TTS were excluded for their non-commercial weights.
+
+The test used 12 takes where only Kael speaks (1-02, 1-02B, 1-03, 3-01),
+against `elenco/voz_kael_genebra.wav`:
+
+- Likeness to the reference rose from 0.672 to 0.816, and its spread fell
+  from 0.094 to 0.051.
+- Likeness between takes rose from 0.604 to 0.769.
+- The word error rate stayed the same (0.051 before and after).
+- The speech envelope moved 0–10 ms in 11 takes and 50 ms in one.
+- Converting alone removes the room (noise floor −inf). Separating with
+  Demucs, converting only the voice and remixing keeps it, with likeness
+  0.85 on 1-02 P12 and 0.72 on 3-01 P13.
+- Cost: about 5 s of CPU per second of speech.
+
+The comparison video for the author is
+`singular/cenas/1-02/ltx/teste-conversao-voz/comparacao-voz-kael.mp4`, with
+the numbers in `medicoes.json` beside it. The claims are in knowledge
+profile `chatterbox-vc` (7 claims).
+
+**Feature.**
+
+- `voice.py` works out:
+  - the take (the selected one, or the first);
+  - the single in-take speaker, and the cast sheet it resolves to;
+  - the first existing voice recording on that sheet.
+
+  It refuses no speaker, two speakers, no sheet, and no recording.
+- `voice_worker.py` is standalone, importing nothing from Cine Toaster.
+  It separates, converts, remixes at the separated voice's level, and
+  measures likeness.
+- Job kind `convert_voice` runs the worker in `.venv-voice` (or
+  `CINE_TOASTER_VOICE_PYTHON`) as a cancellable process. It muxes the new
+  sound under the untouched picture into `_takes/<stem>-voice.mp4`, and
+  writes provenance: source take, member, recording and digest, engines,
+  timings, likeness.
+- CLI `toast revoice <project> <scene> <shot> [--take] [--dry-run]`. The
+  name `toast voice` was already Piper narration.
+- `make install-voice` and `requirements-voice.txt` (pinned). A separate
+  environment is needed because Chatterbox pins `numpy<2`, `torch==2.6`
+  and `transformers`.
+- `toast doctor` reports "Voice conversion".
+- Docs are in `docs/voice-conversion.md`.
+
+**Validation.**
+
+- `tests/test_voice.py` (4 tests, with a fake voice interpreter) covers
+  the plan, refusals, and the new take with lineage and untouched picture.
+- A real run on the SINGULAR scratch copy, with a Kael sheet written only
+  in the copy: 3-01 P13 became take `VOICE`, likeness 0.474 → 0.727, in
+  64 s.
+
+Remaining:
+
+- the author listening. That decides whether the delivery (Kael weak in
+  3-01) survives;
+- converting per speaker in two-speaker takes, which needs diarization;
+- a control-room action;
+- applying conversion inside `assemble` rather than as a take.
+
 # Order
 
 - **Now, at no cost:** voice identity on the cast sheet, state and delivery
   fields, the brief composing them, and the drift check (with SINGULAR's
   scene-level `vozes` read for comparison).
-- **Later:** a TTS and voice-conversion spike, which needs a GPU and budget
-  decision.
+- **Later:** ~~a voice-conversion spike~~ done on CPU at no cost; expressive TTS
+  for voice-over lines is still open.

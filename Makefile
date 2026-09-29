@@ -12,7 +12,7 @@ RUN = $(VENV)/bin/python
 TOAST = $(VENV)/bin/toast
 
 .DEFAULT_GOAL := setup
-.PHONY: ui ui-test setup environment submodules install install-media install-audio install-gpu test check demo doctor serve clean help voice build
+.PHONY: ui ui-test setup environment submodules install install-media install-audio install-gpu install-voice test check demo doctor serve clean help voice build
 
 help:
 	@echo "make setup     install and report what works"
@@ -69,6 +69,14 @@ install-audio: install
 install-gpu: install
 	@echo "==> Installing the gpu extra (transitions run their own shaders)"
 	@$(RUN) -m pip install --quiet -e '.[gpu]'
+
+# Voice conversion (CT-0040) runs in its own environment: its engines pin
+# their own numpy and torch. CPU is enough; nothing here needs a GPU.
+install-voice:
+	@echo "==> Creating .venv-voice (Chatterbox, Demucs, Resemblyzer; about 2 GB)"
+	@uv venv --quiet --python 3.11 .venv-voice
+	@VIRTUAL_ENV=.venv-voice uv pip install --quiet -r requirements-voice.txt --index-strategy unsafe-best-match
+	@.venv-voice/bin/python -c "import chatterbox, demucs, resemblyzer" && echo "    voice conversion ready"
 
 # The canvas is React (ADR 0015). Node is needed to build it, never to run
 # Cine Toaster: the build lands in the package and the runtime serves it.
