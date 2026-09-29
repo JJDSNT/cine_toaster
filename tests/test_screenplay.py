@@ -244,6 +244,30 @@ class ScreenplayFilesTests(unittest.TestCase):
         self.assertEqual(load_production(root)["script_files"], ["story/film.fountain"])
 
 
+class FieldAliasTests(unittest.TestCase):
+    """A production declares what its own field names mean (CT-0035)."""
+
+    def scene(self, shot_fields: str, shot: str) -> dict:
+        directory = Path(tempfile.mkdtemp())
+        (directory / "project.yaml").write_text(f"id: t\ntitle: T\npaths:\n  scenes: scenes\nshot_fields:\n{shot_fields}")
+        (directory / "scenes" / "010").mkdir(parents=True)
+        (directory / "scenes" / "010" / "scene.yaml").write_text(f"scene: SC-1\nshots:\n  - n: 1\n{shot}")
+        return load_production(directory)["scenes"][0]
+
+    def test_a_declared_alias_fills_a_core_field(self) -> None:
+        scene = self.scene("  seg: {label: segundos, maps_to: duration}\n", "    seg: 6\n")
+        self.assertEqual(scene["shots"][0]["duration_seconds"], 6.0)
+        self.assertEqual(codes_of(scene), [])
+
+    def test_the_canonical_field_wins(self) -> None:
+        scene = self.scene("  seg: {maps_to: duration}\n", "    seg: 6\n    duration: 4\n")
+        self.assertEqual(scene["shots"][0]["duration_seconds"], 4.0)
+
+    def test_only_core_fields_can_be_targets(self) -> None:
+        scene = self.scene("  seg: {maps_to: anything_at_all}\n", "    seg: 6\n")
+        self.assertEqual(scene["shots"][0]["duration_seconds"], 0.0)
+
+
 def codes_of(scene):
     return [finding["code"] for finding in scene["findings"]]
 

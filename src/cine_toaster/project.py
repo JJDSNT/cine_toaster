@@ -17,6 +17,7 @@ from .transitions import list_transitions
 from .takes import discover, shot_key, work_directory_for
 from .vocabulary import (
     LEGACY_KEYS,
+    CORE_SHOT_FIELDS,
     COMPOSED_ENGINES,
     GENERATED_NOTHING,
     KIND_ENGINES,
@@ -114,6 +115,7 @@ def _load_shots(
     path: Path,
     root: Path,
     declared_fields: dict[str, str] | None = None,
+    aliases: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     raw_shots = field(document, "shots") or []
     if not isinstance(raw_shots, list):
@@ -126,6 +128,11 @@ def _load_shots(
     for raw in raw_shots:
         if not isinstance(raw, dict):
             raise ProjectFormatError(f"Each shot must be a mapping in {path}")
+        # A production's own name for a core field, declared in its manifest,
+        # stands in only where the canonical name is absent.
+        for alias, canonical in (aliases or {}).items():
+            if alias in raw and field(raw, canonical) is None:
+                raw = {**raw, canonical: raw[alias]}
         number = raw.get("n")
         if number in (None, ""):
             raise ProjectFormatError(f"A shot is missing its number in {path}")
@@ -331,6 +338,7 @@ def _load_scene(
     declared_fields: dict[str, str] | None = None,
     project_look: str = "",
     screenplay: script_model.Screenplay | None = None,
+    aliases: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     document = _read_yaml(path)
     scene_id = vtext(document, "scene") or _text(document.get("id"))
@@ -338,7 +346,7 @@ def _load_scene(
         raise ProjectFormatError(f"Missing 'scene' in {path}")
 
     geography = field(document, "geography") or {}
-    shots = _load_shots(document, path, root, declared_fields)
+    shots = _load_shots(document, path, root, declared_fields, aliases)
     assignments = _camera_assignments(geography)
     for shot in shots:
         if not shot["camera"]:
@@ -754,6 +762,24 @@ def discover_stills(root: Path, scene_id: str) -> dict[str, str]:
     return stills
 
 
+def _shot_field_aliases(manifest: dict[str, Any]) -> dict[str, str]:
+    """Production fields that mean a core field: `shot_fields: {seg: {maps_to: duration}}`.
+
+    The application's legacy map is frozen (vocabulary.py). A production whose
+    own tools still write its dialect declares what those names mean, in its
+    manifest, instead of the application learning another language. Only core
+    shot fields can be targets.
+    """
+
+    aliases: dict[str, str] = {}
+    raw = manifest.get("shot_fields") or {}
+    if isinstance(raw, dict):
+        for name, value in raw.items():
+            if isinstance(value, dict) and str(value.get("maps_to") or "") in CORE_SHOT_FIELDS:
+                aliases[str(name)] = str(value["maps_to"])
+    return aliases
+
+
 def _declared_shot_fields(manifest: dict[str, Any]) -> dict[str, str]:
     """Shot keys this production declares, with the label it wants shown.
 
@@ -956,7 +982,7 @@ def load_production(root: Path) -> dict[str, Any]:
     script_files, script_problem = screenplay_files(manifest, root)
     screenplay = _read_screenplay(root, script_files)
     scenes = [
-        _load_scene(path, root, declared_fields, project_look, screenplay)
+        _load_scene(path, root, declared_fields, project_look, screenplay, _shot_field_aliases(manifest))
         for path in scene_files(root, manifest)
     ]
     scenes.sort(key=lambda scene: (scene["order"], scene["id"]))
