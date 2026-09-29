@@ -125,7 +125,19 @@ on the subject side.
    (last→first), optional bridge generation, and an optional catalog transition
    with a required `reason` (SPEC-0004). Decide whether it belongs in
    SPEC-0004 or a new specification.
-3. ~~Spike SceneFlow~~ done. Follow-up: when a generation adapter exists,
+3. ~~Spike SceneFlow~~ done. ~~Brief builder~~ done (plan step 4,
+   2026-09-29): `brief.py`, `toast brief`, `/api/brief`, and the Brief panel.
+   Every slot is badged authored, screenplay, derived, or missing. The review
+   runs on **local** take video in Cine Toaster, at the user's request; the
+   export keeps SceneFlow's JSON shape plus `video`, with an empty
+   `youtubeId`. Still open:
+   - recording a review's re-timed cues and adherence verdicts as production
+     records, through a command;
+   - an explicit per-shot brief override;
+   - `[STATE OUT]` from wardrobe and props, which are not records;
+   - a local-video patch to SceneFlow, if we want to open exports there.
+
+   The original follow-up read: when a generation adapter exists,
    promote the derivation into a provider-neutral brief builder: authored
    fields plus geometry, emitted in Auteur Script form. Add `state_out` and
    `look`-provided wardrobe as the two missing inputs.
@@ -170,6 +182,8 @@ on the subject side.
   `PYTHONPATH=src .venv/bin/python` on `examples/demo-project` SC-030. Per-camera
   subject angles were verified independently: CAM-C half-FOV 32.7°, Mara at
   44.7°. No repository code changed, so no test run was needed.
+- Brief: `tests/test_brief.py` (14 tests); a headless screenshot of the
+  Brief panel with a local take playing.
 - SPEC-0007: `tests/test_cuts.py` (14 tests), the full suite, `toast check` on
   both demos, and a headless screenshot of the Cut room with a scratch-only
   `chain: frame` finding.

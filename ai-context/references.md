@@ -90,6 +90,9 @@ experimental research notes. Its source lives in the SceneFlow repository under
   Cine Toaster has the same review loop, applied at beat level.
 - **BRIEF State Engine (v2.5.0).** `briefAnalysis.ts` parses `->` chains and
   counts macro-states and sub-states per scene.
+- **Video source.** SceneFlow plays YouTube only (`youtubeId`). Cine Toaster
+  reviews takes as local files in its own player, and exports SceneFlow's JSON
+  shape plus `video` (2026-09-29).
 - **Author's stance.** Write a detailed script and go straight to video
   generation, skipping separate asset generation. This contrasts with our
   reference-image path (SPEC-0003). Treat it as an option to test, not a rule.

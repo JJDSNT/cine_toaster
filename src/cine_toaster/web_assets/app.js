@@ -364,7 +364,117 @@ async function renderScene(sceneId, { record = true } = {}) {
 
   const blockout = renderBlockout(scene);
   if (blockout) root.append(blockout);
+  root.append(renderBrief(scene));
   root.append(renderIterations(scene));
+}
+
+const BRIEF_SOURCES = {
+  authored: "From the scene file",
+  screenplay: "From the screenplay",
+  derived: "Computed from geometry, movement or the cut",
+  missing: "No record fills this yet",
+};
+
+function briefSlot(slot) {
+  const row = el("div", `brief-slot brief-${slot.source}`);
+  const tag = el("span", "brief-tag", slot.tag);
+  const badge = el("span", "brief-source", slot.source);
+  badge.title = BRIEF_SOURCES[slot.source] || "";
+  row.append(tag, el("p", "", slot.text), badge);
+  return row;
+}
+
+// The brief a generation would receive, derived from the records above
+// (plan step 4). Every line says where it came from, and a shot's local take
+// can be reviewed against it.
+function renderBrief(scene) {
+  const panel = el("section", "panel wide-panel brief-panel");
+  panel.append(sectionHeading(
+    "BRIEF",
+    "What a generation would be told",
+    "Auteur Script form, derived from the records. Nothing here is written by hand: fix a line by fixing its record.",
+  ));
+  const body = el("div", "brief-body", "Deriving…");
+  panel.append(body);
+  api(`/api/brief?scene=${encodeURIComponent(scene.id)}`).then((brief) => {
+    body.replaceChildren();
+    const legend = el("div", "brief-legend");
+    for (const [source, text] of Object.entries(BRIEF_SOURCES)) {
+      const item = el("span", `brief-source brief-${source}`, source);
+      item.title = text;
+      legend.append(item);
+    }
+    if (brief.missing) legend.append(el("strong", "brief-missing-count", `${brief.missing} missing`));
+    body.append(legend);
+
+    const staging = el("div", "brief-block");
+    staging.append(el("h3", "", "Staging"));
+    brief.staging.forEach((slot) => staging.append(briefSlot(slot)));
+    body.append(staging);
+
+    for (const state of brief.states) {
+      const block = el("div", "brief-block");
+      const shot = scene.shots.find((item) => item.id === state.shot);
+      const title = el("h3", "", `S${state.n} · ${state.shot}${state.label ? ` · ${state.label}` : ""}`);
+      if (state.duration_seconds) title.append(el("small", "", ` ${state.duration_seconds} s`));
+      block.append(title);
+      state.slots.forEach((slot) => block.append(briefSlot(slot)));
+      const takes = (shot?.takes || []).filter((take) => take.media);
+      if (takes.length) block.append(briefReview(scene, state, takes));
+      body.append(block);
+    }
+  }).catch((error) => body.replaceChildren(el("p", "preview-error", error.message)));
+  return panel;
+}
+
+// Play a shot's local take beside the lines it was meant to show.
+function briefReview(scene, state, takes) {
+  const box = el("div", "brief-review");
+  const picker = el("div", "brief-takes");
+  const stage = el("div", "brief-stage");
+  const open = (take) => {
+    for (const chip of picker.children) chip.classList.toggle("active", chip.dataset.take === take.id);
+    const video = el("video");
+    video.src = `/media/${take.media}`;
+    video.controls = true;
+    video.playsInline = true;
+    const cues = el("ol", "brief-cues");
+    fetch(`/api/brief-review?scene=${encodeURIComponent(scene.id)}&shot=${encodeURIComponent(state.shot)}&take=${encodeURIComponent(take.id)}`)
+      .then((response) => response.json())
+      .then((review) => {
+        for (const cue of review.cues) {
+          const item = el("li", "brief-cue");
+          item.dataset.start = cue.startTime;
+          item.dataset.end = cue.endTime;
+          item.append(el("span", "brief-tag", cue.type), el("p", "", cue.selectedText));
+          item.addEventListener("click", () => { video.currentTime = cue.startTime * scale(); video.play(); });
+          cues.append(item);
+        }
+        const exported = el("a", "quiet-button", "Review project (JSON)");
+        exported.href = `/api/brief-review?scene=${encodeURIComponent(scene.id)}&shot=${encodeURIComponent(state.shot)}&take=${encodeURIComponent(take.id)}`;
+        exported.download = `${scene.id}-${state.shot}-${take.id}.review.json`;
+        stage.append(exported);
+      });
+    // Cue times are planned; a take rarely runs exactly the planned length,
+    // so the plan is stretched over the take until a review re-times it.
+    const scale = () => (video.duration && state.duration_seconds ? video.duration / state.duration_seconds : 1);
+    video.addEventListener("timeupdate", () => {
+      const planned = video.currentTime / scale();
+      for (const item of cues.children) {
+        const active = planned >= Number(item.dataset.start) && planned <= Number(item.dataset.end);
+        item.classList.toggle("active", active);
+      }
+    });
+    stage.replaceChildren(video, cues);
+  };
+  for (const take of takes) {
+    const chip = button(take.label || take.id, () => open(take), "blockout-chip");
+    chip.dataset.take = take.id;
+    if (take.selected) chip.classList.add("selected");
+    picker.append(chip);
+  }
+  box.append(el("span", "eyebrow", "REVIEW A TAKE AGAINST THIS STATE"), picker, stage);
+  return box;
 }
 
 // Continuity problems are read from the scene geometry before anything is

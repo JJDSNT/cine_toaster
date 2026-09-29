@@ -150,9 +150,10 @@ Follow the **ordered plan** in `development/roadmap.md` (2026-09-29):
 13. editable canvas;
 14. Tauri.
 
-Steps 1–3 are **done**: screenplay coverage (SPEC-0006), the cut record
-(SPEC-0007), and the blocking frame (`CT-0025`). The next action is step 4,
-the brief builder with SceneFlow export.
+Steps 1–4 are **done**: screenplay coverage (SPEC-0006), the cut record
+(SPEC-0007), the blocking frame (`CT-0025`), and the brief builder with a
+local-video review (`docs/brief.md`). The next action is step 4b, light
+previs (`CT-0029`).
 
 Earlier notes:
 

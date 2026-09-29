@@ -270,6 +270,30 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             self._send_json(scene)
             return
 
+        if parsed.path in ("/api/brief", "/api/brief-review"):
+            # A scene's generation brief, derived from its records (plan step 4),
+            # and the review project for one shot's local take.
+            from .brief import production_brief, take_review
+
+            try:
+                found = production_brief(self.project_root, query.get("scene", [""])[0])
+            except (FileNotFoundError, ProjectFormatError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
+                return
+            if found is None:
+                self._send_json({"error": "Scene not found"}, HTTPStatus.NOT_FOUND)
+                return
+            scene, brief = found
+            if parsed.path == "/api/brief":
+                self._send_json(brief.public_dict())
+                return
+            review = take_review(scene, brief, query.get("shot", [""])[0], query.get("take", [""])[0] or None)
+            if review is None:
+                self._send_json({"error": "That shot has no take with a video"}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json(review)
+            return
+
         if parsed.path == "/api/blocking-frame":
             # What a shot's camera sees at its start or end, computed from the
             # scene geometry (CT-0025). Derived on every request, never stored.

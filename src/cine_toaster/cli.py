@@ -396,6 +396,39 @@ def command_check(args: argparse.Namespace) -> int:
     return 1 if any(finding["severity"] == "error" for finding in findings) else 0
 
 
+def command_brief(args: argparse.Namespace) -> int:
+    """Derive a scene's generation brief from its records (plan step 4)."""
+
+    from .brief import production_brief, take_review
+
+    found = production_brief(args.project.expanduser().resolve(), args.scene)
+    if found is None:
+        print(f"No scene {args.scene!r}.", file=sys.stderr)
+        return 1
+    scene, brief = found
+    if args.review:
+        review = take_review(scene, brief, args.review, args.take)
+        if review is None:
+            print(f"{args.scene} {args.review} has no take with a video.", file=sys.stderr)
+            return 1
+        text = json.dumps(review, indent=2, ensure_ascii=False)
+        if args.output:
+            args.output.write_text(text + "\n", encoding="utf-8")
+            print(f"Wrote {args.output} (review of {review['take']}: {len(review['cues'])} cue(s), video {review['video']})")
+        else:
+            print(text)
+        return 0
+    if args.json:
+        print(json.dumps(brief.public_dict(), indent=2, ensure_ascii=False))
+    else:
+        print(brief.text(), end="")
+        missing = brief.missing()
+        if missing:
+            print(f"\n{len(missing)} slot(s) missing: " + ", ".join(
+                f"{slot.shot + ' ' if slot.shot else ''}{slot.tag}" for slot in missing), file=sys.stderr)
+    return 0
+
+
 def command_frame(args: argparse.Namespace) -> int:
     """Draw what a shot's camera sees, from the scene geometry (CT-0025)."""
 
@@ -835,6 +868,20 @@ def build_parser() -> argparse.ArgumentParser:
         action.add_argument("project", type=Path)
         action.add_argument("--scene")
         action.set_defaults(function=command_script)
+
+    brief_parser = subparsers.add_parser(
+        "brief", help="Derive a scene's generation brief from its records"
+    )
+    brief_parser.add_argument("project", type=Path)
+    brief_parser.add_argument("scene")
+    brief_parser.add_argument("--json", action="store_true", help="slots with their sources")
+    brief_parser.add_argument(
+        "--review", metavar="SHOT",
+        help="write the SceneFlow-shaped review project for this shot's local take",
+    )
+    brief_parser.add_argument("--take", help="with --review: which take (default: the selected one)")
+    brief_parser.add_argument("--output", type=Path)
+    brief_parser.set_defaults(function=command_brief)
 
     frame_parser = subparsers.add_parser(
         "frame", help="Draw a shot's blocking frame from the scene geometry, as SVG"
