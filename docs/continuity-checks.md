@@ -65,6 +65,13 @@ shots:
 
 Nothing is read from prose: an action line that says she walks moves nobody.
 
+The same numbers draw the **blocking frame**: what the shot's camera sees at
+its start and end, with subjects as silhouettes, the room, the axis and the
+marks. Select a shot in the scene's blockout to see it, or run
+`toast frame <project> <scene> <shot> [--at end] [--output f.svg]`. It is
+computed on demand and never stored, and whoever the checks call framed is
+inside it, on the same side (CT-0025).
+
 ## Which screenplay each shot holds
 
 A scene names the screenplay scene it films, and each shot quotes the start of

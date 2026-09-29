@@ -46,8 +46,8 @@ The order of work is the ordered plan in
   gl-transitions shaders, recreated from observation (`ready`)
 - `CT-0027` — camera-movement catalog, shaped like the transition catalog;
   after the blocking frame (`ready`)
-- `CT-0025` — storyboard fidelity levels; computed blocking frame first
-  (`ready`)
+- `CT-0025` — storyboard fidelity levels; blocking frame delivered
+  (`doing`)
 - `CT-0024` — spike: node canvases in the reference repositories and Arcads
   (`doing`; Arcads first-hand verification pending)
 - `CT-0023` — two graphs: the production canvas and orchestration

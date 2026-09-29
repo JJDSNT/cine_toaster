@@ -396,6 +396,31 @@ def command_check(args: argparse.Namespace) -> int:
     return 1 if any(finding["severity"] == "error" for finding in findings) else 0
 
 
+def command_frame(args: argparse.Namespace) -> int:
+    """Draw what a shot's camera sees, from the scene geometry (CT-0025)."""
+
+    from .blocking import blocking_frame, public_frame, render_svg
+    from .project import load_scene
+
+    scene = load_scene(args.project.expanduser().resolve(), args.scene)
+    if scene is None:
+        print(f"No scene {args.scene!r}.", file=sys.stderr)
+        return 1
+    shot = next((item for item in scene["shots"] if item["id"] == args.shot), None)
+    frame = blocking_frame(scene, shot, args.at) if shot else None
+    if frame is None:
+        print(f"{args.scene} {args.shot} has no camera pose to look from.", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(public_frame(frame), indent=2))
+    elif args.output:
+        args.output.write_text(render_svg(frame), encoding="utf-8")
+        print(f"Wrote {args.output}")
+    else:
+        print(render_svg(frame))
+    return 0
+
+
 def command_script(args: argparse.Namespace) -> int:
     """Show what each shot covers of the screenplay, or propose the links (SPEC-0006)."""
 
@@ -810,6 +835,17 @@ def build_parser() -> argparse.ArgumentParser:
         action.add_argument("project", type=Path)
         action.add_argument("--scene")
         action.set_defaults(function=command_script)
+
+    frame_parser = subparsers.add_parser(
+        "frame", help="Draw a shot's blocking frame from the scene geometry, as SVG"
+    )
+    frame_parser.add_argument("project", type=Path)
+    frame_parser.add_argument("scene")
+    frame_parser.add_argument("shot")
+    frame_parser.add_argument("--at", choices=("start", "end"), default="start")
+    frame_parser.add_argument("--output", type=Path)
+    frame_parser.add_argument("--json", action="store_true", help="the frame's facts instead of the drawing")
+    frame_parser.set_defaults(function=command_frame)
 
     build_parser = subparsers.add_parser(
         "build", help="Render the production's composed shots into a file"

@@ -509,6 +509,7 @@ function renderBlockout(scene) {
       activeShot = shotId;
       for (const chip of chips.children) chip.classList.toggle("active", chip.dataset.shot === shotId);
       detail.replaceChildren(...(shotId ? describeMotion(scene, shotId) : []));
+      showFrames(shotId);
       draw();
     };
     const all = button("All shots", () => select(""), "blockout-chip active");
@@ -522,7 +523,23 @@ function renderBlockout(scene) {
     }
     panel.append(chips);
   }
-  panel.append(canvas, detail);
+  // Beside the plan, what the selected shot's camera sees (CT-0025).
+  const frames = el("div", "blocking-frames");
+  const showFrames = (shotId) => {
+    frames.replaceChildren();
+    const motion = motions.find((item) => item.shot_id === shotId);
+    if (!motion || !motion.start.camera) return;
+    const changes = motion.kind !== "static" || motion.moved_subjects.length;
+    for (const at of changes ? ["start", "end"] : ["start"]) {
+      const figure = el("figure", "blocking-frame");
+      const image = el("img");
+      image.src = `/api/blocking-frame?scene=${encodeURIComponent(scene.id)}&shot=${encodeURIComponent(shotId)}&at=${at}`;
+      image.alt = `${shotId} blocking frame at ${at}`;
+      figure.append(image, el("figcaption", "", changes ? `${shotId} · ${at}` : `${shotId} · the whole shot`));
+      frames.append(figure);
+    }
+  };
+  panel.append(canvas, frames, detail);
   const legend = el("div", "blockout-legend");
   for (const camera of geometry.cameras) {
     const shots = scene.shots.filter((shot) => shot.camera === camera.id).map((shot) => shot.id);

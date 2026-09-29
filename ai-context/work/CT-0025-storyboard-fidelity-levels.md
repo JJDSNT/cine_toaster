@@ -2,8 +2,8 @@
 id: CT-0025
 title: Storyboard fidelity levels — computed blocking frame, sketch, master image
 type: work
-status: ready
-owner: unassigned
+status: doing
+owner: development agent
 created_at: 2026-09-29
 updated_at: 2026-09-29
 tags:
@@ -64,14 +64,15 @@ otherwise depend on prompt wording.
 
 # To do
 
-1. **Blocking frame renderer.** For a shot's start and end state
+1. ~~**Blocking frame renderer.**~~ Done (plan step 3). The original step read:
+   **Blocking frame renderer.** For a shot's start and end state
    (`ShotMotion`), draw the camera's view: the frame at the aspect ratio,
    subjects as silhouettes sized by distance and lens, placed by screen
    angle, and heights used when declared. Show it beside the blockout. Add a
    golden test on SC-030.
-2. Decide the storage class of a blocking frame. The proposal is that it is
-   **derived, never stored**: regenerate it on demand, and keep it at most in
-   the disposable cache.
+2. ~~Decide the storage class~~ Decided: **derived, never stored**. It is
+   drawn on every request (`/api/blocking-frame`, `toast frame`) and nothing
+   caches it yet, because drawing costs less than a millisecond.
 3. Define the level on a picture: `blocking`, `sketch`, or `master`, with
    lineage (`from`) to the level below. This belongs with SPEC-0003 lineage.
 4. When the generation adapter exists, add a first step that renders a master
@@ -85,6 +86,42 @@ otherwise depend on prompt wording.
 - Sketches remain optional. Some productions will go straight from the
   blocking frame to a master image.
 
+# Implementation (step 1)
+
+- `src/cine_toaster/blocking.py`:
+  - a pinhole camera on a full-frame 16:9 sensor, at the shot's start or end
+    pose (SPEC-0005);
+  - screen right uses the plan convention of `screen_side`, so sides cannot
+    disagree with the checks;
+  - the camera tilts toward the eye height of the subject it follows, and is
+    otherwise level;
+  - defaults when heights are missing: camera 1.5 m, eyes 1.6 m. The caption
+    says "assumed".
+  - subjects are drawn as silhouettes, far to near, with labels; those out of
+    frame or behind the camera are named at the matching edge;
+  - the room's edges, the axis and the marks are clipped at the near plane;
+  - output is facts (`public_frame`) plus an SVG drawing (`render_svg`).
+- `GET /api/blocking-frame?scene=&shot=&at=start|end[&format=json]`.
+- `toast frame <project> <scene> <shot> [--at] [--output] [--json]`.
+- In the scene room, selecting a shot chip in the blockout shows its start
+  and end frames (a single frame when nothing moves).
+
+Known limits:
+
+- every subject is drawn as a person; the speaker stack is too. A subject
+  `kind` or size would fix it and belongs to the schema;
+- no lens distortion, depth of field, or vertical framing beyond tilt.
+
 # Validation
 
-- Design only. No code yet.
+- `tests/test_blocking.py` (9 tests):
+  - golden values on SC-030, measured by hand: P2 starts with the stack at
+    x ≈ −0.99 and Mara off right, and ends with Mara centred at 1.8 m; in P1
+    Mara is behind the camera; in P3 the stack is off left;
+  - an agreement test: every framed subject in every shot is inside the frame,
+    on the same side;
+  - the tilt, the SVG content, and the HTTP endpoint.
+- SVGs rasterised with rsvg-convert and inspected. The head and shoulder gap
+  was corrected after the first look.
+- Headless screenshot of the SC-030 blockout with P2 selected.
+- Full suite: 271 tests OK.

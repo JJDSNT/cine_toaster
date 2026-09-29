@@ -108,8 +108,9 @@ Cine Toaster cannot yet:
   executable graph of creative-level nodes. The corrected position is one
   canvas with entity nodes (records) and step nodes (workflow templates);
   steps run in the orchestration layer and results become takes with lineage.
-- `CT-0025` is ready: storyboard fidelity levels, starting with a blocking
-  frame computed from geometry.
+- `CT-0025` is in `doing`: storyboard fidelity levels. The blocking frame is
+  delivered: the camera's view computed from geometry, shown beside the
+  blockout, and available through `toast frame`.
 
 ## Closed: scene import
 
@@ -149,8 +150,9 @@ Follow the **ordered plan** in `development/roadmap.md` (2026-09-29):
 13. editable canvas;
 14. Tauri.
 
-Steps 1 and 2, screenplay coverage (SPEC-0006) and the cut record (SPEC-0007),
-are **done**. The next action is step 3, the blocking frame (`CT-0025`).
+Steps 1–3 are **done**: screenplay coverage (SPEC-0006), the cut record
+(SPEC-0007), and the blocking frame (`CT-0025`). The next action is step 4,
+the brief builder with SceneFlow export.
 
 Earlier notes:
 
