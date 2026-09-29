@@ -9,6 +9,7 @@ unless you confirm.
 toast previs <project> SC-030 P2            # a job in the foreground; adopts to renders/previs/
 toast build <project> --output reel.mp4     # the same, for the whole reel
 toast slice <project> 1-02A 1               # a generation block's clip -> one take per shot
+toast generate <project> 1-02A 2 --dry-run  # a paid block generation, within the budget (docs/generation.md)
 toast assemble <project> SC-030             # a new, kept version of the scene from its chosen takes
 toast jobs list [<project>]
 toast jobs cancel <job>                     # works from any shell

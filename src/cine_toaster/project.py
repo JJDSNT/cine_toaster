@@ -175,6 +175,11 @@ def _load_shots(
                 "generated_seconds": float(field(raw, "generated_seconds") or 0),
                 # The loudness a shot's sound should sit at, when it is not speech (LUFS).
                 "level_db": float(field(raw, "level_db")) if field(raw, "level_db") is not None else None,
+                # What the shot's starting picture shows, in the words a model is given.
+                "picture": vtext(raw, "picture"),
+                # A shot's `camera` may be a camera id or, in a breakdown written for
+                # a model, how the camera behaves ("static close-up, locked off").
+                "camera_text": raw.get("camera") if isinstance(raw.get("camera"), str) else "",
                 "look": vtext(raw, "look"),
                 "from": _lineage(raw),
                 "variant": vtext(raw, "variant"),
@@ -478,6 +483,8 @@ def _load_scene(
         "cast": _scene_field(document, "cast", scene_aliases) or {},
         "voice_state": _scene_field(document, "voice_state", scene_aliases) or {},
         "voices": _scene_field(document, "voices", scene_aliases) or {},
+        # How a generation model should refer to each speaker ("The man beside the bed").
+        "refer_as": _scene_field(document, "refer_as", scene_aliases) or {},
         "findings": findings,
         "decision_log": list(reversed(state.decisions)),
         "pending_shots": pending_shots,
@@ -803,7 +810,7 @@ def discover_stills(root: Path, scene_id: str) -> dict[str, str]:
 
 
 #: Scene fields a production may name in its own words (`scene_fields`).
-SCENE_ALIAS_TARGETS = ("cast", "voice_state", "voices")
+SCENE_ALIAS_TARGETS = ("cast", "voice_state", "voices", "refer_as")
 
 
 def _scene_field_aliases(manifest: dict[str, Any]) -> dict[str, str]:

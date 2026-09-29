@@ -381,7 +381,8 @@ def command_slice(args: argparse.Namespace) -> int:
 
     manager = JobManager()
     try:
-        job = manager.wait(manager.submit("slice_block", args.project, {"scene": args.scene, "block": args.block})["id"])
+        params = {"scene": args.scene, "block": args.block} | ({"clip": args.clip} if args.clip else {})
+        job = manager.wait(manager.submit("slice_block", args.project, params)["id"])
         if job["state"] != "succeeded":
             print(f"slice {job['state']}: {job.get('error') or job['message']}  (job {job['id']})", file=sys.stderr)
             return 1
@@ -394,6 +395,73 @@ def command_slice(args: argparse.Namespace) -> int:
     for item in summary["slices"]:
         print(f"  {item['shot']:5} take {item['take']:12} {item['seconds'][0]:.3f}–{item['seconds'][1]:.3f} s")
     print("  (not adopted: --dry-run)" if args.dry_run else "  adopted as takes; choose between them in the control room")
+    return 0
+
+
+def command_budget(args: argparse.Namespace) -> int:
+    """What paid generation may spend, and what it has spent (CT-0037)."""
+
+    from . import spend
+
+    if args.budget_command == "set":
+        spend.set_limit(args.usd)
+    data = spend.load()
+    if args.json:
+        print(json.dumps({**data, "spent_usd": spend.spent(data)}, indent=2))
+        return 0
+    limit = float(data.get("limit_usd") or 0)
+    print(f"Spent US$ {spend.spent(data):.2f} of US$ {limit:.2f}" if limit else
+          f"No budget set (spent US$ {spend.spent(data):.2f}); nothing will be generated. Set one: toast budget set <usd>")
+    for entry in data["entries"][-10:]:
+        print(f"  {entry['at'][:19]}  US$ {entry['usd']:.4f}  {entry.get('status', ''):10} {entry['what']}")
+    print(f"Ledger: {spend.ledger_path()}")
+    return 0
+
+
+def command_generate(args: argparse.Namespace) -> int:
+    """Generate a block of shots as one paid generation, within the budget (CT-0037)."""
+
+    from . import spend
+    from .generation import hourly_rate, plan_block
+    from .jobs import JobManager
+    from .providers.runpod import load_credentials
+
+    root = Path(args.project).expanduser().resolve()
+    if args.env_file:
+        load_credentials(Path(args.env_file).expanduser())  # never printed
+    plan = plan_block(root, load_production(root), args.scene, args.block, seed=args.seed,
+                      rate=hourly_rate(root, os.environ.get("RUNPOD_LTX_ENDPOINT_ID", "")))
+    if args.json and args.dry_run:
+        print(json.dumps(plan.public_dict(root), indent=2, ensure_ascii=False))
+        return 0
+    print(f"{plan.scene} block {plan.block}: {', '.join(plan.shots)}, {plan.seconds} s, seed {plan.seed}")
+    print(f"  starts from {plan.image.relative_to(root)}")
+    for guide in plan.guides:
+        print(f"  guide at frame {guide.frame:4}: {guide.path.relative_to(root)} ({guide.role})")
+    for note in plan.notes:
+        print(f"  note: {note}")
+    print(f"  estimate US$ {plan.estimate_usd:.3f}; spent US$ {spend.spent():.2f} of US$ {spend.load().get('limit_usd') or 0:.2f}")
+    print("\n" + plan.prompt + "\n")
+    if args.dry_run:
+        print("Nothing was sent (--dry-run).")
+        return 0
+    manager = JobManager()
+    try:
+        job = manager.submit("generate_block", root, {"scene": plan.scene, "block": plan.block, "seed": plan.seed})
+        try:
+            job = manager.wait(job["id"])
+        except KeyboardInterrupt:
+            manager.cancel(job["id"])
+            job = manager.wait(job["id"])
+        if job["state"] != "succeeded":
+            print(f"generate {job['state']}: {job.get('error') or job['message']}  (job {job['id']})", file=sys.stderr)
+            return 1
+        job = manager.adopt(job["id"])
+    finally:
+        manager.shutdown()
+    summary = job["result"]["summary"]
+    print(f"Made {summary['clip']} for US$ {summary['cost_usd']:.3f} (estimated {summary['estimate_usd']:.3f}).")
+    print(f"Slice it: toast slice {args.project} {plan.scene} {plan.block} --clip {summary['clip'].rsplit('/', 1)[-1]}")
     return 0
 
 
@@ -1199,6 +1267,23 @@ def build_parser() -> argparse.ArgumentParser:
     costs_parser.add_argument("--json", action="store_true")
     costs_parser.set_defaults(function=command_costs)
 
+    budget_parser = subparsers.add_parser("budget", help="What paid generation may spend, and has spent")
+    budget_parser.add_argument("--json", action="store_true")
+    budget_sub = budget_parser.add_subparsers(dest="budget_command")
+    budget_set = budget_sub.add_parser("set", help="Set the ceiling, in US dollars")
+    budget_set.add_argument("usd", type=float)
+    budget_parser.set_defaults(function=command_budget)
+
+    generate_parser = subparsers.add_parser("generate", help="Generate a block of shots in one paid generation")
+    generate_parser.add_argument("project", type=Path)
+    generate_parser.add_argument("scene")
+    generate_parser.add_argument("block")
+    generate_parser.add_argument("--seed", type=int, default=1)
+    generate_parser.add_argument("--dry-run", action="store_true", help="show the plan, the prompt and the estimate; send nothing")
+    generate_parser.add_argument("--json", action="store_true", help="with --dry-run, the plan as JSON")
+    generate_parser.add_argument("--env-file", help="read RUNPOD_API_KEY and RUNPOD_LTX_ENDPOINT_ID from this file")
+    generate_parser.set_defaults(function=command_generate)
+
     slice_parser = subparsers.add_parser(
         "slice", help="Slice a generation block's clip into one take per shot"
     )
@@ -1206,6 +1291,7 @@ def build_parser() -> argparse.ArgumentParser:
     slice_parser.add_argument("scene")
     slice_parser.add_argument("block")
     slice_parser.add_argument("--dry-run", action="store_true", help="find and cut, but do not adopt the takes")
+    slice_parser.add_argument("--clip", help="which version of the block to slice (e.g. b2-1.mp4); default its own clip")
     slice_parser.set_defaults(function=command_slice)
 
     jobs_parser = subparsers.add_parser("jobs", help="Background work: list, show, cancel, retry, adopt")

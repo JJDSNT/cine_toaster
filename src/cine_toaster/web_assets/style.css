@@ -603,6 +603,8 @@ dialog::backdrop { background: #000b; }
 .block-card.warning { border-color: #e7b75c; }
 .block-card video { width: 100%; border-radius: 6px; background: #000; }
 .block-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+.block-versions { display: flex; flex-wrap: wrap; gap: 4px; }
+.block-versions .active { outline: 1px solid var(--accent, currentColor); }
 
 /* --- Sequence versions --------------------------------------------------- */
 .sequence-versions { display: grid; gap: 10px; margin: 10px 0; }

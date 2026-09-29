@@ -101,8 +101,74 @@ exactly where SINGULAR's own tool did.
 Tests: `tests/test_blocks.py` (9 tests), including a synthetic clip with an
 extra cut and a returning shot.
 
+# Done: the generation adapter, within a budget (2026-09-29)
+
+The user approved a US$ 2 ceiling for test runs.
+
+- **`generation.py`: the block plan, from the records.** It holds:
+  - the starting picture, and guides at frame 0 and at each later cut;
+  - whole seconds from 1 to 20;
+  - the prompt, with digests of every picture sent;
+  - an estimate: 6.4 s of execution per clip second plus 15 s of queue, at
+    `generation_rates` or the assumed US$ 1.75/h.
+- **Prompt grammar: `providers/ltx_prompt.py`.** It is reimplemented from
+  `cena_ltx.prompt_bloco`, and each rule cites a claim in
+  `knowledge/providers/ltx-2.5.md`. The inputs are:
+  - `picture`, falling back to the picture of the shot it is made from;
+  - `camera_text` and the action;
+  - lines, with `refer_as` for the speaker and the voice as cast-sheet
+    identity plus scene `voice_state` (or scene `voices`).
+  - A shot with no `picture` is reported in the plan's notes.
+- **`spend.py`: the ledger.** It lives in the state directory.
+  - No budget means no generation.
+  - The estimate is checked at submission and again when the job starts.
+  - Billed time is recorded even when a job fails or is cancelled.
+- **Job kind `generate_block`.**
+  - The clip is kept as `work/b<id>-<n>.mp4`, beside `.job.json` and
+    `.provenance.json` (plan, guides with digests, prompt, seed, cost).
+    The production's `b<id>.mp4` is never replaced.
+  - Cancelling the job cancels the RunPod job too.
+  - Tests inject a transport through `jobs.GENERATION_TRANSPORT`.
+- **Block versions.**
+  - `Block.versions` lists `b<id>` and then each `b<id>-<n>`.
+  - `slice_block` takes `clip`. Slices of a version are named
+    `BLOCK-<id>V<n>`.
+  - The Blocks panel lets you switch between versions and slices the one
+    shown.
+- **CLI.**
+  - `toast budget [set <usd>]`;
+  - `toast generate <project> <scene> <block> [--seed] [--dry-run [--json]] [--env-file]`;
+  - `toast slice … --clip`.
+  - Docs are in `docs/generation.md`.
+- **Tests.** `tests/test_generation.py` (5 tests) covers:
+  - the plan built from the records;
+  - refusal without a budget;
+  - a version with its lineage and ledger entry;
+  - a failure's billed time;
+  - slicing a chosen version.
+
+**Dry run on SINGULAR 1-02A block 2** (on a scratch copy that declares
+`quadro→picture`, `sujeitos→refer_as` and `vozes→voices`):
+
+- The plan matched `cena_ltx.produzir_bloco`: `pmB.png` as the start and at
+  frame 0, then `pmA.png` at frame 144, for 14 s.
+- The prompt has the same structure as `prompt_bloco`. Only the seed
+  differs.
+- Estimate: US$ 0.051. SINGULAR's own `b2` took 97 s of execution, about
+  US$ 0.047.
+
+Remaining:
+
+- starting a generation from the control room (it needs a plan endpoint to
+  show the estimate before confirming);
+- SINGULAR's `guia_no_corte` and `forca_corte` per-shot options;
+- resuming a remote job after the process dies (a retry is a new
+  submission).
+- The ledger counts `delayTime`, which includes queueing while no worker
+  exists. That is conservative against the ceiling, but it overstates the
+  cost.
+
 # Open questions
 
 - ~~Whether `block` becomes a core shot field~~ decided: it is.
-- Spending: every run costs money on RunPod. Test runs need the user's
-  approval and a budget.
+- ~~Spending~~ decided: a US$ 2 ceiling, enforced by `spend.py`.

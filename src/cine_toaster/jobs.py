@@ -674,6 +674,13 @@ def _validate_slice(root: Path, params: dict[str, Any]) -> dict[str, Any]:
         raise ValidationError(f"Block {block_id} of {scene_id} has no clip (expected b{block_id}.mp4 in {work.name}/)")
     if not block.contiguous:
         raise ValidationError(f"Block {block_id} of {scene_id} is not a run of consecutive shots")
+    clip = str(params.get("clip") or "").strip()
+    if clip:
+        # A version by its file name or its path: `b2-1.mp4`.
+        match = next((item for item in block.versions if item == clip or item.rsplit("/", 1)[-1] == clip), None)
+        if match is None:
+            raise ValidationError(f"Block {block_id} has no clip {clip!r}; it has {', '.join(block.versions)}")
+        return {"scene": scene_id, "block": block_id, "clip": match}
     return {"scene": scene_id, "block": block_id}
 
 
@@ -685,7 +692,8 @@ def _run_slice(context: JobContext) -> dict[str, Any]:
 
     root = context.project_root
     scene, work, block = _block_context(root, context.params["scene"], context.params["block"])
-    clip = root / block.clip
+    clip = root / (context.params.get("clip") or block.clip)
+    version = clip.stem.partition("-")[2]
     length, fps = clip_info(clip)
     shots = {shot["id"]: shot for shot in scene["shots"]}
     references = [reference_picture(work, root, scene, shots[shot_id]) for shot_id in block.shots]
@@ -699,10 +707,11 @@ def _run_slice(context: JobContext) -> dict[str, Any]:
         number = shot_key(shots[shot_id]["number"])
         digits = "".join(ch for ch in number if ch.isdigit())
         stem = f"c{int(digits):02d}{number[len(digits):]}" if digits else f"c{number}"
-        slug, attempt = f"block-{block.id}", 1
+        base = f"block-{block.id}" + (f"v{version}" if version else "")
+        slug, attempt = base, 1
         while (takes_dir / f"{stem}-{slug}.mp4").exists():
             attempt += 1
-            slug = f"block-{block.id}-{attempt}"
+            slug = f"{base}-{attempt}"
         name = f"{stem}-{slug}.mp4"
         context.run_process(
             [ffmpeg, "-y", "-loglevel", "error", "-ss", f"{start / fps:.4f}", "-to", f"{end / fps:.4f}", "-i", str(clip),
@@ -711,7 +720,7 @@ def _run_slice(context: JobContext) -> dict[str, Any]:
             span=(0.1 + 0.85 * index / len(block.shots), 0.1 + 0.85 * (index + 1) / len(block.shots)),
         )
         provenance = {
-            "kind": "block-slice", "block": block.id, "clip": block.clip, "frames": [start, end],
+            "kind": "block-slice", "block": block.id, "clip": clip.relative_to(root).as_posix(), "frames": [start, end],
             "seconds": [round(start / fps, 3), round(end / fps, 3)], "method": slicing.method,
             "detected": slicing.detected, "requested": slicing.requested, "note": slicing.note,
             "reference": references[index].relative_to(root).as_posix() if references[index] else "",
@@ -816,3 +825,103 @@ def _adopted_assemble_sequence(job: dict[str, Any], placed: list[str]) -> None:
 
 register(JobKind("assemble_sequence", _validate_assemble_sequence, _run_assemble_sequence, _adopted_assemble_sequence))
 
+
+
+# --- generating a block ------------------------------------------------------
+
+
+#: Tests replace the RunPod transport; production code leaves it None.
+GENERATION_TRANSPORT = None
+
+
+def _generation_plan(root: Path, params: dict[str, Any]):
+    from .generation import hourly_rate, plan_block
+    from .project import load_production
+
+    endpoint = os.environ.get("RUNPOD_LTX_ENDPOINT_ID", "")
+    production = load_production(root)
+    plan = plan_block(root, production, str(params.get("scene", "")).strip(), str(params.get("block", "")).strip(),
+                      seed=int(params.get("seed") or 1), rate=hourly_rate(root, endpoint))
+    return plan, endpoint
+
+
+def _validate_generate(root: Path, params: dict[str, Any]) -> dict[str, Any]:
+    from . import spend
+
+    plan, endpoint = _generation_plan(root, params)
+    if GENERATION_TRANSPORT is None and not (endpoint and os.environ.get("RUNPOD_API_KEY")):
+        raise ValidationError("Generation needs RUNPOD_API_KEY and RUNPOD_LTX_ENDPOINT_ID in the environment "
+                              "(toast generate --env-file <file> reads them without printing them)")
+    spend.check(plan.estimate_usd, f"Block {plan.block} of {plan.scene}")
+    return {"scene": plan.scene, "block": plan.block, "seed": plan.seed}
+
+
+def _run_generate(context: JobContext) -> dict[str, Any]:
+    """One paid generation of the block, kept as a new version of its clip."""
+
+    from . import spend
+    from .blocks import block_versions
+    from .generation import hourly_rate
+    from .providers import runpod
+    from .project import load_production
+    from .providers.ltx import Guide, LtxProvider
+    from .takes import JOB_SUFFIX, work_directory_for
+
+    root = context.project_root
+    plan, endpoint = _generation_plan(root, context.params)
+    what = f"Block {plan.block} of {plan.scene}"
+    spend.check(plan.estimate_usd, what)  # again: another job may have spent since this one was queued
+    scene_file = next(item["file"] for item in load_production(root)["scenes"] if item["id"] == plan.scene)
+    work = work_directory_for(root / scene_file)
+    numbers = [int(path.stem.rpartition("-")[2]) for path in block_versions(work, plan.block) if "-" in path.stem]
+    name = f"b{plan.block}-{max(numbers, default=0) + 1}.mp4"
+    output = context.staging / name
+    base = GENERATION_TRANSPORT or runpod.request
+    remote = {"id": ""}
+
+    def transport(path: str, body: dict[str, Any] | None) -> dict[str, Any]:
+        # A cancelled job cancels the paid work too, not only the waiting.
+        if body is None and remote["id"] and context.cancelled():
+            try:
+                base(f"/{endpoint}/cancel/{remote['id']}", {})
+            finally:
+                raise JobCancelled()
+        response = base(path, body)
+        if path.endswith("/run"):
+            remote["id"] = response.get("id", "")
+        elif body is None:
+            status = response.get("status", "")
+            context.progress(0.1 if status == "IN_QUEUE" else 0.5, {"IN_QUEUE": "Waiting for a worker",
+                             "IN_PROGRESS": "Generating"}.get(status, status.title()))
+        return response
+
+    context.progress(0.02, "Sending the block")
+    provider = LtxProvider(endpoint, transport=transport)
+    guides = tuple(Guide(ref.path, ref.frame) for ref in plan.guides)
+    record_path = output.with_name(name + JOB_SUFFIX)
+    try:
+        result = provider.generate(image=plan.image, output=output, seconds=plan.seconds, prompt=plan.prompt,
+                                   seed=plan.seed, guides=guides, label=what)
+    finally:
+        # What the platform billed is spent whatever the outcome.
+        record = json.loads(record_path.read_text(encoding="utf-8")) if record_path.is_file() else {}
+        cost = runpod.cost_usd(record, hourly_rate(root, endpoint)) if record else 0.0
+        if record.get("id"):
+            spend.record(cost, what, job=context.job_id, remote=record["id"], status=record.get("status", ""),
+                         estimate_usd=plan.estimate_usd)
+    provenance = {
+        "kind": "block-generation", "scene": plan.scene, "block": plan.block, "shots": plan.shots,
+        "provider": result.provider, "model": result.model, "seed": plan.seed, "seconds": plan.seconds,
+        **plan.public_dict(root), "settings": result.provenance,
+        "cost_usd": round(cost, 4), "job": context.job_id,
+    }
+    (context.staging / f"{name}.provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
+    destination = (work / name).relative_to(root).as_posix()
+    files = [{"staged": name, "destination": destination},
+             {"staged": record_path.name, "destination": destination + JOB_SUFFIX},
+             {"staged": f"{name}.provenance.json", "destination": destination + ".provenance.json"}]
+    return {"files": files, "summary": {"scene": plan.scene, "block": plan.block, "clip": destination,
+                                        "cost_usd": round(cost, 4), "estimate_usd": plan.estimate_usd}}
+
+
+register(JobKind("generate_block", _validate_generate, _run_generate))

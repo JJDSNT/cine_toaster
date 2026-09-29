@@ -42,10 +42,27 @@ class Block:
     durations: list[float]
     clip: str = ""
     contiguous: bool = True
+    #: Every generation of the block: `b<id>.mp4`, then `b<id>-<n>.mp4` in order.
+    versions: list[str] = field(default_factory=list)
 
     def public_dict(self) -> dict[str, Any]:
         return {"id": self.id, "shots": self.shots, "durations": self.durations, "clip": self.clip,
-                "duration": round(sum(self.durations), 3), "contiguous": self.contiguous}
+                "duration": round(sum(self.durations), 3), "contiguous": self.contiguous,
+                "versions": self.versions}
+
+
+def block_versions(work: Path, block_id: str) -> list[Path]:
+    """The block's clips: the production's own `b<id>`, then each generation `b<id>-<n>`."""
+
+    if not work.is_dir():
+        return []
+    pattern = re.compile(rf"b{re.escape(block_id)}(?:-(\d+))?")
+    found = []
+    for path in work.iterdir():
+        match = pattern.fullmatch(path.stem)
+        if match and path.suffix.lower() in MEDIA_SUFFIXES[:3] and path.is_file():
+            found.append((int(match[1] or 0), path))
+    return [path for _, path in sorted(found)]
 
 
 def scene_blocks(scene: dict[str, Any], work: Path | None, root: Path) -> list[Block]:
@@ -67,11 +84,10 @@ def scene_blocks(scene: dict[str, Any], work: Path | None, root: Path) -> list[B
         where = positions[block_id]
         block.contiguous = where == list(range(where[0], where[0] + len(where)))
         if work is not None:
-            for suffix in MEDIA_SUFFIXES:
-                candidate = work / f"b{block_id}{suffix}"
-                if candidate.is_file():
-                    block.clip = candidate.relative_to(root).as_posix()
-                    break
+            block.versions = [path.relative_to(root).as_posix() for path in block_versions(work, block_id)]
+            # The production's own clip stays the block's clip; a generation
+            # made here is one more version, never a replacement.
+            block.clip = block.versions[0] if block.versions else ""
     return list(blocks.values())
 
 

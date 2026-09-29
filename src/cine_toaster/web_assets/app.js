@@ -1628,10 +1628,28 @@ function renderBlocks(scene) {
       video.controls = true;
       video.preload = "metadata";
       card.append(video);
+      // Every generation of the block is kept; the one shown is the one sliced.
+      const versions = block.versions || [block.clip];
+      let chosen = block.clip;
+      if (versions.length > 1) {
+        const row = el("div", "block-versions");
+        for (const path of versions) {
+          const name = path.split("/").pop();
+          const pick = button(name.replace(/\.[^.]+$/, ""), () => {
+            chosen = path;
+            video.src = `/media/${path}`;
+            row.querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === pick));
+          }, `quiet-button ${path === chosen ? "active" : ""}`);
+          row.append(pick);
+        }
+        card.append(row);
+      }
       const slice = button("Slice into takes", async () => {
         slice.disabled = true;
         try {
-          await startJob("slice_block", { scene: scene.id, block: block.id });
+          const params = { scene: scene.id, block: block.id };
+          if (chosen !== block.clip) params.clip = chosen.split("/").pop();
+          await startJob("slice_block", params);
         } catch (error) {
           alert(error.message);
         } finally {
