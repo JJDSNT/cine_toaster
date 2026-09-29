@@ -211,3 +211,10 @@ def cost_usd(status: dict[str, Any], hourly_rate: float) -> float:
 
     seconds = (status.get("delayTime", 0) + status.get("executionTime", 0)) / 1000
     return seconds * hourly_rate / 3600
+
+
+def job_seconds(record: dict[str, Any]) -> float:
+    """Billable time in a recorded job: queue and cold start, then execution."""
+
+    return (float(record.get("delayTime") or 0) + float(record.get("executionTime") or 0)) / 1000
+

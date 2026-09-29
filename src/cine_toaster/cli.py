@@ -397,6 +397,28 @@ def command_slice(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_costs(args: argparse.Namespace) -> int:
+    """Generation time and estimated cost, from the providers' job records."""
+
+    from .costs import production_costs
+    from .project import _read_yaml
+
+    root = Path(args.project).expanduser().resolve()
+    production = load_production(root)
+    manifest = _read_yaml(root / "project.yaml")
+    report = production_costs(production, manifest.get("generation_rates") or {})
+    if args.json:
+        print(json.dumps(report, indent=2))
+        return 0
+    for scene in report["scenes"]:
+        if scene["jobs"]:
+            print(f"  {scene['scene']:8} {scene['jobs']:4} generation(s)  {scene['seconds'] / 60:7.1f} min  ~US$ {scene['usd']:8.2f}")
+    print(f"Total: {report['seconds'] / 60:.1f} GPU minutes, ~US$ {report['usd']:.2f}"
+          + (f"  (rate assumed: US$ {report['assumed_rate_usd_per_hour']}/h; declare generation_rates in project.yaml)"
+             if report["rate"] == "assumed" else ""))
+    return 0
+
+
 def command_jobs(args: argparse.Namespace) -> int:
     """Background work: list, inspect, cancel, retry, adopt (SPEC-0008)."""
 
@@ -1085,6 +1107,11 @@ def build_parser() -> argparse.ArgumentParser:
     assemble_parser.add_argument("--version", help="default: the next free v<n>")
     assemble_parser.add_argument("--summary", help="what changed in this version")
     assemble_parser.set_defaults(function=command_assemble)
+
+    costs_parser = subparsers.add_parser("costs", help="Generation time and estimated cost, from job records")
+    costs_parser.add_argument("project", type=Path)
+    costs_parser.add_argument("--json", action="store_true")
+    costs_parser.set_defaults(function=command_costs)
 
     slice_parser = subparsers.add_parser(
         "slice", help="Slice a generation block's clip into one take per shot"

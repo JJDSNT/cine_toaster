@@ -717,6 +717,12 @@ def _run_slice(context: JobContext) -> dict[str, Any]:
             "reference": references[index].relative_to(root).as_posix() if references[index] else "",
             "job": context.job_id,
         }
+        # The generation that made the block made this slice: its record travels with it.
+        from .takes import JOB_SUFFIX, _read_json
+
+        block_job = _read_json(clip.with_name(clip.name + JOB_SUFFIX))
+        if block_job:
+            provenance["generation"] = {**block_job, "shared_by": len(block.shots)}
         (context.staging / f"{name}.provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
         destination = (takes_dir / name).relative_to(root).as_posix()
         files += [{"staged": name, "destination": destination},

@@ -97,6 +97,22 @@ priority order below.
     production-specific rule, left as a known difference.
   - Tests: speech cuts, sidecars, `in_take`, key renaming. Full suite: 378
     OK.
+- **Item 2: job lineage and cost** (2026-09-29).
+  - Take discovery keeps a provider's `<take>.job.json` as it is, under
+    `provenance.job`: the Core preserves it without interpreting it.
+  - A block slice carries its block's generation record, marked `shared_by`.
+  - `costs.py` and `toast costs <project>` report GPU time and estimated cost
+    per scene. Time comes from the platform's record (queue, cold start and
+    execution). The rate comes from the production's `generation_rates`, or
+    the LTX adapter's assumed US$ 1.75/h, and the report says which. A shared
+    block generation is counted once.
+  - SINGULAR: 81 generations with records, 148.2 GPU minutes, about US$ 4.32
+    at the assumed rate.
+  - Endpoint check (read-only): `ltx25-i2v` runs on the ADA_48_PRO pool.
+    **Its environment holds a HuggingFace token in plain text**, visible to
+    anyone with read access to the endpoint. It should be rotated and moved
+    to a RunPod secret. Reported to the user; the value was not recorded
+    anywhere.
 
 # Validation
 

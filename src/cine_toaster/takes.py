@@ -138,17 +138,30 @@ def discover(work_directory: Path, number: Any, *, relative_to: Path) -> list[Di
 PROVENANCE_SUFFIX = ".provenance.json"
 
 
-def read_provenance(media: Path) -> dict[str, Any]:
-    """Where a take came from, when something recorded it beside the file."""
+#: A generation provider's own job record, written beside the file it made
+#: (the RunPod data plane does, CT-0012). Kept as it is: the Core preserves a
+#: provider's payload without interpreting it.
+JOB_SUFFIX = ".job.json"
 
-    sidecar = media.with_name(media.name + PROVENANCE_SUFFIX)
-    if not sidecar.is_file():
+
+def _read_json(path: Path) -> dict[str, Any]:
+    if not path.is_file():
         return {}
     try:
-        value = json.loads(sidecar.read_text(encoding="utf-8"))
+        value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
     return value if isinstance(value, dict) else {}
+
+
+def read_provenance(media: Path) -> dict[str, Any]:
+    """Where a take came from, when something recorded it beside the file."""
+
+    provenance = _read_json(media.with_name(media.name + PROVENANCE_SUFFIX))
+    job = _read_json(media.with_name(media.name + JOB_SUFFIX))
+    if job:
+        provenance = {**provenance, "job": job}
+    return provenance
 
 
 def work_directory_for(scene_file: Path) -> Path:
