@@ -293,7 +293,7 @@ def command_build(args: argparse.Namespace) -> int:
 
     from .build import build
 
-    result = build(args.project, args.output)
+    result = build(args.project, args.output, engine=args.engine)
     if args.json:
         print(json.dumps(result.public_dict(), indent=2))
     else:
@@ -302,6 +302,7 @@ def command_build(args: argparse.Namespace) -> int:
             f"  {result.shots} shot(s), {result.transitions} transition(s), "
             f"{result.duration_seconds:.1f}s, "
             f"{'with audio' if result.audio else 'silent'}\n"
+            f"  engine {result.engine}: {result.shaders} transition(s) ran their own shader\n"
             f"  {result.stills} still(s) kept for the storyboard"
         )
     return 0
@@ -816,6 +817,11 @@ def build_parser() -> argparse.ArgumentParser:
     build_parser.add_argument("project", type=Path)
     build_parser.add_argument("--output", type=Path)
     build_parser.add_argument("--json", action="store_true")
+    build_parser.add_argument(
+        "--engine", choices=("auto", "gl", "ffmpeg"), default="auto",
+        help="gl runs each GLSL transition's own shader; ffmpeg its declared stand-in "
+        "(default: gl when a GL context is available)",
+    )
     build_parser.set_defaults(function=command_build)
 
     voice_parser = subparsers.add_parser(

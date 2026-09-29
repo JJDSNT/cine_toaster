@@ -59,6 +59,7 @@ Ranked by value to the three priority problems.
 | 6 | [oshtz/noder](https://github.com/oshtz/noder) | MIT | code | Same stack as our target: Tauri 2, React, Vite, and React Flow. It is a reference for the shell, OS credential store, and signed releases. It is small and early. |
 | 7 | [Valiera00/SPITE](https://github.com/Valiera00/SPITE) | AGPL-3.0 | ideas only | A scene strip over the canvas, with nodes tagged as "Shot 1 of Scene A". It shows cost on every Generate button and recovers generation jobs after a reload. It covers pre-production only. |
 | 8 | [shrimbly/node-banana](https://github.com/shrimbly/node-banana) | MIT | code | Popular generic node workflows with typed handles. It is closer to ComfyUI than Arcads, so it is less relevant. |
+| — | [gl-transitions/gl-transitions](https://github.com/gl-transitions/gl-transitions) | MIT (items MIT, BSD-2, BSD-3) | **submodule** | **Adopted** as the transition catalog's shader bank (`CT-0026`). 125 shaders in our own GLSL contract; 123 usable, 6 reviewed so far. |
 | 9 | [NatronGitHub/Natron](https://github.com/NatronGitHub/Natron) | GPL-2.0 | ideas / external tool | Node-based compositor. It is not a graph-UI candidate. At most, it is an external tool for VFX shots behind an adapter. |
 
 ## SceneFlow and Auteur Script in detail

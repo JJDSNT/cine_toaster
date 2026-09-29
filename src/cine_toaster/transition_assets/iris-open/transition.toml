@@ -1,0 +1,28 @@
+schema_version = 1
+id = "iris-open"
+name = "Iris Open"
+kind = "glsl"
+# The shader is gl-transitions' own; this manifest adds the review.
+upstream = "gl-transitions:circleopen"
+category = "graphic"
+description = "The incoming shot opens as a circle from the centre of frame."
+guidance = "A period device and a pointer: it draws the eye to the centre. Use it knowingly, as homage or storybook framing, with the subject centred in the incoming shot."
+energy = "medium"
+motion = "radial"
+duration_ms = 1000
+tags = ["iris", "vintage", "radial", "graphic"]
+use_when = [
+  "Silent-film or storybook tone",
+  "The incoming subject is centred",
+]
+avoid_when = [
+  "Naturalistic drama",
+  "The incoming subject sits at the edge of frame",
+]
+
+# How this item renders on each engine that can execute it. Declared by whoever
+# wrote the item, never inferred by the renderer: a substitution nobody chose
+# is a substitution nobody can argue with.
+[render]
+ffmpeg = "circleopen"
+ffmpeg_note = "The same circular reveal; the edge softness differs."

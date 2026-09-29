@@ -120,6 +120,8 @@ required are all deleted.
 
 ## Delivered
 
+- `CT-0026` — gl-transitions submodule: 117 unreviewed shaders plus 6 reviewed;
+  `toast build` runs GLSL transitions through ModernGL (`done`).
 - `CT-0013` — production-specific tooling boundary and demo examples (`done`).
 - `CT-0002` — canonical take selection (`done`).
 - `CT-0008` — scene geometry, continuity checks, sequences, live board (`done`).

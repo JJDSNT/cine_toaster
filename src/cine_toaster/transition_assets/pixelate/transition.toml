@@ -1,0 +1,27 @@
+schema_version = 1
+id = "pixelate"
+name = "Pixelate"
+kind = "glsl"
+# The shader is gl-transitions' own; this manifest adds the review.
+upstream = "gl-transitions:pixelize"
+category = "digital"
+description = "The outgoing shot breaks into growing blocks that resolve into the incoming shot."
+guidance = "A digital fault: screens, games, surveillance, a system glitching. It belongs to the world of the film, not to the edit, so motivate it with something on screen."
+energy = "high"
+motion = "neutral"
+duration_ms = 800
+tags = ["digital", "glitch", "screen", "retro"]
+use_when = [
+  "The story crosses into or out of a screen",
+  "A game or computer world",
+]
+avoid_when = [
+  "Period or naturalistic settings with no screen in them",
+]
+
+# How this item renders on each engine that can execute it. Declared by whoever
+# wrote the item, never inferred by the renderer: a substitution nobody chose
+# is a substitution nobody can argue with.
+[render]
+ffmpeg = "pixelize"
+ffmpeg_note = "The same block reveal; step counts differ."

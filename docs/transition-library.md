@@ -67,9 +67,11 @@ name alone.
 
 Catalogs are loaded in this order:
 
-1. built-ins distributed with Cine Toaster;
-2. directories in `CINE_TOASTER_TRANSITIONS_PATH`;
-3. a production's optional `transitions/` directory.
+1. the [gl-transitions](https://github.com/gl-transitions/gl-transitions)
+   shader bank, a git submodule at `vendor/gl-transitions` (see below);
+2. built-ins distributed with Cine Toaster;
+3. directories in `CINE_TOASTER_TRANSITIONS_PATH`;
+4. a production's optional `transitions/` directory.
 
 Later catalogs override earlier items with the same ID. This permits project
 pinning and customization without modifying application code. All asset paths
@@ -81,9 +83,56 @@ stay with the production while Cine Toaster owns only the loader and shader
 contract. See [Production-specific tooling](production-tooling.md) for the
 general ownership rule.
 
-## Current boundary
+## gl-transitions: reviewed and unreviewed
 
-The first implementation is a preview and guidance bank. It executes GLSL live
-against two sample frames and plays WebM references. Applying a transition to a
-timeline, rendering through FFmpeg, recording a project selection, downloading
-third-party packs, and parsing adjustable shader uniforms are deferred.
+gl-transitions' shaders follow the contract above, so they run unchanged. Its
+licences are MIT, with one BSD-2 and one BSD-3 item: permissive, so ADR 0011
+allows the submodule. A clone needs `git submodule update --init` (`make
+setup` runs it), and a wheel carries the shaders and their licence.
+
+Every upstream shader is listed as **unreviewed**: its name, author, licence
+and parameters come from its own header, but nobody has said when it serves a
+film and it declares no FFmpeg stand-in. The Transitions room keeps these in a
+collapsed bank, and an agent should not propose one.
+
+A shader is **reviewed** by writing a manifest that names it instead of an
+asset. The manifest adds the editorial contract and the stand-in, and replaces
+the raw item:
+
+```toml
+id = "film-burn"
+name = "Film Burn"
+kind = "glsl"
+upstream = "gl-transitions:FilmBurn"   # licence and author come from the shader
+# ...description, guidance, use_when, avoid_when, [render]
+```
+
+Two upstream shaders (`luma`, `displacement`) need an extra texture that no
+renderer supplies, and are left out.
+
+## Parameters
+
+A shader declares its parameters as uniforms with a default in a comment:
+
+```glsl
+uniform float count; // = 10.0
+uniform ivec2 size;  // = ivec2(4)
+```
+
+The catalog reads them, and both the preview and the render set them. An unset
+uniform is zero, and many transitions do nothing at zero. A uniform without a
+default, or of a type the renderers cannot supply, keeps the shader out of the
+catalog.
+
+## Rendering
+
+`toast build` has two engines. **GL** (ModernGL, the `gpu` extra) runs a GLSL
+item's own shader over the real frames of the two shots. **FFmpeg** runs the
+`[render].ffmpeg` stand-in its manifest declares. `--engine auto`, the
+default, uses GL when a context can be created. An item with no stand-in, such
+as every unreviewed shader, is refused by the FFmpeg engine rather than
+replaced. Both engines produce the same running time: a join replaces the end
+of the outgoing shot and the start of the incoming one.
+
+Recording a per-shot parameter override, and WebM compositing roles, are
+deferred.

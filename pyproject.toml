@@ -39,6 +39,9 @@ packages = ["src/cine_toaster"]
 [tool.hatch.build.targets.wheel.force-include]
 "examples/demo-project" = "cine_toaster/demo_projects/the-last-signal"
 "examples/amiga-demo-reel" = "cine_toaster/demo_projects/amiga-demo-reel"
+# The gl-transitions submodule: its shaders and its licence travel together.
+"vendor/gl-transitions/transitions" = "cine_toaster/vendor/gl-transitions/transitions"
+"vendor/gl-transitions/LICENSE" = "cine_toaster/vendor/gl-transitions/LICENSE"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

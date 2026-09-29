@@ -722,6 +722,20 @@ function compileShader(gl, type, source) {
   return shader;
 }
 
+function setShaderParam(gl, program, { name, type, default: value }) {
+  const location = gl.getUniformLocation(program, name);
+  if (!location) return;
+  const values = Array.isArray(value) ? value : [Number(value)];
+  const setters = {
+    float: "uniform1fv", vec2: "uniform2fv", vec3: "uniform3fv", vec4: "uniform4fv",
+    int: "uniform1iv", bool: "uniform1iv", ivec2: "uniform2iv", ivec3: "uniform3iv", ivec4: "uniform4iv",
+  };
+  const setter = setters[type];
+  if (!setter) return;
+  const typed = setter.endsWith("iv") ? new Int32Array(values) : new Float32Array(values);
+  gl[setter](location, typed);
+}
+
 async function startShaderPreview(canvas, transition) {
   const gl = canvas.getContext("webgl", { alpha: false, antialias: true });
   if (!gl) {
@@ -739,7 +753,11 @@ async function startShaderPreview(canvas, transition) {
       }
     `;
     const fragmentSource = `
+      #ifdef GL_FRAGMENT_PRECISION_HIGH
+      precision highp float;
+      #else
       precision mediump float;
+      #endif
       uniform sampler2D fromTexture;
       uniform sampler2D toTexture;
       uniform float progress;
@@ -773,6 +791,9 @@ async function startShaderPreview(canvas, transition) {
     gl.bindTexture(gl.TEXTURE_2D, toTexture);
     gl.uniform1i(gl.getUniformLocation(program, "toTexture"), 1);
     gl.uniform1f(gl.getUniformLocation(program, "ratio"), canvas.width / canvas.height);
+    // The shader's own parameters, at the defaults it declares: an unset
+    // uniform is zero, and many transitions do nothing at zero.
+    for (const param of transition.params || []) setShaderParam(gl, program, param);
     const progressLocation = gl.getUniformLocation(program, "progress");
     const started = performance.now();
     const duration = Math.max(250, transition.duration_ms);
@@ -794,9 +815,28 @@ async function startShaderPreview(canvas, transition) {
   }
 }
 
-function transitionVisual(transition, large = false) {
+function transitionVisual(transition, large = false, lazy = false) {
   const frame = el("div", large ? "transition-visual transition-visual-large" : "transition-visual");
-  if (transition.kind === "webm") {
+  if (lazy && transition.kind === "glsl") {
+    // A browser keeps only a few WebGL contexts alive, so a bank of a hundred
+    // shaders plays one at a time, while the pointer is on it.
+    frame.classList.add("transition-visual-lazy");
+    frame.append(el("span", "lazy-hint", "Hover to play"));
+    let canvas = null;
+    frame.addEventListener("pointerenter", () => {
+      canvas = el("canvas");
+      canvas.width = 640;
+      canvas.height = 360;
+      frame.prepend(canvas);
+      startShaderPreview(canvas, transition);
+    });
+    frame.addEventListener("pointerleave", () => {
+      if (!canvas) return;
+      canvas.getContext("webgl")?.getExtension("WEBGL_lose_context")?.loseContext();
+      canvas.remove();
+      canvas = null;
+    });
+  } else if (transition.kind === "webm") {
     const video = el("video");
     video.src = transition.preview_url;
     video.muted = true;
@@ -824,8 +864,10 @@ function renderTransitions() {
   heading.classList.add("page-heading");
   root.append(heading);
 
+  const reviewed = state.transitions.filter((transition) => transition.curated !== false);
+  const unreviewed = state.transitions.filter((transition) => transition.curated === false);
   const categories = new Map();
-  for (const transition of state.transitions) {
+  for (const transition of reviewed) {
     if (!categories.has(transition.category)) categories.set(transition.category, []);
     categories.get(transition.category).push(transition);
   }
@@ -833,22 +875,41 @@ function renderTransitions() {
     const section = el("section", "transition-section");
     section.append(sectionHeading("BANK", label(category), `${transitions.length} available`));
     const grid = el("div", "transition-grid");
-    for (const transition of transitions) {
-      const card = el("article", "transition-card");
-      card.append(transitionVisual(transition));
-      const copy = el("div", "transition-card-copy");
-      const top = el("div", "transition-card-top");
-      top.append(el("strong", "", transition.name), el("span", `energy energy-${transition.energy}`, transition.energy));
-      copy.append(top, el("p", "", transition.description));
-      const tags = el("div", "tag-list");
-      transition.tags.slice(0, 4).forEach((tag) => tags.append(el("span", "tag", tag)));
-      copy.append(tags, button("Inspect and guide AI", () => renderTransitionDetail(transition.id), "quiet-button"));
-      card.append(copy);
-      grid.append(card);
-    }
+    transitions.forEach((transition) => grid.append(transitionCard(transition)));
     section.append(grid);
     root.append(section);
   }
+
+  if (unreviewed.length) {
+    const section = el("details", "transition-section transition-unreviewed");
+    const summary = el("summary");
+    summary.append(sectionHeading(
+      "NOT REVIEWED · GL-TRANSITIONS",
+      `${unreviewed.length} more shaders`,
+      "Usable and rendered by their own shader, but nobody has said when they serve a film. Reviewing one gives it a manifest and moves it up.",
+    ));
+    section.append(summary);
+    const grid = el("div", "transition-grid");
+    unreviewed.forEach((transition) => grid.append(transitionCard(transition, true)));
+    section.append(grid);
+    root.append(section);
+  }
+}
+
+function transitionCard(transition, lazy = false) {
+  const card = el("article", "transition-card");
+  card.append(transitionVisual(transition, false, lazy));
+  const copy = el("div", "transition-card-copy");
+  const top = el("div", "transition-card-top");
+  top.append(el("strong", "", transition.name));
+  if (transition.curated === false) top.append(el("span", "energy energy-unknown", "unreviewed"));
+  else top.append(el("span", `energy energy-${transition.energy}`, transition.energy));
+  copy.append(top, el("p", "", transition.curated === false ? `by ${transition.author || "unknown"} · ${transition.license}` : transition.description));
+  const tags = el("div", "tag-list");
+  transition.tags.slice(0, 4).forEach((tag) => tags.append(el("span", "tag", tag)));
+  copy.append(tags, button(transition.curated === false ? "Inspect" : "Inspect and guide AI", () => renderTransitionDetail(transition.id), "quiet-button"));
+  card.append(copy);
+  return card;
 }
 
 function guidanceList(title, values, tone) {
@@ -877,12 +938,32 @@ function renderTransitionDetail(transitionId) {
 
   const aiPanel = el("section", "panel ai-guidance-panel");
   const aiHeading = sectionHeading("AGENT GUIDANCE", "How the AI should reason about it", "This text is part of the catalog, not inferred from the filename.");
-  aiPanel.append(aiHeading, el("blockquote", "", transition.guidance));
+  aiPanel.append(aiHeading, el("blockquote", "", transition.guidance || "Not reviewed. Nothing tells an agent when this serves a film, so it should not propose it."));
   const facts = el("dl", "transition-facts");
-  for (const [name, value] of [["Energy", transition.energy], ["Motion", transition.motion], ["Asset role", transition.webm_role], ["Origin", transition.origin], ["License", transition.license]]) {
-    facts.append(el("dt", "", name), el("dd", "", label(value)));
+  const rows = [["Energy", transition.energy], ["Motion", transition.motion], ["Asset role", transition.webm_role], ["Origin", transition.origin], ["License", transition.license]];
+  if (transition.author) rows.push(["Author", transition.author]);
+  rows.push(["Film render", transition.render?.ffmpeg ? `shader, or FFmpeg ${transition.render.ffmpeg} without GL` : "shader only (needs GL)"]);
+  for (const [name, value] of rows) {
+    facts.append(el("dt", "", name), el("dd", "", name === "Author" || name === "Film render" ? value : label(value)));
+  }
+  if (transition.source) {
+    const link = el("a", "", "source");
+    link.href = transition.source;
+    link.target = "_blank";
+    link.rel = "noopener";
+    const dd = el("dd");
+    dd.append(link);
+    facts.append(el("dt", "", "Source"), dd);
   }
   aiPanel.append(facts);
+  if ((transition.params || []).length) {
+    const params = el("dl", "transition-facts transition-params");
+    for (const param of transition.params) {
+      const value = Array.isArray(param.default) ? param.default.join(", ") : String(param.default);
+      params.append(el("dt", "", param.name), el("dd", "", `${param.type} = ${value}`));
+    }
+    aiPanel.append(el("span", "eyebrow", "SHADER PARAMETERS (DEFAULTS)"), params);
+  }
   const guidance = el("div", "guidance-columns");
   guidance.append(guidanceList("USE WHEN", transition.use_when, "use"), guidanceList("AVOID WHEN", transition.avoid_when, "avoid"));
   root.append(aiPanel, guidance);

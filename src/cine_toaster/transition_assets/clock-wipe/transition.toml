@@ -1,0 +1,27 @@
+schema_version = 1
+id = "clock-wipe"
+name = "Clock Wipe"
+kind = "glsl"
+# The shader is gl-transitions' own; this manifest adds the review.
+upstream = "gl-transitions:Radial"
+category = "graphic"
+description = "The incoming shot sweeps in around the centre like a clock hand."
+guidance = "Time made visible. It works where the story counts time: a deadline, a routine, a montage of hours. Anywhere else it is decoration."
+energy = "medium"
+motion = "rotational"
+duration_ms = 1000
+tags = ["wipe", "time", "graphic", "montage"]
+use_when = [
+  "The story is about time running",
+  "A montage of repeated moments",
+]
+avoid_when = [
+  "An emotional scene: the device distracts",
+]
+
+# How this item renders on each engine that can execute it. Declared by whoever
+# wrote the item, never inferred by the renderer: a substitution nobody chose
+# is a substitution nobody can argue with.
+[render]
+ffmpeg = "radial"
+ffmpeg_note = "xfade's radial is the same clock sweep."

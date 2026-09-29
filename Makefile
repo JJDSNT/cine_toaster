@@ -12,7 +12,7 @@ RUN = $(VENV)/bin/python
 TOAST = $(VENV)/bin/toast
 
 .DEFAULT_GOAL := setup
-.PHONY: setup environment install install-media install-audio test check demo doctor serve clean help voice build
+.PHONY: setup environment submodules install install-media install-audio install-gpu test check demo doctor serve clean help voice build
 
 help:
 	@echo "make setup     install and report what works"
@@ -45,7 +45,14 @@ environment:
 			|| { echo "ERROR: could not add pip to $(VENV). Remove it and run make again."; exit 1; }; \
 	}
 
-install: environment
+# gl-transitions is a submodule: a clone without --recursive has an empty
+# directory, and the catalog would silently lose its shader bank.
+submodules:
+	@if [ -d .git ] && command -v git >/dev/null 2>&1; then \
+		git submodule update --init --quiet; \
+	fi
+
+install: environment submodules
 	@echo "==> Installing Cine Toaster"
 	@$(RUN) -m pip install --quiet --upgrade pip
 	@$(RUN) -m pip install --quiet -e .
@@ -58,7 +65,11 @@ install-audio: install
 	@echo "==> Installing the audio extra (offline narration)"
 	@$(RUN) -m pip install --quiet -e '.[audio]'
 
-setup: install-media install-audio
+install-gpu: install
+	@echo "==> Installing the gpu extra (transitions run their own shaders)"
+	@$(RUN) -m pip install --quiet -e '.[gpu]'
+
+setup: install-media install-audio install-gpu
 	@$(TOAST) doctor
 	@echo "Next:  make demo    then    make serve"
 

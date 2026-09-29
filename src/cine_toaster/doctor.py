@@ -137,7 +137,9 @@ def _transitions() -> Capability:
     from .transitions import list_transitions
 
     try:
-        count = len(list_transitions())
+        catalog = list_transitions()
+        total = len(catalog)
+        count = sum(1 for item in catalog if item["curated"])
     except Exception as error:  # pragma: no cover - a broken catalog is a bug
         return Capability(
             name="Transition catalog",
@@ -152,7 +154,7 @@ def _transitions() -> Capability:
         what_it_enables="choosing an edit from a shared vocabulary",
         required=True,
         status=OK if count else MISSING,
-        detail=f"{count} built-in",
+        detail=f"{count} reviewed" + (f", {total - count} unreviewed" if total > count else ""),
         remedy="" if count else "This ships with the package; reinstall it.",
     )
 
@@ -208,14 +210,31 @@ def _blender() -> Capability:
 
 
 def _moderngl() -> Capability:
-    ok = _module("moderngl")
+    from .shader_render import gl_unavailable_reason
+
+    reason = gl_unavailable_reason()
     return Capability(
         name="ModernGL",
-        what_it_enables="running a transition's GLSL shader instead of an FFmpeg stand-in",
+        what_it_enables="running a transition's own GLSL shader in `toast build` instead of its FFmpeg stand-in",
         required=False,
-        status=OK if ok else MISSING,
-        remedy="" if ok else "uv sync --extra gpu   (or: pip install -e '.[gpu]')",
-        wired=False,
+        status=OK if reason is None else MISSING,
+        detail=reason or "",
+        remedy="" if reason is None else "uv sync --extra gpu   (or: pip install -e '.[gpu]')",
+    )
+
+
+def _gl_transitions() -> Capability:
+    from .transitions import list_transitions, upstream_root
+
+    root = upstream_root()
+    count = sum(1 for item in list_transitions() if item["origin"] == "gl-transitions") if root else 0
+    return Capability(
+        name="gl-transitions",
+        what_it_enables="the unreviewed shader bank beside the curated catalog, and shaders curated items name",
+        required=False,
+        status=OK if root else MISSING,
+        detail=f"{count} unreviewed shader(s) in {root}" if root else "",
+        remedy="" if root else "git submodule update --init",
     )
 
 
@@ -239,6 +258,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _python,
     _yaml,
     _transitions,
+    _gl_transitions,
     _demos,
     _media,
     _piper,

@@ -47,6 +47,7 @@ exit. "Decision" marks a step that ends in an ADR.
 | 12 | **CopilotKit / CoAgents spike.** CoAgents connect a LangGraph agent's state to React UI through AG-UI: shared state, human-in-the-loop, and generative UI. In the step 7 stack, spike: an agent panel on the canvas scoped to the selected shot (SPEC-0001 threads); the step 10 gate rendered as an in-canvas approval; the agent proposing a graph (Arcads' "describe and it suggests the nodes") through commands; and screenplay suggestions as diffs in the step 8 editor. Compare with an MCP-only agent path (BeatDesign's model). If step 11 rejects LangGraph, spike CopilotKit over AG-UI against the built-in workflow instead. **Decision:** agent UI protocol (ADR). | Stack | 7, 10, 11 | ADR on CopilotKit/CoAgents versus MCP-only. |
 | 13 | **Canvas becomes editable.** Edit cuts, references, and workflow steps through commands. Agent-proposed graphs are accepted or rejected as decisions. Decide where card positions live (`CT-0024` finding 5): auto-layout or disposable operational layout. | Both | 7, 12 | Every canvas edit is a command, with conflict tests across the GUI, CLI, and agent. |
 | 14 | **Tauri shell** (Phase 3 remainder). | Stack | 7 | The Phase 3 exit. |
+Inserted between steps 2 and 3 at the user's request (2026-09-29, done): gl-transitions as the catalog's shader bank, and builds that run a transition's own shader (`CT-0026`).
 
 Why this order: screenplay coverage comes first because it depends on nothing
 and everything downstream reads it: the storyboard, the brief, SceneFlow

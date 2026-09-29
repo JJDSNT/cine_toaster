@@ -60,6 +60,8 @@ The order of work is the ordered plan in
 
 ## Recently completed
 
+- `CT-0026` — gl-transitions as a submodule shader bank; builds run a
+  transition's own shader (`done`)
 - `CT-0019` — two halves of the interface, and an address for each room (`done`)
 - `CT-0018` — install, doctor, offline narration, and a render (`done`)
 - `CT-0016` — English schema; legacy names behind one translation point (`done`)

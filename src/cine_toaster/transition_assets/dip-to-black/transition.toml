@@ -1,0 +1,29 @@
+schema_version = 1
+id = "dip-to-black"
+name = "Dip to Black"
+kind = "glsl"
+# The shader is gl-transitions' own; this manifest adds the review.
+upstream = "gl-transitions:fadecolor"
+category = "classic"
+description = "The outgoing shot fades to black, holds, and the incoming shot fades up."
+guidance = "A full stop. Use it where the story rests: the end of a sequence, a real passage of time, a death. Overused, it turns every scene into an ending."
+energy = "low"
+motion = "neutral"
+duration_ms = 1400
+tags = ["classic", "temporal", "pause", "ending"]
+use_when = [
+  "A sequence or an act ends",
+  "Time passes that the audience should feel",
+  "The next scene must start clean",
+]
+avoid_when = [
+  "Inside a scene: it breaks continuous time",
+  "Several in a row: each one weakens the last",
+]
+
+# How this item renders on each engine that can execute it. Declared by whoever
+# wrote the item, never inferred by the renderer: a substitution nobody chose
+# is a substitution nobody can argue with.
+[render]
+ffmpeg = "fadeblack"
+ffmpeg_note = "xfade's fadeblack passes through black the same way; the hold length differs."

@@ -1,0 +1,27 @@
+schema_version = 1
+id = "blur-dissolve"
+name = "Blur Dissolve"
+kind = "glsl"
+# The shader is gl-transitions' own; this manifest adds the review.
+upstream = "gl-transitions:LinearBlur"
+category = "classic"
+description = "Both shots soften while they blend, so the join passes through a blur."
+guidance = "A dissolve that hides a mismatch: busy or high-contrast frames that would muddy in a plain dissolve blur through each other instead. Also reads as memory, sleep or drifting attention."
+energy = "low"
+motion = "neutral"
+duration_ms = 1000
+tags = ["soft", "dream", "memory", "temporal"]
+use_when = [
+  "Two busy frames would muddy in a dissolve",
+  "Drifting into memory or sleep",
+]
+avoid_when = [
+  "The audience must read detail through the join",
+]
+
+# How this item renders on each engine that can execute it. Declared by whoever
+# wrote the item, never inferred by the renderer: a substitution nobody chose
+# is a substitution nobody can argue with.
+[render]
+ffmpeg = "hblur"
+ffmpeg_note = "xfade's hblur blurs horizontally only; the shader blurs in every direction."

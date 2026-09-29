@@ -8,7 +8,8 @@ import unittest
 from pathlib import Path
 
 from cine_toaster.build import BuildError, build, draw_card
-from cine_toaster.transitions import list_transitions
+from cine_toaster.shader_render import gl_unavailable_reason
+from cine_toaster.transitions import list_transitions, upstream_root
 
 
 EXAMPLES = Path(__file__).parents[1] / "examples"
@@ -19,14 +20,27 @@ try:
     HAS_PILLOW = True
 except ImportError:
     HAS_PILLOW = False
+HAS_GL = gl_unavailable_reason() is None
+
+
+def _use_transition(reel: Path, old: str, new: str) -> None:
+    """Point one of the reel's transitions at another catalog item."""
+
+    scene = reel / "scenes" / "030-the-switcher" / "scene.yaml"
+    text = scene.read_text(encoding="utf-8").replace(f"id: {old}", f"id: {new}")
+    scene.write_text(text, encoding="utf-8")
 
 
 class TransitionRenderingTests(unittest.TestCase):
-    def test_every_catalog_item_declares_how_it_renders(self) -> None:
+    def test_every_reviewed_item_declares_how_it_renders(self) -> None:
         """A renderer never guesses a substitution the author did not choose."""
 
         for item in list_transitions(EXAMPLES / "amiga-demo-reel"):
             declared = item.get("render") or {}
+            if not item["curated"]:
+                # Nobody has chosen a stand-in for an unreviewed shader.
+                self.assertEqual(declared, {}, item["id"])
+                continue
             self.assertTrue(declared.get("ffmpeg"), item["id"])
             self.assertTrue(declared.get("ffmpeg_note"), item["id"])
 
@@ -38,7 +52,7 @@ class TransitionRenderingTests(unittest.TestCase):
             text = manifest.read_text(encoding="utf-8")
             manifest.write_text(text.split("[render]")[0], encoding="utf-8")
             with self.assertRaises(BuildError) as caught:
-                build(root / "reel")
+                build(root / "reel", engine="ffmpeg")
         self.assertIn("declares no FFmpeg rendering", str(caught.exception))
 
 
@@ -89,6 +103,31 @@ class BuildTests(unittest.TestCase):
             self.assertEqual(result.stills, 7)
             self.assertTrue((root / "stills" / "SC-020" / "P1.png").is_file())
             self.assertFalse((root / "renders" / ".work").exists())
+
+    @unittest.skipIf(upstream_root() is None, "the gl-transitions submodule is not checked out")
+    def test_an_unreviewed_shader_is_refused_by_the_ffmpeg_engine(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw) / "reel"
+            shutil.copytree(EXAMPLES / "amiga-demo-reel", root)
+            _use_transition(root, "cross-dissolve", "cube")
+            with self.assertRaises(BuildError) as caught:
+                build(root, engine="ffmpeg")
+        self.assertIn("gpu extra", str(caught.exception))
+
+    @unittest.skipUnless(HAS_GL and upstream_root() is not None, "no GL context or no submodule")
+    def test_the_gl_engine_runs_the_shader_and_keeps_the_running_time(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw) / "reel"
+            shutil.copytree(EXAMPLES / "amiga-demo-reel", root)
+            _use_transition(root, "cross-dissolve", "cube")
+            gl = build(root, root / "gl.mp4", engine="gl")
+            # The FFmpeg engine needs a stand-in, which the unreviewed cube lacks.
+            _use_transition(root, "cube", "cross-dissolve")
+            plain = build(root, root / "plain.mp4", engine="ffmpeg")
+        self.assertEqual(gl.engine, "gl")
+        self.assertGreaterEqual(gl.shaders, 1)
+        self.assertEqual(plain.shaders, 0)
+        self.assertAlmostEqual(gl.duration_seconds, plain.duration_seconds, delta=0.1)
 
     def test_a_production_with_no_composed_shots_is_refused(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

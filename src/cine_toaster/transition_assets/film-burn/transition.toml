@@ -1,0 +1,28 @@
+schema_version = 1
+id = "film-burn"
+name = "Film Burn"
+kind = "glsl"
+# The shader is gl-transitions' own; this manifest adds the review.
+upstream = "gl-transitions:FilmBurn"
+category = "analog"
+description = "Light burns through the outgoing frame, as when film stock catches, and gives way to the incoming shot."
+guidance = "An analog rupture: flashbacks, home movies, archive, the end of a reel. It says the image is a physical thing that can be damaged."
+energy = "high"
+motion = "organic"
+duration_ms = 1200
+tags = ["analog", "film", "flashback", "archive"]
+use_when = [
+  "Entering or leaving found footage, a flashback or archive",
+  "A reel or tape ends",
+]
+avoid_when = [
+  "Digital-native worlds",
+  "A calm continuous scene",
+]
+
+# How this item renders on each engine that can execute it. Declared by whoever
+# wrote the item, never inferred by the renderer: a substitution nobody chose
+# is a substitution nobody can argue with.
+[render]
+ffmpeg = "fadewhite"
+ffmpeg_note = "A flash to white stands in for the burn; the texture needs the shader."
