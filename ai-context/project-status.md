@@ -43,6 +43,10 @@ Cine Toaster can currently:
 - read scene geometry and report continuity problems before anything is
   generated (`toast check`);
 - draw a plan-view blockout of the set, the cameras, and the line of action;
+- declare movement within a shot, meaning characters sent to marks and camera
+  moves between poses, and check it before generating: positions carry across
+  the cut, the move kind is derived, and axis crossings and screen-side jumps
+  are reported (SPEC-0005);
 - group scenes into sequences and report progress at the level a production
   actually reviews;
 - follow committed decisions live, including decisions made from another
@@ -92,9 +96,16 @@ Cine Toaster cannot yet:
 - `CT-0022` is in `doing`: camera movement and cuts between clips are the main
   production pain. External references are screened and ranked in
   `references.md`, and the SceneFlow spike is done. Briefs can be derived from
-  records, including screen sides from geometry. The gaps are subject and
-  camera movement within a shot and a shot's exit state. Demo SC-030 contains
-  a P2→P3 position jump that `toast check` cannot see yet.
+  records, including screen sides from geometry. SPEC-0005 is implemented:
+  movement within a shot, eight new checks, and blockout paths. Next is the
+  cut record (step 2).
+- `CT-0023` and `CT-0024` cover the node canvas. All six reference
+  repositories use React Flow and none uses CopilotKit. Arcads is an
+  executable graph of creative-level nodes. The corrected position is one
+  canvas with entity nodes (records) and step nodes (workflow templates);
+  steps run in the orchestration layer and results become takes with lineage.
+- `CT-0025` is ready: storyboard fidelity levels, starting with a blocking
+  frame computed from geometry.
 
 ## Closed: scene import
 
@@ -114,6 +125,24 @@ required are all deleted.
 - `CT-0012` — generation providers moved into the tool (`done`).
 
 ## Ready next
+
+Follow the **ordered plan** in `development/roadmap.md` (2026-09-29):
+
+1. cut record;
+2. blocking frame;
+3. brief builder;
+4. jobs runtime;
+5. React stack decision and read-only canvas;
+6. first generation adapter;
+7. built-in workflow with a gate;
+8. LangGraph spike;
+9. CopilotKit/CoAgents spike;
+10. editable canvas;
+11. Tauri.
+
+The next action is step 1, the cut record.
+
+Earlier notes:
 
 - Phase 2 — application runtime and jobs. The first job should be the one the
   external production already needs: assemble a sequence from its selected takes

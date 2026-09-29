@@ -39,6 +39,15 @@ execution history and links to those destinations.
 
 ## Work queue
 
+The order of work is the ordered plan in
+[`development/roadmap.md`](../development/roadmap.md).
+
+- `CT-0025` — storyboard fidelity levels; computed blocking frame first
+  (`ready`)
+- `CT-0024` — spike: node canvases in the reference repositories and Arcads
+  (`doing`; Arcads first-hand verification pending)
+- `CT-0023` — two graphs: the production canvas and orchestration
+  (LangGraph as a later adapter candidate) (`ready`)
 - `CT-0022` — camera movement, cuts between clips, and an Arcads-style
   graph; SceneFlow spike done (`doing`)
 - `CT-0021` — evaluate Fountain screenplay tools and Final Draft FDX
