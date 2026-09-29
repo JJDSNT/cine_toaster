@@ -113,6 +113,9 @@ class GenerateBlockTests(unittest.TestCase):
         self.assertIn("P3 has no picture description", plan.notes[0])
         self.assertIn("Sound: a low electrical hum", plan.prompt)
         self.assertEqual(plan.estimate_usd, estimate(20))
+        # The prompt by shot, for a person to read; joined, the prompt itself.
+        self.assertEqual([section["shot"] for section in plan.sections], ["P2", "P3", ""])
+        self.assertEqual(" ".join(section["text"] for section in plan.sections), plan.prompt)
 
     def test_nothing_is_generated_without_a_budget(self) -> None:
         jobs.GENERATION_TRANSPORT = FakeRunpod(self.video)
@@ -160,6 +163,14 @@ class GenerateBlockTests(unittest.TestCase):
         sliced = self.manager.wait(submitted["id"], timeout=120)
         self.assertEqual(sliced["state"], "succeeded", sliced["error"])
         self.assertTrue(all(item["take"].startswith("BLOCK-AV1") for item in sliced["result"]["summary"]["slices"]))
+        # The block's record travels with the version and with each slice of it.
+        self.manager.adopt(sliced["id"])
+        scene = load_scene(self.root, "SC-030")
+        record = scene["blocks"][0]["records"]["scenes/030-echo-chamber/work/bA-1.mp4"]
+        self.assertEqual((record["kind"], record["job"]["id"]), ("block-generation", "remote-1"))
+        self.assertEqual(scene["blocks"][0]["records"]["scenes/030-echo-chamber/work/bA.mp4"], {})
+        take = next(item for item in scene["shots"][1]["takes"] if item["id"].startswith("BLOCK-AV1"))
+        self.assertEqual(take["provenance"]["block_generation"]["prompt"], record["prompt"])
 
     def test_the_control_room_sees_the_plan_before_paying(self) -> None:
         import threading

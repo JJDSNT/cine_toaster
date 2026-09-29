@@ -58,17 +58,17 @@ def _speech(lines: list[Line], already_spoken: bool) -> list[str]:
     return parts
 
 
-def block_prompt(shots: list[ShotPrompt]) -> str:
-    """One generation holding several shots, cut by the model itself.
+def block_prompt_sections(shots: list[ShotPrompt]) -> list[str]:
+    """The prompt in pieces: one per shot, then what holds across the block.
 
-    The first shot describes only what its starting picture shows (claim
-    `prompt-must-match-first-frame`); each later one is introduced as a hard
-    cut to a new shot. Setting, light and voices are held across the cuts.
+    Joined, they are the prompt the model receives (`block_prompt`); apart,
+    a person can read which words belong to which shot.
     """
 
-    parts: list[str] = []
+    sections: list[str] = []
     spoken = False
     for index, shot in enumerate(shots):
+        parts: list[str] = []
         camera = shot.camera.rstrip(".")
         if index == 0:
             parts += [_sentence(shot.picture), _sentence(f"Camera: {camera}") if camera else ""]
@@ -79,11 +79,24 @@ def block_prompt(shots: list[ShotPrompt]) -> str:
             parts.append(_sentence(shot.action))
         parts += _speech(shot.lines, spoken)
         spoken = spoken or bool(shot.lines)
+        sections.append(" ".join(" ".join(part for part in parts if part).split()))
     constant = "The setting, the light and the voices stay the same across the cuts, and nobody else enters the frame."
     if len(shots) == 1:
         constant = "The setting stays exactly as in the first frame and nobody else enters the frame."
-    parts.append(constant + ("" if spoken else " Nobody speaks."))
     # One sound for the block: it is one continuous room.
     sound = next((shot.sound for shot in shots if shot.sound), "quiet room")
-    parts.append(f"Sound: {sound}{', continuing across the cuts' if len(shots) > 1 else ''}. No music.")
-    return " ".join(" ".join(part for part in parts if part).split())
+    closing = [constant + ("" if spoken else " Nobody speaks."),
+               f"Sound: {sound}{', continuing across the cuts' if len(shots) > 1 else ''}. No music."]
+    sections.append(" ".join(" ".join(closing).split()))
+    return sections
+
+
+def block_prompt(shots: list[ShotPrompt]) -> str:
+    """One generation holding several shots, cut by the model itself.
+
+    The first shot describes only what its starting picture shows (claim
+    `prompt-must-match-first-frame`); each later one is introduced as a hard
+    cut to a new shot. Setting, light and voices are held across the cuts.
+    """
+
+    return " ".join(section for section in block_prompt_sections(shots) if section)

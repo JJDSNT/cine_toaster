@@ -631,3 +631,25 @@ dialog::backdrop { background: #000b; }
 .cast-scene { display: grid; grid-template-columns: 60px 1fr; gap: 2px 8px; text-align: left; background: none; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; color: inherit; cursor: pointer; }
 .cast-scene small { grid-column: 1 / -1; }
 @media (max-width: 700px) { .cast-card { grid-template-columns: 1fr; } }
+
+/* --- What a model was given (sent.js) ------------------------------------- */
+.sent-details { margin-top: 6px; font-size: 12px; }
+.sent-details > summary { cursor: pointer; color: var(--muted); }
+.sent-details[open] > summary { color: var(--text); margin-bottom: 6px; }
+.sent-view { display: grid; gap: 8px; }
+.sent-plan { display: grid; gap: 8px; margin-top: 8px; padding: 10px; border: 1px solid var(--accent-soft); border-radius: 8px; background: var(--surface-2); }
+.sent-plan h4 { margin: 0; font-size: 13px; }
+.sent-facts { display: flex; flex-wrap: wrap; gap: 6px; }
+.sent-fact { display: grid; padding: 4px 8px; border-radius: 6px; background: var(--surface-3); }
+.sent-fact small { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.sent-fact strong { font-size: 12px; font-weight: 600; }
+.sent-pictures { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.sent-picture { margin: 0; display: grid; gap: 4px; }
+.sent-picture img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; background: #000; }
+.sent-picture figcaption { display: grid; font-size: 11px; line-height: 1.3; }
+.sent-picture figcaption small { color: var(--muted); overflow-wrap: anywhere; }
+.sent-prompt { display: grid; gap: 6px; }
+.sent-section, .sent-whole { margin: 0; display: grid; gap: 2px; font-size: 12px; line-height: 1.45; }
+.sent-shot { color: var(--accent); font-weight: 700; font-size: 11px; }
+.sent-copy { justify-self: start; }
+.sent-view audio { width: 100%; }

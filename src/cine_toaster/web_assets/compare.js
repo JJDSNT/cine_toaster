@@ -6,6 +6,7 @@
 // to make, and the reason for the choice. Here the alternatives stay, the
 // choice is explicit, and the rationale is stored with it.
 
+import { sentDetails } from "./sent.js";
 import { button, el, runCommand, sectionHeading, statusPill, toast } from "./ui.js";
 
 const state = {
@@ -64,7 +65,8 @@ function takeSurface(scene, take, { large = false } = {}) {
 }
 
 function provenanceLine(take) {
-  const entries = Object.entries(take.provenance || {});
+  // Structured records (a generation, a slice, a converted voice) have their own view.
+  const entries = Object.entries(take.provenance || {}).filter(([, value]) => value === null || typeof value !== "object");
   if (!entries.length) return null;
   const text = entries.map(([key, value]) => `${key} ${value}`).join(" · ");
   return el("small", "take-provenance", text);
@@ -89,7 +91,7 @@ function takeCard(scene, shot, take, { onCompare, onSelect }) {
   if (take.cost_usd) facts.append(el("span", "", `$${take.cost_usd.toFixed(2)}`));
   if (facts.childElementCount) card.append(facts);
 
-  const provenance = provenanceLine(take);
+  const provenance = sentDetails(take.provenance) || provenanceLine(take);
   if (provenance) card.append(provenance);
 
   const actions = el("div", "take-actions");

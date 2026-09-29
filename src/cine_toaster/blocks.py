@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .takes import MEDIA_SUFFIXES, shot_key
+from .takes import MEDIA_SUFFIXES, read_provenance, shot_key
 
 SIGNATURE = (32, 18)
 SCENE_THRESHOLD = 0.25
@@ -44,11 +44,13 @@ class Block:
     contiguous: bool = True
     #: Every generation of the block: `b<id>.mp4`, then `b<id>-<n>.mp4` in order.
     versions: list[str] = field(default_factory=list)
+    #: What each version was made from, as recorded beside it (by path).
+    records: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def public_dict(self) -> dict[str, Any]:
         return {"id": self.id, "shots": self.shots, "durations": self.durations, "clip": self.clip,
                 "duration": round(sum(self.durations), 3), "contiguous": self.contiguous,
-                "versions": self.versions}
+                "versions": self.versions, "records": self.records}
 
 
 def block_versions(work: Path, block_id: str) -> list[Path]:
@@ -84,7 +86,9 @@ def scene_blocks(scene: dict[str, Any], work: Path | None, root: Path) -> list[B
         where = positions[block_id]
         block.contiguous = where == list(range(where[0], where[0] + len(where)))
         if work is not None:
-            block.versions = [path.relative_to(root).as_posix() for path in block_versions(work, block_id)]
+            found = block_versions(work, block_id)
+            block.versions = [path.relative_to(root).as_posix() for path in found]
+            block.records = {path.relative_to(root).as_posix(): read_provenance(path) for path in found}
             # The production's own clip stays the block's clip; a generation
             # made here is one more version, never a replacement.
             block.clip = block.versions[0] if block.versions else ""

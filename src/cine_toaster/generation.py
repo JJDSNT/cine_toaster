@@ -19,7 +19,7 @@ from .blocks import reference_picture, requested_cuts, scene_blocks
 from .cast import cast_key
 from .errors import ValidationError
 from .providers.ltx import FPS, HOURLY_RATE_USD, MAX_SECONDS
-from .providers.ltx_prompt import Line, ShotPrompt, block_prompt
+from .providers.ltx_prompt import Line, ShotPrompt, block_prompt, block_prompt_sections
 from .takes import work_directory_for
 
 #: Measured on SINGULAR (knowledge/providers/ltx-2.5.md): a 10 s clip at
@@ -51,6 +51,8 @@ class BlockPlan:
     seed: int
     estimate_usd: float
     notes: list[str] = field(default_factory=list)
+    #: The prompt by shot, then what holds across the block; joined, it is `prompt`.
+    sections: list[dict[str, str]] = field(default_factory=list)
 
     def public_dict(self, root: Path) -> dict[str, Any]:
         return {
@@ -58,7 +60,8 @@ class BlockPlan:
             "image": self.image.relative_to(root).as_posix(),
             "guides": [{"role": ref.role, "path": ref.path.relative_to(root).as_posix(), "frame": ref.frame,
                         "digest": ref.digest} for ref in self.guides],
-            "prompt": self.prompt, "seed": self.seed, "estimate_usd": self.estimate_usd, "notes": self.notes,
+            "prompt": self.prompt, "prompt_sections": self.sections, "seed": self.seed,
+            "estimate_usd": self.estimate_usd, "notes": self.notes,
         }
 
 
@@ -160,4 +163,6 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
     return BlockPlan(
         scene=scene_id, block=block.id, shots=block.shots, seconds=int(seconds), image=references[0],
         guides=guides, prompt=block_prompt(prompts), seed=seed, estimate_usd=estimate(seconds, rate), notes=notes,
+        sections=[{"shot": shot_id, "text": text}
+                  for shot_id, text in zip([*block.shots, ""], block_prompt_sections(prompts))],
     )

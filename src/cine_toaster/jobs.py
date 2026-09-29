@@ -732,6 +732,10 @@ def _run_slice(context: JobContext) -> dict[str, Any]:
         block_job = _read_json(clip.with_name(clip.name + JOB_SUFFIX))
         if block_job:
             provenance["generation"] = {**block_job, "shared_by": len(block.shots)}
+        # And what the block was made from, when Cine Toaster made it.
+        block_made = _read_json(clip.with_name(clip.name + ".provenance.json"))
+        if block_made:
+            provenance["block_generation"] = block_made
         (context.staging / f"{name}.provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
         destination = (takes_dir / name).relative_to(root).as_posix()
         files += [{"staged": name, "destination": destination},

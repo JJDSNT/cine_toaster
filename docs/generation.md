@@ -51,8 +51,24 @@ A generation never replaces the production's own clip. It becomes
 - `.provenance.json`: the plan, the guides with their digests, the prompt,
   the seed, the cost and the job.
 
-The Blocks panel shows every version of the block. **Generate a new version…** shows the
-plan, the estimate and the budget, and asks before sending. Slicing a version gives
+## Seeing it in the control room
+
+The scene's **Blocks** panel shows every version of a block.
+
+- **What would be sent…** shows exactly what a generation would be given,
+  and nothing is sent until you press **Send** there:
+  - the starting picture and each guide, with the frame and time it holds
+    and the picture's digest;
+  - the prompt, split by shot, followed by what holds across the block;
+  - the length, the seed, the estimate, and the budget spent so far.
+- Under each version, **What … was made from** shows the same, read from
+  the record kept beside the clip, with the real cost and GPU time. A clip
+  made outside Cine Toaster shows only the platform's job, and says that
+  what was sent was not recorded.
+- In the comparison room, each take made here has **What was sent**:
+  - a slice shows where it was cut, and the block's record;
+  - a converted voice shows the recording it was converted to (playable),
+    and the likeness before and after. Slicing a version gives
 takes named `BLOCK-<id>V<n>`, each carrying the generation's record.
 
 Credentials are read from the environment, or from `--env-file`. Neither is

@@ -175,6 +175,33 @@ The user approved a US$ 2 ceiling for test runs.
 - The estimate was US$ 0.051. It now assumes a cold start (150 s),
   giving about US$ 0.116 for 14 s.
 
+**What was sent, in the control room** (2026-09-29, at the user's request).
+`web_assets/sent.js` renders one view from a plan or from a recorded
+provenance:
+
+- the starting picture and the guides, with frame, time, role and digest;
+- the prompt by shot (`prompt_sections`: `block_prompt_sections`, whose
+  joined text is the prompt);
+- model, length, seed, estimate, cost, GPU running and waiting time, and
+  the budget.
+
+Where it appears:
+
+- **Blocks panel.** "What would be sent…" replaces the `confirm()` dialog,
+  and **Send** is inside the view, disabled with no budget. Each version
+  gets "What … was made from", from `Block.records`, read with
+  `read_provenance`.
+- **Comparison room.** Each take card has "What was sent" for slices,
+  where `block_generation` is now copied into the slice's provenance, and
+  for voice conversions. Other provenance keeps the one-line summary,
+  scalars only.
+- **Clips made elsewhere.** A clip from outside Cine Toaster
+  (SINGULAR's `b1`/`b2`) shows only the platform job, and says so.
+
+Checked with headless screenshots on the SINGULAR copy: the 1-02A block 2
+plan and `b2-1`'s record, the 3-01 P13 `VOICE` take, and the 1-02A P12
+`BLOCK-2V1` slice.
+
 Remaining:
 
 - SINGULAR's `guia_no_corte` and `forca_corte` per-shot options;

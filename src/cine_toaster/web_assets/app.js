@@ -1,5 +1,6 @@
 import { drawBlockout } from "./blockout.js";
 import { renderCompare } from "./compare.js";
+import { sentDetails, sentView } from "./sent.js";
 import { renderVersions } from "./versions.js";
 import { api, button, byId, el, label, metric, sectionHeading, statusPill, toast } from "./ui.js";
 
@@ -1622,15 +1623,22 @@ function renderBlocks(scene) {
     const head = el("div", "block-head");
     head.append(el("strong", "", `Block ${block.id}`), el("span", "muted", `${block.shots.join(" · ")} · ${block.duration}s`));
     card.append(head);
+    const planned = el("div", "block-plan");
     if (block.clip) {
       const video = el("video");
       video.src = `/media/${block.clip}`;
       video.controls = true;
       video.preload = "metadata";
       card.append(video);
-      // Every generation of the block is kept; the one shown is the one sliced.
+      // Every generation of the block is kept; the one shown is the one sliced,
+      // and what it was made from is shown beneath it.
       const versions = block.versions || [block.clip];
       let chosen = block.clip;
+      const sent = el("div", "block-sent");
+      const showSent = () => {
+        const details = sentDetails((block.records || {})[chosen], `What ${chosen.split("/").pop()} was made from`);
+        sent.replaceChildren(...(details ? [details] : []));
+      };
       if (versions.length > 1) {
         const row = el("div", "block-versions");
         for (const path of versions) {
@@ -1639,11 +1647,14 @@ function renderBlocks(scene) {
             chosen = path;
             video.src = `/media/${path}`;
             row.querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === pick));
+            showSent();
           }, `quiet-button ${path === chosen ? "active" : ""}`);
           row.append(pick);
         }
         card.append(row);
       }
+      showSent();
+      card.append(sent);
       const slice = button("Slice into takes", async () => {
         slice.disabled = true;
         try {
@@ -1660,7 +1671,7 @@ function renderBlocks(scene) {
     } else {
       card.append(el("p", "muted", `No clip yet (b${block.id}.mp4 in the scene's work folder).`));
     }
-    if (block.contiguous) card.append(generateButton(scene, block));
+    if (block.contiguous) card.append(generateButton(scene, block, planned), planned);
     if (!block.contiguous) card.append(el("p", "join-finding warning", "These shots are not consecutive in the cut."));
     list.append(card);
   }
@@ -1668,22 +1679,35 @@ function renderBlocks(scene) {
   return panel;
 }
 
-// A paid generation of the block: the plan, the estimate and the budget are
-// shown before anything is sent, and the job refuses what the budget cannot pay.
-function generateButton(scene, block) {
-  const start = button("Generate a new version…", async () => {
+// A paid generation of the block. Everything the model will be given is shown
+// first -- pictures, the frames they guide, the prompt by shot, the estimate
+// against the budget -- and nothing is sent until it is confirmed there.
+function generateButton(scene, block, holder) {
+  const start = button("What would be sent…", async () => {
     start.disabled = true;
     try {
       const query = new URLSearchParams({ scene: scene.id, block: block.id });
       const plan = await api(`/api/generation-plan?${query}`);
-      const money = plan.limit_usd
-        ? `Estimated US$ ${plan.estimate_usd.toFixed(3)}; US$ ${plan.spent_usd.toFixed(2)} of US$ ${plan.limit_usd.toFixed(2)} spent.`
-        : "No budget is set (toast budget set <usd>), so this will be refused.";
-      const notes = plan.notes.length ? `\n\n${plan.notes.join("\n")}` : "";
-      const message = `Generate block ${plan.block} (${plan.shots.join(", ")}, ${plan.seconds} s)?\n\n${money}${notes}\n\n${plan.prompt}`;
-      if (confirm(message)) await startJob("generate_block", { scene: scene.id, block: block.id });
+      const view = el("div", "sent-plan");
+      view.append(el("h4", "", `Block ${plan.block}: what the model would be given`), sentView(plan, { plan: true }));
+      const actions = el("div", "take-actions");
+      const send = button(plan.limit_usd ? `Send (≈ US$ ${plan.estimate_usd.toFixed(2)})` : "Send (no budget set)", async () => {
+        send.disabled = true;
+        try {
+          await startJob("generate_block", { scene: scene.id, block: block.id });
+          holder.replaceChildren(el("p", "muted", "Sent. Progress is in the jobs tray; adopt the result to see it here."));
+        } catch (error) {
+          alert(error.message);
+          send.disabled = false;
+        }
+      }, "primary-button");
+      send.disabled = !plan.limit_usd;
+      actions.append(send, button("Close", () => holder.replaceChildren()));
+      if (!plan.limit_usd) view.append(el("p", "join-finding warning", "No generation budget is set: toast budget set <usd>."));
+      view.append(actions);
+      holder.replaceChildren(view);
     } catch (error) {
-      alert(error.message);
+      holder.replaceChildren(el("p", "join-finding warning", error.message));
     } finally {
       start.disabled = false;
     }
