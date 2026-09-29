@@ -61,20 +61,38 @@ cover these functions more reliably than a new parser or editor built here.
   room, and the Dialogue room read coverage. `toast script show|link` is
   available. screenplay-tools 0.0.10 is a pinned runtime dependency.
 
+- **FDX interchange spike done (plan step 5, 2026-09-29).** Decision:
+  [ADR 0014](../../docs/architecture/0014-final-draft-is-interchange.md).
+  - Samples: `TestFDX-FD.fdx` (saved by Final Draft) and `TestFDX-FI.fdx`
+    (Fade In) from screenplay-tools. A richer case was built from the Final
+    Draft file with styled runs, dual dialogue, a Shot, scene number `12A` and
+    a revision mark.
+  - screenplay-tools' FDX reader and writer lose content silently: a
+    paragraph is cut at its first style change, dual dialogue is dropped, a
+    Shot becomes a scene heading, and scene numbers, revisions and the title
+    page are lost. Its Fountain writer turns "FADE TO BLACK" into action.
+  - Implemented `cine_toaster/fdx.py`. Import writes a new Fountain file
+    (`toast script import-fdx`, which refuses to overwrite) and reports each
+    loss. Export (`toast script export-fdx`) writes a derived `.fdx`. The demo
+    screenplay and the richer file round-trip with identical units and title.
+  - Anchor normalisation now ignores Fountain emphasis.
+  - **Not verified:** opening the export in Final Draft; script notes and
+    tags from a real file.
+
 # To do
 
 - Test the candidates with Fountain's examples and representative production
   scripts, including title pages, scenes, dialogue, dual dialogue, notes,
   sections, emphasis, Unicode, and intentional whitespace.
-- Round-trip sample FDX files through import, editing, and export. Record lost
-  content and metadata, page-layout differences, and unsupported features.
+- ~~Round-trip sample FDX files~~ done (ADR 0014). Remaining: open an
+  export in Final Draft, and test a real file with script notes, tags and
+  revisions.
 - Compare screenplay navigation, auto-formatting, keyboard flow, preview,
   performance, browser/Tauri fit, maintenance, dependencies, and license details.
 - Define a screenplay write command with revision/conflict handling. Keep the
   authored screenplay in project files; the editor must not write around the
   shared command boundary.
-- Decide whether FDX is an interchange format or warrants another role. Record
-  the chosen component and supported subset before claiming full support.
+- ~~Decide FDX's role~~ decided: interchange only (ADR 0014).
 
 # Decisions
 
@@ -90,7 +108,7 @@ cover these functions more reliably than a new parser or editor built here.
   revision check. It needs an explicit ADR 0006 amendment before it ships.
   Agents only propose diffs.
 - FDX import creates a new authored Fountain file. FDX export is a derived
-  artifact. Neither rewrites the source.
+  artifact. Neither rewrites the source. Recorded as ADR 0014.
 
 - Current Fountain support is read-only display, not full screenplay support.
 - Keep the existing project file authoritative. No editor or external document

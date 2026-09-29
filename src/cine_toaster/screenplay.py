@@ -94,6 +94,9 @@ def normalize(text: str) -> str:
         .replace("—", "-")
         .replace("…", "...")
     )
+    # Emphasis is how a line looks, not what it says: an anchor quoted without
+    # the asterisks still finds a line imported from Final Draft in bold.
+    text = re.sub(r"(\*{1,3}|_)(?=\S)(.+?)(?<=\S)\1", r"\2", text)
     return re.sub(r"\s+", " ", text).strip().casefold()
 
 

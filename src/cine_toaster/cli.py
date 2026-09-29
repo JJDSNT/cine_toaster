@@ -495,6 +495,38 @@ def command_frame(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_fdx(args: argparse.Namespace) -> int:
+    """Final Draft interchange: import to a new Fountain file, export a derived .fdx (ADR 0014)."""
+
+    from .fdx import export_fdx, import_fdx
+
+    if args.script_command == "import-fdx":
+        if args.output.exists():
+            print(f"{args.output} exists. Import writes a new screenplay and never overwrites one.",
+                  file=sys.stderr)
+            return 1
+        try:
+            result = import_fdx(args.source.read_text(encoding="utf-8"))
+        except ValueError as error:
+            print(str(error), file=sys.stderr)
+            return 1
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(result.text, encoding="utf-8")
+        print(f"Wrote {args.output}")
+    else:
+        production = load_production(args.project)
+        script_path = production.get("script_path")
+        if not script_path:
+            print("This production has no screenplay to export.", file=sys.stderr)
+            return 1
+        source = Path(args.project).expanduser().resolve() / script_path
+        result = export_fdx(source.read_text(encoding="utf-8"))
+        args.output.write_text(result.text, encoding="utf-8")
+        print(f"Wrote {args.output} from {script_path} (derived; never edit it as the screenplay)")
+    print(result.report())
+    return 0
+
+
 def command_script(args: argparse.Namespace) -> int:
     """Show what each shot covers of the screenplay, or propose the links (SPEC-0006)."""
 
@@ -909,6 +941,18 @@ def build_parser() -> argparse.ArgumentParser:
         action.add_argument("project", type=Path)
         action.add_argument("--scene")
         action.set_defaults(function=command_script)
+    importer = script_actions.add_parser(
+        "import-fdx", help="Convert a Final Draft .fdx into a new Fountain file, reporting what is lost"
+    )
+    importer.add_argument("source", type=Path)
+    importer.add_argument("--output", type=Path, required=True, help="the new .fountain file (never overwritten)")
+    importer.set_defaults(function=command_fdx)
+    exporter = script_actions.add_parser(
+        "export-fdx", help="Write the production's screenplay as a derived Final Draft .fdx"
+    )
+    exporter.add_argument("project", type=Path)
+    exporter.add_argument("--output", type=Path, required=True)
+    exporter.set_defaults(function=command_fdx)
 
     brief_parser = subparsers.add_parser(
         "brief", help="Derive a scene's generation brief from its records"

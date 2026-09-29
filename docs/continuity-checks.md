@@ -95,6 +95,12 @@ shots:
       to: The stack repeats it
 ```
 
+A screenplay written in Final Draft comes in with `toast script import-fdx
+file.fdx --output story/screenplay.fountain`. This writes a new file and
+reports what Fountain cannot hold, such as revisions, notes and tags.
+`toast script export-fdx <project> --output draft.fdx` sends the screenplay
+back as a derived file. See ADR 0014.
+
 `toast script show <project>` prints what each shot covers, in screenplay
 order. `toast script link <project>` proposes `script` and `covers` for shots
 that already carry lines — it writes nothing. The storyboard shows each frame's

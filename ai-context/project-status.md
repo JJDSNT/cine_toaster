@@ -153,7 +153,9 @@ Follow the **ordered plan** in `development/roadmap.md` (2026-09-29):
 Steps 1–4 are **done**: screenplay coverage (SPEC-0006), the cut record
 (SPEC-0007), the blocking frame (`CT-0025`), and the brief builder with a
 local-video review (`docs/brief.md`). Step 4b, light previs (`CT-0029`), is
-done too. The next action is step 5, the Final Draft interchange spike.
+done too, and so is step 5, Final Draft interchange (ADR 0014: import to a new
+Fountain file with a loss report, export a derived `.fdx`). The next action is
+step 6, the jobs runtime.
 
 Earlier notes:
 
