@@ -100,6 +100,13 @@ per scene. **A move within a shot cannot be expressed, so the continuity error
 across the P2→P3 cut is invisible.** This is the same gap as camera movement,
 on the subject side.
 
+- **SceneFlow versus SPEC-0006 (2026-09-29).** They are complementary:
+  coverage is planning ("which lines"), and cues are review ("when").
+  Recorded tensions: the source of truth, answered by a derived brief with an
+  optional explicit override and an export to SceneFlow's JSON; and multi-shot
+  generations, which need a generation unit before plan step 9. See
+  SPEC-0006 § Relation to SceneFlow.
+
 # To do
 
 1. ~~Draft and implement SPEC-0005~~ done. The original step read: draft a

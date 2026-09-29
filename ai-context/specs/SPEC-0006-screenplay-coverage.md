@@ -169,6 +169,34 @@ vendoring it later changes one file.
   screenshot.
 - `toast check` still passes on both demos.
 
+# Relation to SceneFlow
+
+- **Same anchoring principle.** Both link to the script by text: exact match,
+  then whitespace- and quote-normalized, then case-insensitive. SPEC-0006
+  anchors whole elements; SceneFlow cues anchor any substring.
+- **Complementary questions.** Coverage says which elements a shot *should*
+  hold, at planning time. SceneFlow's Timeline Anatomy says *when* each
+  fragment happens in a take, at review time. Timing is the natural next layer
+  over coverage, and coverage narrows each take's alignment search to that
+  shot's lines.
+- **Cue types map onto existing records:**
+  - dialogue and action come from coverage;
+  - camera and shot come from SPEC-0005;
+  - transition comes from the cut record;
+  - `[OPENING]` is the blocking frame (CT-0025).
+- **Tension 1: source of truth.** SceneFlow's hand-written Auteur Script is
+  both screenplay and prompt. Here the brief is derived from records. It can
+  be exported in Auteur Script form, and in SceneFlow's project JSON so its
+  Timeline Anatomy can review Cine Toaster takes. Whether a shot may carry a
+  hand-written execution override is open. If allowed, it is an explicit
+  field that visibly replaces the derived brief.
+- **Tension 2: one generation, several shots.** Vector Field generates about 8
+  `[CAM]` setups per clip; here a take belongs to one shot. Multi-setup
+  generation would need a generation unit spanning shots, with cut points
+  inside the take. Cue timing is exactly that data. This must be decided
+  before the first generation adapter (plan step 9). It does not affect this
+  specification.
+
 # Open questions
 
 - Whether FDX import (plan step 5) should preserve Final Draft scene numbers
