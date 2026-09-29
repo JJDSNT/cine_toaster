@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from cine_toaster.assembly import _trim, plan_scene
+from cine_toaster.assembly import _cut, _speaks, _trim, plan_scene, words_for
 from cine_toaster.commands import Actor, select_take
 from cine_toaster.errors import ValidationError
 from cine_toaster.jobs import JobError, JobManager, JobStore
@@ -36,6 +36,38 @@ class TrimTests(unittest.TestCase):
     def test_a_cut_that_leaves_nothing_is_refused(self) -> None:
         with self.assertRaises(ValidationError):
             _trim({"in": 2.0, "out": 2.0}, 5.0, 0)
+
+
+class SpeechCutTests(unittest.TestCase):
+    """Rules reimplemented from SINGULAR's montage; its own cuts matched on 20 of 21 shots (CT-0039)."""
+
+    WORDS = [(1.8, 2.2), (2.3, 3.1)]
+
+    def test_speech_is_kept_whole_with_air_around_it(self) -> None:
+        self.assertEqual(_cut({}, 8.0, 3.0, self.WORDS, 0.35)[:3], (0.8, 4.0, "speech"))
+
+    def test_the_opening_is_never_used_even_before_early_speech(self) -> None:
+        self.assertEqual(_cut({}, 8.0, 3.0, [(0.5, 1.0)], 0.35)[:2], (0.35, 1.9))
+
+    def test_declared_margins_win(self) -> None:
+        self.assertEqual(_cut({"before": 0.4, "after": 0.2}, 8.0, 3.0, self.WORDS, 0.35)[:2], (1.4, 3.3))
+
+    def test_an_explicit_in_keeps_the_words_for_the_end(self) -> None:
+        self.assertEqual(_cut({"in": 0.0}, 8.0, 3.0, self.WORDS, 0.35)[:3], (0.0, 4.0, "trim+speech"))
+
+    def test_a_silent_take_uses_its_duration_after_the_opening(self) -> None:
+        self.assertEqual(_cut({}, 8.0, 3.0, [], 0.35)[:3], (0.35, 3.35, "duration"))
+
+    def test_a_line_added_in_the_mix_is_not_spoken_in_the_take(self) -> None:
+        self.assertFalse(_speaks({"lines": [{"who": "LIRA", "in_take": False}]}))
+        self.assertTrue(_speaks({"lines": [{"who": "LIRA", "in_take": True}]}))
+
+    def test_word_timings_are_read_from_a_sidecar(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            take = Path(raw) / "c08.mp4"
+            (Path(raw) / "c08.palavras.json").write_text("[[1.0, 1.5, \" Hello\"], [0.2, 0.4, \" Oh\"]]", encoding="utf-8")
+            self.assertEqual(words_for(take, "{stem}.palavras.json"), [(0.2, 0.4), (1.0, 1.5)])
+            self.assertEqual(words_for(take, "{stem}.words.json"), [])
 
 
 @unittest.skipUnless(HAS_FFMPEG, "FFmpeg is missing")

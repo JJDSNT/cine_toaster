@@ -116,7 +116,7 @@ def _load_shots(
     path: Path,
     root: Path,
     declared_fields: dict[str, str] | None = None,
-    aliases: dict[str, str] | None = None,
+    aliases: dict[str, tuple[str, dict[str, str]]] | None = None,
 ) -> list[dict[str, Any]]:
     raw_shots = field(document, "shots") or []
     if not isinstance(raw_shots, list):
@@ -131,9 +131,12 @@ def _load_shots(
             raise ProjectFormatError(f"Each shot must be a mapping in {path}")
         # A production's own name for a core field, declared in its manifest,
         # stands in only where the canonical name is absent.
-        for alias, canonical in (aliases or {}).items():
+        for alias, (canonical, keys) in (aliases or {}).items():
             if alias in raw and field(raw, canonical) is None:
-                raw = {**raw, canonical: raw[alias]}
+                value = raw[alias]
+                if keys and isinstance(value, dict):
+                    value = {keys.get(str(key), key): item for key, item in value.items()}
+                raw = {**raw, canonical: value}
         number = raw.get("n")
         if number in (None, ""):
             raise ProjectFormatError(f"A shot is missing its number in {path}")
@@ -169,6 +172,8 @@ def _load_shots(
                 "duration_seconds": float(field(raw, "duration") or field(raw, "generated_seconds") or 0),
                 # How long a generation is asked to be (CT-0037): not the edit length.
                 "generated_seconds": float(field(raw, "generated_seconds") or 0),
+                # The loudness a shot's sound should sit at, when it is not speech (LUFS).
+                "level_db": float(field(raw, "level_db")) if field(raw, "level_db") is not None else None,
                 "look": vtext(raw, "look"),
                 "from": _lineage(raw),
                 "variant": vtext(raw, "variant"),
@@ -244,9 +249,11 @@ def _lines(raw: dict[str, Any]) -> list[dict[str, Any]]:
     """Spoken lines. The field OpenMontage has nowhere to put (CT-0014)."""
 
     lines: list[dict[str, Any]] = []
-    for item in field(raw, "lines") or []:
+    value = field(raw, "lines") or []
+    for item in [value] if isinstance(value, dict) else value:
         if not isinstance(item, dict):
             continue
+        mix = field(item, "mix")
         lines.append(
             {
                 "who": vtext(item, "who"),
@@ -254,7 +261,10 @@ def _lines(raw: dict[str, Any]) -> list[dict[str, Any]]:
                 "en": _text(item.get("en")),
                 "delivery": vtext(item, "delivery"),
                 "voice": vtext(item, "voice"),
-                "mix": field(item, "mix") or {},
+                "mix": mix if isinstance(mix, dict) else {},
+                # A line marked for the mix only (`mix: true`) is added in the
+                # montage: nobody says it in the take itself.
+                "in_take": mix is not True,
             }
         )
     return lines
@@ -346,7 +356,7 @@ def _load_scene(
     declared_fields: dict[str, str] | None = None,
     project_look: str = "",
     screenplay: script_model.Screenplay | None = None,
-    aliases: dict[str, str] | None = None,
+    aliases: dict[str, tuple[str, dict[str, str]]] | None = None,
 ) -> dict[str, Any]:
     document = _read_yaml(path)
     scene_id = vtext(document, "scene") or _text(document.get("id"))
@@ -779,7 +789,7 @@ def discover_stills(root: Path, scene_id: str) -> dict[str, str]:
     return stills
 
 
-def _shot_field_aliases(manifest: dict[str, Any]) -> dict[str, str]:
+def _shot_field_aliases(manifest: dict[str, Any]) -> dict[str, tuple[str, dict[str, str]]]:
     """Production fields that mean a core field: `shot_fields: {seg: {maps_to: duration}}`.
 
     The application's legacy map is frozen (vocabulary.py). A production whose
@@ -788,12 +798,15 @@ def _shot_field_aliases(manifest: dict[str, Any]) -> dict[str, str]:
     shot fields can be targets.
     """
 
-    aliases: dict[str, str] = {}
+    aliases: dict[str, tuple[str, dict[str, str]]] = {}
     raw = manifest.get("shot_fields") or {}
     if isinstance(raw, dict):
         for name, value in raw.items():
             if isinstance(value, dict) and str(value.get("maps_to") or "") in CORE_SHOT_FIELDS:
-                aliases[str(name)] = str(value["maps_to"])
+                # `keys` renames the keys inside a mapping value, e.g. a trim
+                # written {antes, depois} read as {before, after}.
+                keys = value.get("keys") if isinstance(value.get("keys"), dict) else {}
+                aliases[str(name)] = (str(value["maps_to"]), {str(k): str(v) for k, v in keys.items()})
     return aliases
 
 
@@ -1055,6 +1068,9 @@ def load_production(root: Path) -> dict[str, Any]:
         "script_problem": script_problem,
         # ADR 0016: a generated screenplay is read only in the editor.
         "script_generated_by": _text(manifest.get("screenplay_generated_by")),
+        # Where a take's word timings are, beside it: `{stem}` is the take's
+        # file name without its extension.
+        "words_sidecar": _text(manifest.get("words_sidecar")) or "{stem}.words.json",
         "looks": {name: look.public_dict() for name, look in load_looks(root).items()},
         "production": production,
         "phases": field(manifest, "phases") or [],

@@ -4,16 +4,24 @@ Every assembly is a **version**: rendered to its own file, never overwritten,
 and registered with the takes it was built from (`record_assembly`), so a
 version can be watched, judged, compared and restored.
 
-This first assembly is deliberately plain, and says so:
+How a take is cut (CT-0039, from SINGULAR's practice):
 
-- each shot contributes its selected take, or the production's current one
-  (`c02.mp4`);
-- the take is cut to the shot's `trim` (`{in, out}` or `{head, tail}`, in
-  seconds) or, without one, to the shot's duration from the start of the take;
-- shots are joined with straight cuts. Transitions and split edits (J/L) are
-  listed as not rendered yet, not approximated;
-- picture is normalised to the first take's size and frame rate, and sound to
-  48 kHz stereo. A take without sound gets silence of the same length.
+- an explicit `trim` wins: `{in, out}`, `{head, tail}`, or `before`/`after`
+  around speech, with `to_end` to keep the take's tail;
+- a shot that **declares** speech in its take is cut around the spoken words,
+  never through them: from a moment before the first word to a moment after
+  the last. Words come from a sidecar beside the take. Detected words alone do
+  not count: a model sometimes murmurs in a shot written as silent;
+- otherwise the shot's duration is taken, after the generation's still
+  opening (a generated take eases out of its first frame).
+
+Each take's sound is set to a loudness: speech to −20 LUFS, measured on the
+speech only; other sound to the shot's `level_db` (−34 by default), with only
+a small boost, so a silent room's hiss is not raised.
+
+Shots are joined with straight cuts. Transitions and split edits (J/L) are
+listed as not rendered yet, not approximated. Picture is normalised to the
+first take's size and frame rate, sound to 48 kHz stereo.
 
 A production's own montage tools can register their renders as versions too;
 this module is not the only way a version is made.
@@ -22,6 +30,7 @@ this module is not the only way a version is made.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -31,6 +40,13 @@ from typing import Any
 from .errors import ValidationError
 
 FPS = 24
+#: A generated take opens on its still first frame (SINGULAR: 0.35 s).
+OPENING_SECONDS = 0.35
+#: Kept around declared speech, before the first word and after the last.
+SPEECH_BEFORE = 1.0
+SPEECH_AFTER = 0.9
+SPEECH_LUFS = -20.0
+AMBIENT_LUFS = -34.0
 
 
 @dataclass(slots=True)
@@ -41,6 +57,9 @@ class Segment:
     start: float
     end: float
     join: str = "hard"
+    method: str = "duration"
+    speech: tuple[float, float] | None = None
+    level: float | None = None
 
 
 @dataclass(slots=True)
@@ -48,6 +67,7 @@ class Plan:
     scene: str
     segments: list[Segment] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    gains: dict[str, float] = field(default_factory=dict)
 
     @property
     def takes(self) -> dict[str, str]:
@@ -81,29 +101,77 @@ def probe(path: Path) -> dict[str, Any]:
     }
 
 
-def _trim(raw: Any, length: float, duration: float) -> tuple[float, float, str]:
-    """Where a take is cut, and a note when the declared cut does not fit."""
+def words_for(media: Path, pattern: str) -> list[tuple[float, float]]:
+    """Word timings beside a take, as (start, end) seconds; empty when there are none."""
 
-    trim = raw if isinstance(raw, dict) else {}
-    start = float(trim.get("in", trim.get("head", 0.0)) or 0.0)
-    if "out" in trim:
-        end = float(trim["out"])
-    elif "tail" in trim:
-        end = length - float(trim["tail"])
-    elif duration:
-        end = start + duration
+    sidecar = media.parent / pattern.format(stem=media.stem, name=media.name)
+    if not sidecar.is_file():
+        return []
+    try:
+        data = json.loads(sidecar.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    words = []
+    for item in data if isinstance(data, list) else []:
+        if isinstance(item, (list, tuple)) and len(item) >= 2:
+            words.append((float(item[0]), float(item[1])))
+        elif isinstance(item, dict) and "start" in item and "end" in item:
+            words.append((float(item["start"]), float(item["end"])))
+    return sorted(words)
+
+
+def _cut(trim: dict[str, Any], length: float, duration: float, words: list[tuple[float, float]],
+         opening: float) -> tuple[float, float, str, str]:
+    """(start, end, method, note) for one take."""
+
+    before = float(trim.get("before", SPEECH_BEFORE))
+    after = float(trim.get("after", SPEECH_AFTER))
+    to_end = bool(trim.get("to_end"))
+    if "in" in trim:
+        start, method = float(trim["in"]), "trim"
+        if "out" in trim:
+            end = float(trim["out"])
+        elif to_end:
+            end = length
+        elif words:
+            end, method = words[-1][1] + after, "trim+speech"
+        else:
+            end = start + (duration or length)
+    elif "out" in trim:
+        start, end, method = opening, float(trim["out"]), "trim"
+    elif "head" in trim or "tail" in trim:
+        start, end, method = float(trim.get("head", opening)), length - float(trim.get("tail", 0.0)), "trim"
+    elif words:
+        start = max(opening, words[0][0] - before)
+        end, method = (length if to_end else words[-1][1] + after), "speech"
     else:
-        end = length
+        start, method = opening, "duration"
+        end = start + duration if duration else length
     note = ""
     if end > length + 0.01:
         note = f"runs {end - length:.2f} s past the end of its take; cut at the take's end"
         end = length
     if end - start < 1 / FPS:
         raise ValidationError(f"The cut leaves nothing of the take ({start:.2f}–{end:.2f} s of {length:.2f} s)")
-    return round(start, 3), round(end, 3), note
+    return round(start, 3), round(end, 3), method, note
 
 
-def plan_scene(root: Path, scene: dict[str, Any]) -> Plan:
+def _trim(raw: Any, length: float, duration: float) -> tuple[float, float, str]:
+    """The cut of a take with no speech and no opening (kept for callers and tests)."""
+
+    start, end, _, note = _cut(raw if isinstance(raw, dict) else {}, length, duration, [], 0.0)
+    return start, end, note
+
+
+def _speaks(shot: dict[str, Any]) -> bool:
+    """Whether the shot declares someone speaking in the take itself."""
+
+    if any(line.get("in_take", True) for line in shot.get("lines") or []):
+        return True
+    return bool((shot.get("script") or {}).get("dialogue"))
+
+
+def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.words.json") -> Plan:
     """Which take of each shot, cut where, joined how."""
 
     plan = Plan(scene=scene["id"])
@@ -123,7 +191,14 @@ def plan_scene(root: Path, scene: dict[str, Any]) -> Plan:
             continue
         path = root / chosen["media"]
         info = probe(path)
-        start, end, note = _trim(shot.get("trim"), info["duration"], float(shot.get("duration_seconds") or 0))
+        speaks = _speaks(shot)
+        words = words_for(path, words_sidecar) if speaks else []
+        if speaks and not words:
+            plan.notes.append(f"{shot['id']} speaks, but its take has no word timings; cut by duration.")
+        opening = OPENING_SECONDS if shot.get("source") == "generated" else 0.0
+        start, end, method, note = _cut(shot.get("trim") or {}, info["duration"],
+                                        float(shot.get("duration_seconds") or 0), words, opening)
+        spoken = [(a, b) for a, b in words if a >= start - 0.05 and b <= end + 0.05]
         if note:
             plan.notes.append(f"{shot['id']} {note}.")
         cut = cuts.get(shot["id"]) or {}
@@ -133,10 +208,29 @@ def plan_scene(root: Path, scene: dict[str, Any]) -> Plan:
         transition = (cut.get("transition") or {}).get("id")
         if plan.segments and transition:
             plan.notes.append(f"{shot['id']}: the transition {transition!r} is not rendered in this version.")
-        plan.segments.append(Segment(shot["id"], chosen["id"], chosen["media"], start, end, join))
+        plan.segments.append(Segment(
+            shot["id"], chosen["id"], chosen["media"], start, end, join, method,
+            (spoken[0][0], spoken[-1][1]) if spoken else None, shot.get("level_db"),
+        ))
     if not plan.segments:
         raise ValidationError(f"{scene['id']} has no shot with a take to assemble")
     return plan
+
+
+def loudness_gain(source: Path, segment: Segment) -> float:
+    """dB to bring the take to its loudness: speech measured on the speech alone."""
+
+    ffmpeg = shutil.which("ffmpeg")
+    begin, finish = segment.speech or (segment.start, segment.end)
+    target = SPEECH_LUFS if segment.speech else (segment.level if segment.level is not None else AMBIENT_LUFS)
+    completed = subprocess.run(
+        [ffmpeg, "-hide_banner", "-ss", f"{begin:.3f}", "-t", f"{max(0.4, finish - begin):.3f}", "-i", str(source),
+         "-af", "ebur128", "-f", "null", "-"], capture_output=True, text=True, timeout=120)
+    measured = re.findall(r"I:\s+(-?[\d.]+) LUFS", completed.stderr)
+    if not measured or float(measured[-1]) < -60:
+        return 0.0
+    ceiling = 12.0 if segment.speech or segment.level is not None else 3.0
+    return round(max(-12.0, min(ceiling, target - float(measured[-1]))), 1)
 
 
 def render(root: Path, plan: Plan, output: Path, work: Path, run_process) -> None:
@@ -154,11 +248,15 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process) -> Non
     size = f"{first['width'] // 2 * 2}:{first['height'] // 2 * 2}"
     fps = first["fps"] or FPS
     pieces = []
+    segment_gain: dict[str, float] = {}
+    plan.gains = segment_gain
     total = len(plan.segments)
     for index, segment in enumerate(plan.segments):
         source = root / segment.media
         has_audio = probe(source)["audio"]
         length = segment.end - segment.start
+        gain = loudness_gain(source, segment) if has_audio else 0.0
+        segment_gain[segment.shot] = gain
         piece = work / f"piece-{index:03d}.mp4"
         command = [ffmpeg, "-y", "-loglevel", "error", "-ss", f"{segment.start:.3f}", "-t", f"{length:.3f}", "-i", str(source)]
         if not has_audio:
@@ -166,6 +264,7 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process) -> Non
         command += [
             "-vf", f"scale={size}:force_original_aspect_ratio=decrease,pad={size}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps},format=yuv420p",
             "-map", "0:v:0", "-map", "0:a:0" if has_audio else "1:a:0",
+            "-af", f"volume={gain}dB",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
             "-c:a", "aac", "-ar", "48000", "-ac", "2", "-shortest", str(piece),
         ]

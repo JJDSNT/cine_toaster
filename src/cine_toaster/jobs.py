@@ -609,8 +609,11 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
     from .assembly import plan_scene, render
     from .project import load_scene
 
-    scene = load_scene(context.project_root, context.params["scene"])
-    plan = plan_scene(context.project_root, scene)
+    from .project import load_production
+
+    production = load_production(context.project_root)
+    scene = next(item for item in production["scenes"] if item["id"] == context.params["scene"])
+    plan = plan_scene(context.project_root, scene, production.get("words_sidecar") or "{stem}.words.json")
     context.progress(0.01, f"{len(plan.segments)} shots")
     output = context.staging / "assembly.mp4"
     render(context.project_root, plan, output, context.staging / "work", context.run_process)
@@ -618,7 +621,8 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
     scene_id, version = context.params["scene"], context.params["version"]
     return {
         "files": [{"staged": "assembly.mp4", "destination": f"renders/assemblies/{scene_id}/{version}.mp4"}],
-        "summary": {"segments": [asdict(segment) for segment in plan.segments], "notes": plan.notes,
+        "summary": {"segments": [{**asdict(segment), "gain_db": plan.gains.get(segment.shot, 0.0)} for segment in plan.segments],
+                    "notes": plan.notes,
                     "duration_seconds": plan.duration, "takes": plan.takes},
     }
 

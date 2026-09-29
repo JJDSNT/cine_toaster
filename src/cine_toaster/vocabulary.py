@@ -169,6 +169,7 @@ CORE_SHOT_FIELDS: frozenset[str] = frozenset(
         "cut",
         "block",
         "generated_seconds",
+        "level_db",
         "trim",
     }
 )

@@ -263,6 +263,16 @@ class FieldAliasTests(unittest.TestCase):
         scene = self.scene("  seg: {maps_to: duration}\n", "    seg: 6\n    duration: 4\n")
         self.assertEqual(scene["shots"][0]["duration_seconds"], 4.0)
 
+    def test_keys_inside_a_mapped_value_are_renamed(self) -> None:
+        scene = self.scene("  corte: {maps_to: trim, keys: {antes: before, depois: after}}\n",
+                           "    corte: {antes: 0.4, depois: 0.2}\n")
+        self.assertEqual(scene["shots"][0]["trim"], {"before": 0.4, "after": 0.2})
+
+    def test_a_single_line_mapping_is_a_line(self) -> None:
+        scene = self.scene("  fala: {maps_to: lines}\n", "    fala: {quem: LIRA, en: Hello., montagem: true}\n")
+        line = scene["shots"][0]["lines"][0]
+        self.assertEqual((line["who"], line["en"], line["in_take"]), ("LIRA", "Hello.", False))
+
     def test_only_core_fields_can_be_targets(self) -> None:
         scene = self.scene("  seg: {maps_to: anything_at_all}\n", "    seg: 6\n")
         self.assertEqual(scene["shots"][0]["duration_seconds"], 0.0)

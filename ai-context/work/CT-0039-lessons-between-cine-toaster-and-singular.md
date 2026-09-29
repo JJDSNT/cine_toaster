@@ -73,7 +73,30 @@ priority order below.
 
 # Done
 
-- (see below as items land)
+- **Item 1: speech-aware trims and loudness** (2026-09-29).
+  - `assembly.py` cuts a take around its **declared** speech: 1.0 s before
+    the first word and 0.9 s after the last, SINGULAR's margins. A line
+    marked for the mix only (`mix: true`, SINGULAR's `montagem: true`) does
+    not count. Detected words alone never decide.
+  - It skips a generated take's still opening (0.35 s). An explicit `trim`
+    (`in`, `out`, `head`, `tail`, `before`, `after`, `to_end`) wins.
+  - Word timings come from a sidecar named by the production
+    (`words_sidecar`, default `{stem}.words.json`).
+  - Loudness per take: speech to −20 LUFS, measured on the speech; other
+    sound to `level_db` (−34 by default). A silent take gets a boost of at
+    most 3 dB.
+  - The core gained `level_db` and `in_take` on lines, accepts a single line
+    mapping, and `maps_to` can rename keys inside a value (`keys:`).
+  - SINGULAR maps `fala`→`lines`, `corte`→`trim` (with its keys),
+    `nivel`→`level_db`, and `words_sidecar: "{stem}.palavras.json"` (commit
+    in its git).
+  - **Validation:** on a copy of SINGULAR, Cine Toaster's cut points for
+    3-01 equal those of SINGULAR's own `corte()` on **20 of 21 shots**, to
+    the hundredth of a second. The exception is P2, a POV shot
+    (`montagem_pov`), which SINGULAR does not trim at its opening; that is a
+    production-specific rule, left as a known difference.
+  - Tests: speech cuts, sidecars, `in_take`, key renaming. Full suite: 378
+    OK.
 
 # Validation
 
