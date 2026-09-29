@@ -491,11 +491,38 @@ function renderBlockout(scene) {
     sectionHeading(
       "BLOCKOUT",
       "Where the cameras are",
-      "A plan of the set: subjects, fixed camera positions, and the line of action.",
+      "A plan of the set: subjects, marks, camera positions, the line of action, and what moves in each shot.",
     ),
   );
+  const motions = scene.shots.map((shot) => shot.motion).filter(Boolean);
   const canvas = el("canvas", "blockout-canvas");
-  panel.append(canvas);
+  const detail = el("div", "blockout-detail");
+  let activeShot = "";
+
+  const draw = () =>
+    drawBlockout(canvas, geometry, { findings: scene.findings, motions, activeShot });
+
+  if (motions.length) {
+    // One chip per shot: select it to see where everything is when it starts and ends.
+    const chips = el("div", "blockout-shots");
+    const select = (shotId) => {
+      activeShot = shotId;
+      for (const chip of chips.children) chip.classList.toggle("active", chip.dataset.shot === shotId);
+      detail.replaceChildren(...(shotId ? describeMotion(scene, shotId) : []));
+      draw();
+    };
+    const all = button("All shots", () => select(""), "blockout-chip active");
+    all.dataset.shot = "";
+    chips.append(all);
+    for (const motion of motions) {
+      const chip = button(motion.shot_id, () => select(motion.shot_id), "blockout-chip");
+      chip.dataset.shot = motion.shot_id;
+      if (motion.kind !== "static" || motion.moved_subjects.length) chip.classList.add("moves");
+      chips.append(chip);
+    }
+    panel.append(chips);
+  }
+  panel.append(canvas, detail);
   const legend = el("div", "blockout-legend");
   for (const camera of geometry.cameras) {
     const shots = scene.shots.filter((shot) => shot.camera === camera.id).map((shot) => shot.id);
@@ -506,8 +533,42 @@ function renderBlockout(scene) {
   }
   panel.append(legend);
   // The canvas needs its measured width, so draw once it is in the document.
-  requestAnimationFrame(() => drawBlockout(canvas, geometry, { findings: scene.findings }));
+  requestAnimationFrame(draw);
   return panel;
+}
+
+function describeMotion(scene, shotId) {
+  const shot = scene.shots.find((item) => item.id === shotId);
+  const motion = shot?.motion;
+  if (!motion) return [];
+  const names = Object.fromEntries(scene.geometry.subjects.map((subject) => [subject.id, subject.label]));
+  const framed = (list) =>
+    list.length ? list.map((item) => `${names[item.subject] || item.subject} ${item.side}`).join(", ") : "nobody";
+  const move = motion.kind === "static"
+    ? "Static camera"
+    : [
+        `${motion.kind} ${motion.direction}`.trim(),
+        motion.degrees ? `${motion.degrees}°` : "",
+        motion.speed,
+        motion.rig ? `rig: ${motion.rig}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ") + (motion.derived ? "" : " (declared)");
+  const rows = [
+    ["Camera", `${motion.camera_id || "none"} — ${move}`],
+    ["Frame at start", framed(motion.start.framed)],
+    ["Frame at end", framed(motion.end.framed)],
+  ];
+  if (motion.moved_subjects.length) {
+    rows.push(["Moves", motion.moved_subjects.map((id) => names[id] || id).join(", ")]);
+  }
+  if (motion.secondary.length) rows.push(["Also", motion.secondary.join(", ")]);
+  if (motion.ends_on) rows.push(["Ends on", motion.ends_on]);
+  return rows.map(([label, value]) => {
+    const row = el("div", "blockout-detail-row");
+    row.append(el("span", "", label), el("b", "", value));
+    return row;
+  });
 }
 
 function renderShots(scene) {

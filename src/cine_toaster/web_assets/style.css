@@ -336,6 +336,15 @@ dialog::backdrop { background: #000b; }
 .finding-warning { border-left-color: var(--yellow); }
 .finding-card p { margin: 0; font-size: 13px; line-height: 1.5; }
 .blockout-canvas { width: 100%; margin-top: 4px; background: #0b0d0e; border: 1px solid var(--border); border-radius: 9px; }
+.blockout-shots { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.blockout-chip { font: inherit; font-size: 11px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; }
+.blockout-chip.moves { color: var(--text); }
+.blockout-chip.moves::after { content: " \2197"; color: var(--accent); }
+.blockout-chip.active { border-color: var(--accent); color: var(--accent); }
+.blockout-detail { display: grid; gap: 4px; margin-top: 10px; font-size: 12px; }
+.blockout-detail:empty { display: none; }
+.blockout-detail-row { display: grid; grid-template-columns: 120px 1fr; gap: 10px; }
+.blockout-detail-row span { color: var(--muted); }
 .blockout-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
 .blockout-legend-item { display: flex; align-items: baseline; gap: 7px; font-size: 11px; }
 .blockout-legend-item b { color: var(--accent); }

@@ -158,6 +158,11 @@ CORE_SHOT_FIELDS: frozenset[str] = frozenset(
         "lines",
         "transition",
         "look",
+        # SPEC-0005: movement within a shot.
+        "subjects_move",
+        "subjects_at",
+        "move",
+        "ends_on",
     }
 )
 

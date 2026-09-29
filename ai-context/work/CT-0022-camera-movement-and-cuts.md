@@ -102,7 +102,8 @@ on the subject side.
 
 # To do
 
-1. Draft a camera-move vocabulary, informed by the 46 moves in
+1. ~~Draft and implement SPEC-0005~~ done. The original step read: draft a
+   camera-move vocabulary, informed by the 46 moves in
    aicameramovements.com's taxonomy but written here. Attach a move to
    `[[geometry.cameras]]` as start pose → end pose, speed, and end state. Add a
    `toast check` rule that flags a move crossing the line of action.

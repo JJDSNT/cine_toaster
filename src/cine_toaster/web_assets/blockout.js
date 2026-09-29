@@ -18,6 +18,9 @@ const COLORS = {
   cameraActive: "#ef6a3a",
   cameraFlagged: "#ed6e68",
   axis: "#e7b75c",
+  mark: "#b99be0",
+  path: "#70aee8",
+  cameraPath: "#ef6a3a",
   text: "#f1eee7",
   muted: "#8c9597",
 };
@@ -56,18 +59,76 @@ function drawGrid(context, room, project) {
   }
 }
 
-function drawSubject(context, subject, project) {
-  const [x, y] = project.point(subject.position);
-  context.fillStyle = COLORS.subject;
+function drawSubject(context, subject, project, { position = subject.position, ghost = false } = {}) {
+  const [x, y] = project.point(position);
   context.beginPath();
   context.arc(x, y, 9, 0, Math.PI * 2);
+  if (ghost) {
+    // Where the subject was when the shot began: an outline, not a body.
+    context.strokeStyle = COLORS.subject;
+    context.lineWidth = 1.5;
+    context.stroke();
+    return;
+  }
+  context.fillStyle = COLORS.subject;
   context.fill();
   context.fillStyle = COLORS.text;
   context.font = "600 12px Inter, system-ui, sans-serif";
   context.fillText(subject.label, x + 14, y + 4);
-  context.fillStyle = COLORS.muted;
-  context.font = "11px Inter, system-ui, sans-serif";
-  context.fillText(`eye ${subject.eye_height} m`, x + 14, y + 19);
+  if (subject.eye_height != null) {
+    context.fillStyle = COLORS.muted;
+    context.font = "11px Inter, system-ui, sans-serif";
+    context.fillText(`eye ${subject.eye_height} m`, x + 14, y + 19);
+  }
+}
+
+function drawMark(context, mark, project) {
+  const [x, y] = project.point(mark.position);
+  context.strokeStyle = COLORS.mark;
+  context.lineWidth = 1.5;
+  context.beginPath();
+  context.moveTo(x, y - 7);
+  context.lineTo(x + 7, y);
+  context.lineTo(x, y + 7);
+  context.lineTo(x - 7, y);
+  context.closePath();
+  context.stroke();
+  // Labelled on the left: a subject standing on the mark labels itself on the right.
+  context.fillStyle = COLORS.mark;
+  context.font = "10px Inter, system-ui, sans-serif";
+  context.textAlign = "right";
+  context.fillText(mark.label || mark.id, x - 11, y + 18);
+  context.textAlign = "left";
+}
+
+function drawArrow(context, from, to, color, label, { dashed = false } = {}) {
+  const [x0, y0] = from;
+  const [x1, y1] = to;
+  if (Math.hypot(x1 - x0, y1 - y0) < 4) return;
+  const heading = Math.atan2(y1 - y0, x1 - x0);
+  context.strokeStyle = color;
+  context.fillStyle = color;
+  context.lineWidth = 1.5;
+  if (dashed) context.setLineDash([5, 4]);
+  context.beginPath();
+  context.moveTo(x0, y0);
+  context.lineTo(x1, y1);
+  context.stroke();
+  context.setLineDash([]);
+  context.beginPath();
+  context.moveTo(x1, y1);
+  context.lineTo(x1 - Math.cos(heading - 0.45) * 9, y1 - Math.sin(heading - 0.45) * 9);
+  context.lineTo(x1 - Math.cos(heading + 0.45) * 9, y1 - Math.sin(heading + 0.45) * 9);
+  context.closePath();
+  context.fill();
+  if (label) {
+    context.font = "700 10px Inter, system-ui, sans-serif";
+    context.fillText(label, (x0 + x1) / 2 + 6, (y0 + y1) / 2 - 6);
+  }
+}
+
+function fovDegrees(lens) {
+  return (2 * Math.atan(36 / (2 * lens)) * 180) / Math.PI;
 }
 
 function drawCamera(context, camera, target, project, tone) {
@@ -108,15 +169,16 @@ function drawCamera(context, camera, target, project, tone) {
   context.fillText(`${camera.lens_mm}mm · ${camera.height} m`, x + 11, y + 6);
 }
 
-function drawAxis(context, geometry, project) {
+function drawAxis(context, geometry, project, positions = {}) {
   if (!geometry.axis) return;
   const [firstId, secondId] = geometry.axis.between;
   const first = geometry.subjects.find((subject) => subject.id === firstId);
   const second = geometry.subjects.find((subject) => subject.id === secondId);
   if (!first || !second) return;
 
-  const [ax, ay] = project.point(first.position);
-  const [bx, by] = project.point(second.position);
+  // The line runs between the two where they stand when the shown shot begins.
+  const [ax, ay] = project.point(positions[firstId] || first.position);
+  const [bx, by] = project.point(positions[secondId] || second.position);
   const dx = bx - ax;
   const dy = by - ay;
   const length = Math.hypot(dx, dy) || 1;
@@ -137,7 +199,11 @@ function drawAxis(context, geometry, project) {
   context.fillText("LINE OF ACTION", (ax + bx) / 2 + 8, (ay + by) / 2 - 8);
 }
 
-export function drawBlockout(canvas, geometry, { findings = [], activeCamera = "" } = {}) {
+export function drawBlockout(
+  canvas,
+  geometry,
+  { findings = [], activeCamera = "", motions = [], activeShot = "" } = {},
+) {
   const room = geometry.room;
   if (!room) return false;
 
@@ -161,7 +227,30 @@ export function drawBlockout(canvas, geometry, { findings = [], activeCamera = "
   context.lineWidth = 2;
   context.strokeRect(originX, originY, room.width * project.scale, room.depth * project.scale);
 
-  drawAxis(context, geometry, project);
+  const active = activeShot ? motions.find((motion) => motion.shot_id === activeShot) : null;
+  drawAxis(context, geometry, project, active ? active.start.subjects : {});
+
+  for (const mark of geometry.marks || []) drawMark(context, mark, project);
+
+  // Movement within shots (SPEC-0005): subject paths and camera paths. With a
+  // shot selected, only that shot's start and end are drawn.
+  const shown = activeShot ? motions.filter((motion) => motion.shot_id === activeShot) : motions;
+  for (const motion of shown) {
+    for (const subjectId of motion.moved_subjects || []) {
+      const from = motion.start.subjects[subjectId];
+      const to = motion.end.subjects[subjectId];
+      if (from && to) {
+        drawArrow(context, project.point(from), project.point(to), COLORS.path, motion.shot_id);
+      }
+    }
+    const start = motion.start.camera;
+    const end = motion.end.camera;
+    if (start && end && motion.kind !== "static" &&
+        (start.position[0] !== end.position[0] || start.position[1] !== end.position[1])) {
+      drawArrow(context, project.point(start.position), project.point(end.position),
+        COLORS.cameraPath, `${motion.shot_id} ${motion.kind} ${motion.direction}`.trim(), { dashed: true });
+    }
+  }
 
   const flagged = new Set(findings.flatMap((finding) => finding.cameras || []));
   for (const camera of geometry.cameras) {
@@ -169,6 +258,10 @@ export function drawBlockout(canvas, geometry, { findings = [], activeCamera = "
       ? geometry.subjects.find((subject) => subject.id === camera.target)?.position
       : camera.target;
     if (!target) continue;
+    // The selected shot's camera is drawn below at its own start and end aim.
+    if (active && camera.id === active.camera_id && active.start.camera) continue;
+    const endPosition = active?.end.camera?.position;
+    if (endPosition && endPosition[0] === camera.position[0] && endPosition[1] === camera.position[1]) continue;
     const tone = flagged.has(camera.id)
       ? "flagged"
       : camera.id === activeCamera
@@ -176,7 +269,32 @@ export function drawBlockout(canvas, geometry, { findings = [], activeCamera = "
         : "idle";
     drawCamera(context, camera, target, project, tone);
   }
-  for (const subject of geometry.subjects) drawSubject(context, subject, project);
+  if (active && active.start.camera && active.end.camera) {
+    // The selected shot's camera at its start and its end, whatever its name.
+    const camera = geometry.cameras.find((item) => item.id === active.camera_id) || { id: active.camera_id };
+    for (const [pose, suffix] of [[active.start.camera, "start"], [active.end.camera, "end"]]) {
+      drawCamera(context, {
+        ...camera,
+        id: active.kind === "static" ? active.camera_id : `${active.camera_id} ${suffix}`,
+        position: pose.position,
+        lens_mm: pose.lens_mm,
+        height: pose.height,
+        fov_degrees: fovDegrees(pose.lens_mm),
+      }, pose.target, project, "active");
+      if (active.kind === "static") break;
+    }
+  }
+
+  for (const subject of geometry.subjects) {
+    if (!active) {
+      drawSubject(context, subject, project);
+      continue;
+    }
+    const from = active.start.subjects[subject.id] || subject.position;
+    const to = active.end.subjects[subject.id] || from;
+    if (from[0] !== to[0] || from[1] !== to[1]) drawSubject(context, subject, project, { position: from, ghost: true });
+    drawSubject(context, subject, project, { position: to });
+  }
 
   context.fillStyle = COLORS.muted;
   context.font = "10px Inter, system-ui, sans-serif";

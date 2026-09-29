@@ -7,6 +7,7 @@ import yaml
 
 from .errors import ResourceNotFoundError, ValidationError
 from .geometry import Finding, check_geometry, parse_geometry
+from .movement import check_movement, shot_motions
 from .looks import load_looks, resolve as resolve_look
 from .state import SceneState, load_scene_state
 from .transitions import list_transitions
@@ -162,6 +163,11 @@ def _load_shots(
                 "notes": _notes(raw),
                 "lines": _lines(raw),
                 "transition": _transition(raw),
+                "subjects_move": _entries(field(raw, "subjects_move")),
+                "subjects_at": _entries(field(raw, "subjects_at")),
+                "move": field(raw, "move") if isinstance(field(raw, "move"), dict) else None,
+                "ends_on": vtext(raw, "ends_on"),
+                "motion": None,
                 "authored_status": "",
                 "authored_selected_take": "",
                 "out_of_cut": bool(field(raw, "out_of_cut")),
@@ -172,6 +178,14 @@ def _load_shots(
             }
         )
     return shots
+
+
+def _entries(value: Any) -> list[dict[str, Any]]:
+    """A list of mappings, or nothing; SPEC-0005 movement entries."""
+
+    if isinstance(value, dict):
+        value = [value]
+    return [dict(item) for item in value or [] if isinstance(item, dict)]
 
 
 def _lineage(raw: dict[str, Any]) -> list[dict[str, Any]]:
@@ -331,9 +345,21 @@ def _load_scene(
         geometry = parse_geometry(_geometry_document(geography))
     except ValidationError as error:
         raise ProjectFormatError(f"{error.message} (in {path})") from error
+    motions = shot_motions(geometry, shots, scene_id=scene_id)
+    positions_by_shot = {motion.shot_id: motion.start_positions for motion in motions}
     findings = [
-        finding.public_dict() for finding in check_geometry(geometry, shots, scene_id=scene_id)
+        finding.public_dict()
+        for finding in check_geometry(
+            geometry, shots, scene_id=scene_id, positions_by_shot=positions_by_shot
+        )
     ]
+    findings.extend(
+        finding.public_dict()
+        for finding in check_movement(geometry, shots, scene_id=scene_id, motions=motions)
+    )
+    if not geometry.is_empty():
+        for shot, motion in zip(shots, motions):
+            shot["motion"] = motion.public_dict()
     findings.extend(finding.public_dict() for finding in _check_shot_fields(shots, scene_id))
     findings.extend(
         finding.public_dict() for finding in _check_transitions(shots, scene_id, root)
@@ -525,7 +551,22 @@ def _geometry_document(geography: dict[str, Any]) -> dict[str, Any] | None:
             }
         )
 
-    document: dict[str, Any] = {"units": "m", "subjects": subjects, "cameras": cameras}
+    marks = [
+        {
+            "id": _text(mark.get("id")),
+            "label": vtext(mark, "label") or _text(mark.get("id")),
+            "position": [float(mark["x"]), float(mark["y"])],
+        }
+        for mark in field(geography, "marks") or []
+        if isinstance(mark, dict) and "x" in mark
+    ]
+
+    document: dict[str, Any] = {
+        "units": "m",
+        "subjects": subjects,
+        "cameras": cameras,
+        "marks": marks,
+    }
     if isinstance(room, (list, tuple)) and len(room) >= 2:
         document["room"] = {
             "width": float(room[0]),

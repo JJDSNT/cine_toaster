@@ -22,6 +22,37 @@ command can gate a generation run.
 | `eyeline_height_flip` | warning | One subject is filmed from above by one camera and from below by another. Unless deliberate, this breaks the sense of one place. |
 | `camera_outside_room` | warning | A camera position falls outside the declared room. Usually a typo in the measurements. |
 | `subjects_overlap` | warning | Two subjects are closer than 25 cm and will read as one body. |
+| `move_crosses_axis` | error | A camera move (dolly, truck, arc…) crosses the line of action during the shot. |
+| `subject_path_crosses_axis` | warning | A character crosses the line. Legal and often deliberate; it redraws the line for every later shot. |
+| `cut_screen_flip` | warning | A character leaves one shot on one side of frame and enters the next on the other. |
+| `framed_subject_missing` | warning | A shot names who it is on, but its camera frames them neither where the shot starts nor where it ends. |
+| `move_kind_mismatch` | warning | The move a shot names disagrees with the move its start and end positions describe. |
+| `move_value_unknown` | error | A move's `speed`, `rig` or `kind` is outside the vocabulary. |
+| `unknown_mark` | error | A shot sends a character or camera to a mark the geometry does not declare. |
+| `movement_subject_missing` | error | A shot moves a character the geometry does not define. |
+
+## Movement within a shot
+
+A character's position in the geometry is where they stand when the scene
+begins. A shot can send them to a named mark (`subjects_move`), and the next shot
+finds them there; a time jump restates positions with `subjects_at`. A shot's
+`camera` is where it starts; `move.to` is where it ends, and the kind of move is
+derived from the two, not taken from its name. See
+[`SPEC-0005`](../ai-context/specs/SPEC-0005-movement-within-a-shot.md).
+
+```yaml
+geography:
+  marks:
+    - {id: HALFWAY, x: 2.6, y: 2.3, label: Two steps short of the stack}
+shots:
+  - n: 2
+    subjects_move: [{subject: MARA, to: HALFWAY}]
+    ends_on: Mara stopped, facing the stack.
+  - n: 3
+    move: {to: CAM-A2, speed: slow, rig: dolly, kind: dolly_in}
+```
+
+Nothing is read from prose: an action line that says she walks moves nobody.
 
 ## What is deliberately not checked
 

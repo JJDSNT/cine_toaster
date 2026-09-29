@@ -5,7 +5,7 @@ type: index
 status: active
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-09-22
+updated_at: 2026-09-29
 tags:
   - specifications
   - contracts
@@ -40,6 +40,7 @@ work is tracked separately under `ai-context/work/`.
 | `SPEC-0002` | project locators, sources, and materialized workspaces | accepted | partial |
 | `SPEC-0003` | cast entities, executable references, and generation lineage | accepted | planned |
 | `SPEC-0004` | the production schema for a feature and a demo reel | draft | planned |
+| `SPEC-0005` | movement within a shot: camera moves, subject marks, exit state | implemented | complete |
 
 ## Rule
 

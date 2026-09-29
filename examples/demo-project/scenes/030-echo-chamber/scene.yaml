@@ -26,6 +26,13 @@ geography:
       y: 2.4
       eye_height: 1.55
   axis: [MARA, SPEAKER]
+  # Where people are sent during the scene (SPEC-0005). A subject's x/y above is
+  # where they stand when the scene begins; shots move them from there.
+  marks:
+    - id: HALFWAY
+      x: 2.6
+      y: 2.3
+      label: Two steps short of the stack
   cameras:
     - id: CAM-A
       x: 3.4
@@ -62,6 +69,11 @@ shots:
     duration: 9
     label: Mara crosses the room and stops halfway.
     action: She leaves the console and stops two steps short of the stack.
+    # Without this, the next shot would find her back at the console.
+    subjects_move:
+      - subject: MARA
+        to: HALFWAY
+    ends_on: Mara stopped, facing the stack.
 
   - n: 3
     duration: 11

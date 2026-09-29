@@ -15,13 +15,21 @@ CHECK_CODES = frozenset(
         "axis_break",
         "axis_subject_missing",
         "camera_outside_room",
+        "cut_screen_flip",
         "eyeline_height_flip",
         "eyeline_mismatch",
         "eyeline_subject_missing",
+        "framed_subject_missing",
+        "move_crosses_axis",
+        "move_kind_mismatch",
+        "move_value_unknown",
+        "movement_subject_missing",
         "shot_field_undeclared",
+        "subject_path_crosses_axis",
         "subjects_overlap",
         "transition_unknown",
         "unknown_camera",
+        "unknown_mark",
     }
 )
 
@@ -108,6 +116,18 @@ class Camera:
 
 
 @dataclass(frozen=True, slots=True)
+class Mark:
+    """A named point on the plan: where a subject is sent to (SPEC-0005)."""
+
+    id: str
+    label: str
+    position: tuple[float, float]
+
+    def public_dict(self) -> dict[str, Any]:
+        return {"id": self.id, "label": self.label, "position": list(self.position)}
+
+
+@dataclass(frozen=True, slots=True)
 class Axis:
     """The line of action between two subjects (the 180-degree line)."""
 
@@ -124,6 +144,7 @@ class SceneGeometry:
     subjects: dict[str, Subject] = field(default_factory=dict)
     cameras: dict[str, Camera] = field(default_factory=dict)
     axis: Axis | None = None
+    marks: dict[str, Mark] = field(default_factory=dict)
 
     def is_empty(self) -> bool:
         return self.room is None and not self.subjects and not self.cameras
@@ -135,6 +156,7 @@ class SceneGeometry:
             "subjects": [subject.public_dict() for subject in self.subjects.values()],
             "cameras": [camera.public_dict() for camera in self.cameras.values()],
             "axis": self.axis.public_dict() if self.axis else None,
+            "marks": [mark.public_dict() for mark in self.marks.values()],
         }
 
     def resolve_target(self, camera: Camera) -> tuple[float, float] | None:
@@ -210,6 +232,21 @@ def parse_geometry(document: dict[str, Any] | None) -> SceneGeometry:
             lens_mm=lens,
         )
 
+    marks: dict[str, Mark] = {}
+    for raw in document.get("marks", []) or []:
+        if not isinstance(raw, dict):
+            raise ValidationError("Each geometry.marks entry must be a table")
+        mark_id = str(raw.get("id", "")).strip()
+        if not mark_id:
+            raise ValidationError("A geometry mark needs an id")
+        if mark_id in marks or mark_id in subjects or mark_id in cameras:
+            raise ValidationError(f"Duplicate geometry id {mark_id!r}")
+        marks[mark_id] = Mark(
+            id=mark_id,
+            label=str(raw.get("label", mark_id)),
+            position=_point(raw.get("position"), label=f"mark {mark_id} position"),
+        )
+
     axis = None
     axis_document = document.get("axis")
     if isinstance(axis_document, dict):
@@ -224,6 +261,7 @@ def parse_geometry(document: dict[str, Any] | None) -> SceneGeometry:
         subjects=subjects,
         cameras=cameras,
         axis=axis,
+        marks=marks,
     )
 
 
@@ -307,6 +345,7 @@ def check_geometry(
     shots: list[dict[str, Any]],
     *,
     scene_id: str = "",
+    positions_by_shot: dict[str, dict[str, tuple[float, float]]] | None = None,
 ) -> list[Finding]:
     """Check the grammar a generated scene silently breaks.
 
@@ -378,7 +417,7 @@ def check_geometry(
 
     findings.extend(_check_axis(geometry, used_cameras, scene_id))
     findings.extend(_check_eyeline_height(geometry, used_cameras, scene_id))
-    findings.extend(_check_eyeline_direction(geometry, shots, scene_id))
+    findings.extend(_check_eyeline_direction(geometry, shots, scene_id, positions_by_shot))
     return findings
 
 
@@ -386,6 +425,7 @@ def _check_eyeline_direction(
     geometry: SceneGeometry,
     shots: list[dict[str, Any]],
     scene_id: str,
+    positions_by_shot: dict[str, dict[str, tuple[float, float]]] | None = None,
 ) -> list[Finding]:
     """Two people in conversation must look toward each other across the cut.
 
@@ -430,7 +470,14 @@ def _check_eyeline_direction(
         if camera is None:
             continue
 
-        side, angle = screen_side(camera.position, subject.position, other.position)
+        # Where the two stand when this shot begins (SPEC-0005), not where the
+        # scene began: a character who has walked is looked at where they are.
+        positions = (positions_by_shot or {}).get(shot_id, {})
+        side, angle = screen_side(
+            camera.position,
+            positions.get(subject.id, subject.position),
+            positions.get(other.id, other.position),
+        )
         covered.append(
             {
                 "shot_id": shot_id,
