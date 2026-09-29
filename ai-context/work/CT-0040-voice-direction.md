@@ -98,6 +98,20 @@ These decisions are left to the user, in `singular/docs/SINGULAR-CINE-TOASTER.md
 Validation: `tests/test_cast.py` (11 tests) and the brief voice test. Full
 suite: 398 OK.
 
+**Cast room** (2026-09-29). The control room gained a **Cast** room, with
+each member's:
+
+- master picture ("Voice only" when the sheet does not decide a face);
+- names, what the sheet decides, and description;
+- voice, with language and playable reference recordings;
+- variants, with their pictures;
+- every scene they appear in, with shots, variant and the scene's voice
+  state, linking to the scene.
+
+The production payload carries `cast[*].appearances`, and voice recordings are
+project-relative. Validated with a headless screenshot on a demo copy that has
+a variant and a recording, and an appearances test. Full suite: 399 OK.
+
 # Order
 
 - **Now, at no cost:** voice identity on the cast sheet, state and delivery

@@ -56,6 +56,16 @@ class DemoTests(unittest.TestCase):
         self.assertEqual([finding for scene in loaded["scenes"] for finding in scene["findings"]], [])
 
 
+class AppearanceTests(unittest.TestCase):
+    def test_each_member_knows_the_scenes_shots_and_voice_state(self) -> None:
+        cast = load_production(DEMO)["cast"]
+        mara = {item["scene"]: item for item in cast["MARA"]["appearances"]}
+        self.assertEqual(sorted(mara), ["SC-010", "SC-030"])
+        self.assertIn("P3", mara["SC-030"]["shots"])
+        self.assertIn("whisper", mara["SC-030"]["voice_state"])
+        self.assertEqual([item["scene"] for item in cast["ANNOUNCER"]["appearances"]], ["SC-010"])
+
+
 class CheckTests(unittest.TestCase):
     def test_nothing_is_checked_without_a_cast(self) -> None:
         loaded = production({}, {"010": SCENE.format(id="S1", who="KAEL", label="Kael")})

@@ -11,7 +11,7 @@ from .geometry import Finding, check_geometry, parse_geometry
 from .movement import check_movement, shot_motions
 from . import screenplay as script_model
 from .blocks import scene_blocks
-from .cast import check_cast, load_cast
+from .cast import appearances as cast_appearances, check_cast, load_cast
 from .cuts import scene_cuts
 from .looks import load_looks, resolve as resolve_look
 from .state import SceneState, load_scene_state
@@ -1110,7 +1110,8 @@ def load_production(root: Path) -> dict[str, Any]:
         "script_path": _script_path(manifest, root),
         "script_files": script_files,
         "script_problem": script_problem,
-        "cast": {key: member.public_dict() for key, member in cast.items()},
+        "cast": {key: {**member.public_dict(), "appearances": seen.get(key, [])}
+                 for seen in [cast_appearances(scenes, cast)] for key, member in cast.items()},
         # ADR 0016: a generated screenplay is read only in the editor.
         "script_generated_by": _text(manifest.get("screenplay_generated_by")),
         # Where a take's word timings are, beside it: `{stem}` is the take's

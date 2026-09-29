@@ -151,11 +151,15 @@ def load_cast(root: Path, manifest: dict[str, Any]) -> dict[str, Member]:
         voice_raw = raw.get("voice")
         voice = None
         if isinstance(voice_raw, dict):
+            recordings = []
+            for item in voice_raw.get("references") or []:
+                path = (base / str(item)).resolve()
+                recordings.append(path.relative_to(root.resolve()).as_posix() if path.is_relative_to(root.resolve()) else str(item))
             voice = Voice(
                 identity=str(voice_raw.get("identity") or ""),
                 accent=str(voice_raw.get("accent") or ""),
                 language=str(voice_raw.get("language") or ""),
-                references=[str(item) for item in voice_raw.get("references") or []],
+                references=recordings,
             )
         members[member_id] = Member(
             id=member_id,
@@ -281,3 +285,30 @@ def propose(scenes_raw: list[tuple[str, dict[str, Any]]]) -> dict[str, dict[str,
                 draft = drafts.setdefault(cast_key(name), {"descriptions": {}, "voices": {}, "sheets": {}})
                 draft[target].setdefault(" ".join(str(text).split()), []).append(scene_id)
     return drafts
+
+
+def appearances(scenes: list[dict[str, Any]], cast: dict[str, Member]) -> dict[str, list[dict[str, Any]]]:
+    """Where each cast member is: the scenes, the shots, the variant and how their voice sounds."""
+
+    names = resolver(cast)
+    found: dict[str, list[dict[str, Any]]] = {key: [] for key in cast}
+    for scene in scenes:
+        shots: dict[str, list[str]] = {}
+        for subject in (scene.get("geometry") or {}).get("subjects", []):
+            member = names.get(cast_key(subject["id"]))
+            if member:
+                shots.setdefault(member.id, [])
+        for shot in scene["shots"]:
+            speakers = [line.get("who") for line in shot.get("lines") or []]
+            speakers += [line.get("who") for line in (shot.get("script") or {}).get("dialogue") or []]
+            for who in [shot.get("subject"), *speakers]:
+                member = names.get(cast_key(who)) if who else None
+                if member and shot["id"] not in shots.setdefault(member.id, []):
+                    shots[member.id].append(shot["id"])
+        variants = {names[cast_key(n)].id: str(v) for n, v in (scene.get("cast") or {}).items() if cast_key(n) in names}
+        states = {names[cast_key(n)].id: str(v) for n, v in (scene.get("voice_state") or {}).items() if cast_key(n) in names}
+        for member_id, member_shots in shots.items():
+            found[member_id].append({"scene": scene["id"], "title": scene.get("title", ""), "shots": member_shots,
+                                     "variant": variants.get(member_id, ""), "voice_state": states.get(member_id, "")})
+    return found
+

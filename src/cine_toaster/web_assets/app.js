@@ -18,7 +18,7 @@ const state = {
 
 const ROOMS = new Set([
   "overview", "script", "storyboard", "dialogue",
-  "sequences", "scenes", "review", "cut",
+  "sequences", "scenes", "review", "cut", "cast",
   "transitions", "library", "knowledge",
 ]);
 
@@ -68,6 +68,7 @@ function draw(view) {
   else if (view === "review") renderReview();
   else if (view === "cut") renderCut();
   else if (view === "transitions") renderTransitions();
+  else if (view === "cast") renderCast();
   else if (view === "library") renderLibrary(state.project.id);
   else if (view === "knowledge") renderKnowledge();
   byId("workspace").focus();
@@ -270,6 +271,91 @@ function toastMessage(text) {
   const note = el("div", "toast-note", text);
   document.body.append(note);
   setTimeout(() => note.remove(), 4000);
+}
+
+// The cast (SPEC-0003, CT-0040): each character declared once -- the picture
+// that makes them, the variants the story needs, the voice they always have --
+// and where they appear, with how their voice sounds in each scene.
+function renderCast() {
+  if (!state.production) return renderUnstructured();
+  const root = byId("workspace");
+  root.replaceChildren();
+  const heading = sectionHeading("CAST", "Who is in the film", "Each character once: their picture, their variants, their voice, and every scene they are in.");
+  heading.classList.add("page-heading");
+  root.append(heading);
+  const members = Object.values(state.production.cast || {});
+  if (!members.length) {
+    root.append(el("p", "empty-state",
+      "No cast sheets yet (cast/<id>/character.yaml). To draft them from what the scenes already say, without writing anything: toast cast propose <project>"));
+    return;
+  }
+  const grid = el("div", "cast-grid");
+  for (const member of members) {
+    const card = el("article", "cast-card");
+    const picture = el("div", "cast-picture");
+    const master = member.references.find((ref) => ref.role === "master" && ref.exists);
+    if (master) {
+      const image = el("img");
+      image.src = `/media/${master.path}`;
+      image.alt = member.label;
+      picture.append(image);
+    } else {
+      picture.append(el("span", "muted", member.authoritative_for.includes("face") ? "No master picture" : "Voice only"));
+    }
+    card.append(picture);
+    const body = el("div", "cast-body");
+    const title = el("div", "cast-title");
+    title.append(el("strong", "", member.label), el("small", "muted", [member.id, ...(member.names || [])].join(" · ")));
+    body.append(title);
+    const decides = el("div", "tag-list");
+    member.authoritative_for.forEach((item) => decides.append(el("span", "tag", item)));
+    body.append(decides);
+    if (member.description) body.append(el("p", "", member.description));
+    if (member.voice) {
+      const voice = el("div", "cast-voice");
+      voice.append(el("span", "eyebrow", "VOICE"), el("p", "", member.voice.described || "—"));
+      if (member.voice.language) voice.append(el("small", "muted", member.voice.language));
+      for (const recording of member.voice.references || []) {
+        const audio = el("audio");
+        audio.src = `/media/${recording}`;
+        audio.controls = true;
+        audio.preload = "none";
+        voice.append(audio);
+      }
+      body.append(voice);
+    }
+    const variants = Object.entries(member.variants || {});
+    if (variants.length) {
+      const list = el("div", "cast-variants");
+      list.append(el("span", "eyebrow", "VARIANTS"));
+      for (const [name, variant] of variants) {
+        const row = el("div", "cast-variant");
+        const ref = (variant.references || []).find((item) => item.role === "master" && item.exists);
+        if (ref) {
+          const image = el("img");
+          image.src = `/media/${ref.path}`;
+          image.alt = name;
+          row.append(image);
+        }
+        row.append(el("b", "", name), el("small", "muted", variant.description || ""));
+        list.append(row);
+      }
+      body.append(list);
+    }
+    const scenes = el("div", "cast-scenes");
+    scenes.append(el("span", "eyebrow", `IN ${member.appearances.length} SCENE${member.appearances.length === 1 ? "" : "S"}`));
+    for (const seen of member.appearances) {
+      const row = button("", () => renderScene(seen.scene), "cast-scene");
+      row.append(el("b", "", seen.scene), el("span", "", seen.title),
+        el("small", "muted", [seen.shots.join(", "), seen.variant && `as ${seen.variant}`, seen.voice_state && `voice: ${seen.voice_state}`].filter(Boolean).join(" · ")));
+      scenes.append(row);
+    }
+    body.append(scenes);
+    for (const problem of member.problems || []) body.append(el("p", "join-finding warning", problem));
+    card.append(body);
+    grid.append(card);
+  }
+  root.append(grid);
 }
 
 function renderSequences() {
@@ -1776,6 +1862,8 @@ function updateChrome() {
   byId("knowledge-nav-count").textContent = state.knowledge?.coverage.practices || 0;
   byId("review-nav-count").textContent = state.production?.metrics.pending_shots ?? state.production?.metrics.attention_items ?? 0;
   byId("transition-nav-count").textContent = state.transitions.length;
+  const castCount = byId("cast-nav-count");
+  if (castCount) castCount.textContent = String(Object.keys(state.production?.cast || {}).length);
   byId("cut-nav-count").textContent = (state.production?.renders || []).length;
   const writingCounts = state.writing?.counts;
   byId("storyboard-nav-count").textContent = writingCounts?.frames ?? 0;
