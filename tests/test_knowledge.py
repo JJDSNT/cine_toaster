@@ -177,18 +177,29 @@ class ProviderTests(KnowledgeTestCase):
             load_providers(self.root)
 
 
+class BuiltInProviderTests(unittest.TestCase):
+    def test_measured_generation_facts_are_shipped_with_dates(self) -> None:
+        profiles = {profile.id: profile for profile in load_providers()}
+        ltx = profiles["ltx-2.5"]
+        self.assertTrue(all(claim.measured_on for claim in ltx.claims if claim.status == "measured"))
+        self.assertIn("multishot-own-rhythm", {claim.id for claim in ltx.claims})
+        self.assertIn("silent-gpu-swap", {claim.id for claim in profiles["runpod-serverless"].claims})
+
+
 class CoverageTests(KnowledgeTestCase):
     def test_coverage_counts_what_software_enforces(self) -> None:
         self.write_practice("test-practice.md", PRACTICE)
         self.write_practice("still-manual.md", UNENFORCED)
         self.write_provider("test-model.md", PROVIDER)
+        built_in = coverage()
         report = coverage(self.root)
 
         self.assertGreaterEqual(report.practices, 8)
         self.assertIn("still-manual", report.unenforced)
         self.assertNotIn("test-practice", report.unenforced)
-        self.assertEqual(report.claims, 2)
-        self.assertEqual(report.measured_claims, 1)
+        # The production's profile adds its claims to the built-in providers'.
+        self.assertEqual(report.claims, built_in.claims + 2)
+        self.assertEqual(report.measured_claims, built_in.measured_claims + 1)
         self.assertIn("craft", report.by_domain)
 
     def test_every_built_in_check_has_recorded_reasoning(self) -> None:

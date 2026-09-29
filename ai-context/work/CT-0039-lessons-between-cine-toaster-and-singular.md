@@ -113,6 +113,25 @@ priority order below.
     anyone with read access to the endpoint. It should be rotated and moved
     to a RunPod secret. Reported to the user; the value was not recorded
     anywhere.
+- **Item 3: measured rules as knowledge** (2026-09-29).
+  - Built-in provider profiles: `knowledge/providers/ltx-2.5.md` (16 claims)
+    and `runpod-serverless.md` (4 claims). Each claim has a status, a
+    measurement date, evidence in SINGULAR, an impact and a workaround.
+  - The sources are SINGULAR's production diary
+    (`docs/SINGULAR-PROXIMOS-PASSOS.md`) and the dated comments in
+    `cena_ltx.py`.
+  - High-impact claims:
+    - the model reads acting direction aloud;
+    - an off-screen line comes out of the visible mouth;
+    - the text must match the first frame;
+    - multi-shot cuts follow the model's own rhythm;
+    - frame 0 must be guided;
+    - the platform can swap the GPU silently;
+    - endpoint environments expose secrets.
+  - The generation adapter (plan step 9) will read these profiles rather than
+    re-encode them.
+  - Tests: a built-in profile test; the coverage test now counts built-in
+    claims. Full suite: 383 OK.
 
 # Validation
 
