@@ -24,8 +24,14 @@ class EchoChamberBriefTests(unittest.TestCase):
 
     def test_staging_names_its_sources(self) -> None:
         sources = {slot.tag: slot.source for slot in self.brief.staging}
-        self.assertEqual(sources, {"INTENT": "authored", "LOGIC": "derived",
-                                   "AESTHETIC": "missing", "OPENING": "derived"})
+        self.assertEqual(sources, {"INTENT": "authored", "LOGIC": "derived", "AESTHETIC": "missing",
+                                   "VOICES": "authored", "OPENING": "derived"})
+
+    def test_voices_join_the_sheet_and_the_scene(self) -> None:
+        voices = next(slot.text for slot in self.brief.staging if slot.tag == "VOICES")
+        self.assertIn("MARA: a low, dry female voice in her forties, unhurried, soft Scottish accent", voices)
+        self.assertIn("here, barely above a whisper", voices)
+        self.assertIn("SPEAKER STACK:", voices)
 
     def test_screen_direction_is_derived_from_the_geometry(self) -> None:
         logic = self.brief.staging[1].text

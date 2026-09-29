@@ -421,6 +421,51 @@ def command_assemble_sequence(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_cast(args: argparse.Namespace) -> int:
+    """The production's cast sheets, or drafts of them from what the scenes say (SPEC-0003)."""
+
+    from .cast import propose
+    from .project import _read_yaml, scene_files
+
+    root = Path(args.project).expanduser().resolve()
+    if args.cast_command == "propose":
+        documents = []
+        for path in scene_files(root):
+            document = _read_yaml(path) or {}
+            documents.append((str(document.get("scene") or document.get("cena") or path.parent.name), document))
+        drafts = propose(documents)
+        if not drafts:
+            print("The scenes describe no characters or voices to draft from.")
+            return 0
+        print("Drafts only: nothing was written. Where scenes disagree, every version is listed.\n")
+        for key, draft in sorted(drafts.items()):
+            print(f"{key}  (cast/{key.lower()}/character.yaml)")
+            for label, versions in (("description", draft["descriptions"]), ("voice", draft["voices"]),
+                                    ("sheet chosen", draft["sheets"])):
+                if not versions:
+                    continue
+                marker = "  <- differs across scenes" if len(versions) > 1 else ""
+                print(f"  {label}:{marker}")
+                for text, scenes in sorted(versions.items(), key=lambda item: -len(item[1])):
+                    print(f"    [{', '.join(scenes)}] {text[:150]}")
+            print()
+        return 0
+    production = load_production(root)
+    if not production["cast"]:
+        print("No cast sheets (cast/<id>/character.yaml). Try: toast cast propose", args.project)
+        return 0
+    for member in production["cast"].values():
+        voice = (member.get("voice") or {}).get("described") or "no voice declared"
+        master = next((ref for ref in member["references"] if ref["role"] == "master"), None)
+        print(f"{member['id']:12} {member['label']:20} decides {', '.join(member['authoritative_for'])}")
+        print(f"             voice: {voice}")
+        print(f"             master: {master['path'] if master else '-'}"
+              + (f"; variants: {', '.join(member['variants'])}" if member["variants"] else ""))
+        for problem in member["problems"]:
+            print(f"             problem: {problem}")
+    return 0
+
+
 def command_costs(args: argparse.Namespace) -> int:
     """Generation time and estimated cost, from the providers' job records."""
 
@@ -1140,6 +1185,14 @@ def build_parser() -> argparse.ArgumentParser:
     sequence_parser.add_argument("--version")
     sequence_parser.add_argument("--summary")
     sequence_parser.set_defaults(function=command_assemble_sequence)
+
+    cast_parser = subparsers.add_parser("cast", help="Cast sheets: list them, or draft them from the scenes")
+    cast_actions = cast_parser.add_subparsers(dest="cast_command", required=True)
+    for name, text in (("list", "The cast sheets and their voices"),
+                       ("propose", "Draft cast sheets from the scenes' own descriptions; writes nothing")):
+        action = cast_actions.add_parser(name, help=text)
+        action.add_argument("project", type=Path)
+        action.set_defaults(function=command_cast)
 
     costs_parser = subparsers.add_parser("costs", help="Generation time and estimated cost, from job records")
     costs_parser.add_argument("project", type=Path)

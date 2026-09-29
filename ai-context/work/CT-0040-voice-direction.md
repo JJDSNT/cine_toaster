@@ -2,7 +2,7 @@
 id: CT-0040
 title: Voice direction — identity, state and delivery (intonation, accent, pace)
 type: work
-status: ready
+status: doing
 owner: unassigned
 created_at: 2026-09-29
 updated_at: 2026-09-29
@@ -71,6 +71,32 @@ this on 2026-09-29.
   sheet: `voice_identity_drift`, which would flag KAEL's accent.
 - A line whose delivery asks for something the chosen engine cannot render:
   reported, not silently dropped.
+
+# Done (2026-09-29)
+
+The zero-cost part is implemented, as the SPEC-0003 amendment describes:
+
+- cast sheets with `voice` (identity, accent, language, references),
+  `variants` and `names`;
+- scene `voice_state` and `cast`, and the `voice_identity_restated` check,
+  with the practice "a voice has one identity";
+- `[[VOICES]]` in the brief;
+- `toast cast list` and `toast cast propose`.
+
+The demo production declares Mara (face, wardrobe, voice), the speaker stack
+and the announcer (voice only).
+
+On SINGULAR, read-only, `toast cast propose` shows:
+
+- Kael's three voices;
+- a scar above his left eyebrow that only 1-02 and 3-01 describe;
+- Claire's sheet changing from `claire_doente` to `claire` between Geneva
+  and Boreal, which is an intended variant.
+
+These decisions are left to the user, in `singular/docs/SINGULAR-CINE-TOASTER.md`.
+
+Validation: `tests/test_cast.py` (11 tests) and the brief voice test. Full
+suite: 398 OK.
 
 # Order
 

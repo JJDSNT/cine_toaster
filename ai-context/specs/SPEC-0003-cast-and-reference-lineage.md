@@ -3,7 +3,7 @@ id: SPEC-0003
 title: Cast entities, executable references, and generation lineage
 type: specification
 status: accepted
-implementation: planned
+implementation: partial
 owner: project
 created_at: 2026-09-22
 updated_at: 2026-09-22
@@ -160,6 +160,53 @@ once.
 - Replacing a master reference leaves prior takes valid, marked, and findable.
 - All five checks are implemented, each with a knowledge practice explaining it.
 - Authored files are never rewritten by lineage.
+
+# Amendment: variants, names and voice (2026-09-29, CT-0040)
+
+Implemented in `cast.py`; built on evidence from SINGULAR, which had made sheets
+by hand (`elenco/fichas/`), variants (`kael_genebra`, `kael_boreal`,
+`lira15`, `lira35`), a per-scene choice (`fichas: {KAEL: kael_genebra}`) and
+a voice recording.
+
+- **`variants`**: the same person at another age or in another state, each
+  with its own description and references. A scene picks one with
+  `cast: {KAEL: boreal}`. This settles the "per-scene overrides" deferred
+  below for what a production actually needed. Costume changes by act use
+  the same mechanism.
+- **`names`**: every other name the character goes by, such as the
+  screenplay cue (`MARA VALE`) or a geometry id. Lines, shot subjects and
+  geometry subjects resolve through them.
+- **`voice`**: `identity` (timbre, age), `accent`, `language` and reference
+  recordings. The sheet owns the identity. A scene holds only
+  `voice_state`, and a line only its `delivery`.
+- **Checks implemented:**
+  - `cast_subject_unknown`, `cast_reference_missing` and `cast_label_drift`,
+    as specified;
+  - `cast_variant_unknown` (error): a scene asks for a variant the sheet
+    does not have;
+  - `voice_identity_restated` (advice): a scene describes a voice whose
+    identity the sheet already holds.
+
+  All of them run only when the production has a cast.
+- **A master face is owed only by a sheet that is authoritative for `face`.**
+  A voice heard off screen, such as a narrator or a loudspeaker, owes none.
+- **The brief** adds `[[VOICES]]`: each speaker's identity from the sheet,
+  and the scene's state.
+- **Commands:** `toast cast list`; `toast cast propose` drafts sheets from
+  the scenes' own descriptions, listing every version with its scenes, and
+  writes nothing.
+- A production in the legacy vocabulary declares its scene fields with
+  `scene_fields: {vozes: {maps_to: voices}}`. Only `cast`, `voice_state` and
+  `voices` can be targets.
+
+**Still planned:**
+
+- lineage records written by generation;
+- `cast_reference_unused` and `cast_reference_superseded`, which need
+  lineage;
+- attaching master references to generation requests.
+
+All of these arrive with the generation adapter.
 
 # Deferred choices
 

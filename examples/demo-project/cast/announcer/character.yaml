@@ -1,0 +1,9 @@
+# Heard only on the radio (V.O.): a voice-only cast member.
+id: ANNOUNCER
+label: Announcer
+description: The last scheduled broadcaster from Earth, heard through static.
+authoritative_for: [voice]
+voice:
+  identity: a warm, practised male broadcast voice in his sixties, slightly formal
+  accent: mid-Atlantic
+  language: en

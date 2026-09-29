@@ -198,7 +198,42 @@ def _aesthetic(scene: dict[str, Any], looks: dict[str, dict[str, Any]]) -> Slot:
     return Slot("AESTHETIC", "; ".join(str(part) for part in parts if part), "authored")
 
 
-def scene_brief(scene: dict[str, Any], looks: dict[str, dict[str, Any]] | None = None) -> Brief:
+def _voices(scene: dict[str, Any], cast: dict[str, dict[str, Any]]) -> Slot | None:
+    """Each speaker's voice: who they sound like (the cast sheet), then how they sound here."""
+
+    from .cast import cast_key
+
+    speakers: list[str] = []
+    for shot in scene.get("shots", []):
+        for line in (shot.get("script") or {}).get("dialogue") or []:
+            speakers.append(line["who"])
+        if not shot.get("script"):
+            speakers += [line.get("who", "") for line in shot.get("lines") or []]
+    speakers = list(dict.fromkeys(name for name in speakers if name))
+    if not speakers:
+        return None
+    by_name = {}
+    for member in cast.values():
+        for name in [member["id"], member["label"], *member.get("names", [])]:
+            by_name.setdefault(cast_key(name), member)
+    states = {cast_key(name): str(text) for name, text in (scene.get("voice_state") or {}).items()}
+    parts, missing = [], []
+    for speaker in speakers:
+        member = by_name.get(cast_key(speaker))
+        voice = ((member or {}).get("voice") or {}).get("described", "")
+        state = states.get(cast_key(speaker)) or (states.get(member["id"]) if member else "")
+        if not voice:
+            missing.append(speaker)
+            continue
+        parts.append(f"{speaker}: {voice}" + (f"; here, {state}" if state else ""))
+    if missing and not parts:
+        return Slot("VOICES", f"No voice for {', '.join(missing)}: declare it on the cast sheet.", "missing")
+    text = ". ".join(parts) + (f". No voice declared for {', '.join(missing)}." if missing else "")
+    return Slot("VOICES", text, "authored")
+
+
+def scene_brief(scene: dict[str, Any], looks: dict[str, dict[str, Any]] | None = None,
+                cast: dict[str, dict[str, Any]] | None = None) -> Brief:
     """The brief for one loaded scene (`load_production`'s scene dict)."""
 
     labels = _labels(scene)
@@ -210,6 +245,9 @@ def scene_brief(scene: dict[str, Any], looks: dict[str, dict[str, Any]] | None =
     )
     brief.staging.append(_logic(scene, labels))
     brief.staging.append(_aesthetic(scene, looks or {}))
+    voices = _voices(scene, cast or {})
+    if voices:
+        brief.staging.append(voices)
 
     shots = scene.get("shots", [])
     cuts = {cut["to"]: cut for cut in scene.get("cuts") or []}
@@ -399,7 +437,7 @@ def production_brief(root, scene_id: str, production: dict[str, Any] | None = No
     if scene is None:
         return None
     looks = {name: look.public_dict() for name, look in load_looks(root).items()}
-    return scene, scene_brief(scene, looks)
+    return scene, scene_brief(scene, looks, production.get("cast") or {})
 
 
 def take_review(scene: dict[str, Any], brief: Brief, shot_id: str, take_id: str | None = None) -> dict[str, Any] | None:

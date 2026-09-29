@@ -1,0 +1,13 @@
+# Mara Vale, declared once (SPEC-0003). Scenes name her; they do not describe her.
+id: MARA
+names: [MARA VALE]
+label: Mara Vale
+description: A radio astronomer in her forties, alone at the station for years; short grey-streaked hair, a heavy wool cardigan.
+authoritative_for: [face, wardrobe, voice]
+references:
+  - {path: reference/face.png, kind: face, role: master}
+voice:
+  identity: a low, dry female voice in her forties, unhurried
+  accent: soft Scottish
+  language: en-GB
+continuity: The headphones stay on her neck from SC-030 on.

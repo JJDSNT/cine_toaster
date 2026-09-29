@@ -38,7 +38,7 @@ work is tracked separately under `ai-context/work/`.
 | --- | --- | --- | --- |
 | `SPEC-0001` | scoped production-agent threads and provider session bindings | accepted | planned |
 | `SPEC-0002` | project locators, sources, and materialized workspaces | accepted | partial |
-| `SPEC-0003` | cast entities, executable references, and generation lineage | accepted | planned |
+| `SPEC-0003` | cast entities, executable references, and generation lineage | accepted | partial |
 | `SPEC-0004` | the production schema for a feature and a demo reel | draft | planned |
 | `SPEC-0005` | movement within a shot: camera moves, subject marks, exit state | implemented | complete |
 | `SPEC-0006` | screenplay coverage: each shot knows its screenplay and dialogue | implemented | complete |

@@ -11,6 +11,7 @@ from .geometry import Finding, check_geometry, parse_geometry
 from .movement import check_movement, shot_motions
 from . import screenplay as script_model
 from .blocks import scene_blocks
+from .cast import check_cast, load_cast
 from .cuts import scene_cuts
 from .looks import load_looks, resolve as resolve_look
 from .state import SceneState, load_scene_state
@@ -357,6 +358,7 @@ def _load_scene(
     project_look: str = "",
     screenplay: script_model.Screenplay | None = None,
     aliases: dict[str, tuple[str, dict[str, str]]] | None = None,
+    scene_aliases: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     document = _read_yaml(path)
     scene_id = vtext(document, "scene") or _text(document.get("id"))
@@ -471,6 +473,11 @@ def _load_scene(
         "script": script_link,
         "cuts": cuts,
         "blocks": [block.public_dict() for block in blocks],
+        # SPEC-0003 / CT-0040: which variant of each cast member this scene
+        # uses, how their voice sounds here, and any voice restated in full.
+        "cast": _scene_field(document, "cast", scene_aliases) or {},
+        "voice_state": _scene_field(document, "voice_state", scene_aliases) or {},
+        "voices": _scene_field(document, "voices", scene_aliases) or {},
         "findings": findings,
         "decision_log": list(reversed(state.decisions)),
         "pending_shots": pending_shots,
@@ -795,6 +802,31 @@ def discover_stills(root: Path, scene_id: str) -> dict[str, str]:
     return stills
 
 
+#: Scene fields a production may name in its own words (`scene_fields`).
+SCENE_ALIAS_TARGETS = ("cast", "voice_state", "voices")
+
+
+def _scene_field_aliases(manifest: dict[str, Any]) -> dict[str, str]:
+    """`scene_fields: {vozes: {maps_to: voices}}`, as for shots, for the few scene fields that allow it."""
+
+    aliases: dict[str, str] = {}
+    raw = manifest.get("scene_fields") or {}
+    if isinstance(raw, dict):
+        for name, value in raw.items():
+            if isinstance(value, dict) and str(value.get("maps_to") or "") in SCENE_ALIAS_TARGETS:
+                aliases[str(name)] = str(value["maps_to"])
+    return aliases
+
+
+def _scene_field(document: dict[str, Any], canonical: str, aliases: dict[str, str] | None) -> Any:
+    value = document.get(canonical)
+    if value is None:
+        for alias, target in (aliases or {}).items():
+            if target == canonical and document.get(alias) is not None:
+                return document[alias]
+    return value
+
+
 def _shot_field_aliases(manifest: dict[str, Any]) -> dict[str, tuple[str, dict[str, str]]]:
     """Production fields that mean a core field: `shot_fields: {seg: {maps_to: duration}}`.
 
@@ -1018,13 +1050,19 @@ def load_production(root: Path) -> dict[str, Any]:
     script_files, script_problem = screenplay_files(manifest, root)
     screenplay = _read_screenplay(root, script_files)
     scenes = [
-        _load_scene(path, root, declared_fields, project_look, screenplay, _shot_field_aliases(manifest))
+        _load_scene(path, root, declared_fields, project_look, screenplay, _shot_field_aliases(manifest),
+                    _scene_field_aliases(manifest))
         for path in scene_files(root, manifest)
     ]
     scenes.sort(key=lambda scene: (scene["order"], scene["id"]))
     scene_ids = [scene["id"] for scene in scenes]
     if len(scene_ids) != len(set(scene_ids)):
         raise ProjectFormatError("Scene ids must be unique")
+
+    cast = load_cast(root, manifest)
+    for scene_id, found in check_cast(scenes, cast).items():
+        scene = next(item for item in scenes if item["id"] == scene_id)
+        scene["findings"].extend(finding.public_dict() for finding in found)
 
     sequences = _load_sequences(manifest, scenes, manifest_path)
     for sequence in sequences:
@@ -1072,6 +1110,7 @@ def load_production(root: Path) -> dict[str, Any]:
         "script_path": _script_path(manifest, root),
         "script_files": script_files,
         "script_problem": script_problem,
+        "cast": {key: member.public_dict() for key, member in cast.items()},
         # ADR 0016: a generated screenplay is read only in the editor.
         "script_generated_by": _text(manifest.get("screenplay_generated_by")),
         # Where a take's word timings are, beside it: `{stem}` is the take's

@@ -9,6 +9,10 @@ script:
   heading: INT. LISTENING STATION - NIGHT
   occurrence: 2
 
+# How Mara's voice sounds here; who she sounds like is on her cast sheet.
+voice_state:
+  MARA: barely above a whisper, as if the room might hear
+
 direction: |
   Mara stays on the right of frame and the speaker stack on the left for the
   whole scene. The room is only ever seen from the console side, so the reply

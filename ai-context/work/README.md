@@ -42,9 +42,8 @@ execution history and links to those destinations.
 The order of work is the ordered plan in
 [`development/roadmap.md`](../development/roadmap.md).
 
-- `CT-0040` — voice direction: cast voice identity, per-scene state, line
-  delivery (accent, intonation, pace); KAEL's accent drift in SINGULAR
-  (`ready`)
+- `CT-0040` — voice direction: cast sheets with voice, variants and names are
+  done; TTS and voice conversion await a spike (`doing`)
 - `CT-0039` — lessons between Cine Toaster and SINGULAR, with the working
   order: speech trims and loudness, job lineage, LTX rules, SINGULAR geometry,
   sequences, generation (`doing`)

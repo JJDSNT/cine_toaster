@@ -1,0 +1,9 @@
+# The speaker stack is heard, never seen as a person: a cast member that is
+# only a voice. The screenplay calls it SPEAKER STACK.
+id: SPEAKER
+label: Speaker stack
+names: [SPEAKER STACK]
+description: A bank of old receiver loudspeakers. It speaks in the voice of whoever it repeats.
+authoritative_for: [voice]
+voice:
+  identity: Mara's own words, played back through tired loudspeakers, thin and slightly delayed
