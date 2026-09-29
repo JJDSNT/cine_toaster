@@ -1,0 +1,83 @@
+---
+id: CT-0039
+title: What Cine Toaster and SINGULAR can learn from each other
+type: work
+status: doing
+owner: development agent
+created_at: 2026-09-29
+updated_at: 2026-09-29
+tags:
+  - real-production
+  - roadmap
+  - assembly
+  - generation
+---
+
+# What
+
+Lessons from working on both. SINGULAR is ahead in phase 2 practice
+(generation, montage). Cine Toaster is ahead in structure and verification
+(phase 1, records, checks). Agreed with the user on 2026-09-29, including the
+priority order below.
+
+# Cine Toaster, from SINGULAR
+
+1. **Speech-aware trims.** SINGULAR cuts a take around its declared speech,
+   using word timings, and skips the generation's still opening (0.35 s). The
+   assembly used the shot duration instead: 3-01 came out at 98 s against
+   94.85 s.
+2. **Loudness per clip**, measured on speech only. The target is −20 LUFS,
+   with a smaller boost allowed for silent shots, so room tone is not
+   amplified.
+3. **Measured generation rules become knowledge.** SINGULAR has dated
+   measurements buried in code comments:
+   - the model's own cut rhythm;
+   - a guide at frame 0;
+   - frame counts in multiples of 8;
+   - generations of 1–20 s.
+
+   They belong in the provider adapter and in evidence-linked practices.
+4. **Existing lineage and cost.** `<clip>.job.json` records the endpoint,
+   worker, execution time and hash. Take discovery can read it.
+5. **Master image from a blockout.** SINGULAR already renders a Blender
+   blockout (`rA`) and turns it into a photograph (`mA`), with edit lineage
+   (`base` → `mask` → `qwen`). This is CT-0025 step 4 with CT-0029 stage 2.
+6. **Montage features**: subtitles, voice mixing, layers, overlays, muted
+   stretches. They map to CT-0031 catalogs and an audio track.
+7. **Review exports**: review PDFs and contact sheets.
+
+# SINGULAR, from Cine Toaster
+
+1. **Geometry with the real cast.** The subjects are the placeholders
+   `ESQUERDA` and `DIREITA`, and 4 of 9 scenes have no geometry. Declaring
+   shot subjects makes the axis, eyeline and jump checks meaningful, and
+   gives every scene blocking frames and previs.
+2. **Screenplay links written by the breakdown generators** (`script:`,
+   `covers:`).
+3. **Intentions as records, not prose**: `cut: {type: continuation, chain:
+   frame}`, inserts, reverse shots.
+4. **Never lose a version.** Regeneration overwrites `c08.mp4` and
+   `cena-3-01.mp4`. Use takes in `_takes/` and assembly versions, and a
+   storage policy for media, since git covers only text.
+5. **Retire tools gradually.** Montage moves to Cine Toaster once items 1, 2
+   and 6 above exist. Generation stays in SINGULAR's tools until the adapter
+   exists.
+
+# Order
+
+1. Speech-aware trims and loudness in the assembly.
+2. Read `.job.json` as take lineage and cost.
+3. Measured LTX rules into knowledge and the future adapter.
+4. SINGULAR: cast subjects and geometry; generators writing screenplay links.
+5. Sequence assembly, then the generation adapter (needs a budget).
+
+# Done
+
+- (see below as items land)
+
+# Validation
+
+- Evidence gathered on SINGULAR, read-only or on scratch copies.
+- Declared speech against detected words: in 2 of about 80 clips, words were
+  detected in shots declared silent (3-01 P8, "Halts the reactor."; 1-02 P40,
+  breathing). Trims must follow **declared** speech, not detected words.

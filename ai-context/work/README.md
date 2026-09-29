@@ -42,6 +42,9 @@ execution history and links to those destinations.
 The order of work is the ordered plan in
 [`development/roadmap.md`](../development/roadmap.md).
 
+- `CT-0039` — lessons between Cine Toaster and SINGULAR, with the working
+  order: speech trims and loudness, job lineage, LTX rules, SINGULAR geometry,
+  sequences, generation (`doing`)
 - `CT-0037` — the generation unit: blocks, as SINGULAR's pipeline already
   does; a proposal for plan step 9 (`ready`)
 - `CT-0035` — validation on SINGULAR: seven problems the demos missed,
