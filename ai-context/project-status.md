@@ -14,7 +14,7 @@ tags:
 
 # Project status
 
-Last updated: 2026-09-27
+Last updated: 2026-09-29
 
 ## Current phase
 
@@ -89,6 +89,10 @@ Cine Toaster cannot yet:
 - `CT-0020` records a future UI evaluation: Okay Wannabe as a production-stage
   reference and a node-based way to guide clip transitions. No interface or
   schema choice has been made.
+- `CT-0022` is ready: camera movement and cuts between clips are the main
+  production pain. External references are screened and ranked in
+  `references.md`. The graph view follows Arcads' production canvas, not
+  ComfyUI.
 
 ## Closed: scene import
 

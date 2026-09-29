@@ -5,7 +5,7 @@ type: index
 status: active
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-09-22
+updated_at: 2026-09-29
 tags:
   - work
   - tracker
@@ -39,6 +39,8 @@ execution history and links to those destinations.
 
 ## Work queue
 
+- `CT-0022` — camera movement, cuts between clips, and an Arcads-style
+  graph; external references screened (`ready`)
 - `CT-0021` — evaluate Fountain screenplay tools and Final Draft FDX
   interchange (`ready`)
 - `CT-0020` — evaluate Okay Wannabe's UI and a visual graph for transitions

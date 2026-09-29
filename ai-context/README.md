@@ -53,6 +53,7 @@ Then read the focused guidance relevant to the task:
 - `development/testing.md`
 - `decisions/README.md`
 - `specs/README.md`
+- `references.md` — external products and repositories, with reuse licence
 
 ## Documentation authority
 
