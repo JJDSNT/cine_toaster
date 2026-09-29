@@ -23,10 +23,11 @@ from .providers.ltx_prompt import Line, ShotPrompt, block_prompt
 from .takes import work_directory_for
 
 #: Measured on SINGULAR (knowledge/providers/ltx-2.5.md): a 10 s clip at
-#: 1280x704 took about 64 s on an L40S. The estimate keeps that ratio and adds
-#: the queue a warm worker still spends.
+#: 1280x704 took about 64 s on an L40S, warm.
 EXECUTION_SECONDS_PER_CLIP_SECOND = 6.4
-QUEUE_SECONDS = 15.0
+#: A cold worker loads the model first: 1-02A block 2 ran 97 s warm and 245 s
+#: cold (2026-09-29). The estimate assumes the worse case.
+COLD_START_SECONDS = 150.0
 GUIDE_STRENGTH = 0.7
 
 
@@ -66,7 +67,7 @@ def _digest(path: Path) -> str:
 
 
 def estimate(seconds: float, hourly_rate: float = HOURLY_RATE_USD) -> float:
-    return round((seconds * EXECUTION_SECONDS_PER_CLIP_SECOND + QUEUE_SECONDS) * hourly_rate / 3600, 3)
+    return round((seconds * EXECUTION_SECONDS_PER_CLIP_SECOND + COLD_START_SECONDS) * hourly_rate / 3600, 3)
 
 
 def _from_shot(scene: dict[str, Any], shot: dict[str, Any]) -> dict[str, Any] | None:

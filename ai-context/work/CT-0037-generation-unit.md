@@ -161,6 +161,20 @@ The user approved a US$ 2 ceiling for test runs.
 - Estimate: US$ 0.051. SINGULAR's own `b2` took 97 s of execution, about
   US$ 0.047.
 
+**Real run on the same copy (2026-09-29, US$ 2 ceiling):**
+
+- The job succeeded and was adopted as `b2-1.mp4`, 14.04 s long, with its
+  `.job.json` and `.provenance.json`. SINGULAR's `b2.mp4` was untouched.
+- The picture matches the original: Kael against the window, then Claire
+  on the pillow, one cut.
+- Content slicing put the cut at 3.75 s. The original was cut at 4.5 s.
+- Timing: execution 245.5 s (cold; warm was 97 s), plus 900 s queued while
+  no L40/L40S was free in the volume's data centre.
+- The ledger recorded US$ 0.557, because it counts the queue too. The
+  execution alone is about US$ 0.12.
+- The estimate was US$ 0.051. It now assumes a cold start (150 s),
+  giving about US$ 0.116 for 14 s.
+
 Remaining:
 
 - SINGULAR's `guia_no_corte` and `forca_corte` per-shot options;
