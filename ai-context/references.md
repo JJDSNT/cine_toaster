@@ -60,7 +60,9 @@ Ranked by value to the three priority problems.
 | 7 | [Valiera00/SPITE](https://github.com/Valiera00/SPITE) | AGPL-3.0 | ideas only | A scene strip over the canvas, with nodes tagged as "Shot 1 of Scene A". It shows cost on every Generate button and recovers generation jobs after a reload. It covers pre-production only. |
 | 8 | [shrimbly/node-banana](https://github.com/shrimbly/node-banana) | MIT | code | Popular generic node workflows with typed handles. It is closer to ComfyUI than Arcads, so it is less relevant. |
 | — | [gl-transitions/gl-transitions](https://github.com/gl-transitions/gl-transitions) | MIT (items MIT, BSD-2, BSD-3) | **submodule** | **Adopted** as the transition catalog's shader bank (`CT-0026`). 125 shaders in our own GLSL contract; 123 usable, 6 reviewed so far. |
-| 9 | [NatronGitHub/Natron](https://github.com/NatronGitHub/Natron) | GPL-2.0 | ideas / external tool | Node-based compositor. It is not a graph-UI candidate. At most, it is an external tool for VFX shots behind an adapter. |
+| 9 | [NatronGitHub/Natron](https://github.com/NatronGitHub/Natron) | GPL-2.0 | external tool | Node-based compositor. It is not a graph-UI candidate. **VFX candidate** behind an adapter, driven headless by `NatronRenderer` (`CT-0031`). Upstream is largely inactive since 2.5. |
+| — | [friction2d/friction](https://github.com/friction2d/friction) | GPL-3.0 | external tool | Vector and raster motion graphics (lower thirds, animated graphics). **Motion-graphics candidate** behind the same adapter (`CT-0031`); headless render not yet verified. |
+| — | [snuq/QuickTitling](https://github.com/snuq/QuickTitling) | GPL-2.0+ | external tool | Blender sequencer addon (v0.6.8, Blender 5.1) that builds title scenes from presets. **Titles candidate**: the user installs it, and Cine Toaster only calls Blender (`CT-0031`). Its preset model is a reference for our composed cards. |
 
 ## SceneFlow and Auteur Script in detail
 

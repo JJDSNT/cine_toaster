@@ -161,6 +161,9 @@ decision, and continue from the committed result without bypassing permissions.
   (`CT-0029` stages 2 and 3), after step 9;
 - locations as entities, then a shared backlot of sets that productions pin
   (`CT-0030`), after step 9;
+- VFX, motion graphics and titles through external tools (Natron, Friction,
+  Blender with QuickTitling) behind one adapter (`CT-0031`), after steps 6
+  and 9;
 - a camera-movement catalog shaped like the transition catalog (`CT-0027`),
   after the blocking frame;
 - a separate project recreating Video Toaster transitions as gl-transitions
