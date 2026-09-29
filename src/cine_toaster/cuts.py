@@ -62,6 +62,13 @@ def _state(motion: ShotMotion | None, at: str) -> dict[str, Any]:
     }
 
 
+def _declared_subjects(shot: dict[str, Any]) -> set[str]:
+    raw = shot.get("subject")
+    if isinstance(raw, (list, tuple)):
+        return {str(item).strip() for item in raw if str(item).strip()}
+    return {part.strip() for part in str(raw or "").split(",") if part.strip()}
+
+
 def _edge_unit(shot: dict[str, Any], last: bool) -> dict[str, Any] | None:
     script = shot.get("script")
     if not script:
@@ -104,7 +111,13 @@ def scene_cuts(
         exit_pose = out.end_pose if out else None
         entry_pose = into.start_pose if into else None
 
-        if exit_pose and entry_pose and cut_type != "jump":
+        # Shots that say whom they are on and name different people are not a
+        # jump, whatever one camera position frames: an insert and a close-up
+        # declared on the same camera are two framings the plan did not model.
+        declared_before, declared_after = _declared_subjects(before), _declared_subjects(after)
+        different_subjects = bool(declared_before and declared_after and not declared_before & declared_after)
+
+        if exit_pose and entry_pose and cut_type != "jump" and not different_subjects:
             exit_angles = {s: a for s, _, a in out.framed(at="end")}
             entry_angles = {s: a for s, _, a in into.framed(at="start")}
             for subject_id in sorted(exit_angles.keys() & entry_angles.keys()):
@@ -122,7 +135,9 @@ def scene_cuts(
                     pair.append(_finding("jump_cut_undeclared", "warning", scene_id, before, after,
                         f"{before['id']} and {after['id']} see {label} from {angle:.0f}° apart with "
                         f"{ratio:.2f}× the framing. Cut together it reads as a jump. Move the camera "
-                        f"at least {JUMP_ANGLE_DEG:.0f}°, change the size, or declare the cut a jump."))
+                        f"at least {JUMP_ANGLE_DEG:.0f}°, change the size, or declare the cut a jump. "
+                        f"If the shots frame different things (an insert), give one its own camera "
+                        f"or declare each shot's subject."))
                     break
 
         if chain == "frame" and exit_pose and entry_pose:

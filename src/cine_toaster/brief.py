@@ -387,13 +387,13 @@ def sceneflow_project(brief: Brief, video: str = "", shot: str | None = None) ->
     }
 
 
-def production_brief(root, scene_id: str) -> tuple[dict[str, Any], Brief] | None:
-    """Load a production and derive one scene's brief, with its looks."""
+def production_brief(root, scene_id: str, production: dict[str, Any] | None = None) -> tuple[dict[str, Any], Brief] | None:
+    """Load a production (unless given) and derive one scene's brief, with its looks."""
 
     from .looks import load_looks
     from .project import load_production
 
-    production = load_production(root)
+    production = production if production is not None else load_production(root)
     scene = next((item for item in production["scenes"] if item["id"] == scene_id), None)
     if scene is None:
         return None

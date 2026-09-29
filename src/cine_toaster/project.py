@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -775,29 +776,92 @@ def _declared_shot_fields(manifest: dict[str, Any]) -> dict[str, str]:
     return declared
 
 
-def _script_path(manifest: dict[str, Any], root: Path) -> str:
-    """The screenplay, if the production points at one that exists."""
+_TITLE_KEY = re.compile(r"^[A-Za-z][A-Za-z ]*:")
+
+
+def screenplay_files(manifest: dict[str, Any], root: Path) -> tuple[list[str], str]:
+    """The screenplay's files in reading order, and what is wrong if none.
+
+    ``paths.script`` may name one file, a directory whose ``.fountain`` files
+    are read in name order (a feature split by act or arc), or an explicit
+    list. Nothing is guessed: a declared path that does not exist, or several
+    undeclared candidates, leave the production without a screenplay and say
+    why, rather than quietly reading a draft or a work file.
+    """
 
     paths = field(manifest, "paths") or {}
-    declared = vtext(paths, "script")
-    if declared and (root / declared).is_file():
-        return declared
-    for candidate in sorted(root.glob("**/*.fountain")):
-        if candidate.is_file():
-            return candidate.relative_to(root).as_posix()
+    declared = field(paths, "script")
+    if isinstance(declared, list):
+        files = [str(item) for item in declared]
+        missing = [item for item in files if not (root / item).is_file()]
+        if missing:
+            return [], f"The declared screenplay files are missing: {', '.join(missing)}."
+        return files, ""
+    if declared:
+        target = root / str(declared)
+        if target.is_file():
+            return [str(declared)], ""
+        if target.is_dir():
+            files = sorted(path for path in target.glob("*.fountain") if path.is_file())
+            if files:
+                return [path.relative_to(root).as_posix() for path in files], ""
+            return [], f"The declared screenplay directory {declared} has no .fountain file."
+        return [], f"The declared screenplay {declared} does not exist."
+    candidates = sorted(path for path in root.glob("**/*.fountain") if path.is_file())
+    if len(candidates) == 1:
+        return [candidates[0].relative_to(root).as_posix()], ""
+    if candidates:
+        return [], (f"{len(candidates)} .fountain files and none declared: set paths.script to the "
+                    f"screenplay (a file, a directory, or a list).")
+    return [], ""
+
+
+def _script_path(manifest: dict[str, Any], root: Path) -> str:
+    """The screenplay as declared (a file or a directory), or the one file found."""
+
+    files, _ = screenplay_files(manifest, root)
+    if not files:
+        return ""
+    declared = field(field(manifest, "paths") or {}, "script")
+    return str(declared) if declared and not isinstance(declared, list) else files[0]
+
+
+def _strip_title_page(text: str) -> str:
+    lines = text.lstrip("\ufeff").splitlines()
+    if not lines or not _TITLE_KEY.match(lines[0]):
+        return text
+    for index, line in enumerate(lines):
+        if not line.strip():
+            return "\n".join(lines[index + 1:])
     return ""
 
 
-def _read_screenplay(root: Path, script_path: str) -> script_model.Screenplay | None:
+def screenplay_text(root: Path, files: list[str]) -> str:
+    """The screenplay as one text: later parts lose their title page."""
+
+    parts = []
+    for index, name in enumerate(files):
+        try:
+            text = (root / name).read_text(encoding="utf-8")
+        except OSError:
+            continue
+        parts.append(text if index == 0 else _strip_title_page(text))
+    return "\n\n".join(part.strip("\n") for part in parts) + ("\n" if parts else "")
+
+
+def _read_screenplay(root: Path, script_path: str | list[str]) -> script_model.Screenplay | None:
     """Parse the production's screenplay once; it is only ever read (ADR 0006)."""
 
     if not script_path:
         return None
-    try:
-        text = (root / script_path).read_text(encoding="utf-8")
-    except OSError:
-        return None
-    return script_model.parse(text)
+    if isinstance(script_path, str):
+        target = root / script_path
+        files = ([p.relative_to(root).as_posix() for p in sorted(target.glob("*.fountain"))]
+                 if target.is_dir() else [script_path])
+    else:
+        files = script_path
+    text = screenplay_text(root, files)
+    return script_model.parse(text) if text.strip() else None
 
 
 def _link_screenplay(
@@ -889,7 +953,8 @@ def load_production(root: Path) -> dict[str, Any]:
 
     declared_fields = _declared_shot_fields(manifest)
     project_look = vtext(manifest, "look")
-    screenplay = _read_screenplay(root, _script_path(manifest, root))
+    script_files, script_problem = screenplay_files(manifest, root)
+    screenplay = _read_screenplay(root, script_files)
     scenes = [
         _load_scene(path, root, declared_fields, project_look, screenplay)
         for path in scene_files(root, manifest)
@@ -907,6 +972,8 @@ def load_production(root: Path) -> dict[str, Any]:
             ]
 
     attention: list[dict[str, Any]] = []
+    if script_problem:
+        attention.append({"kind": "screenplay", "scene_id": "", "scene_title": "", "message": script_problem})
     for scene in scenes:
         for finding in scene["findings"]:
             if finding["severity"] == "error":
@@ -941,6 +1008,8 @@ def load_production(root: Path) -> dict[str, Any]:
         "look": project_look,
         "renders": discover_renders(root),
         "script_path": _script_path(manifest, root),
+        "script_files": script_files,
+        "script_problem": script_problem,
         "looks": {name: look.public_dict() for name, look in load_looks(root).items()},
         "production": production,
         "phases": field(manifest, "phases") or [],
@@ -983,12 +1052,7 @@ def writing_room(root: Path) -> dict[str, Any]:
     root = Path(root).expanduser().resolve()
     production = load_production(root)
 
-    screenplay = ""
-    if production["script_path"]:
-        try:
-            screenplay = (root / production["script_path"]).read_text(encoding="utf-8")
-        except OSError:
-            screenplay = ""
+    screenplay = screenplay_text(root, production["script_files"])
 
     scenes: list[dict[str, Any]] = []
     speakers: dict[str, dict[str, Any]] = {}
@@ -1068,6 +1132,7 @@ def writing_room(root: Path) -> dict[str, Any]:
         "title": production["title"],
         "logline": production["logline"],
         "script_path": production["script_path"],
+        "script_files": production["script_files"],
         "screenplay": screenplay,
         "scenes": scenes,
         "cast": cast,

@@ -46,3 +46,12 @@ test("the same graph always lays out the same way", () => {
   const nodes = [scene("A", 0), shot("A", "P1", 0), take("A", "P1", "T1")];
   assert.deepEqual([...layout(nodes)], [...layout(structuredClone(nodes))]);
 });
+
+test("a long scene wraps onto further lines instead of one endless row", () => {
+  const nodes = [scene("A", 0), ...Array.from({ length: 10 }, (_, i) => shot("A", `P${i + 1}`, i)), scene("B", 1)];
+  const at = layout(nodes, { perRow: 4 });
+  assert.equal(at.get("shot:A/P5")!.x, at.get("shot:A/P1")!.x);
+  assert.ok(at.get("shot:A/P5")!.y > at.get("shot:A/P1")!.y);
+  assert.ok(at.get("shot:A/P9")!.y > at.get("shot:A/P5")!.y);
+  assert.ok(at.get("scene:B")!.y > at.get("shot:A/P9")!.y + SIZES.shot.height);
+});

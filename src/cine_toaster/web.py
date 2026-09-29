@@ -194,6 +194,7 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             if not command_type:
                 raise ValidationError("A command name is required")
             result = dispatch(self.project_root, command_type, payload)
+            forget_production(self.project_root)
         except CineToasterError as error:
             self._send_json(error.public_dict(), HTTPStatus(error.http_status))
             return
@@ -273,7 +274,7 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
 
         if parsed.path == "/api/production":
             try:
-                self._send_json(load_production(self.project_root))
+                self._send_json(cached_production(self.project_root))
             except FileNotFoundError:
                 self._send_json(
                     {"error": "This directory has no project.toml operational manifest"},
@@ -286,7 +287,7 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/scene":
             scene_id = query.get("id", [""])[0]
             try:
-                scene = load_scene(self.project_root, scene_id)
+                scene = self._scene(scene_id)
             except (FileNotFoundError, ProjectFormatError) as error:
                 self._send_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
                 return
@@ -302,7 +303,7 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             from .brief import production_brief, take_review
 
             try:
-                found = production_brief(self.project_root, query.get("scene", [""])[0])
+                found = production_brief(self.project_root, query.get("scene", [""])[0], cached_production(self.project_root))
             except (FileNotFoundError, ProjectFormatError) as error:
                 self._send_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
                 return
@@ -322,10 +323,10 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
 
         if parsed.path == "/api/graph":
             # The production canvas: records as nodes and edges, no positions (plan step 7).
-            from .graph import load_graph
+            from .graph import production_graph
 
             try:
-                self._send_json(load_graph(self.project_root))
+                self._send_json(production_graph(cached_production(self.project_root)))
             except (FileNotFoundError, ProjectFormatError) as error:
                 self._send_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
             return
@@ -334,7 +335,7 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             # The shot as a light animatic, sampled from the blocking frame
             # over its duration (CT-0029). Derived on request, never stored.
             try:
-                scene = load_scene(self.project_root, query.get("scene", [""])[0])
+                scene = self._scene(query.get("scene", [""])[0])
             except (FileNotFoundError, ProjectFormatError) as error:
                 self._send_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
                 return
@@ -354,7 +355,7 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             shot_id = query.get("shot", [""])[0]
             at = query.get("at", ["start"])[0]
             try:
-                scene = load_scene(self.project_root, scene_id)
+                scene = self._scene(scene_id)
             except (FileNotFoundError, ProjectFormatError) as error:
                 self._send_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
                 return
@@ -389,7 +390,7 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
 
         if parsed.path == "/api/findings":
             try:
-                production = load_production(self.project_root)
+                production = cached_production(self.project_root)
             except (FileNotFoundError, ProjectFormatError) as error:
                 self._send_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
                 return
@@ -486,6 +487,10 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
                 server.job_manager = JobManager()  # type: ignore[attr-defined]
         return server.job_manager  # type: ignore[attr-defined]
 
+    def _scene(self, scene_id: str) -> dict | None:
+        production = cached_production(self.project_root)
+        return next((scene for scene in production["scenes"] if scene["id"] == scene_id), None)
+
     def _project_id(self) -> str:
         server = self.server
         if getattr(server, "project_id", None) is None:
@@ -527,6 +532,7 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
                 length = int(self.headers.get("Content-Length", "0") or 0)
                 payload = self._read_json_body() if length else {}
                 job = manager.adopt(job_id, overwrite=bool(payload.get("overwrite")))
+                forget_production(self.project_root)
             else:
                 raise ValidationError(f"Unknown job action {action!r}", available=["cancel", "retry", "adopt"])
             self._send_json(public_job(job))
@@ -556,6 +562,30 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
 
 
 _JOB_MANAGER_LOCK = threading.Lock()
+
+#: How long one loaded production answers requests. A canvas asks for a
+#: hundred thumbnails at once; each used to reload the whole production. A
+#: command clears it at once, and edits made by hand show within this window.
+PRODUCTION_TTL_SECONDS = 2.0
+_PRODUCTION_CACHE: dict[Path, tuple[float, dict]] = {}
+_PRODUCTION_LOCK = threading.Lock()
+
+
+def cached_production(root: Path) -> dict:
+    """The loaded production, shared by a burst of requests (read-only for callers)."""
+
+    with _PRODUCTION_LOCK:
+        entry = _PRODUCTION_CACHE.get(root)
+        if entry and time.monotonic() - entry[0] < PRODUCTION_TTL_SECONDS:
+            return entry[1]
+        production = load_production(root)
+        _PRODUCTION_CACHE[root] = (time.monotonic(), production)
+        return production
+
+
+def forget_production(root: Path) -> None:
+    with _PRODUCTION_LOCK:
+        _PRODUCTION_CACHE.pop(root, None)
 
 
 def serve_project(

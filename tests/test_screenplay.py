@@ -195,6 +195,55 @@ class ProjectTests(unittest.TestCase):
         self.assertEqual(codes_of(scene), ["dialogue_uncovered", "dialogue_uncovered"])
 
 
+class ScreenplayFilesTests(unittest.TestCase):
+    """A feature split by act or arc is one screenplay; nothing is guessed (CT-0035)."""
+
+    def project(self, script_line: str, files: dict[str, str]) -> Path:
+        directory = Path(tempfile.mkdtemp())
+        (directory / "project.yaml").write_text(f"id: t\ntitle: T\npaths:\n  scenes: scenes\n{script_line}")
+        (directory / "scenes").mkdir()
+        for name, text in files.items():
+            (directory / name).parent.mkdir(parents=True, exist_ok=True)
+            (directory / name).write_text(text)
+        return directory
+
+    ARC_I = "Title: FILM\nAuthor: A\n\nINT. ONE - DAY\n\nFirst.\n"
+    ARC_II = "Title: FILM\nSource: arc two\n\nINT. TWO - DAY\n\nSecond.\n"
+
+    def test_a_directory_reads_its_files_in_order_as_one_screenplay(self) -> None:
+        root = self.project("  script: story\n", {"story/Arc-II.fountain": self.ARC_II, "story/Arc-I.fountain": self.ARC_I,
+                                                   "work/draft.fountain": "INT. DRAFT - DAY\n"})
+        production = load_production(root)
+        self.assertEqual(production["script_files"], ["story/Arc-I.fountain", "story/Arc-II.fountain"])
+        from cine_toaster.project import _read_screenplay
+        play = _read_screenplay(root, production["script_files"])
+        self.assertEqual([scene.heading for scene in play.scenes], ["INT. ONE - DAY", "INT. TWO - DAY"])
+        self.assertEqual(play.title, "FILM")
+        # The second arc's title page is not read as action.
+        self.assertNotIn("Source", " ".join(unit.text for scene in play.scenes for unit in scene.units))
+
+    def test_an_explicit_list_sets_the_order(self) -> None:
+        root = self.project("  script: [b.fountain, a.fountain]\n", {"a.fountain": self.ARC_II, "b.fountain": self.ARC_I})
+        self.assertEqual(load_production(root)["script_files"], ["b.fountain", "a.fountain"])
+
+    def test_a_missing_declared_screenplay_is_reported_not_replaced(self) -> None:
+        root = self.project("  script: story/v4\n", {"work/draft.fountain": self.ARC_I})
+        production = load_production(root)
+        self.assertEqual(production["script_files"], [])
+        self.assertIn("does not exist", production["script_problem"])
+        self.assertIn("screenplay", [item["kind"] for item in production["attention"]])
+
+    def test_several_undeclared_candidates_are_not_guessed(self) -> None:
+        root = self.project("", {"a.fountain": self.ARC_I, "b/c.fountain": self.ARC_II})
+        production = load_production(root)
+        self.assertEqual(production["script_files"], [])
+        self.assertIn("none declared", production["script_problem"])
+
+    def test_a_single_undeclared_screenplay_is_still_found(self) -> None:
+        root = self.project("", {"story/film.fountain": self.ARC_I})
+        self.assertEqual(load_production(root)["script_files"], ["story/film.fountain"])
+
+
 def codes_of(scene):
     return [finding["code"] for finding in scene["findings"]]
 

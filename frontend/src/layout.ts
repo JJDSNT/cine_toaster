@@ -23,7 +23,16 @@ export interface Position {
   y: number;
 }
 
-export function layout(nodes: GraphNode[], options: { takes: boolean } = { takes: true }): Map<string, Position> {
+export interface LayoutOptions {
+  takes: boolean;
+  /** Shots per line before a long scene wraps onto the next one. */
+  perRow: number;
+}
+
+export const DEFAULT_OPTIONS: LayoutOptions = { takes: true, perRow: 8 };
+
+export function layout(nodes: GraphNode[], options: Partial<LayoutOptions> = {}): Map<string, Position> {
+  const { takes: showTakes, perRow } = { ...DEFAULT_OPTIONS, ...options };
   const positions = new Map<string, Position>();
   const scenes = nodes
     .filter((node) => node.type === "scene")
@@ -35,24 +44,30 @@ export function layout(nodes: GraphNode[], options: { takes: boolean } = { takes
     const shots = nodes
       .filter((node) => node.type === "shot" && node.scene === scene.scene)
       .sort((a, b) => (a.type === "shot" && b.type === "shot" ? a.data.order - b.data.order : 0));
-    let deepest = 0;
-    shots.forEach((shot, index) => {
-      const x = SIZES.header.width + SIZES.gap + index * (SIZES.shot.width + SIZES.gap);
-      positions.set(shot.id, { x, y });
-      if (!options.takes || shot.type !== "shot") return;
-      const takes = nodes.filter(
-        (node) => node.type === "take" && node.scene === scene.scene && node.data.shot === shot.data.shot,
-      );
-      takes.forEach((take, row) => {
-        positions.set(take.id, {
-          x: x + (SIZES.shot.width - SIZES.take.width) / 2,
-          y: y + SIZES.shot.height + SIZES.takeGap + row * SIZES.takeStep,
+    // A long scene wraps: each line is as tall as its deepest stack of takes.
+    let lineTop = y;
+    for (let start = 0; start < Math.max(shots.length, 1); start += perRow) {
+      const line = shots.slice(start, start + perRow);
+      let deepest = 0;
+      line.forEach((shot, column) => {
+        const x = SIZES.header.width + SIZES.gap + column * (SIZES.shot.width + SIZES.gap);
+        positions.set(shot.id, { x, y: lineTop });
+        if (!showTakes || shot.type !== "shot") return;
+        const takes = nodes.filter(
+          (node) => node.type === "take" && node.scene === scene.scene && node.data.shot === shot.data.shot,
+        );
+        takes.forEach((take, row) => {
+          positions.set(take.id, {
+            x: x + (SIZES.shot.width - SIZES.take.width) / 2,
+            y: lineTop + SIZES.shot.height + SIZES.takeGap + row * SIZES.takeStep,
+          });
         });
+        deepest = Math.max(deepest, takes.length);
       });
-      deepest = Math.max(deepest, takes.length);
-    });
-    const takesDepth = deepest ? SIZES.takeGap + (deepest - 1) * SIZES.takeStep + SIZES.take.height : 0;
-    y += Math.max(SIZES.header.height, SIZES.shot.height + takesDepth) + SIZES.rowGap;
+      const takesDepth = deepest ? SIZES.takeGap + (deepest - 1) * SIZES.takeStep + SIZES.take.height : 0;
+      lineTop += SIZES.shot.height + takesDepth + SIZES.gap;
+    }
+    y = Math.max(y + SIZES.header.height, lineTop - SIZES.gap) + SIZES.rowGap;
   }
   return positions;
 }

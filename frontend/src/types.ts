@@ -68,8 +68,14 @@ export type GraphEdge =
   | { id: string; type: "take"; source: string; target: string; data: { selected: boolean } }
   | { id: string; type: "scene-order"; source: string; target: string; data: Record<string, never> };
 
+export interface Sequence {
+  id: string;
+  label: string;
+  scenes: string[];
+}
+
 export interface ProductionGraph {
-  production: { id: string; title: string };
+  production: { id: string; title: string; active_scene: string; sequences: Sequence[] };
   nodes: GraphNode[];
   edges: GraphEdge[];
 }

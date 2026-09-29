@@ -139,8 +139,18 @@ def production_graph(production: dict[str, Any]) -> dict[str, Any]:
         if shot_nodes:
             previous_last, previous_scene = shot_nodes[-1], scene["id"]
 
+    active = production.get("active_scene") or {}
     return {
-        "production": {"id": production["id"], "title": production["title"]},
+        "production": {
+            "id": production["id"],
+            "title": production["title"],
+            "active_scene": active.get("id") if isinstance(active, dict) else "",
+            "sequences": [
+                {"id": item["id"], "label": item.get("label") or item["id"], "scenes": list(item.get("scene_ids") or [])}
+                for item in production.get("sequences") or []
+                if item["id"] != "unassigned" and item.get("scene_ids")
+            ],
+        },
         "nodes": nodes,
         "edges": edges,
     }

@@ -66,6 +66,12 @@ class CheckTests(unittest.TestCase):
         _, findings = run([{"id": "P1", "camera": "FRONT"}, {"id": "P2", "camera": "FRONT-NUDGE"}])
         self.assertEqual(codes(findings), ["jump_cut_undeclared"])
 
+    def test_shots_on_different_declared_subjects_are_not_a_jump(self):
+        shots = [{"id": "P1", "camera": "FRONT", "subject": "LAMP"}, {"id": "P2", "camera": "FRONT-NUDGE", "subject": "A"}]
+        self.assertEqual(run(shots)[1], [])
+        same = [{"id": "P1", "camera": "FRONT", "subject": "A"}, {"id": "P2", "camera": "FRONT-NUDGE", "subject": "A"}]
+        self.assertEqual(codes(run(same)[1]), ["jump_cut_undeclared"])
+
     def test_declared_jump_passes(self):
         _, findings = run([{"id": "P1", "camera": "FRONT"}, {"id": "P2", "camera": "FRONT-NUDGE", "cut": {"type": "jump"}}])
         self.assertEqual(findings, [])

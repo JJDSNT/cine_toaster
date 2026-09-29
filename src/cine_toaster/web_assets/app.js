@@ -1224,7 +1224,12 @@ async function renderScript() {
 
   if (data.screenplay) {
     const panel = el("section", "panel wide-panel");
-    panel.append(sectionHeading("SCREENPLAY", data.script_path, "The authored file, as written."));
+    const files = data.script_files || [];
+    panel.append(sectionHeading(
+      "SCREENPLAY",
+      data.script_path,
+      files.length > 1 ? `${files.length} authored files, read in order as one screenplay.` : "The authored file, as written.",
+    ));
     const page = el("pre", "screenplay-page");
     page.textContent = data.screenplay;
     panel.append(page);

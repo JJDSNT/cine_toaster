@@ -10,8 +10,32 @@ import type { GraphEdge, GraphNode, ProductionGraph } from "./types.ts";
 
 type Selection = { kind: "node"; node: GraphNode } | { kind: "edge"; edge: GraphEdge } | null;
 
-function toFlow(graph: ProductionGraph, showTakes: boolean): { nodes: Node[]; edges: Edge[] } {
-  const visible = graph.nodes.filter((node) => showTakes || node.type !== "take");
+/** The films this view shows: everything, one sequence, or one scene. */
+type Focus = { kind: "all" } | { kind: "sequence"; id: string } | { kind: "scene"; id: string };
+
+const LARGE = 60;
+
+function scenesIn(graph: ProductionGraph, focus: Focus): Set<string> | null {
+  if (focus.kind === "all") return null;
+  if (focus.kind === "scene") return new Set([focus.id]);
+  return new Set(graph.production.sequences.find((item) => item.id === focus.id)?.scenes ?? []);
+}
+
+/** A large film opens on the sequence being worked on, not on everything at once. */
+function initialFocus(graph: ProductionGraph): Focus {
+  const shots = graph.nodes.filter((node) => node.type === "shot").length;
+  if (shots <= LARGE) return { kind: "all" };
+  const active = graph.production.active_scene;
+  const sequence = graph.production.sequences.find((item) => item.scenes.includes(active));
+  if (sequence) return { kind: "sequence", id: sequence.id };
+  const first = graph.nodes.find((node) => node.type === "scene");
+  return first ? { kind: "scene", id: first.scene } : { kind: "all" };
+}
+
+function toFlow(graph: ProductionGraph, showTakes: boolean, focus: Focus): { nodes: Node[]; edges: Edge[] } {
+  const only = scenesIn(graph, focus);
+  const visible = graph.nodes.filter((node) => (showTakes || node.type !== "take") && (!only || only.has(node.scene)));
+  const shown = new Set(visible.map((node) => node.id));
   const positions = layout(visible, { takes: showTakes });
   const nodes: Node[] = visible.map((node) => ({
     id: node.id,
@@ -20,7 +44,7 @@ function toFlow(graph: ProductionGraph, showTakes: boolean): { nodes: Node[]; ed
     data: node.data as unknown as Record<string, unknown>,
   }));
   const edges: Edge[] = graph.edges
-    .filter((edge) => showTakes || edge.type !== "take")
+    .filter((edge) => (showTakes || edge.type !== "take") && shown.has(edge.source) && shown.has(edge.target))
     .map((edge) => {
       if (edge.type === "cut") {
         return { id: edge.id, source: edge.source, target: edge.target, type: "cut", data: edge.data as unknown as Record<string, unknown> };
@@ -105,11 +129,16 @@ export function App() {
   const [error, setError] = useState("");
   const [showTakes, setShowTakes] = useState(true);
   const [selection, setSelection] = useState<Selection>(null);
+  const [focus, setFocus] = useState<Focus | null>(null);
 
   const load = useCallback(() => {
     fetch("/api/graph")
       .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
-      .then((value: ProductionGraph) => { setGraph(value); setError(""); })
+      .then((value: ProductionGraph) => {
+        setGraph(value);
+        setFocus((current) => current ?? initialFocus(value));
+        setError("");
+      })
       .catch((reason: Error) => setError(reason.message));
   }, []);
 
@@ -127,7 +156,26 @@ export function App() {
     return () => source.close();
   }, [load]);
 
-  const flow = useMemo(() => (graph ? toFlow(graph, showTakes) : { nodes: [], edges: [] }), [graph, showTakes]);
+  const flow = useMemo(
+    () => (graph && focus ? toFlow(graph, showTakes, focus) : { nodes: [], edges: [] }),
+    [graph, showTakes, focus],
+  );
+  // Open on the first scene in view, readable, rather than shrinking a whole
+  // sequence until nothing on it can be read.
+  const firstScene = useMemo(() => {
+    const scene = flow.nodes.find((node) => node.type === "scene");
+    if (!scene) return undefined;
+    const sceneId = (scene.data as { scene: string }).scene;
+    return flow.nodes
+      .filter((node) => (node.data as { scene?: string }).scene === sceneId && node.type !== "take")
+      .map((node) => ({ id: node.id }));
+  }, [flow.nodes]);
+  const focusValue = !focus || focus.kind === "all" ? "all" : `${focus.kind}:${focus.id}`;
+  const chooseFocus = (value: string) => {
+    const [kind, ...rest] = value.split(":");
+    setFocus(kind === "all" ? { kind: "all" } : { kind: kind as "sequence" | "scene", id: rest.join(":") });
+    setSelection(null);
+  };
 
   const onNodeClick: NodeMouseHandler = (_, node) => {
     const found = graph?.nodes.find((item) => item.id === node.id);
@@ -146,6 +194,21 @@ export function App() {
           <span className="eyebrow">Production canvas · read only</span>
           <h1>{graph?.production.title ?? "…"}</h1>
         </div>
+        {graph && (
+          <select className="focus" value={focusValue} onChange={(e) => chooseFocus(e.target.value)} aria-label="Show">
+            <option value="all">Whole film · {graph.nodes.filter((n) => n.type === "shot").length} shots</option>
+            {graph.production.sequences.length > 0 && (
+              <optgroup label="Sequence">
+                {graph.production.sequences.map((item) => <option key={item.id} value={`sequence:${item.id}`}>{item.label}</option>)}
+              </optgroup>
+            )}
+            <optgroup label="Scene">
+              {graph.nodes.filter((n) => n.type === "scene").map((n) => (
+                <option key={n.id} value={`scene:${n.scene}`}>{n.scene} · {n.type === "scene" ? n.data.title : ""}</option>
+              ))}
+            </optgroup>
+          </select>
+        )}
         <label className="toggle"><input type="checkbox" checked={showTakes} onChange={(e) => setShowTakes(e.target.checked)} /> Takes</label>
       </header>
       {error && <p className="error">Could not read the production: {error}</p>}
@@ -162,8 +225,11 @@ export function App() {
             onNodeClick={onNodeClick}
             onEdgeClick={onEdgeClick}
             onPaneClick={() => setSelection(null)}
+            key={focusValue}
             fitView
-            minZoom={0.2}
+            fitViewOptions={{ maxZoom: 1, minZoom: 0.3, nodes: firstScene }}
+            onlyRenderVisibleElements
+            minZoom={0.05}
             proOptions={{ hideAttribution: false }}
           >
             <Background gap={24} />

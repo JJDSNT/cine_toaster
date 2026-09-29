@@ -565,12 +565,13 @@ def command_fdx(args: argparse.Namespace) -> int:
         print(f"Wrote {args.output}")
     else:
         production = load_production(args.project)
+        from .project import screenplay_text
+
         script_path = production.get("script_path")
-        if not script_path:
-            print("This production has no screenplay to export.", file=sys.stderr)
+        if not production.get("script_files"):
+            print(production.get("script_problem") or "This production has no screenplay to export.", file=sys.stderr)
             return 1
-        source = Path(args.project).expanduser().resolve() / script_path
-        result = export_fdx(source.read_text(encoding="utf-8"))
+        result = export_fdx(screenplay_text(Path(args.project).expanduser().resolve(), production["script_files"]))
         args.output.write_text(result.text, encoding="utf-8")
         print(f"Wrote {args.output} from {script_path} (derived; never edit it as the screenplay)")
     print(result.report())
@@ -613,7 +614,7 @@ def command_script(args: argparse.Namespace) -> int:
                 print(f"  (uncovered) {unit['speaker']}: {unit['text']}")
         return 0
 
-    screenplay = _read_screenplay(Path(args.project).expanduser().resolve(), production["script_path"])
+    screenplay = _read_screenplay(Path(args.project).expanduser().resolve(), production["script_files"])
     if screenplay is None:
         print("This production has no screenplay to link to.")
         return 1

@@ -9,7 +9,8 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .shell { height: 100vh; display: grid; grid-template-rows: auto 1fr; }
 header { display: flex; align-items: center; gap: 20px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
 header h1 { margin: 0; font-size: 18px; }
-header .toggle { margin-left: auto; color: var(--muted); }
+header .focus { margin-left: auto; background: var(--card); color: var(--ink); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; max-width: 320px; }
+header .toggle { color: var(--muted); }
 .back { color: var(--muted); text-decoration: none; }
 .eyebrow { display: block; font: 700 10px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 main { display: grid; grid-template-columns: 1fr 320px; min-height: 0; }

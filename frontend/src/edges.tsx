@@ -1,4 +1,4 @@
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, type Edge, type EdgeProps } from "@xyflow/react";
+import { BaseEdge, EdgeLabelRenderer, getBezierPath, getSmoothStepPath, type Edge, type EdgeProps } from "@xyflow/react";
 import type { CutData } from "./types.ts";
 
 export type CutEdge = Edge<CutData & Record<string, unknown>, "cut">;
@@ -12,7 +12,12 @@ export const CUT_NAMES: Record<string, string> = {
 // through, and whether the checks found anything wrong with it (SPEC-0007).
 export function CutLine(props: EdgeProps<CutEdge>) {
   const { data, selected } = props;
-  const [path, labelX, labelY] = getBezierPath(props);
+  // A cut that wraps to the next line steps down under the cards instead of
+  // cutting diagonally across them.
+  const wraps = props.targetX < props.sourceX;
+  const [path, labelX, labelY] = wraps
+    ? getSmoothStepPath({ ...props, offset: 24, borderRadius: 12 })
+    : getBezierPath(props);
   const severity = data?.severity || "";
   return (
     <>
