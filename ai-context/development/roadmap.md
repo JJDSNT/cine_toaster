@@ -153,6 +153,10 @@ decision, and continue from the committed result without bypassing permissions.
 
 ## Later evaluation
 
+- a camera-movement catalog shaped like the transition catalog (`CT-0027`),
+  after the blocking frame;
+- a separate project recreating Video Toaster transitions as gl-transitions
+  shaders (`CT-0028`);
 - Okay Wannabe's production-stage UI (`CT-0020`). The node editor is now
   steps 5, 7, and 10 of the ordered plan;
 - ComfyUI local and remote generation adapters;

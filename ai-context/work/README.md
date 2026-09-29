@@ -42,6 +42,10 @@ execution history and links to those destinations.
 The order of work is the ordered plan in
 [`development/roadmap.md`](../development/roadmap.md).
 
+- `CT-0028` — separate project: Video Toaster-style transitions as
+  gl-transitions shaders, recreated from observation (`ready`)
+- `CT-0027` — camera-movement catalog, shaped like the transition catalog;
+  after the blocking frame (`ready`)
 - `CT-0025` — storyboard fidelity levels; computed blocking frame first
   (`ready`)
 - `CT-0024` — spike: node canvases in the reference repositories and Arcads
