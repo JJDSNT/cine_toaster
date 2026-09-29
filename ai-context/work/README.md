@@ -42,6 +42,10 @@ execution history and links to those destinations.
 The order of work is the ordered plan in
 [`development/roadmap.md`](../development/roadmap.md).
 
+- `CT-0035` — validation on SINGULAR: seven problems the demos missed,
+  including the screenplay path, legacy fields, jump false positives,
+  continuation, and canvas scale and speed (`ready`)
+
 - `CT-0031` — VFX, motion graphics and titles through external tools
   (Natron, Friction, Blender + QuickTitling) (`ready`)
 - `CT-0030` — backlot: locations as entities, shared sets that productions
