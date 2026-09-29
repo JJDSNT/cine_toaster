@@ -153,6 +153,9 @@ decision, and continue from the committed result without bypassing permissions.
 
 ## Later evaluation
 
+- the blocking frame's recorded limits (`CT-0025` To do item 5): subject kind
+  and size, facing, height changes, set pieces, in-between frames, and camera
+  roll, sensor and aspect;
 - a camera-movement catalog shaped like the transition catalog (`CT-0027`),
   after the blocking frame;
 - a separate project recreating Video Toaster transitions as gl-transitions

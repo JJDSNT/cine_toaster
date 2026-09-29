@@ -79,6 +79,24 @@ otherwise depend on prompt wording.
    image from the blocking frame plus cast and look references, and record
    the adherence of each result against the frame.
 
+5. **Revisit the blocking frame's limits** (recorded 2026-09-29 at the
+   user's request). Most need schema fields, so they wait for a real shot
+   that the frame gets wrong:
+   - every subject is drawn as a person, including the speaker stack. A
+     subject `kind` (person, object) and a size would fix it;
+   - silhouettes always face the camera. Subjects have no facing direction,
+     although eyelines imply one;
+   - a subject's height is fixed for the scene, so standing up or sitting down
+     inside a shot cannot be shown;
+   - the set is an empty box: no furniture, doors, windows or occluders, so
+     nothing can hide a subject;
+   - only the start and end are drawn, not the move between them;
+   - camera: no roll or dutch angle, no lens distortion, no depth of field,
+     and a 16:9 full-frame sensor is assumed; there is no per-production
+     aspect ratio or sensor;
+   - heights default to 1.5 m for the camera and 1.6 m for eyes when the plan
+     omits them. The caption says "assumed", but no check reports it.
+
 # Decisions
 
 - The blocking frame is computed, not generated. It is the cheapest level,
@@ -106,11 +124,7 @@ otherwise depend on prompt wording.
 - In the scene room, selecting a shot chip in the blockout shows its start
   and end frames (a single frame when nothing moves).
 
-Known limits:
-
-- every subject is drawn as a person; the speaker stack is too. A subject
-  `kind` or size would fix it and belongs to the schema;
-- no lens distortion, depth of field, or vertical framing beyond tilt.
+Known limits (to revisit; listed in To do item 5).
 
 # Validation
 
