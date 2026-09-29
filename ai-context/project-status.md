@@ -167,8 +167,8 @@ they match SINGULAR's own slicing on all six blocks. The working order is in CT-
 and cost, LTX rules as knowledge, and sequence versions are done. What
 remains:
 
-- SINGULAR geometry and screenplay links (the production's decisions, held
-  for the user);
+- SINGULAR's direction and production decisions are recorded in its own
+  `docs/SINGULAR-CINE-TOASTER.md`, to take up when the user returns to it;
 - voice direction (CT-0040);
 - the generation adapter, which needs a spending budget from the user.
 

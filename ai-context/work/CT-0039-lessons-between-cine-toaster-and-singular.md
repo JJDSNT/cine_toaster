@@ -132,6 +132,16 @@ priority order below.
     re-encode them.
   - Tests: a built-in profile test; the coverage test now counts built-in
     claims. Full suite: 383 OK.
+- **Geometry names fixed.** SINGULAR's plans already name their people
+  (`{nome: Claire, rotulo: esquerda}`). Cine Toaster was reading the
+  screen-side note as the name; the person's name now wins, and findings
+  speak of Kael and Claire.
+- **The user chose to keep production decisions in SINGULAR's own folder**
+  while focusing on direction and production. They are recorded in
+  `singular/docs/SINGULAR-CINE-TOASTER.md` (committed in its git), with a
+  pointer from `SINGULAR-PROXIMOS-PASSOS.md`. The list covers screen flips,
+  jump cuts, continuations, missing geography, screenplay links, Kael's
+  voice, the endpoint token, and media backup.
 - **Item 4 (SINGULAR geometry with cast subjects; generators writing screenplay
   links) is held for the user.** Placing cameras and characters and saying
   what each shot films are creative and editorial decisions of the
