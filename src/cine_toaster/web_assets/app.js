@@ -1764,6 +1764,9 @@ async function renderJobs(open = false) {
           await jobAction(`/api/jobs/${job.id}/adopt`, { overwrite: true }).catch((again) => alert(again.message));
         }
         renderJobs(true);
+        // Adoption changed the production (a new render, perhaps a new
+        // version): refresh now rather than waiting for the event stream.
+        refreshFromEvent({ type: "job.adopted" }).catch(() => {});
       }, "blockout-chip");
       actions.append(adopt);
     }
@@ -1812,6 +1815,7 @@ async function start() {
   updateChrome();
   startEventStream();
   renderJobs().catch(() => {});
+  document.addEventListener("jobs-changed", () => renderJobs(true).catch(() => {}));
   const parameters = new URLSearchParams(window.location.search);
   const requestedTransition = parameters.get("transition");
   if (requestedTransition && state.transitions.some((item) => item.id === requestedTransition)) {

@@ -22,7 +22,7 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -175,6 +175,9 @@ class JobKind:
     name: str
     validate: Callable[[Path, dict[str, Any]], dict[str, Any]]
     run: Callable[["JobContext"], dict[str, Any]]
+    #: Called after the staged files are placed: a kind that produces a
+    #: production record (an assembly version) registers it here.
+    adopted: Callable[[dict[str, Any], list[str]], None] | None = None
 
 
 KINDS: dict[str, JobKind] = {}
@@ -479,6 +482,9 @@ class JobManager:
             shutil.copy2(source, temporary)
             os.replace(temporary, target)
             placed.append(str(target))
+        hook = KINDS[job["kind"]].adopted if job["kind"] in KINDS else None
+        if hook:
+            hook(job, placed)
         self.store.update(job_id, adopted_at=_now(), message=f"Adopted: {', '.join(placed)}")
         job = self.get(job_id)
         self._event(job, "job.adopted", files=placed)
@@ -571,3 +577,73 @@ def _run_build(context: JobContext) -> dict[str, Any]:
 
 register(JobKind("previs", _validate_previs, _run_previs))
 register(JobKind("build", _validate_build, _run_build))
+
+
+def _next_version(root: Path, scene_id: str) -> str:
+    from .project import load_scene
+
+    scene = load_scene(root, scene_id) or {}
+    taken = {item["id"] for item in scene.get("assemblies") or []}
+    number = 1
+    while f"v{number}" in taken:
+        number += 1
+    return f"v{number}"
+
+
+def _validate_assemble(root: Path, params: dict[str, Any]) -> dict[str, Any]:
+    from .assembly import plan_scene
+    from .project import load_scene
+
+    scene_id = str(params.get("scene", "")).strip()
+    scene = load_scene(root, scene_id) if scene_id else None
+    if scene is None:
+        raise ValidationError(f"No scene {scene_id!r}")
+    plan_scene(root, scene)  # refuse up front a scene with nothing to assemble
+    version = str(params.get("version") or "").strip() or _next_version(root, scene_id)
+    if any(item["id"] == version for item in scene.get("assemblies") or []):
+        raise ValidationError(f"{scene_id} already has a version {version!r}")
+    return {"scene": scene_id, "version": version, "summary": str(params.get("summary") or "")}
+
+
+def _run_assemble(context: JobContext) -> dict[str, Any]:
+    from .assembly import plan_scene, render
+    from .project import load_scene
+
+    scene = load_scene(context.project_root, context.params["scene"])
+    plan = plan_scene(context.project_root, scene)
+    context.progress(0.01, f"{len(plan.segments)} shots")
+    output = context.staging / "assembly.mp4"
+    render(context.project_root, plan, output, context.staging / "work", context.run_process)
+    shutil.rmtree(context.staging / "work", ignore_errors=True)
+    scene_id, version = context.params["scene"], context.params["version"]
+    return {
+        "files": [{"staged": "assembly.mp4", "destination": f"renders/assemblies/{scene_id}/{version}.mp4"}],
+        "summary": {"segments": [asdict(segment) for segment in plan.segments], "notes": plan.notes,
+                    "duration_seconds": plan.duration, "takes": plan.takes},
+    }
+
+
+def _adopted_assemble(job: dict[str, Any], placed: list[str]) -> None:
+    """An adopted assembly is a new version of the scene, with the takes it used."""
+
+    from .commands import Actor, record_assembly
+
+    root = Path(job["project_root"])
+    summary = job["result"]["summary"]
+    media = Path(placed[0]).resolve().relative_to(root.resolve()).as_posix()
+    notes = "; ".join(summary["notes"])
+    record_assembly(
+        root,
+        scene_id=job["params"]["scene"],
+        assembly_id=job["params"]["version"],
+        actor=Actor(id="assembly-job", kind="system"),
+        media=media,
+        summary=(job["params"].get("summary") or f"Assembled from the selected takes (job {job['id']})")
+        + (f". Not rendered: {notes}" if notes else ""),
+        duration_seconds=summary["duration_seconds"],
+        takes=summary["takes"],
+    )
+
+
+register(JobKind("assemble", _validate_assemble, _run_assemble, _adopted_assemble))
+

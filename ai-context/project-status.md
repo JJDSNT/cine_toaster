@@ -160,8 +160,14 @@ previs and build as jobs, cancel, reconcile, retry, adopt, jobs tray). Step 7
 is done: React 19 + Vite + React Flow (ADR 0015), with a read-only production
 canvas at `/canvas/`. Step 8 is done: the screenplay editor (ADR 0016, amending ADR 0006) at
 `/app/script.html`. SINGULAR was validated read-only (CT-0035), and several
-fixes and a SPEC-0007 amendment (continuation) came from it. The next action
-is step 9: the generation-unit decision, then the first generation adapter.
+fixes and a SPEC-0007 amendment (continuation) came from it. The flow is framed in two phases (`production-flow.md`): fitting the
+screenplay and storyboard, then producing what was defined, with versions.
+Scene assembly from the chosen takes now makes kept versions (CT-0038). The
+next actions, in order:
+
+- slicing existing block clips into per-shot takes (CT-0037), at no cost;
+- sequence assembly;
+- the generation adapter, which needs a spending budget from the user.
 
 Earlier notes:
 

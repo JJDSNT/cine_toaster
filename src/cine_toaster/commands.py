@@ -302,8 +302,13 @@ def record_assembly(
     summary: str = "",
     duration_seconds: float = 0.0,
     expected_revision: int | None = None,
+    takes: dict[str, str] | None = None,
 ) -> CommandResult:
     """Register a rendered version of the scene, with the takes it contains.
+
+    ``takes`` is the snapshot when the caller knows exactly which take of each
+    shot the render used (an assembly job does); otherwise the scene's
+    committed selections are taken.
 
     The snapshot is the point. Without it, "v10 was better" is a memory; with
     it, v10 is a set of selections that can be restored in one command.
@@ -340,7 +345,7 @@ def record_assembly(
         summary=summary.strip(),
         duration_seconds=float(duration_seconds or 0),
         revision=state.revision,
-        takes={
+        takes=dict(takes) if takes is not None else {
             shot_id: selection.take_id for shot_id, selection in state.selections.items()
         },
     )

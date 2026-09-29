@@ -3,6 +3,7 @@
 Before changing architecture, the project model, persistence, jobs, agents, or
 external integrations, read:
 
+- `ai-context/production-flow.md` (the two phases the product serves)
 - `ai-context/architecture.md`
 - `ai-context/project-model.md`
 - `ai-context/agent-architecture.md`

@@ -1,0 +1,52 @@
+---
+id: CTX-PRODUCTION-FLOW
+title: The production flow — two phases
+type: context
+status: active
+owner: project
+created_at: 2026-09-29
+updated_at: 2026-09-29
+tags:
+  - product
+  - flow
+  - phases
+---
+
+# Two phases
+
+Stated by the user on 2026-09-29. The flow is **screenplay → storyboard →
+blockouts → master images → clips → sequences**, in two phases of different
+character.
+
+## Phase 1 — fitting the screenplay and the storyboard together
+
+Iterative and cheap. The screenplay and the storyboard are adjusted against
+each other until what will be shot is defined.
+
+| Step | What exists | Where |
+| --- | --- | --- |
+| Screenplay | Fountain, FDX import/export, the editor (byte for byte, revision-checked) | ADR 0014, ADR 0016, `/app/script.html` |
+| Screenplay ↔ shots | Each shot covers screenplay text; findings for lines no shot films and anchors that broke | SPEC-0006, `toast script link` |
+| Storyboard | Shots and their cuts; the canvas; the brief | SPEC-0007, `/app/`, `toast brief` |
+| Blockouts | Scene geometry and movement; blocking frame; light previs | SPEC-0005, CT-0025, CT-0029 |
+
+Nothing in phase 1 costs money or waits on a model.
+
+## Phase 2 — producing what was defined
+
+Costly and versioned. Every result is kept, and the person chooses between
+versions.
+
+| Step | What exists | What is missing |
+| --- | --- | --- |
+| Master images | Discovered stills; the storyboard's best picture per shot | Generating them from blocking frame, cast and look (CT-0025 step 4, SPEC-0003) |
+| Clips | Takes per shot, as versions (`c02.mp4`, `_takes/`, `_rejected/`); `select_take`; comparison | Generation in blocks (CT-0037), content-based slicing into per-shot takes, and a generation adapter |
+| Cuts and scene assembly | Cut records; **scene assembly from the chosen takes as kept versions** (`toast assemble`, versions panel); verdicts; restore | Transitions and J/L cuts in the assembly; speech-aware trims |
+| Sequences | Sequences declared in the manifest | Sequence assembly from approved scene versions, as versions |
+
+## The gate between them
+
+Moving a scene from phase 1 to phase 2 is a decision: the storyboard is
+approved as what will be produced. It belongs in the production record, as a
+human gate (architecture invariant), not in chat. It is not modelled yet. It
+is the natural first step of the built-in workflow (plan step 10).

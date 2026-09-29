@@ -125,13 +125,35 @@ export function renderVersions(scene, { onChanged }) {
     ),
   );
 
+  // A new version is assembled in the background from the takes chosen now,
+  // and becomes a version when its result is adopted from the jobs tray.
+  const assemble = button("Assemble a new version from the chosen takes", async () => {
+    assemble.disabled = true;
+    try {
+      const response = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "assemble", params: { scene: scene.id } }),
+      });
+      const job = await response.json();
+      if (!response.ok) throw new Error(job.error?.message || `HTTP ${response.status}`);
+      toast(`Assembling ${job.params.version}. Adopt it from the jobs tray when it is ready.`, "good");
+      document.dispatchEvent(new CustomEvent("jobs-changed"));
+    } catch (error) {
+      toast(error.message, "bad");
+    } finally {
+      assemble.disabled = false;
+    }
+  }, "quiet-button");
+  panel.append(assemble);
+
   if (!assemblies.length) {
     panel.append(
       el(
         "p",
         "empty-state",
-        "No versions recorded. Register one with: toast version record <project> " +
-          `${scene.id} v1 --media <path> --summary "what changed"`,
+        "No versions yet. Assemble one above, or register a render made elsewhere with: " +
+          `toast version record <project> ${scene.id} v1 --media <path> --summary "what changed"`,
       ),
     );
     return panel;

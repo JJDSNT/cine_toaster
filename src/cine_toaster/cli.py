@@ -348,6 +348,32 @@ def command_build(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_assemble(args: argparse.Namespace) -> int:
+    """Assemble a new version of a scene from its selected takes, as a job."""
+
+    from .jobs import JobManager
+
+    manager = JobManager()
+    try:
+        job = manager.submit("assemble", args.project, {"scene": args.scene, "version": args.version or "",
+                                                        "summary": args.summary or ""})
+        job = manager.wait(job["id"])
+        if job["state"] != "succeeded":
+            print(f"assemble {job['state']}: {job.get('error') or job['message']}  (job {job['id']})", file=sys.stderr)
+            return 1
+        job = manager.adopt(job["id"])
+    finally:
+        manager.shutdown()
+    summary = job["result"]["summary"]
+    print(f"{args.scene} {job['params']['version']}: {len(summary['segments'])} shot(s), "
+          f"{summary['duration_seconds']:.1f} s -> {job['message'].removeprefix('Adopted: ')}")
+    for segment in summary["segments"]:
+        print(f"  {segment['shot']:5} take {segment['take']:12} {segment['start']:.2f}–{segment['end']:.2f} s  ({segment['join']})")
+    for note in summary["notes"]:
+        print(f"  note: {note}")
+    return 0
+
+
 def command_jobs(args: argparse.Namespace) -> int:
     """Background work: list, inspect, cancel, retry, adopt (SPEC-0008)."""
 
@@ -1027,6 +1053,15 @@ def build_parser() -> argparse.ArgumentParser:
     previs_parser.add_argument("shot")
     previs_parser.add_argument("--output", type=Path, help="default: renders/previs/<scene>-<shot>.mp4 in the project")
     previs_parser.set_defaults(function=command_previs)
+
+    assemble_parser = subparsers.add_parser(
+        "assemble", help="Assemble a new, kept version of a scene from its selected takes"
+    )
+    assemble_parser.add_argument("project", type=Path)
+    assemble_parser.add_argument("scene")
+    assemble_parser.add_argument("--version", help="default: the next free v<n>")
+    assemble_parser.add_argument("--summary", help="what changed in this version")
+    assemble_parser.set_defaults(function=command_assemble)
 
     jobs_parser = subparsers.add_parser("jobs", help="Background work: list, show, cancel, retry, adopt")
     jobs_actions = jobs_parser.add_subparsers(dest="jobs_command", required=True)

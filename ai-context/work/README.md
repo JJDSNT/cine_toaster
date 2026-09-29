@@ -76,6 +76,7 @@ The order of work is the ordered plan in
 
 ## Recently completed
 
+- `CT-0038` — scene assembly from the chosen takes, as kept versions (`done`)
 - `CT-0036` — screenplay editor, byte-exact and revision-checked (ADR 0016)
   (`done`)
 - `CT-0034` — React stack (ADR 0015) and the read-only production canvas

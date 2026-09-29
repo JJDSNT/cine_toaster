@@ -83,6 +83,7 @@ Project Manager does not touch another project's jobs, or its own.
 | --- | --- | --- | --- |
 | `previs` | `scene`, `shot` | `previs.mp4` | `renders/previs/<scene>-<shot>.mp4` |
 | `build` | `engine` | `<production>.mp4` | `renders/<production>.mp4` |
+| `assemble` | `scene`, `version`, `summary` | `assembly.mp4` | `renders/assemblies/<scene>/<version>.mp4`, then registered as a scene version (`record_assembly`) |
 
 A kind validates its parameters before the job is queued. FFmpeg progress is
 read from `-progress` output (`out_time_us` against the expected duration).
