@@ -395,6 +395,79 @@ def command_check(args: argparse.Namespace) -> int:
     return 1 if any(finding["severity"] == "error" for finding in findings) else 0
 
 
+def command_script(args: argparse.Namespace) -> int:
+    """Show what each shot covers of the screenplay, or propose the links (SPEC-0006)."""
+
+    from . import screenplay as script_model
+    from .project import _read_screenplay
+
+    production = load_production(args.project)
+    scenes = production["scenes"]
+    if args.scene:
+        scenes = [scene for scene in scenes if scene["id"] == args.scene]
+
+    if args.script_command == "show":
+        for scene in scenes:
+            link = scene["script"]
+            if not link:
+                print(f"{scene['id']}  not linked to the screenplay")
+                continue
+            print(f"{scene['id']}  {link['heading']}" + (f"  (occurrence {link['occurrence']})" if link["occurrence"] > 1 else ""))
+            for shot in scene["shots"]:
+                covered = shot.get("script")
+                if not covered:
+                    print(f"  {shot['id']}  covers nothing")
+                    continue
+                print(f"  {shot['id']}")
+                # In screenplay order, the way the shot will play.
+                for unit in covered["units"]:
+                    if unit["kind"] == "speech":
+                        extension = f" ({unit['extension']})" if unit["extension"] else ""
+                        print(f"      {unit['speaker']}{extension}: {unit['text']}")
+                    elif unit["kind"] != "heading":
+                        print(f"      {unit['text']}")
+            uncovered = [unit for unit in link["units"] if unit["kind"] == "speech" and not unit["shots"]]
+            for unit in uncovered:
+                print(f"  (uncovered) {unit['speaker']}: {unit['text']}")
+        return 0
+
+    screenplay = _read_screenplay(Path(args.project).expanduser().resolve(), production["script_path"])
+    if screenplay is None:
+        print("This production has no screenplay to link to.")
+        return 1
+    proposals = 0
+    for scene in scenes:
+        link = scene["script"]
+        if link and link["linked"]:
+            target = screenplay.find_scene(link["heading"], link["occurrence"])
+        else:
+            guess = script_model.suggest_scene(screenplay, scene["shots"])
+            if guess is None:
+                continue
+            target, hits = guess
+            proposals += 1
+            print(f"{scene['id']}: {hits} line(s) match screenplay scene {target.heading!r}")
+            print("  script:")
+            print(f"    heading: {target.heading}")
+            if target.occurrence > 1:
+                print(f"    occurrence: {target.occurrence}")
+        for suggestion in script_model.suggest_links(target, scene["shots"]):
+            proposals += 1
+            certainty = "exact" if suggestion["exact"] else "approximate"
+            print(
+                f"{scene['id']} {suggestion['shot_id']}: {suggestion['matched']}/{suggestion['lines']} "
+                f"line(s) matched ({certainty})"
+            )
+            print("  covers:")
+            print(f"    from: {json.dumps(suggestion['from'], ensure_ascii=False)}")
+            print(f"    to: {json.dumps(suggestion['to'], ensure_ascii=False)}")
+    if not proposals:
+        print("Nothing to propose: every shot with lines is already linked, or no lines match.")
+    else:
+        print("\nThese are suggestions. Nothing was written; paste what you accept into the breakdown.")
+    return 0
+
+
 def command_events(args: argparse.Namespace) -> int:
     events = tail_events(args.project, limit=args.limit)
     if args.json:
@@ -723,6 +796,19 @@ def build_parser() -> argparse.ArgumentParser:
     check_parser.add_argument("--scene")
     check_parser.add_argument("--json", action="store_true")
     check_parser.set_defaults(function=command_check)
+
+    script_parser = subparsers.add_parser(
+        "script", help="What each shot covers of the screenplay (SPEC-0006)"
+    )
+    script_actions = script_parser.add_subparsers(dest="script_command", required=True)
+    for name, text in (
+        ("show", "Show each shot's covered action and dialogue"),
+        ("link", "Propose screenplay links from shots' authored lines; writes nothing"),
+    ):
+        action = script_actions.add_parser(name, help=text)
+        action.add_argument("project", type=Path)
+        action.add_argument("--scene")
+        action.set_defaults(function=command_script)
 
     build_parser = subparsers.add_parser(
         "build", help="Render the production's composed shots into a file"

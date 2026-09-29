@@ -4,6 +4,11 @@ title: Echo Chamber
 sequence: Sequence 02 · The Reply
 summary: The station repeats a sentence Mara never transmitted.
 
+# Same set as SC-010, so the heading appears twice in the screenplay.
+script:
+  heading: INT. LISTENING STATION - NIGHT
+  occurrence: 2
+
 direction: |
   Mara stays on the right of frame and the speaker stack on the left for the
   whole scene. The room is only ever seen from the console side, so the reply
@@ -64,11 +69,13 @@ shots:
     duration: 6
     label: The sleeping stack lights one channel at a time.
     action: Channels light left to right; the stack reads as machinery waking.
+    covers: The speaker stack wakes
 
   - n: 2
     duration: 9
     label: Mara crosses the room and stops halfway.
     action: She leaves the console and stops two steps short of the stack.
+    covers: Mara leaves the console
     # Without this, the next shot would find her back at the console.
     subjects_move:
       - subject: MARA
@@ -80,6 +87,9 @@ shots:
     subject: MARA
     looks_at: SPEAKER
     label: Locked on Mara as the station repeats her words.
+    covers:
+      from: "SPEAKER STACK: That's it"
+      to: The stack repeats it
     action: She does not move. A single blink on the second word, or none at all.
 
 decisions:

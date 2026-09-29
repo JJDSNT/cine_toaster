@@ -56,6 +56,11 @@ cover these functions more reliably than a new parser or editor built here.
   the screenplay and dialogue it holds.** That is specified as
   [`SPEC-0006`](../specs/SPEC-0006-screenplay-coverage.md) (draft).
 
+- **SPEC-0006 implemented (plan step 1).** Scenes link to screenplay
+  scenes, shots cover units by quote, and each storyboard frame, the Script
+  room, and the Dialogue room read coverage. `toast script show|link` is
+  available. screenplay-tools 0.0.10 is a pinned runtime dependency.
+
 # To do
 
 - Test the candidates with Fountain's examples and representative production

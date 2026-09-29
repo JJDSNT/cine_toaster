@@ -937,6 +937,11 @@ async function renderScript() {
   header.append(copy, facts);
   root.append(header);
 
+  for (const scene of data.scenes) {
+    if (!scene.script || !scene.script.linked) continue;
+    root.append(renderCoverage(scene));
+  }
+
   if (data.screenplay) {
     const panel = el("section", "panel wide-panel");
     panel.append(sectionHeading("SCREENPLAY", data.script_path, "The authored file, as written."));
@@ -1025,6 +1030,7 @@ async function renderStoryboard() {
       const meta = el("div", "filmstrip-meta");
       meta.append(el("strong", "", frame.shot_id), el("span", "muted", `${frame.duration_seconds}s`));
       card.append(meta, el("p", "", frame.label));
+      card.append(frameScript(frame));
       if (frame.transition) {
         card.append(el("small", "filmstrip-transition", `↳ ${frame.transition.id}`));
       }
@@ -1034,6 +1040,71 @@ async function renderStoryboard() {
     panel.append(strip);
     root.append(panel);
   }
+}
+
+// A linked scene's screenplay, formatted, with the shots that cover each unit in
+// the margin. A speech no shot covers is marked: it is a line nobody films.
+function renderCoverage(scene) {
+  const panel = el("section", "panel wide-panel");
+  const where = scene.script.occurrence > 1 ? ` (occurrence ${scene.script.occurrence})` : "";
+  panel.append(
+    sectionHeading(scene.id, `${scene.title} — coverage`, `${scene.script.heading}${where}`),
+  );
+  const page = el("div", "coverage-page");
+  for (const unit of scene.script.units) {
+    const row = el("div", `coverage-row coverage-${unit.kind}`);
+    const margin = el("div", "coverage-margin");
+    for (const shotId of unit.shots) {
+      margin.append(button(shotId, () => renderScene(scene.id), "coverage-chip"));
+    }
+    const body = el("div", "coverage-body");
+    if (unit.kind === "speech") {
+      body.append(el("div", "coverage-speaker", unit.speaker + (unit.extension ? ` (${unit.extension})` : "") + (unit.dual ? " ^" : "")));
+      for (const part of unit.parts) {
+        body.append(el("div", part.kind === "parenthetical" ? "coverage-paren" : "coverage-dialogue", part.kind === "parenthetical" ? `(${part.text})` : part.text));
+      }
+      if (!unit.shots.length) {
+        row.classList.add("uncovered");
+        margin.append(el("span", "coverage-missing", "no shot"));
+      }
+    } else {
+      body.append(el("div", "", unit.text));
+    }
+    row.append(margin, body);
+    page.append(row);
+  }
+  panel.append(page);
+  return panel;
+}
+
+// What a storyboard frame holds of the screenplay (SPEC-0006), in screenplay order.
+function frameScript(frame) {
+  const box = el("div", "frame-script");
+  const script = frame.script;
+  if (!script) {
+    box.append(el("small", "muted", "not linked to the screenplay"));
+    return box;
+  }
+  const units = script.units.filter((unit) => unit.kind !== "heading");
+  if (!units.length) {
+    box.append(el("small", "muted", "covers no screenplay"));
+    return box;
+  }
+  const delivery = Object.fromEntries(
+    script.dialogue.filter((line) => line.delivery).map((line) => [line.unit, line.delivery]),
+  );
+  for (const unit of units) {
+    if (unit.kind === "speech") {
+      const line = el("p", "frame-line");
+      const who = unit.speaker + (unit.extension ? ` (${unit.extension})` : "");
+      line.append(el("b", "", who), document.createTextNode(` ${unit.text}`));
+      if (delivery[unit.index]) line.append(el("em", "", ` — ${delivery[unit.index]}`));
+      box.append(line);
+    } else {
+      box.append(el("p", "frame-action", unit.text));
+    }
+  }
+  return box;
 }
 
 async function renderDialogue() {

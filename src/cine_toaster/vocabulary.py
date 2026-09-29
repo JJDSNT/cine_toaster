@@ -163,6 +163,8 @@ CORE_SHOT_FIELDS: frozenset[str] = frozenset(
         "subjects_at",
         "move",
         "ends_on",
+        # SPEC-0006: the screenplay this shot covers.
+        "covers",
     }
 )
 

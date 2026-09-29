@@ -43,6 +43,9 @@ Cine Toaster can currently:
 - read scene geometry and report continuity problems before anything is
   generated (`toast check`);
 - draw a plan-view blockout of the set, the cameras, and the line of action;
+- link each scene to its screenplay scene and each shot to the lines it
+  covers, so every storyboard frame shows its dialogue and action, and report
+  uncovered, drifted, and unscripted lines (SPEC-0006, `toast script`);
 - declare movement within a shot, meaning characters sent to marks and camera
   moves between poses, and check it before generating: positions carry across
   the cut, the move kind is derived, and axis crossings and screen-side jumps
@@ -128,22 +131,22 @@ required are all deleted.
 
 Follow the **ordered plan** in `development/roadmap.md` (2026-09-29):
 
-1. cut record;
-2. blocking frame;
-3. screenplay structure (Fountain);
-4. brief builder;
-5. FDX interchange spike;
+1. screenplay coverage (SPEC-0006);
+2. cut record;
+3. blocking frame;
+4. brief builder and SceneFlow export;
+5. FDX interchange;
 6. jobs runtime;
 7. React stack decision and read-only canvas;
 8. screenplay editor (ADR 0006 amendment);
-9. first generation adapter;
+9. generation unit decision and first generation adapter;
 10. built-in workflow with a gate;
 11. LangGraph spike;
 12. CopilotKit/CoAgents spike;
 13. editable canvas;
 14. Tauri.
 
-The next action is step 1, the cut record.
+Step 1, screenplay coverage (SPEC-0006), is **done**. The next action is step 2, the cut record.
 
 Earlier notes:
 

@@ -30,6 +30,12 @@ command can gate a generation run.
 | `move_value_unknown` | error | A move's `speed`, `rig` or `kind` is outside the vocabulary. |
 | `unknown_mark` | error | A shot sends a character or camera to a mark the geometry does not declare. |
 | `movement_subject_missing` | error | A shot moves a character the geometry does not define. |
+| `script_scene_missing` | error | A scene is linked to a screenplay heading the screenplay does not contain. |
+| `script_anchor_missing` | error | A shot covers a quote that is not in its screenplay scene — usually a rewrite. |
+| `script_anchor_ambiguous` | error | A shot's quote matches more than one place; lengthen it. |
+| `dialogue_uncovered` | warning | A line in the screenplay that no shot covers: a line nobody films. |
+| `line_drift` | warning | A shot's line in the breakdown differs from the screenplay. The screenplay's words are used. |
+| `line_unscripted` | advice | A shot's line the screenplay does not contain there. Possibly a deliberate ad-lib. |
 
 ## Movement within a shot
 
@@ -53,6 +59,28 @@ shots:
 ```
 
 Nothing is read from prose: an action line that says she walks moves nobody.
+
+## Which screenplay each shot holds
+
+A scene names the screenplay scene it films, and each shot quotes the start of
+the part it covers (SPEC-0006). The words live only in the screenplay; a
+shot's `lines` add how they are delivered, voiced and mixed.
+
+```yaml
+script:
+  heading: INT. LISTENING STATION - NIGHT
+  occurrence: 2                       # the same heading appears twice
+shots:
+  - n: 3
+    covers:
+      from: "SPEAKER STACK: That's it"  # CHARACTER: restricts to their speech
+      to: The stack repeats it
+```
+
+`toast script show <project>` prints what each shot covers, in screenplay
+order. `toast script link <project>` proposes `script` and `covers` for shots
+that already carry lines — it writes nothing. The storyboard shows each frame's
+lines, and the Script room shows the screenplay with its shots in the margin.
 
 ## What is deliberately not checked
 

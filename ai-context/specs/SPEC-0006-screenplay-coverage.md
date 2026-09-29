@@ -2,8 +2,8 @@
 id: SPEC-0006
 title: Screenplay coverage — every shot knows the screenplay and dialogue it holds
 type: specification
-status: draft
-implementation: planned
+status: implemented
+implementation: complete
 owner: project
 created_at: 2026-09-29
 updated_at: 2026-09-29
@@ -168,6 +168,26 @@ vendoring it later changes one file.
   coverage. The demo shows it. Visual behaviour is verified with a headless
   screenshot.
 - `toast check` still passes on both demos.
+
+# Implementation notes
+
+- The code is in `src/cine_toaster/screenplay.py`, the only importer of
+  screenplay-tools, with linking in `project.py` (`_link_screenplay`) and
+  `toast script show|link` in `cli.py`.
+- **Action paragraphs are split by us.** The parser merges consecutive
+  action paragraphs into one element, and its unmerged mode splits line by
+  line. A shot boundary usually falls between paragraphs, so each
+  blank-line-separated paragraph becomes a unit. The demo exposed this.
+- A speech is one unit: character, parentheticals, and dialogue. Its text
+  reads as one line, and its parts keep line breaks and parentheticals.
+- Drift is judged by `difflib` similarity (≥ 0.6) to the speaker's covered
+  speeches. Containment failed on a changed final full stop.
+- The demo screenplay gained dialogue. SC-010 and SC-030 share a heading, so
+  SC-030 uses `occurrence: 2`.
+- Validated with 20 tests in `tests/test_screenplay.py`, `toast script
+  show|link` on the demo and on a de-linked copy, and headless screenshots of
+  the storyboard cards and the Script room coverage, including an uncovered
+  line.
 
 # Relation to SceneFlow
 

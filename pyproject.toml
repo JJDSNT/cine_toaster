@@ -12,7 +12,11 @@ authors = [{ name = "Cine Toaster contributors" }]
 # The scene format is YAML: the production's breakdown is deeply nested and
 # carries prose, which TOML punishes. Conventions allow a justified dependency
 # rather than contorting an important contract to avoid one.
-dependencies = ["pyyaml>=6"]
+#
+# The screenplay is a core contract too (SPEC-0006). screenplay-tools is small,
+# pure Python and MIT; it is pinned because it is early (0.0.x), and only
+# `screenplay.py` imports it, so replacing or vendoring it changes one file.
+dependencies = ["pyyaml>=6", "screenplay-tools==0.0.10"]
 
 # Frame and clip operations need heavy libraries that are useless to someone who
 # only wants to read a production and decide between takes. They stay optional

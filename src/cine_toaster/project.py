@@ -8,6 +8,7 @@ import yaml
 from .errors import ResourceNotFoundError, ValidationError
 from .geometry import Finding, check_geometry, parse_geometry
 from .movement import check_movement, shot_motions
+from . import screenplay as script_model
 from .looks import load_looks, resolve as resolve_look
 from .state import SceneState, load_scene_state
 from .transitions import list_transitions
@@ -168,6 +169,8 @@ def _load_shots(
                 "move": field(raw, "move") if isinstance(field(raw, "move"), dict) else None,
                 "ends_on": vtext(raw, "ends_on"),
                 "motion": None,
+                "covers": field(raw, "covers"),
+                "script": None,
                 "authored_status": "",
                 "authored_selected_take": "",
                 "out_of_cut": bool(field(raw, "out_of_cut")),
@@ -324,6 +327,7 @@ def _load_scene(
     root: Path,
     declared_fields: dict[str, str] | None = None,
     project_look: str = "",
+    screenplay: script_model.Screenplay | None = None,
 ) -> dict[str, Any]:
     document = _read_yaml(path)
     scene_id = vtext(document, "scene") or _text(document.get("id"))
@@ -364,6 +368,8 @@ def _load_scene(
     findings.extend(
         finding.public_dict() for finding in _check_transitions(shots, scene_id, root)
     )
+    script_link, script_findings = _link_screenplay(document, shots, scene_id, screenplay)
+    findings.extend(finding.public_dict() for finding in script_findings)
 
     decisions = [
         {
@@ -416,6 +422,7 @@ def _load_scene(
         "iterations": [],
         "blockers": field(document, "blockers") or [],
         "geometry": geometry.public_dict(),
+        "script": script_link,
         "findings": findings,
         "decision_log": list(reversed(state.decisions)),
         "pending_shots": pending_shots,
@@ -769,6 +776,91 @@ def _script_path(manifest: dict[str, Any], root: Path) -> str:
     return ""
 
 
+def _read_screenplay(root: Path, script_path: str) -> script_model.Screenplay | None:
+    """Parse the production's screenplay once; it is only ever read (ADR 0006)."""
+
+    if not script_path:
+        return None
+    try:
+        text = (root / script_path).read_text(encoding="utf-8")
+    except OSError:
+        return None
+    return script_model.parse(text)
+
+
+def _link_screenplay(
+    document: dict[str, Any],
+    shots: list[dict[str, Any]],
+    scene_id: str,
+    screenplay: script_model.Screenplay | None,
+) -> tuple[dict[str, Any] | None, list[Finding]]:
+    """Resolve which screenplay scene this is and what each shot covers (SPEC-0006)."""
+
+    declared = field(document, "script")
+    if not declared:
+        return None, []
+    if isinstance(declared, str):
+        declared = {"heading": declared}
+    heading = vtext(declared, "heading")
+    occurrence = int(declared.get("occurrence") or 1)
+    findings: list[Finding] = []
+    scene = screenplay.find_scene(heading, occurrence) if screenplay else None
+    if scene is None:
+        findings.append(
+            Finding(
+                code="script_scene_missing",
+                severity="error",
+                message=(
+                    f"Scene {scene_id} is linked to screenplay heading {heading!r}"
+                    + (f" (occurrence {occurrence})" if occurrence > 1 else "")
+                    + (", which the screenplay does not contain." if screenplay else ", but the production has no screenplay.")
+                ),
+                scene_id=scene_id,
+            )
+        )
+        return {"heading": heading, "occurrence": occurrence, "linked": False, "units": []}, findings
+
+    covered_by: dict[int, list[str]] = {}
+    for shot in shots:
+        if not shot.get("covers"):
+            continue
+        coverage = script_model.shot_coverage(
+            scene, shot["covers"], scene_id=scene_id, shot_id=shot["id"]
+        )
+        findings.extend(coverage.problems)
+        speeches = [unit for unit in coverage.units if unit.kind == "speech"]
+        dialogue, line_findings = script_model.compare_lines(
+            shot["lines"], speeches, scene_id=scene_id, shot_id=shot["id"]
+        )
+        findings.extend(line_findings)
+        shot["script"] = {
+            "units": [unit.public_dict() for unit in coverage.units],
+            "dialogue": dialogue,
+            "action": [unit.text for unit in coverage.units if unit.kind == "action"],
+        }
+        for unit in coverage.units:
+            covered_by.setdefault(unit.index, []).append(shot["id"])
+
+    findings.extend(
+        script_model.uncovered_dialogue(scene, set(covered_by), scene_id=scene_id)
+    )
+    units = []
+    for unit in scene.units:
+        entry = unit.public_dict()
+        entry["shots"] = covered_by.get(unit.index, [])
+        units.append(entry)
+    return (
+        {
+            "heading": scene.heading,
+            "occurrence": scene.occurrence,
+            "number": scene.number,
+            "linked": True,
+            "units": units,
+        },
+        findings,
+    )
+
+
 def load_production(root: Path) -> dict[str, Any]:
     """Load the operational model of one production, straight from its files."""
 
@@ -785,8 +877,9 @@ def load_production(root: Path) -> dict[str, Any]:
 
     declared_fields = _declared_shot_fields(manifest)
     project_look = vtext(manifest, "look")
+    screenplay = _read_screenplay(root, _script_path(manifest, root))
     scenes = [
-        _load_scene(path, root, declared_fields, project_look)
+        _load_scene(path, root, declared_fields, project_look, screenplay)
         for path in scene_files(root, manifest)
     ]
     scenes.sort(key=lambda scene: (scene["order"], scene["id"]))
@@ -901,9 +994,30 @@ def writing_room(root: Path) -> dict[str, Any]:
                     "duration_seconds": shot["duration_seconds"],
                     "transition": shot.get("transition"),
                     "take_count": shot["take_count"],
+                    # SPEC-0006: the screenplay this frame holds, in order.
+                    "script": shot.get("script"),
                 }
             )
-            for line in shot["lines"]:
+            # A linked shot's words come from the screenplay; its authored
+            # lines only add delivery, voice and mix. Unlinked shots keep theirs.
+            spoken = (
+                [
+                    {
+                        "who": line["who"],
+                        "text": line["text"],
+                        "extension": line.get("extension", ""),
+                        "delivery": line.get("delivery", ""),
+                        "voice": line.get("voice", ""),
+                        "mix": line.get("mix", {}),
+                        "en": line.get("en", ""),
+                        "from_screenplay": True,
+                    }
+                    for line in shot["script"]["dialogue"]
+                ]
+                if shot.get("script")
+                else shot["lines"]
+            )
+            for line in spoken:
                 entry = {**line, "scene_id": scene["id"], "shot_id": shot["id"]}
                 lines.append(entry)
                 who = line["who"] or "UNATTRIBUTED"
@@ -921,6 +1035,7 @@ def writing_room(root: Path) -> dict[str, Any]:
                 "duration_seconds": scene["duration_seconds"],
                 "frames": frames,
                 "lines": lines,
+                "script": scene.get("script"),
                 "decisions": scene["decisions"],
                 "open_questions": [
                     item for item in scene["decisions"] if not item.get("answer")

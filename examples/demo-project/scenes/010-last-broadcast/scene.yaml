@@ -4,11 +4,27 @@ title: Last Broadcast
 sequence: Sequence 01
 summary: Waiting on the master images.
 
+# The screenplay scene this breakdown films (SPEC-0006). Each shot below says
+# which part of it it holds; the words themselves live only in the screenplay.
+script:
+  heading: INT. LISTENING STATION - NIGHT
+
 shots:
   - n: 1
     kind: black
     duration: 3
     label: Black screen. Radio static.
+    covers:
+      from: Radio static.
+      to: "ANNOUNCER: This is the final scheduled broadcast"
   - n: 2
     duration: 8
     label: Mara adjusts the receiver as the last broadcast ends.
+    covers:
+      from: Mara turns the receiver's dial
+      to: "MARA: That's it, then."
+    # What the screenplay does not say: how the line is delivered.
+    lines:
+      - who: MARA
+        text: That's it, then.
+        delivery: barely audible, to the dial

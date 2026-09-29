@@ -494,3 +494,23 @@ dialog::backdrop { background: #000b; }
 .dialogue-alt { margin: 0.2rem 0 0; font-size: 0.85rem; opacity: 0.6; }
 
 .panel video { width: 100%; max-width: 46rem; border-radius: 10px; display: block; }
+
+/* --- Screenplay coverage (SPEC-0006) ------------------------------------ */
+.frame-script { display: grid; gap: 3px; margin-top: 6px; font-size: 11px; line-height: 1.4; }
+.frame-line { margin: 0; }
+.frame-line b { color: var(--accent); font-weight: 700; letter-spacing: .02em; }
+.frame-line em { color: var(--muted); }
+.frame-action { margin: 0; color: var(--muted); }
+.coverage-page { display: grid; gap: 6px; font-family: "Courier Prime", "Courier New", monospace; font-size: 13px; }
+.coverage-row { display: grid; grid-template-columns: 110px 1fr; gap: 14px; padding: 4px 0; border-radius: 6px; }
+.coverage-margin { display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start; justify-content: flex-end; }
+.coverage-chip { font: 600 10px Inter, system-ui, sans-serif; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; }
+.coverage-missing { font: 600 10px Inter, system-ui, sans-serif; color: #ed6e68; }
+.coverage-heading .coverage-body { font-weight: 700; text-transform: uppercase; }
+.coverage-transition .coverage-body { text-align: right; text-transform: uppercase; }
+/* Screenplay page proportions: character near the centre, dialogue in a
+   narrower column to its left, parentheticals between the two. */
+.coverage-speaker { padding-left: 32%; text-transform: uppercase; }
+.coverage-dialogue { padding-left: 18%; max-width: 62%; }
+.coverage-paren { padding-left: 26%; color: var(--muted); }
+.coverage-row.uncovered { background: rgba(237,110,104,.08); }
