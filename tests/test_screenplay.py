@@ -273,6 +273,17 @@ class FieldAliasTests(unittest.TestCase):
         line = scene["shots"][0]["lines"][0]
         self.assertEqual((line["who"], line["en"], line["in_take"]), ("LIRA", "Hello.", False))
 
+    def test_a_person_in_the_plan_is_named_by_who_they_are(self) -> None:
+        directory = Path(tempfile.mkdtemp())
+        (directory / "project.yaml").write_text("id: t\ntitle: T\npaths:\n  scenes: scenes\n")
+        (directory / "scenes" / "010").mkdir(parents=True)
+        (directory / "scenes" / "010" / "scene.yaml").write_text(
+            "scene: SC-1\ngeografia:\n  sala: [4, 3]\n  pessoas:\n"
+            "    - {nome: Claire, x: 0.5, y: 1.8, rotulo: esquerda}\n"
+            "    - {nome: Kael, x: 1.4, y: 2.6, rotulo: direita}\nshots:\n  - n: 1\n")
+        geometry = load_production(directory)["scenes"][0]["geometry"]
+        self.assertEqual([(s["id"], s["label"]) for s in geometry["subjects"]], [("CLAIRE", "Claire"), ("KAEL", "Kael")])
+
     def test_only_core_fields_can_be_targets(self) -> None:
         scene = self.scene("  seg: {maps_to: anything_at_all}\n", "    seg: 6\n")
         self.assertEqual(scene["shots"][0]["duration_seconds"], 0.0)

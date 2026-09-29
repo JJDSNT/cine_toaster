@@ -567,7 +567,9 @@ def _geometry_document(geography: dict[str, Any]) -> dict[str, Any] | None:
     for person in field(geography, "subjects") or []:
         if not isinstance(person, dict) or "x" not in person:
             continue
-        name = vtext(person, "label")
+        # A person is who they are. A production may also note where they sit
+        # on screen (SINGULAR's `rotulo: esquerda`); that is not their name.
+        name = _text(person.get("label")) or _text(person.get("nome")) or vtext(person, "label")
         subjects.append(
             {
                 "id": person.get("id") or _identifier(name),
