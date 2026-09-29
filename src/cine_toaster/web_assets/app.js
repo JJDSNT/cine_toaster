@@ -640,6 +640,7 @@ function renderBlockout(scene) {
     const motion = motions.find((item) => item.shot_id === shotId);
     if (!motion || !motion.start.camera) return;
     const changes = motion.kind !== "static" || motion.moved_subjects.length;
+    if (changes) frames.append(previsPlayer(scene, shotId));
     for (const at of changes ? ["start", "end"] : ["start"]) {
       const figure = el("figure", "blocking-frame");
       const image = el("img");
@@ -662,6 +663,70 @@ function renderBlockout(scene) {
   // The canvas needs its measured width, so draw once it is in the document.
   requestAnimationFrame(draw);
   return panel;
+}
+
+// The shot as a light animatic (CT-0029): blocking frames sampled over its
+// duration by the server, played here at the shot's real length.
+function previsPlayer(scene, shotId) {
+  const figure = el("figure", "blocking-frame previs-player");
+  const image = el("img");
+  image.alt = `${shotId} previs`;
+  const controls = el("div", "previs-controls");
+  const play = button("▶", () => toggle(), "blockout-chip");
+  const scrub = el("input");
+  scrub.type = "range";
+  scrub.min = "0";
+  scrub.max = "1000";
+  scrub.value = "0";
+  const clock = el("small", "muted", "");
+  controls.append(play, scrub, clock);
+  figure.append(image, controls, el("figcaption", "", `${shotId} · previs`));
+
+  let data = null;
+  let urls = [];
+  let playing = false;
+  let startedAt = 0;
+  let offset = 0;
+  const show = (t) => {
+    if (!data) return;
+    const index = Math.min(urls.length - 1, Math.round(t * (urls.length - 1)));
+    image.src = urls[index];
+    scrub.value = String(Math.round(t * 1000));
+    clock.textContent = `${(t * data.duration_seconds).toFixed(1)} / ${data.duration_seconds} s`;
+  };
+  const tick = (now) => {
+    if (!playing || !figure.isConnected) return;
+    const t = Math.min(1, offset + (now - startedAt) / (data.duration_seconds * 1000));
+    show(t);
+    if (t >= 1) {
+      playing = false;
+      play.textContent = "▶";
+      offset = 0;
+      return;
+    }
+    requestAnimationFrame(tick);
+  };
+  const toggle = () => {
+    if (!data) return;
+    playing = !playing;
+    play.textContent = playing ? "❚❚" : "▶";
+    if (playing) {
+      offset = Number(scrub.value) / 1000 >= 1 ? 0 : Number(scrub.value) / 1000;
+      startedAt = performance.now();
+      requestAnimationFrame(tick);
+    }
+  };
+  scrub.addEventListener("input", () => {
+    playing = false;
+    play.textContent = "▶";
+    show(Number(scrub.value) / 1000);
+  });
+  api(`/api/previs?scene=${encodeURIComponent(scene.id)}&shot=${encodeURIComponent(shotId)}`).then((result) => {
+    data = result;
+    urls = result.frames.map((svg) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+    show(0);
+  }).catch((error) => figure.append(el("p", "preview-error", error.message)));
+  return figure;
 }
 
 function describeMotion(scene, shotId) {

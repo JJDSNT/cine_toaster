@@ -577,3 +577,6 @@ dialog::backdrop { background: #000b; }
 .brief-cue p { margin: 0; }
 .brief-cue.active { opacity: 1; background: #ffffff0d; }
 @media (max-width: 800px) { .brief-stage { grid-template-columns: 1fr; } .brief-slot { grid-template-columns: 70px 1fr; } .brief-slot .brief-source { grid-column: 2; } }
+.previs-player { grid-column: 1 / -1; max-width: 760px; }
+.previs-controls { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
+.previs-controls input { width: 100%; }

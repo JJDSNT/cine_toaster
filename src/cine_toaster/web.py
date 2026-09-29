@@ -14,7 +14,7 @@ from .errors import CineToasterError, ValidationError
 from .events import read_events, tail_events
 from .index import ProjectIndex
 from .knowledge import coverage, load_practices, load_providers
-from .blocking import blocking_frame, public_frame, render_svg
+from .blocking import blocking_frame, previs, public_frame, render_svg
 from .project import ProjectFormatError, load_production, load_scene, writing_room
 from .transitions import list_transitions, public_transition, transition_asset_path
 
@@ -294,6 +294,23 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             self._send_json(review)
             return
 
+        if parsed.path == "/api/previs":
+            # The shot as a light animatic, sampled from the blocking frame
+            # over its duration (CT-0029). Derived on request, never stored.
+            try:
+                scene = load_scene(self.project_root, query.get("scene", [""])[0])
+            except (FileNotFoundError, ProjectFormatError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
+                return
+            shot_id = query.get("shot", [""])[0]
+            shot = next((item for item in (scene or {}).get("shots", []) if item["id"] == shot_id), None)
+            result = previs(scene, shot) if shot else None
+            if result is None:
+                self._send_json({"error": "No camera pose for that shot"}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json(result)
+            return
+
         if parsed.path == "/api/blocking-frame":
             # What a shot's camera sees at its start or end, computed from the
             # scene geometry (CT-0025). Derived on every request, never stored.
@@ -306,7 +323,11 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
                 return
             shot = next((item for item in (scene or {}).get("shots", []) if item["id"] == shot_id), None)
-            frame = blocking_frame(scene, shot, at) if shot and at in ("start", "end") else None
+            try:
+                frame = blocking_frame(scene, shot, at) if shot else None
+            except ValueError as error:
+                self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+                return
             if frame is None:
                 self._send_json({"error": "No camera pose for that shot"}, HTTPStatus.NOT_FOUND)
                 return

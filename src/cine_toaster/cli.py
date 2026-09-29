@@ -429,6 +429,43 @@ def command_brief(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_previs(args: argparse.Namespace) -> int:
+    """Render a shot's light previs to video, from the scene geometry (CT-0029)."""
+
+    import shutil
+    import subprocess
+    import tempfile
+
+    from .blocking import PREVIS_FPS, previs
+    from .project import load_scene
+
+    scene = load_scene(args.project.expanduser().resolve(), args.scene)
+    shot = next((item for item in (scene or {}).get("shots", []) if item["id"] == args.shot), None)
+    result = previs(scene, shot) if shot else None
+    if result is None:
+        print(f"{args.scene} {args.shot} has no camera pose to look from.", file=sys.stderr)
+        return 1
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        print("FFmpeg is needed to encode the previs.", file=sys.stderr)
+        return 1
+    with tempfile.TemporaryDirectory() as raw:
+        for index, svg in enumerate(result["frames"]):
+            (Path(raw) / f"{index:04d}.svg").write_text(svg, encoding="utf-8")
+        completed = subprocess.run(
+            [ffmpeg, "-y", "-loglevel", "error", "-framerate", str(PREVIS_FPS),
+             "-i", str(Path(raw) / "%04d.svg"), "-vf", "scale=1280:720,format=yuv420p",
+             "-c:v", "libx264", "-preset", "veryfast", "-r", "24", str(args.output)],
+            capture_output=True, text=True,
+        )
+    if completed.returncode != 0:
+        print("FFmpeg could not read the SVG frames; it needs to be built with librsvg. "
+              + completed.stderr.strip()[-200:], file=sys.stderr)
+        return 1
+    print(f"Wrote {args.output} ({len(result['frames'])} frames, {result['duration_seconds']:g} s)")
+    return 0
+
+
 def command_frame(args: argparse.Namespace) -> int:
     """Draw what a shot's camera sees, from the scene geometry (CT-0025)."""
 
@@ -440,7 +477,11 @@ def command_frame(args: argparse.Namespace) -> int:
         print(f"No scene {args.scene!r}.", file=sys.stderr)
         return 1
     shot = next((item for item in scene["shots"] if item["id"] == args.shot), None)
-    frame = blocking_frame(scene, shot, args.at) if shot else None
+    try:
+        frame = blocking_frame(scene, shot, args.at) if shot else None
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 2
     if frame is None:
         print(f"{args.scene} {args.shot} has no camera pose to look from.", file=sys.stderr)
         return 1
@@ -883,13 +924,22 @@ def build_parser() -> argparse.ArgumentParser:
     brief_parser.add_argument("--output", type=Path)
     brief_parser.set_defaults(function=command_brief)
 
+    previs_parser = subparsers.add_parser(
+        "previs", help="Render a shot's light previs (animated blocking frame) to video"
+    )
+    previs_parser.add_argument("project", type=Path)
+    previs_parser.add_argument("scene")
+    previs_parser.add_argument("shot")
+    previs_parser.add_argument("--output", type=Path, required=True)
+    previs_parser.set_defaults(function=command_previs)
+
     frame_parser = subparsers.add_parser(
         "frame", help="Draw a shot's blocking frame from the scene geometry, as SVG"
     )
     frame_parser.add_argument("project", type=Path)
     frame_parser.add_argument("scene")
     frame_parser.add_argument("shot")
-    frame_parser.add_argument("--at", choices=("start", "end"), default="start")
+    frame_parser.add_argument("--at", default="start", help="start, end, or a time through the shot from 0 to 1")
     frame_parser.add_argument("--output", type=Path)
     frame_parser.add_argument("--json", action="store_true", help="the frame's facts instead of the drawing")
     frame_parser.set_defaults(function=command_frame)

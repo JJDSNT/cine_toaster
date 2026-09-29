@@ -104,17 +104,87 @@ class _Camera:
         return kept
 
 
-def blocking_frame(scene: dict[str, Any], shot: dict[str, Any], at: str = "start") -> dict[str, Any] | None:
-    """The camera's view at a shot's start or end, as numbers and shapes.
+def _ease(t: float, speed: str) -> float:
+    """How far through the move the shot is at time t (both 0..1).
+
+    A move is assumed to span the whole shot. It eases in and out unless its
+    declared speed says otherwise: `fast` runs at an even pace, `snap` whips
+    and settles.
+    """
+
+    t = max(0.0, min(1.0, t))
+    if speed == "fast":
+        return t
+    if speed == "snap":
+        return 1 - (1 - t) ** 4
+    return t * t * (3 - 2 * t)
+
+
+def _mix(a: float, b: float, t: float) -> float:
+    return a + (b - a) * t
+
+
+def state_at(motion: dict[str, Any], t: float) -> dict[str, Any]:
+    """The camera pose and subject positions at time t through the shot (0..1).
+
+    Only what the records declare is interpolated: the start and end poses,
+    and each subject's start and end position (SPEC-0005). An arc turns around
+    its target instead of cutting across; everything else travels straight.
+    """
+
+    start, end = motion["start"], motion["end"]
+    a, b = start.get("camera"), end.get("camera")
+    camera = None
+    if a and b:
+        k = _ease(t, motion.get("speed") or "")
+        if motion.get("kind") == "arc":
+            pivot = b["target"]
+            angle_a = math.atan2(a["position"][1] - pivot[1], a["position"][0] - pivot[0])
+            angle_b = math.atan2(b["position"][1] - pivot[1], b["position"][0] - pivot[0])
+            turn = (angle_b - angle_a + math.pi) % (2 * math.pi) - math.pi
+            radius = _mix(math.dist(a["position"], pivot), math.dist(b["position"], pivot), k)
+            angle = angle_a + turn * k
+            position = [pivot[0] + radius * math.cos(angle), pivot[1] + radius * math.sin(angle)]
+        else:
+            position = [_mix(a["position"][i], b["position"][i], k) for i in (0, 1)]
+        heights = (a.get("height"), b.get("height"))
+        camera = {
+            "position": position,
+            "target": [_mix(a["target"][i], b["target"][i], k) for i in (0, 1)],
+            "target_ref": a.get("target_ref") if k < 0.5 else b.get("target_ref"),
+            "lens_mm": _mix(float(a["lens_mm"]), float(b["lens_mm"]), k),
+            "height": _mix(*heights, k) if None not in heights else (heights[0] if k < 0.5 else heights[1]),
+        }
+    walk = _ease(t, "")
+    subjects = {}
+    for subject_id, begin in (start.get("subjects") or {}).items():
+        finish = (end.get("subjects") or {}).get(subject_id, begin)
+        subjects[subject_id] = [_mix(begin[i], finish[i], walk) for i in (0, 1)]
+    return {"camera": camera, "subjects": subjects}
+
+
+def blocking_frame(scene: dict[str, Any], shot: dict[str, Any], at: str | float = "start") -> dict[str, Any] | None:
+    """The camera's view at a shot's start, end, or any time t in between (0..1).
 
     Returns None when the shot has no camera pose to look from.
     """
 
-    if at not in ("start", "end"):
-        raise ValueError("at must be 'start' or 'end'")
     geometry = scene.get("geometry") or {}
     motion = shot.get("motion") or {}
-    state = motion.get(at) or {}
+    if isinstance(at, str) and at not in ("start", "end"):
+        try:
+            at = float(at)
+        except ValueError:
+            raise ValueError("at must be 'start', 'end', or a time between 0 and 1") from None
+    if isinstance(at, str):
+        state = motion.get(at) or {}
+    else:
+        if not 0.0 <= at <= 1.0:
+            raise ValueError("at must be between 0 and 1")
+        if not motion.get("start") or not motion.get("end"):
+            return None
+        state = state_at(motion, at)
+        at = round(at, 3)
     pose = state.get("camera")
     if not pose:
         return None
@@ -186,7 +256,7 @@ def blocking_frame(scene: dict[str, Any], shot: dict[str, Any], at: str = "start
         "at": at,
         "camera": {
             "id": motion.get("camera_id", ""),
-            "lens_mm": camera.lens_mm,
+            "lens_mm": round(camera.lens_mm, 1),
             "height": camera_height,
             "height_declared": pose.get("height") is not None,
             "tilt_deg": round(camera.tilt_deg, 1),
@@ -321,8 +391,39 @@ def render_svg(frame: dict[str, Any]) -> str:
     out.append(f'<rect y="{HEIGHT - 22}" width="{WIDTH}" height="22" fill="#101315" fill-opacity="0.85"/>')
     camera = frame["camera"]
     height = f'{camera["height"]:.2f} m' + ("" if camera["height_declared"] else " (assumed)")
-    caption = (f'{frame["shot"]} · {frame["at"]} · {camera["id"]} · {camera["lens_mm"]:g} mm · '
+    moment = frame["at"] if isinstance(frame["at"], str) else f'{frame["at"]:.0%}'
+    caption = (f'{frame["shot"]} · {moment} · {camera["id"]} · {camera["lens_mm"]:g} mm · '
                f'height {height} · tilt {camera["tilt_deg"]:+.0f}°')
     out.append(f'<text x="8" y="{HEIGHT - 8}" fill="#8a9499" font-size="11">{escape(caption)}</text>')
     out.append("</svg>")
     return "\n".join(out)
+
+
+#: Previs frames per second: enough to read a move, cheap enough to draw live.
+PREVIS_FPS = 12
+PREVIS_MAX_FRAMES = 360
+
+
+def previs(scene: dict[str, Any], shot: dict[str, Any], fps: int = PREVIS_FPS) -> dict[str, Any] | None:
+    """The shot as a light animatic: blocking frames sampled over its duration (CT-0029).
+
+    Derived like the blocking frame, and never stored.
+    """
+
+    motion = shot.get("motion") or {}
+    if not (motion.get("start") or {}).get("camera"):
+        return None
+    duration = float(shot.get("duration_seconds") or 0.0) or 3.0
+    count = max(2, min(PREVIS_MAX_FRAMES, round(duration * fps) + 1))
+    times = [index / (count - 1) for index in range(count)]
+    frames = [blocking_frame(scene, shot, t) for t in times]
+    return {
+        "scene": scene.get("id"),
+        "shot": shot.get("id"),
+        "duration_seconds": duration,
+        "kind": motion.get("kind", "static"),
+        "moves": bool(motion.get("moved_subjects")) or motion.get("kind", "static") != "static",
+        "times": [round(t, 4) for t in times],
+        "frames": [render_svg(frame) for frame in frames],
+    }
+

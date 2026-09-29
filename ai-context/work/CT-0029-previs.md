@@ -2,8 +2,8 @@
 id: CT-0029
 title: Previs — the shot in motion, from the same records as the blocking frame
 type: work
-status: ready
-owner: unassigned
+status: doing
+owner: development agent
 created_at: 2026-09-29
 updated_at: 2026-09-29
 tags:
@@ -50,10 +50,48 @@ point to discover that it is wrong. Agreed with the user on 2026-09-29.
 - Paths interpolate between declared positions only. Nothing is inferred from
   action lines.
 
+# Stage 1 — done (plan step 4b, 2026-09-29)
+
+- `blocking.state_at(motion, t)` interpolates only what the records declare:
+  - the camera travels straight, except an `arc`, which turns around its end
+    target;
+  - lens (zoom), target and height are mixed;
+  - subjects walk straight from their start to their end position.
+
+  Easing follows the declared speed: ease in and out by default, even pace
+  for `fast`, whip and settle for `snap`. A move is assumed to span the whole
+  shot.
+- `blocking_frame(..., at=t)` accepts a time from 0 to 1.
+  `previs(scene, shot)` samples the shot at 12 frames per second.
+- `GET /api/previs?scene=&shot=`, `toast frame … --at 0.5`, and
+  `toast previs <project> <scene> <shot> --output p.mp4` (FFmpeg with
+  librsvg).
+- Scene room: a shot that moves shows a previs player (play and scrub, at the
+  shot's real length) above its start and end frames.
+
+Known limits:
+
+- the move's timing within the shot is not a record; the move always spans
+  the whole shot;
+- paths are straight lines between declared positions, with no waypoints;
+- the blocking frame's own limits apply (`CT-0025` To do item 5).
+
 # To do
 
-- Stage 1 after the brief builder (plan step 4).
+- Stages 2 and 3 after plan step 9.
+- A `move` timing record (`starts_at`, `ends_at` within the shot) when a real
+  shot needs a hold before or after the move.
 
 # Validation
 
-- Not started.
+- `tests/test_blocking.py` `PrevisTests` (7 tests):
+  - the animatic's ends equal the start and end frames;
+  - Mara walks into frame on SC-030 P2 and stays in;
+  - a hand-built dolly travels straight and eases;
+  - an arc keeps its distance from its subject;
+  - a zoom mixes the lens;
+  - the sampling covers the shot, and out-of-range times are refused.
+- `toast previs` rendered SC-030 P2 to a 9 s mp4. Frames at 0, 50, 74 and
+  99 % were inspected.
+- Headless screenshot of the player scrubbed to 60 % (5.4 of 9 s).
+- Full suite: 292 tests OK.

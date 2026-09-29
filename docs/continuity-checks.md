@@ -72,6 +72,12 @@ marks. Select a shot in the scene's blockout to see it, or run
 computed on demand and never stored, and whoever the checks call framed is
 inside it, on the same side (CT-0025).
 
+A shot that moves also plays as a **light previs**: the same frame sampled
+over the shot's duration, with the camera and subjects interpolated between
+their declared positions. Use `toast frame … --at 0.5` for one moment, or
+`toast previs <project> <scene> <shot> --output p.mp4` for the animatic
+(CT-0029).
+
 ## Which screenplay each shot holds
 
 A scene names the screenplay scene it films, and each shot quotes the start of

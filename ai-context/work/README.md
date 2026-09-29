@@ -46,8 +46,8 @@ The order of work is the ordered plan in
   (Natron, Friction, Blender + QuickTitling) (`ready`)
 - `CT-0030` — backlot: locations as entities, shared sets that productions
   pin (`ready`)
-- `CT-0029` — previs: light in-app previs after the brief, then Blender and
-  motion references (`ready`)
+- `CT-0029` — previs: light in-app previs done; Blender and motion
+  references after step 9 (`doing`)
 - `CT-0028` — separate project: Video Toaster-style transitions as
   gl-transitions shaders, recreated from observation (`ready`)
 - `CT-0027` — camera-movement catalog, shaped like the transition catalog;

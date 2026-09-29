@@ -12,7 +12,7 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from cine_toaster.blocking import blocking_frame, public_frame, render_svg
+from cine_toaster.blocking import blocking_frame, previs, public_frame, render_svg, state_at
 from cine_toaster.index import ProjectIndex, build_index
 from cine_toaster.project import load_production
 from cine_toaster.web import ProjectBrowserHandler
@@ -98,6 +98,80 @@ class AgreementTests(unittest.TestCase):
         self.assertIn("Speaker stack</text>", svg)
         self.assertIn("Mara Vale ▸", svg)
         self.assertIn("CAM-C · 28 mm", svg)
+
+
+def moving_shot(kind: str, start: list[float], end: list[float], lens=(35.0, 35.0), speed: str = "") -> tuple[dict, dict]:
+    """A hand-built scene: one subject at the origin, a camera that moves."""
+
+    def pose(position, lens_mm):
+        return {"position": position, "target": [0.0, 0.0], "target_ref": "A", "lens_mm": lens_mm, "height": 1.5}
+
+    scene = {"id": "S", "geometry": {"subjects": [{"id": "A", "label": "Ana", "position": [0.0, 0.0], "eye_height": 1.6}]}}
+    shot = {
+        "id": "P1",
+        "duration_seconds": 4.0,
+        "motion": {
+            "camera_id": "CAM", "kind": kind, "speed": speed, "moved_subjects": [],
+            "start": {"camera": pose(start, lens[0]), "subjects": {"A": [0.0, 0.0]}, "framed": []},
+            "end": {"camera": pose(end, lens[1]), "subjects": {"A": [0.0, 0.0]}, "framed": []},
+        },
+    }
+    return scene, shot
+
+
+class PrevisTests(unittest.TestCase):
+    def test_the_ends_of_the_animatic_are_the_start_and_end_frames(self) -> None:
+        scene = echo_chamber()
+        shot = next(item for item in scene["shots"] if item["id"] == "P2")
+        for t, at in ((0.0, "start"), (1.0, "end")):
+            timed = public_frame(blocking_frame(scene, shot, t))["figures"]
+            named = public_frame(blocking_frame(scene, shot, at))["figures"]
+            self.assertEqual([f["x"] for f in timed], [f["x"] for f in named])
+
+    def test_mara_walks_into_frame_and_never_back_out(self) -> None:
+        scene = echo_chamber()
+        shot = next(item for item in scene["shots"] if item["id"] == "P2")
+        inside = [figures(scene, "P2", "start")["MARA"]["in_frame"]]
+        for step in range(1, 11):
+            frame = public_frame(blocking_frame(scene, shot, step / 10))
+            inside.append(next(f for f in frame["figures"] if f["subject"] == "MARA")["in_frame"])
+        self.assertFalse(inside[0])
+        self.assertTrue(inside[-1])
+        first_in = inside.index(True)
+        self.assertTrue(all(inside[first_in:]))
+
+    def test_a_dolly_travels_straight_and_eases(self) -> None:
+        _, shot = moving_shot("dolly", [0.0, -4.0], [0.0, -2.0])
+        middle = state_at(shot["motion"], 0.5)["camera"]["position"]
+        self.assertAlmostEqual(middle[1], -3.0)
+        # Eased: a quarter of the time covers less than a quarter of the way.
+        quarter = state_at(shot["motion"], 0.25)["camera"]["position"]
+        self.assertGreater(quarter[1], -4.0)
+        self.assertLess(quarter[1], -3.5)
+
+    def test_an_arc_keeps_its_distance_from_the_subject(self) -> None:
+        _, shot = moving_shot("arc", [0.0, -3.0], [3.0, 0.0])
+        for t in (0.25, 0.5, 0.75):
+            position = state_at(shot["motion"], t)["camera"]["position"]
+            self.assertAlmostEqual(math.hypot(*position), 3.0, places=6)
+
+    def test_a_zoom_changes_the_lens_through_the_shot(self) -> None:
+        scene, shot = moving_shot("zoom", [0.0, -3.0], [0.0, -3.0], lens=(24.0, 85.0), speed="fast")
+        self.assertAlmostEqual(blocking_frame(scene, shot, 0.5)["camera"]["lens_mm"], 54.5)
+
+    def test_the_animatic_samples_the_whole_shot(self) -> None:
+        scene, shot = moving_shot("dolly", [0.0, -4.0], [0.0, -2.0])
+        result = previs(scene, shot)
+        self.assertEqual(len(result["frames"]), 4 * 12 + 1)
+        self.assertEqual((result["times"][0], result["times"][-1]), (0.0, 1.0))
+        self.assertIn("P1 · 50%", result["frames"][24])
+
+    def test_a_time_outside_the_shot_is_refused(self) -> None:
+        scene, shot = moving_shot("dolly", [0.0, -4.0], [0.0, -2.0])
+        with self.assertRaises(ValueError):
+            blocking_frame(scene, shot, 1.5)
+        with self.assertRaises(ValueError):
+            blocking_frame(scene, shot, "middle")
 
 
 class EndpointTests(unittest.TestCase):
