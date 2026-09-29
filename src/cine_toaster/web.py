@@ -483,6 +483,23 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/screenplay":
             self._handle_screenplay_edit()
             return
+        if parsed.path == "/api/sequence-review":
+            from .commands import Actor, review_sequence_version
+
+            try:
+                payload = self._read_json_body()
+                result = review_sequence_version(
+                    self.project_root, sequence_id=str(payload.get("sequence_id", "")),
+                    version_id=str(payload.get("version_id", "")), verdict=str(payload.get("verdict", "")),
+                    actor=Actor(id=str((payload.get("actor") or {}).get("id") or "control-room")),
+                    note=str(payload.get("note") or ""),
+                )
+                forget_production(self.project_root)
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+                return
+            self._send_json(result)
+            return
         self.send_error(HTTPStatus.NOT_FOUND)
 
     def _handle_screenplay_edit(self) -> None:

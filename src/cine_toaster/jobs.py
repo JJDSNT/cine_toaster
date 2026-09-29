@@ -635,7 +635,7 @@ def _adopted_assemble(job: dict[str, Any], placed: list[str]) -> None:
     root = Path(job["project_root"])
     summary = job["result"]["summary"]
     media = Path(placed[0]).resolve().relative_to(root.resolve()).as_posix()
-    notes = "; ".join(summary["notes"])
+    notes = " ".join(summary["notes"])
     record_assembly(
         root,
         scene_id=job["params"]["scene"],
@@ -643,7 +643,7 @@ def _adopted_assemble(job: dict[str, Any], placed: list[str]) -> None:
         actor=Actor(id="assembly-job", kind="system"),
         media=media,
         summary=(job["params"].get("summary") or f"Assembled from the selected takes (job {job['id']})")
-        + (f". Not rendered: {notes}" if notes else ""),
+        + (f". Notes: {notes}" if notes else "."),
         duration_seconds=summary["duration_seconds"],
         takes=summary["takes"],
     )
@@ -732,4 +732,87 @@ def _run_slice(context: JobContext) -> dict[str, Any]:
 
 
 register(JobKind("slice_block", _validate_slice, _run_slice))
+
+
+def _sequence_plan(root: Path, sequence_id: str):
+    """Each scene of the sequence, in order, by its approved version or else its latest."""
+
+    from .assembly import Plan, Segment, probe
+    from .project import load_production
+
+    production = load_production(root)
+    sequence = next((item for item in production["sequences"] if item["id"] == sequence_id), None)
+    if sequence is None or sequence_id == "unassigned":
+        raise ValidationError(f"No sequence {sequence_id!r}")
+    scenes = {scene["id"]: scene for scene in production["scenes"]}
+    plan = Plan(scene=sequence_id)
+    for scene_id in sequence["scene_ids"]:
+        scene = scenes[scene_id]
+        versions = [item for item in scene.get("assemblies") or [] if item.get("media") and (root / item["media"]).is_file()]
+        approved = scene.get("approved_assembly") or {}
+        chosen = next((item for item in versions if item["id"] == approved.get("id")), None) or (versions[0] if versions else None)
+        if chosen is None:
+            plan.notes.append(f"{scene_id} has no assembled version with a file; it is left out.")
+            continue
+        if chosen["id"] != approved.get("id"):
+            plan.notes.append(f"{scene_id} has no approved version; its latest, {chosen['id']}, is used.")
+        length = probe(root / chosen["media"])["duration"]
+        plan.segments.append(Segment(scene_id, chosen["id"], chosen["media"], 0.0, round(length, 3), "hard",
+                                     "version", normalize=False))
+    if not plan.segments:
+        raise ValidationError(f"No scene of {sequence_id!r} has an assembled version yet")
+    return plan
+
+
+def _validate_assemble_sequence(root: Path, params: dict[str, Any]) -> dict[str, Any]:
+    from .sequence_state import versions
+
+    sequence_id = str(params.get("sequence", "")).strip()
+    _sequence_plan(root, sequence_id)
+    taken = {item["id"] for item in versions(root, sequence_id)}
+    version = str(params.get("version") or "").strip()
+    if not version:
+        number = 1
+        while f"v{number}" in taken:
+            number += 1
+        version = f"v{number}"
+    if version in taken:
+        raise ValidationError(f"{sequence_id} already has a version {version!r}")
+    return {"sequence": sequence_id, "version": version, "summary": str(params.get("summary") or "")}
+
+
+def _run_assemble_sequence(context: JobContext) -> dict[str, Any]:
+    from .assembly import render
+
+    plan = _sequence_plan(context.project_root, context.params["sequence"])
+    output = context.staging / "sequence.mp4"
+    render(context.project_root, plan, output, context.staging / "work", context.run_process)
+    shutil.rmtree(context.staging / "work", ignore_errors=True)
+    sequence_id, version = context.params["sequence"], context.params["version"]
+    return {
+        "files": [{"staged": "sequence.mp4", "destination": f"renders/sequences/{sequence_id}/{version}.mp4"}],
+        "summary": {"scenes": plan.takes, "notes": plan.notes, "duration_seconds": plan.duration},
+    }
+
+
+def _adopted_assemble_sequence(job: dict[str, Any], placed: list[str]) -> None:
+    from .commands import Actor, record_sequence_version
+
+    root = Path(job["project_root"])
+    summary = job["result"]["summary"]
+    notes = " ".join(summary["notes"])
+    record_sequence_version(
+        root,
+        sequence_id=job["params"]["sequence"],
+        version_id=job["params"]["version"],
+        actor=Actor(id="assembly-job", kind="system"),
+        media=Path(placed[0]).resolve().relative_to(root.resolve()).as_posix(),
+        scenes=summary["scenes"],
+        summary=(job["params"].get("summary") or f"Assembled from the scenes' versions (job {job['id']})")
+        + (f". Notes: {notes}" if notes else "."),
+        duration_seconds=summary["duration_seconds"],
+    )
+
+
+register(JobKind("assemble_sequence", _validate_assemble_sequence, _run_assemble_sequence, _adopted_assemble_sequence))
 

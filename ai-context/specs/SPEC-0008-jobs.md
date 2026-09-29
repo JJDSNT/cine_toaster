@@ -84,6 +84,7 @@ Project Manager does not touch another project's jobs, or its own.
 | `previs` | `scene`, `shot` | `previs.mp4` | `renders/previs/<scene>-<shot>.mp4` |
 | `build` | `engine` | `<production>.mp4` | `renders/<production>.mp4` |
 | `slice_block` | `scene`, `block` | one clip per shot, plus `.provenance.json` | `<work>/_takes/c<nn>-block-<id>.mp4` (new takes) |
+| `assemble_sequence` | `sequence`, `version`, `summary` | `sequence.mp4` | `renders/sequences/<sequence>/<version>.mp4`, then registered as a sequence version |
 | `assemble` | `scene`, `version`, `summary` | `assembly.mp4` | `renders/assemblies/<scene>/<version>.mp4`, then registered as a scene version (`record_assembly`) |
 
 A kind validates its parameters before the job is queued. FFmpeg progress is

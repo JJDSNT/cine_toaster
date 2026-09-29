@@ -60,6 +60,8 @@ class Segment:
     method: str = "duration"
     speech: tuple[float, float] | None = None
     level: float | None = None
+    #: Scene versions in a sequence were levelled when they were assembled.
+    normalize: bool = True
 
 
 @dataclass(slots=True)
@@ -255,7 +257,7 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process) -> Non
         source = root / segment.media
         has_audio = probe(source)["audio"]
         length = segment.end - segment.start
-        gain = loudness_gain(source, segment) if has_audio else 0.0
+        gain = loudness_gain(source, segment) if has_audio and segment.normalize else 0.0
         segment_gain[segment.shot] = gain
         piece = work / f"piece-{index:03d}.mp4"
         command = [ffmpeg, "-y", "-loglevel", "error", "-ss", f"{segment.start:.3f}", "-t", f"{length:.3f}", "-i", str(source)]
@@ -264,7 +266,7 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process) -> Non
         command += [
             "-vf", f"scale={size}:force_original_aspect_ratio=decrease,pad={size}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps},format=yuv420p",
             "-map", "0:v:0", "-map", "0:a:0" if has_audio else "1:a:0",
-            "-af", f"volume={gain}dB",
+            "-af", f"volume={gain}dB,aresample=async=1",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
             "-c:a", "aac", "-ar", "48000", "-ac", "2", "-shortest", str(piece),
         ]

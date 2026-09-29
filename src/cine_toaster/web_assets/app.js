@@ -218,6 +218,60 @@ function compactSceneList(scenes) {
 // A sequence is what the production actually judges as finished or not: a run
 // of scenes assembled and reviewed together. Scenes hold the detail; this is
 // where someone says "this part works now".
+// Versions of a sequence (phase 2): each an assembled cut from its scenes'
+// versions, kept, watchable and judged. Made in the background and adopted
+// from the jobs tray, like a scene's.
+function renderSequenceVersions(sequence) {
+  const box = el("div", "sequence-versions");
+  if (sequence.id === "unassigned") return box;
+  const assemble = button("Assemble a new version from the scenes' versions", async () => {
+    assemble.disabled = true;
+    try {
+      const job = await startJob("assemble_sequence", { sequence: sequence.id });
+      toastMessage(`Assembling ${job.params.version}. Adopt it from the jobs tray when it is ready.`);
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      assemble.disabled = false;
+    }
+  }, "quiet-button");
+  box.append(assemble);
+  for (const version of sequence.versions || []) {
+    const card = el("article", `sequence-version verdict-${version.verdict}`);
+    const head = el("div", "sequence-version-head");
+    head.append(el("strong", "", version.id), statusPill(version.verdict === "pending" ? "in_review" : version.verdict),
+      el("small", "muted", `${Math.round(version.duration_seconds)}s · ${Object.entries(version.scenes).map(([scene, v]) => `${scene} ${v}`).join(", ")}`));
+    card.append(head);
+    const video = el("video");
+    video.src = `/media/${version.media}`;
+    video.controls = true;
+    video.preload = "none";
+    card.append(video, el("p", "muted", version.summary));
+    const actions = el("div", "job-actions");
+    for (const [verdict, label] of [["approved", "Approve"], ["rejected", "Reject"]]) {
+      if (version.verdict === verdict) continue;
+      actions.append(button(label, async () => {
+        const response = await fetch("/api/sequence-review", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sequence_id: sequence.id, version_id: version.id, verdict }),
+        });
+        const payload = await response.json();
+        if (!response.ok) return alert(payload.error?.message || "Could not record the verdict");
+        await refreshFromEvent({ type: "sequence.version.reviewed" });
+      }, "blockout-chip"));
+    }
+    card.append(actions);
+    box.append(card);
+  }
+  return box;
+}
+
+function toastMessage(text) {
+  const note = el("div", "toast-note", text);
+  document.body.append(note);
+  setTimeout(() => note.remove(), 4000);
+}
+
 function renderSequences() {
   if (!state.production) return renderUnstructured();
   const root = byId("workspace");
@@ -246,6 +300,8 @@ function renderSequences() {
       metric(String(sequence.open_findings), "Continuity notes"),
     );
     panel.append(facts);
+
+    panel.append(renderSequenceVersions(sequence));
 
     if (sequence.render) {
       const assembly = el("div", "sequence-assembly");
@@ -1741,6 +1797,8 @@ async function refreshFromEvent(event) {
     renderOverview();
   } else if (state.currentView === "review") {
     renderReview();
+  } else if (state.currentView === "sequences") {
+    renderSequences();
   }
 }
 

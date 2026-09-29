@@ -132,6 +132,27 @@ priority order below.
     re-encode them.
   - Tests: a built-in profile test; the coverage test now counts built-in
     claims. Full suite: 383 OK.
+- **Item 4 (SINGULAR geometry with cast subjects; generators writing screenplay
+  links) is held for the user.** Placing cameras and characters and saying
+  what each shot films are creative and editorial decisions of the
+  production.
+- **Item 5: sequence assembly as versions** (2026-09-29).
+  - `sequence_state.py`: versions in `sequences.state.json`, beside the
+    manifest that declares the sequences (ADR 0006: runtime state beside the
+    authored file, written atomically by commands).
+  - Commands `record_sequence_version` and `review_sequence_version` (with
+    events); `POST /api/sequence-review`.
+  - Job kind `assemble_sequence`. Each scene enters by its approved version,
+    or else its latest, with a note either way. It is not re-levelled, since
+    it was levelled when assembled. The result is adopted to
+    `renders/sequences/<sequence>/<version>.mp4` and registered with the scene
+    versions it holds.
+  - `toast assemble-sequence <project> <sequence>`.
+  - The Sequences room shows versions with player, verdict and "Assemble a
+    new version".
+  - Validation: `tests/test_sequence_versions.py` (3 tests); a headless run in
+    which a version was assembled, adopted and approved from the Sequences
+    room. Full suite: 386 OK.
 
 # Validation
 

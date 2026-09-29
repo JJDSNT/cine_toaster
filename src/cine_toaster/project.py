@@ -670,6 +670,9 @@ def _load_sequences(
     if not isinstance(raw_sequences, list):
         raise ProjectFormatError(f"sequences must be a list in {path}")
 
+    from .sequence_state import load as load_sequence_state
+
+    sequence_versions = load_sequence_state(path.parent)["sequences"]
     by_id = {scene["id"]: scene for scene in scenes}
     claimed: set[str] = set()
     sequences: list[dict[str, Any]] = []
@@ -715,6 +718,7 @@ def _load_sequences(
                 "progress": round(decided / (decided + undecided) * 100)
                 if decided + undecided
                 else 0,
+                "versions": list(reversed(sequence_versions.get(sequence_id, {}).get("versions", []))),
             }
         )
 

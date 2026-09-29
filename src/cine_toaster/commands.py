@@ -604,6 +604,73 @@ def restore_assembly(
     )
 
 
+SEQUENCE_VERDICTS = ("approved", "rejected", "pending")
+
+
+def record_sequence_version(
+    root: Path,
+    *,
+    sequence_id: str,
+    version_id: str,
+    actor: Actor,
+    media: str,
+    scenes: dict[str, str],
+    summary: str = "",
+    duration_seconds: float = 0.0,
+) -> dict[str, Any]:
+    """Register an assembled cut of a sequence, with the scene versions it holds."""
+
+    from . import sequence_state
+
+    root = root.expanduser().resolve()
+    production = load_production(root)
+    if not any(item["id"] == sequence_id for item in production["sequences"]):
+        raise ResourceNotFoundError(f"No sequence {sequence_id!r}")
+    data = sequence_state.load(root)
+    entry = data["sequences"].setdefault(sequence_id, {"versions": []})
+    if any(item["id"] == version_id for item in entry["versions"]):
+        raise ValidationError(f"Sequence {sequence_id!r} already has a version {version_id!r}")
+    version = {
+        "id": version_id, "created_at": now(), "media": media, "summary": summary.strip(),
+        "duration_seconds": float(duration_seconds or 0), "scenes": dict(scenes),
+        "verdict": "pending", "note": "", "reviewed_by": None,
+    }
+    entry["versions"].append(version)
+    data["revision"] += 1
+    sequence_state.write(root, data)
+    event = append_event(root, Event.create(
+        "sequence.version.recorded", production["id"], sequence_id=sequence_id,
+        version_id=version_id, actor=actor.public_dict(), revision=data["revision"],
+    ))
+    return {"sequence_id": sequence_id, "version": version, "revision": data["revision"], "event": event.public_dict()}
+
+
+def review_sequence_version(
+    root: Path, *, sequence_id: str, version_id: str, verdict: str, actor: Actor, note: str = "",
+) -> dict[str, Any]:
+    """A person's verdict on one version of a sequence."""
+
+    from . import sequence_state
+
+    if verdict not in SEQUENCE_VERDICTS:
+        raise ValidationError(f"Unknown verdict {verdict!r}", allowed=list(SEQUENCE_VERDICTS))
+    root = root.expanduser().resolve()
+    production = load_production(root)
+    data = sequence_state.load(root)
+    entry = data["sequences"].get(sequence_id) or {"versions": []}
+    version = next((item for item in entry["versions"] if item["id"] == version_id), None)
+    if version is None:
+        raise ResourceNotFoundError(f"Sequence {sequence_id!r} has no version {version_id!r}")
+    version.update(verdict=verdict, note=_clean_rationale(note), reviewed_by=actor.public_dict(), reviewed_at=now())
+    data["revision"] += 1
+    sequence_state.write(root, data)
+    event = append_event(root, Event.create(
+        "sequence.version.reviewed", production["id"], sequence_id=sequence_id,
+        version_id=version_id, verdict=verdict, actor=actor.public_dict(), revision=data["revision"],
+    ))
+    return {"sequence_id": sequence_id, "version": version, "revision": data["revision"], "event": event.public_dict()}
+
+
 COMMANDS = {
     "select_take": select_take,
     "clear_selection": clear_selection,

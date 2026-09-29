@@ -397,6 +397,30 @@ def command_slice(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_assemble_sequence(args: argparse.Namespace) -> int:
+    """Assemble a new version of a sequence from its scenes' versions, as a job."""
+
+    from .jobs import JobManager
+
+    manager = JobManager()
+    try:
+        job = manager.wait(manager.submit("assemble_sequence", args.project, {
+            "sequence": args.sequence, "version": args.version or "", "summary": args.summary or ""})["id"])
+        if job["state"] != "succeeded":
+            print(f"assemble {job['state']}: {job.get('error') or job['message']}  (job {job['id']})", file=sys.stderr)
+            return 1
+        job = manager.adopt(job["id"])
+    finally:
+        manager.shutdown()
+    summary = job["result"]["summary"]
+    print(f"{args.sequence} {job['params']['version']}: {summary['duration_seconds']:.1f} s -> {job['message'].removeprefix('Adopted: ')}")
+    for scene, version in summary["scenes"].items():
+        print(f"  {scene:8} version {version}")
+    for note in summary["notes"]:
+        print(f"  note: {note}")
+    return 0
+
+
 def command_costs(args: argparse.Namespace) -> int:
     """Generation time and estimated cost, from the providers' job records."""
 
@@ -1107,6 +1131,15 @@ def build_parser() -> argparse.ArgumentParser:
     assemble_parser.add_argument("--version", help="default: the next free v<n>")
     assemble_parser.add_argument("--summary", help="what changed in this version")
     assemble_parser.set_defaults(function=command_assemble)
+
+    sequence_parser = subparsers.add_parser(
+        "assemble-sequence", help="Assemble a new, kept version of a sequence from its scenes' versions"
+    )
+    sequence_parser.add_argument("project", type=Path)
+    sequence_parser.add_argument("sequence")
+    sequence_parser.add_argument("--version")
+    sequence_parser.add_argument("--summary")
+    sequence_parser.set_defaults(function=command_assemble_sequence)
 
     costs_parser = subparsers.add_parser("costs", help="Generation time and estimated cost, from job records")
     costs_parser.add_argument("project", type=Path)
