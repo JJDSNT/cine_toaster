@@ -37,6 +37,7 @@ exit. "Decision" marks a step that ends in an ADR.
 | 2 | ✅ **Cut record** (done 2026-09-29) ([`SPEC-0007`](../specs/SPEC-0007-the-cut.md), `CT-0022` step 2). Specify and implement the cut between adjacent shots: cut type, frame chaining, exit versus entry state (SPEC-0005), and a catalog transition with a reason. Arcads' Clothing Brand Film shows the model: a shared storyboard frame *is* the cut. | Film | SPEC-0005 (done) | Spec accepted; cut findings in `toast check`; the Cut room shows the cut. |
 | 3 | ✅ **Blocking frame** (done 2026-09-29) (`CT-0025` step 1). Render the camera's view from geometry, at a shot's start and end. | Film | SPEC-0005 | Frame shown beside the blockout; golden test on SC-030. |
 | 4 | **Brief builder** (`CT-0022` step 3 follow-up). Derive a provider-neutral brief from records, in Auteur Script form, with every slot badged authored, derived, or missing. It also exports a SceneFlow project (JSON: brief text and take video), so SceneFlow's Timeline Anatomy can review Cine Toaster takes before we build our own. `[AUDIO]` and dialogue come from step 1. | Film | 2, 3, 1 | `toast brief <scene>`; brief preview in the scene room. |
+| 4b | **Light previs** (`CT-0029` stage 1). Animate the blocking frame over the shot: camera and subjects interpolated between declared positions, speed respected. | Film | 3 | Shot plays beside the blockout; interpolation tested on SC-030 P2. |
 | 5 | **Final Draft interchange spike** (`CT-0021`). Round-trip real `.fdx` files. Import produces a **new** authored `.fountain` file; export produces a derived `.fdx` that is never edited in place. Record what is lost: revisions, colours, tagging, page locks. **Decision:** the supported FDX subset and the role of FDX. | Film | 1 | Documented subset with loss report; decision recorded. |
 | 6 | **Jobs runtime**: Phase 2 as written below. Operational store, an FFmpeg job with progress and cancellation, and job isolation across projects. | Film | none | The Phase 2 exit. Nothing generates or orchestrates before this. |
 | 7 | **React stack spike and decision.** React 19 + TypeScript + Vite + `@xyflow/react` 12, in a separate `frontend/` package that talks only to the HTTP API. This is the choice four of six reference repositories made (`CT-0024`). The first room is the **canvas, read-only**: entity nodes (shots with the selected take, cast, looks), cut edges from step 2, and lineage focus. The vanilla UI stays until each room reaches parity. **Decision:** accept the Node/Vite toolchain (ADR). | Stack | 2, 6 | ADR accepted or rejected; canvas shows a real sequence. |
@@ -156,6 +157,10 @@ decision, and continue from the committed result without bypassing permissions.
 - the blocking frame's recorded limits (`CT-0025` To do item 5): subject kind
   and size, facing, height changes, set pieces, in-between frames, and camera
   roll, sensor and aspect;
+- 3D previs in Blender, and previs as the motion reference for generation
+  (`CT-0029` stages 2 and 3), after step 9;
+- locations as entities, then a shared backlot of sets that productions pin
+  (`CT-0030`), after step 9;
 - a camera-movement catalog shaped like the transition catalog (`CT-0027`),
   after the blocking frame;
 - a separate project recreating Video Toaster transitions as gl-transitions
