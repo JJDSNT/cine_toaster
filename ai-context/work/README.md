@@ -50,8 +50,8 @@ The order of work is the ordered plan in
   (LangGraph as a later adapter candidate) (`ready`)
 - `CT-0022` — camera movement, cuts between clips, and an Arcads-style
   graph; SceneFlow spike done (`doing`)
-- `CT-0021` — evaluate Fountain screenplay tools and Final Draft FDX
-  interchange (`ready`)
+- `CT-0021` — Fountain and Final Draft: scheduled as plan steps 3, 5, and 8
+  (`ready`)
 - `CT-0020` — evaluate Okay Wannabe's UI and a visual graph for transitions
   between clips (`ready`)
 - `CT-0017` — SPEC-0004 slice and the Amiga reel (`doing`)

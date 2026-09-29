@@ -5,7 +5,7 @@ type: work
 status: ready
 owner: unassigned
 created_at: 2026-09-27
-updated_at: 2026-09-27
+updated_at: 2026-09-29
 tags:
   - interface
   - screenplay
@@ -60,6 +60,20 @@ cover these functions more reliably than a new parser or editor built here.
   the chosen component and supported subset before claiming full support.
 
 # Decisions
+
+- **Scheduled on 2026-09-29.** The work is split across the ordered plan in
+  `development/roadmap.md`:
+  - **step 3:** parse Fountain into structure, read only;
+  - **step 5:** FDX interchange spike;
+  - **step 8:** screenplay editor in the React stack.
+- **An editor conflicts with ADR 0006 as written.** ADR 0006 lists screenplays
+  among authored files that are never rewritten, because a serializer
+  round-trip destroys comments and notes. The editor therefore edits the
+  Fountain **text**, never a parsed model, and saves through a command with a
+  revision check. It needs an explicit ADR 0006 amendment before it ships.
+  Agents only propose diffs.
+- FDX import creates a new authored Fountain file. FDX export is a derived
+  artifact. Neither rewrites the source.
 
 - Current Fountain support is read-only display, not full screenplay support.
 - Keep the existing project file authoritative. No editor or external document

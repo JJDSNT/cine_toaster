@@ -130,15 +130,18 @@ Follow the **ordered plan** in `development/roadmap.md` (2026-09-29):
 
 1. cut record;
 2. blocking frame;
-3. brief builder;
-4. jobs runtime;
-5. React stack decision and read-only canvas;
-6. first generation adapter;
-7. built-in workflow with a gate;
-8. LangGraph spike;
-9. CopilotKit/CoAgents spike;
-10. editable canvas;
-11. Tauri.
+3. screenplay structure (Fountain);
+4. brief builder;
+5. FDX interchange spike;
+6. jobs runtime;
+7. React stack decision and read-only canvas;
+8. screenplay editor (ADR 0006 amendment);
+9. first generation adapter;
+10. built-in workflow with a gate;
+11. LangGraph spike;
+12. CopilotKit/CoAgents spike;
+13. editable canvas;
+14. Tauri.
 
 The next action is step 1, the cut record.
 
