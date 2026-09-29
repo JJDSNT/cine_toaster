@@ -100,8 +100,9 @@ Cine Toaster cannot yet:
   production pain. External references are screened and ranked in
   `references.md`, and the SceneFlow spike is done. Briefs can be derived from
   records, including screen sides from geometry. SPEC-0005 is implemented:
-  movement within a shot, eight new checks, and blockout paths. Next is the
-  cut record (step 2).
+  movement within a shot, eight new checks, and blockout paths. SPEC-0007 is
+  implemented: a cut record for every join in a scene, five checks, and join
+  cards in the Cut room.
 - `CT-0023` and `CT-0024` cover the node canvas. All six reference
   repositories use React Flow and none uses CopilotKit. Arcads is an
   executable graph of creative-level nodes. The corrected position is one
@@ -146,7 +147,8 @@ Follow the **ordered plan** in `development/roadmap.md` (2026-09-29):
 13. editable canvas;
 14. Tauri.
 
-Step 1, screenplay coverage (SPEC-0006), is **done**. The next action is step 2, the cut record.
+Steps 1 and 2, screenplay coverage (SPEC-0006) and the cut record (SPEC-0007),
+are **done**. The next action is step 3, the blocking frame (`CT-0025`).
 
 Earlier notes:
 

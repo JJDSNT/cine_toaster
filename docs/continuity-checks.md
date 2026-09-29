@@ -36,6 +36,11 @@ command can gate a generation run.
 | `dialogue_uncovered` | warning | A line in the screenplay that no shot covers: a line nobody films. |
 | `line_drift` | warning | A shot's line in the breakdown differs from the screenplay. The screenplay's words are used. |
 | `line_unscripted` | advice | A shot's line the screenplay does not contain there. Possibly a deliberate ad-lib. |
+| `cut_type_unknown` | error | A shot's `cut.type` or `cut.chain` is outside the vocabulary. |
+| `jump_cut_undeclared` | warning | Two adjacent shots see the same subject from under 30° apart, at nearly the same size and screen place. It reads as a jump; declare `type: jump` if meant. |
+| `chain_pose_mismatch` | warning | A shot chains the previous last frame, but its camera or a subject starts somewhere else. |
+| `split_edit_without_sound` | warning | An L-cut whose outgoing shot ends on no dialogue, or a J-cut whose incoming shot starts on none. Judged only when the scene is linked to a screenplay. |
+| `transition_reason_missing` | advice | A catalog transition without a `reason`. |
 
 ## Movement within a shot
 
@@ -81,6 +86,25 @@ shots:
 order. `toast script link <project>` proposes `script` and `covers` for shots
 that already carry lines — it writes nothing. The storyboard shows each frame's
 lines, and the Script room shows the screenplay with its shots in the margin.
+
+## How each shot becomes the next
+
+A shot's `cut` says how it is entered, as its `transition` already does
+(SPEC-0007). Every field is optional; no `cut` is a hard cut. Cuts between
+scenes belong to the sequence and are not checked here.
+
+```yaml
+shots:
+  - n: 3
+    cut:
+      type: j               # hard | match | action | j | l | smash | jump
+      chain: frame          # this shot starts on the previous last frame
+      reason: We hear the stack speak before we see her hear it.
+```
+
+The Cut room shows every join: the two shots, the cut, what the outgoing shot
+leaves framed and what the incoming one finds, the line on each side, and what
+is wrong with it.
 
 ## What is deliberately not checked
 

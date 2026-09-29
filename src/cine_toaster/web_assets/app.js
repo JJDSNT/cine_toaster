@@ -1173,6 +1173,72 @@ async function renderDialogue() {
 
 // ---- Production: is this good? ----------------------------------------------
 
+const CUT_NAMES = {
+  hard: "Hard cut", match: "Match cut", action: "Cut on action", j: "J-cut",
+  l: "L-cut", smash: "Smash cut", jump: "Jump cut",
+};
+
+function renderJoins(scene) {
+  const panel = el("section", "panel wide-panel");
+  panel.append(sectionHeading(`JOINS · ${scene.id}`, scene.title, "How each shot becomes the next, and what the join has to hold."));
+  const names = Object.fromEntries((scene.geometry?.subjects || []).map((s) => [s.id, s.label]));
+  const shots = Object.fromEntries(scene.shots.map((shot) => [shot.id, shot]));
+  const framing = (state) =>
+    state.framed.length ? state.framed.map((f) => `${names[f.subject] || f.subject} ${f.side}`).join(", ") : "nobody";
+  const line = (unit) =>
+    !unit ? "—" : unit.kind === "speech" ? `${unit.speaker}: ${unit.text}` : unit.text;
+
+  const list = el("div", "join-list");
+  for (const cut of scene.cuts) {
+    const card = el("article", "join-card");
+    if (cut.findings.some((f) => f.severity === "error")) card.classList.add("error");
+    else if (cut.findings.some((f) => f.severity === "warning")) card.classList.add("warning");
+
+    const top = el("div", "join-top");
+    const side = (shotId) => {
+      const shot = shots[shotId];
+      const box = el("div", "join-shot");
+      const frame = el("div", "join-frame");
+      if (shot?.still) {
+        const image = el("img");
+        image.src = `/media/${shot.still}`;
+        image.alt = shot.label;
+        frame.append(image);
+      } else {
+        frame.append(el("span", "muted", shotId));
+      }
+      box.append(frame, el("strong", "", shotId), el("small", "muted", shot?.label || ""));
+      return box;
+    };
+    const middle = el("div", "join-type");
+    middle.append(el("b", "", CUT_NAMES[cut.type] || cut.type));
+    if (cut.chain) middle.append(el("small", "", "frames chained"));
+    if (cut.transition?.id) middle.append(el("small", "", `↳ ${cut.transition.id}`));
+    top.append(side(cut.from), middle, side(cut.to));
+    card.append(top);
+
+    const rows = [
+      ["Leaves", framing(cut.exit)],
+      ["Finds", framing(cut.entry)],
+      ["Last line out", line(cut.exit.unit)],
+      ["First line in", line(cut.entry.unit)],
+    ];
+    if (cut.exit.ends_on) rows.push(["Ends on", cut.exit.ends_on]);
+    if (cut.reason) rows.push(["Why", cut.reason]);
+    for (const [label, value] of rows) {
+      const row = el("div", "join-row");
+      row.append(el("span", "", label), el("b", "", value));
+      card.append(row);
+    }
+    for (const finding of cut.findings) {
+      card.append(el("p", `join-finding ${finding.severity}`, `${finding.code}: ${finding.message}`));
+    }
+    list.append(card);
+  }
+  panel.append(list);
+  return panel;
+}
+
 async function renderCut() {
   const root = byId("workspace");
   root.replaceChildren();
@@ -1189,6 +1255,11 @@ async function renderCut() {
   );
   header.append(copy, facts);
   root.append(header);
+
+  // Every join between adjacent shots, scene by scene (SPEC-0007).
+  for (const scene of production.scenes) {
+    if (scene.cuts && scene.cuts.length) root.append(renderJoins(scene));
+  }
 
   const renders = production.renders || [];
   if (!renders.length) {

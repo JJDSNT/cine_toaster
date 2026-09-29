@@ -165,6 +165,8 @@ CORE_SHOT_FIELDS: frozenset[str] = frozenset(
         "ends_on",
         # SPEC-0006: the screenplay this shot covers.
         "covers",
+        # SPEC-0007: how this shot is entered from the previous one.
+        "cut",
     }
 )
 

@@ -9,6 +9,7 @@ from .errors import ResourceNotFoundError, ValidationError
 from .geometry import Finding, check_geometry, parse_geometry
 from .movement import check_movement, shot_motions
 from . import screenplay as script_model
+from .cuts import scene_cuts
 from .looks import load_looks, resolve as resolve_look
 from .state import SceneState, load_scene_state
 from .transitions import list_transitions
@@ -170,6 +171,7 @@ def _load_shots(
                 "ends_on": vtext(raw, "ends_on"),
                 "motion": None,
                 "covers": field(raw, "covers"),
+                "cut": field(raw, "cut") if isinstance(field(raw, "cut"), dict) else None,
                 "script": None,
                 "authored_status": "",
                 "authored_selected_take": "",
@@ -370,6 +372,15 @@ def _load_scene(
     )
     script_link, script_findings = _link_screenplay(document, shots, scene_id, screenplay)
     findings.extend(finding.public_dict() for finding in script_findings)
+    cuts, cut_findings = scene_cuts(
+        shots,
+        motions,
+        geometry,
+        scene_id=scene_id,
+        screenplay_linked=bool(script_link and script_link.get("linked")),
+        earlier=findings,
+    )
+    findings.extend(finding.public_dict() for finding in cut_findings)
 
     decisions = [
         {
@@ -423,6 +434,7 @@ def _load_scene(
         "blockers": field(document, "blockers") or [],
         "geometry": geometry.public_dict(),
         "script": script_link,
+        "cuts": cuts,
         "findings": findings,
         "decision_log": list(reversed(state.decisions)),
         "pending_shots": pending_shots,

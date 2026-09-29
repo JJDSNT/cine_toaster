@@ -118,7 +118,9 @@ on the subject side.
    position, and the next shot inherits it. Then SC-030's P2→P3 position jump
    becomes a check finding. Fix the SC-030 fixture once the field exists; until
    then the fixture documents the gap.
-2. Draft a `cut` record between adjacent shots with these fields: exit state,
+2. ~~Draft and implement SPEC-0007~~ done: the cut record, five checks, and
+   the Cut room's join cards. Bridge generation stays open until generation
+   exists. The original step read: draft a `cut` record between adjacent shots with these fields: exit state,
    entry state, cut type (hard, match, action, J/L), frame chaining
    (last→first), optional bridge generation, and an optional catalog transition
    with a required `reason` (SPEC-0004). Decide whether it belongs in
@@ -168,3 +170,6 @@ on the subject side.
   `PYTHONPATH=src .venv/bin/python` on `examples/demo-project` SC-030. Per-camera
   subject angles were verified independently: CAM-C half-FOV 32.7°, Mara at
   44.7°. No repository code changed, so no test run was needed.
+- SPEC-0007: `tests/test_cuts.py` (14 tests), the full suite, `toast check` on
+  both demos, and a headless screenshot of the Cut room with a scratch-only
+  `chain: frame` finding.

@@ -87,6 +87,9 @@ shots:
     subject: MARA
     looks_at: SPEAKER
     label: Locked on Mara as the station repeats her words.
+    cut:
+      type: j
+      reason: We hear the stack speak before we see her hear it.
     covers:
       from: "SPEAKER STACK: That's it"
       to: The stack repeats it
