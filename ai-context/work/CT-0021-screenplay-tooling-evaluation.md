@@ -2,7 +2,7 @@
 id: CT-0021
 title: Evaluate Fountain editing and Final Draft interchange
 type: work
-status: ready
+status: doing
 owner: unassigned
 created_at: 2026-09-27
 updated_at: 2026-09-29
@@ -43,6 +43,18 @@ cover these functions more reliably than a new parser or editor built here.
   | [ScreenplayJS](https://github.com/Guernsey-Creative/screenplay-js) (MIT) | Fountain parsing and structured preview; example FDX-to-Fountain conversion | How complete is conversion and preservation of real FDX files? |
   | [screenplay-tools](https://github.com/wildwinter/screenplay-tools) (MIT) | Fountain parsing/writing in Python and JavaScript | Its documented FDX API is C#; verify which language builds actually include FDX before relying on it. |
   | [CodeMirror](https://codemirror.net/) (MIT) | Browser text-editing foundation | Fountain-specific behavior would still need an integration. |
+
+- **Hands-on test, 2026-09-29.** screenplay-tools was cloned (MIT, pure
+  Python, no dependencies, v0.0.10) and run through the project's virtual
+  environment. It parsed the demo screenplay and its own dialogue and
+  parenthetical samples correctly. Its **Python build includes an FDX parser
+  and writer**, which resolves the open question in the table above: a real
+  Final Draft file (`TestFDX-FD.fdx`, 16 elements) converted to correct
+  Fountain. Elements carry no source positions, so references must be
+  text-anchored.
+- The user's actual requirement is granular: **each storyboard view must know
+  the screenplay and dialogue it holds.** That is specified as
+  [`SPEC-0006`](../specs/SPEC-0006-screenplay-coverage.md) (draft).
 
 # To do
 
