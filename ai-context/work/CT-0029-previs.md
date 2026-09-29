@@ -78,6 +78,22 @@ Known limits:
 
 # To do
 
+- **Revisit the light previs limits** (recorded 2026-09-29 at the user's
+  request), each when a real shot needs it:
+  - timing of a move within a shot: holds before or after it, and a move over
+    part of the shot (`starts_at` and `ends_at`);
+  - paths with waypoints and curves, for subjects and for the camera (only
+    arcs curve today);
+  - separate timing for a subject's walk and the camera move; today both span
+    the whole shot;
+  - acceleration beyond the four speed words, such as a declared ease or a
+    speed in metres per second;
+  - tilt and roll moves (tilt is declared-only in SPEC-0005), and handheld
+    shake as a rig trait;
+  - playback of a whole scene or sequence across cuts, not one shot at a
+    time;
+  - sound: dialogue and effects placed on the animatic's timeline;
+  - the blocking frame's own limits (`CT-0025` To do item 5).
 - Stages 2 and 3 after plan step 9.
 - A `move` timing record (`starts_at`, `ends_at` within the shot) when a real
   shot needs a hold before or after the move.

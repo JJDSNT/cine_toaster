@@ -154,6 +154,9 @@ decision, and continue from the committed result without bypassing permissions.
 
 ## Later evaluation
 
+- the light previs's recorded limits (`CT-0029` To do): move timing within a
+  shot, waypoints, separate walk and camera timing, easing, tilt, roll and
+  handheld, scene-level playback, and sound;
 - the blocking frame's recorded limits (`CT-0025` To do item 5): subject kind
   and size, facing, height changes, set pieces, in-between frames, and camera
   roll, sensor and aspect;
