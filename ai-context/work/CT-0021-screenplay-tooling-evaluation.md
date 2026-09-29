@@ -89,7 +89,9 @@ cover these functions more reliably than a new parser or editor built here.
   revisions.
 - Compare screenplay navigation, auto-formatting, keyboard flow, preview,
   performance, browser/Tauri fit, maintenance, dependencies, and license details.
-- Define a screenplay write command with revision/conflict handling. Keep the
+- ~~Define a screenplay write command~~ done in plan step 8 (ADR 0016,
+  CT-0036). The original step read: define a screenplay write command with
+  revision/conflict handling. Keep the
   authored screenplay in project files; the editor must not write around the
   shared command boundary.
 - ~~Decide FDX's role~~ decided: interchange only (ADR 0014).

@@ -224,11 +224,11 @@ def _moderngl() -> Capability:
 
 
 def _canvas() -> Capability:
-    built = (Path(__file__).with_name("web_assets") / "canvas" / "index.html").is_file()
+    built = (Path(__file__).with_name("web_assets") / "app" / "index.html").is_file()
     node = _binary("npm")
     return Capability(
-        name="Production canvas",
-        what_it_enables="the read-only canvas of scenes, shots, takes and cuts at /canvas/ (ADR 0015)",
+        name="Canvas and editor",
+        what_it_enables="the production canvas at /app/ and the screenplay editor at /app/script.html (ADR 0015, 0016)",
         required=False,
         status=OK if built else MISSING,
         detail="built" if built else ("Node is installed" if node else ""),

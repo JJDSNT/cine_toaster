@@ -47,7 +47,7 @@ runtime filmmaking skill or production context.
 - Preserve the working Python runtime and CLI while boundaries are extracted.
 - The next write milestone is selecting a take as an atomic canonical decision.
 - New interface work uses React, TypeScript and Vite, with React Flow for the
-  canvas (ADR 0015). Node is a build tool only. The existing control room is
+  canvas and CodeMirror for the screenplay (ADR 0015, 0016). Node is a build tool only. The existing control room is
   not rewritten, and Tauri remains a shell candidate. None of this is
   permission to rewrite the Project Core.
 - CopilotKit, AG-UI, editors, playback engines, and orchestrators require focused

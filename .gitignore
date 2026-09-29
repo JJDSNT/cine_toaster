@@ -14,7 +14,7 @@ build/
 /local-projects/
 /.cinetoaster-projects/
 
-# The canvas (ADR 0015): its dependencies, and its build, which `make ui` writes
+# The React app (canvas and screenplay editor, ADR 0015): its dependencies, and its build, which `make ui` writes
 # into the package and the wheel includes as an artifact.
 /frontend/node_modules/
-/src/cine_toaster/web_assets/canvas/
+/src/cine_toaster/web_assets/app/

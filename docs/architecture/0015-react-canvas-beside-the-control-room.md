@@ -23,7 +23,9 @@ choosing React leaves that option open without committing to it.
 - **Where it lives.** `frontend/` holds the source. `make ui` builds it into
   `src/cine_toaster/web_assets/canvas/`. That output is ignored by git but
   included in the wheel as an artifact, and the Python runtime serves it at
-  `/canvas/`.
+  `/canvas/`. Since ADR 0016, the same app holds the screenplay editor: it is
+  built into `web_assets/app/` and served at `/app/` (canvas) and
+  `/app/script.html` (editor), and `/canvas/` redirects.
 - **Node is a build tool, never a runtime dependency.** Reading, checking and
   rendering a production still need only Python. A machine without Node has
   no canvas, and `toast doctor` reports that and says what to run.

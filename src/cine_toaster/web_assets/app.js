@@ -1230,9 +1230,11 @@ async function renderScript() {
       data.script_path,
       files.length > 1 ? `${files.length} authored files, read in order as one screenplay.` : "The authored file, as written.",
     ));
+    const edit = el("a", "quiet-button screenplay-edit", "Open in the screenplay editor");
+    edit.href = "/app/script.html";
     const page = el("pre", "screenplay-page");
     page.textContent = data.screenplay;
-    panel.append(page);
+    panel.append(edit, page);
     root.append(panel);
   } else {
     emptyRoom(

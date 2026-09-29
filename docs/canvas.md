@@ -1,6 +1,6 @@
 # The production canvas
 
-`/canvas/` in the control room (or the **Canvas** link in its navigation)
+`/app/` in the control room (or the **Canvas** link in its navigation)
 draws the production as cards:
 
 - a **scene** starts each row;
@@ -22,7 +22,7 @@ It is built with React and React Flow (ADR 0015). Building it needs Node 20+,
 but running Cine Toaster does not:
 
 ```bash
-make ui            # builds the canvas into the package
+make ui            # builds the canvas and the screenplay editor into the package
 make ui-test       # typecheck and layout tests
 cd frontend && npm run dev   # live development, next to `toast serve`
 ```

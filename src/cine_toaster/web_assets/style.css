@@ -595,3 +595,4 @@ dialog::backdrop { background: #000b; }
 .job-bar span { display: block; height: 100%; background: var(--accent); transition: width .3s; }
 .job-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .module-navigation .nav-link { color: inherit; text-decoration: none; }
+.screenplay-edit { display: inline-block; margin: 0 0 12px; text-decoration: none; }

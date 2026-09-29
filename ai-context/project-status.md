@@ -158,8 +158,10 @@ Fountain file with a loss report, export a derived `.fdx`). The next action is
 step 6, the jobs runtime, which is now done too (SPEC-0008: durable store,
 previs and build as jobs, cancel, reconcile, retry, adopt, jobs tray). Step 7
 is done: React 19 + Vite + React Flow (ADR 0015), with a read-only production
-canvas at `/canvas/`. The next action is step 8, the screenplay editor, which
-first needs the ADR 0006 amendment.
+canvas at `/canvas/`. Step 8 is done: the screenplay editor (ADR 0016, amending ADR 0006) at
+`/app/script.html`. SINGULAR was validated read-only (CT-0035), and several
+fixes and a SPEC-0007 amendment (continuation) came from it. The next action
+is step 9: the generation-unit decision, then the first generation adapter.
 
 Earlier notes:
 

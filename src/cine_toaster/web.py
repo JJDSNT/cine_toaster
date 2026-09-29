@@ -76,13 +76,13 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def _send_canvas(self, name: str) -> None:
-        """The React canvas, built by `make ui` into the package (ADR 0015)."""
+    def _send_app(self, name: str) -> None:
+        """The React app -- canvas and screenplay editor -- built by `make ui` (ADR 0015)."""
 
-        root = ASSET_ROOT / "canvas"
+        root = ASSET_ROOT / "app"
         if not (root / "index.html").is_file():
             payload = (b"<!doctype html><meta charset=utf-8><body style='font:14px system-ui;padding:2em'>"
-                       b"<h1>The canvas is not built</h1><p>Run <code>make ui</code> (needs Node 20+). "
+                       b"<h1>The canvas and editor are not built</h1><p>Run <code>make ui</code> (needs Node 20+). "
                        b"<code>toast doctor</code> reports it.</p>")
             self.send_response(HTTPStatus.NOT_FOUND)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -163,14 +163,14 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             transition_asset_path(transition_id, filename, self.project_root)
         )
 
-    def _read_json_body(self) -> dict:
+    def _read_json_body(self, limit: int | None = None) -> dict:
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError as error:
             raise ValidationError("Content-Length must be an integer") from error
         if length <= 0:
             raise ValidationError("A command needs a JSON body")
-        if length > MAX_COMMAND_BODY_BYTES:
+        if length > (limit or MAX_COMMAND_BODY_BYTES):
             raise ValidationError("Command body is too large")
         raw = self.rfile.read(length)
         try:
@@ -319,6 +319,15 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": "That shot has no take with a video"}, HTTPStatus.NOT_FOUND)
                 return
             self._send_json(review)
+            return
+
+        if parsed.path == "/api/screenplay":
+            from .screenplay_edit import screenplay_files
+
+            try:
+                self._send_json(screenplay_files(self.project_root, cached_production(self.project_root)))
+            except (FileNotFoundError, ProjectFormatError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
             return
 
         if parsed.path == "/api/graph":
@@ -471,7 +480,32 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/jobs" or parsed.path.startswith("/api/jobs/"):
             self._handle_job_post(parsed)
             return
+        if parsed.path == "/api/screenplay":
+            self._handle_screenplay_edit()
+            return
         self.send_error(HTTPStatus.NOT_FOUND)
+
+    def _handle_screenplay_edit(self) -> None:
+        """A person's edit to one screenplay file (ADR 0016)."""
+
+        from .screenplay_edit import MAX_SCREENPLAY_BYTES, edit_screenplay
+
+        try:
+            payload = self._read_json_body(limit=MAX_SCREENPLAY_BYTES * 2)
+            actor = payload.get("actor") or {}
+            result = edit_screenplay(
+                self.project_root,
+                str(payload.get("path", "")),
+                payload.get("text"),
+                str(payload.get("revision", "")),
+                actor=str(actor.get("id") if isinstance(actor, dict) else actor or "unknown"),
+                rationale=str(payload.get("rationale") or ""),
+            )
+            forget_production(self.project_root)
+        except CineToasterError as error:
+            self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
+        self._send_json(result)
 
     # --- jobs (SPEC-0008) ---------------------------------------------------
 
@@ -544,7 +578,13 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         if parsed.path == "/":
             self._send_static("index.html")
         elif parsed.path in ("/canvas", "/canvas/") or parsed.path.startswith("/canvas/"):
-            self._send_canvas(parsed.path.removeprefix("/canvas").lstrip("/") or "index.html")
+            # The canvas moved into the app with the screenplay editor (ADR 0016).
+            self.send_response(HTTPStatus.MOVED_PERMANENTLY)
+            self.send_header("Location", "/app/")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+        elif parsed.path in ("/app", "/app/") or parsed.path.startswith("/app/"):
+            self._send_app(parsed.path.removeprefix("/app").lstrip("/") or "index.html")
         elif parsed.path.startswith("/static/"):
             self._send_static(parsed.path.removeprefix("/static/"))
         elif parsed.path == "/api/events/stream":

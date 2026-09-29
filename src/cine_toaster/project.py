@@ -1036,6 +1036,8 @@ def load_production(root: Path) -> dict[str, Any]:
         "script_path": _script_path(manifest, root),
         "script_files": script_files,
         "script_problem": script_problem,
+        # ADR 0016: a generated screenplay is read only in the editor.
+        "script_generated_by": _text(manifest.get("screenplay_generated_by")),
         "looks": {name: look.public_dict() for name, look in load_looks(root).items()},
         "production": production,
         "phases": field(manifest, "phases") or [],

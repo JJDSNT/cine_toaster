@@ -98,18 +98,26 @@ class ServingTests(unittest.TestCase):
         self.addCleanup(empty.cleanup)
         web.ASSET_ROOT = Path(empty.name)
         self.addCleanup(setattr, web, "ASSET_ROOT", original)
-        status, body = self.get("/canvas/")
+        status, body = self.get("/app/")
         self.assertEqual(status, 404)
         self.assertIn(b"make ui", body)
 
-    @unittest.skipUnless((web.ASSET_ROOT / "canvas" / "index.html").is_file(), "the canvas is not built (make ui)")
-    def test_the_built_canvas_and_its_routes_are_served(self) -> None:
-        status, body = self.get("/canvas/")
+    @unittest.skipUnless((web.ASSET_ROOT / "app" / "index.html").is_file(), "the app is not built (make ui)")
+    def test_the_built_app_and_its_routes_are_served(self) -> None:
+        status, body = self.get("/app/")
         self.assertEqual(status, 200)
         self.assertIn(b'id="root"', body)
-        self.assertEqual(self.get("/canvas/some/route")[1], body)  # client routes fall back to the app
-        self.assertEqual(self.get("/canvas/../../pyproject.toml")[0] in (200, 404), True)
-        self.assertNotIn(b"[project]", self.get("/canvas/../../pyproject.toml")[1])
+        self.assertEqual(self.get("/app/some/route")[1], body)  # client routes fall back to the app
+        self.assertIn(b"script-", self.get("/app/script.html")[1])
+        self.assertNotIn(b"[project]", self.get("/app/../../pyproject.toml")[1])
+
+    def test_the_old_canvas_address_redirects(self) -> None:
+        request = urllib.request.Request(self.base + "/canvas/")
+        opener = urllib.request.build_opener(type("NoRedirect", (urllib.request.HTTPRedirectHandler,), {"redirect_request": lambda *a, **k: None})())
+        try:
+            opener.open(request, timeout=10)
+        except urllib.error.HTTPError as error:
+            self.assertEqual((error.code, error.headers["Location"]), (301, "/app/"))
 
 
 if __name__ == "__main__":
