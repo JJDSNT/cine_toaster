@@ -26,6 +26,32 @@ behind theirs:
 | [Friction](https://github.com/friction2d/friction) | Vector and raster motion graphics: lower thirds, animated graphics | GPL-3.0 | External program. Headless render not yet verified. |
 | Blender + [QuickTitling](https://github.com/snuq/QuickTitling) | Title scenes in Blender's sequencer, built from presets | GPL-2.0+ (addon, v0.6.8, Blender 5.1) | The user installs the addon. Cine Toaster only calls Blender. |
 
+# Target experience
+
+Effects and titles are **chosen from catalogs the same way transitions are**
+(`docs/transition-library.md`); the user's direction, 2026-09-29. There are
+two new catalogs, `effects` and `titles`, with the same shape as the
+transition catalog:
+
+- one manifest per item: id, name, category, description, guidance,
+  `use_when` and `avoid_when`, energy, tags, licence and author;
+- declared **parameters with defaults**, as shader uniforms are today. For
+  titles these are text slots (headline, subtitle, name and role) plus colour
+  and timing;
+- a **preview** shown in a bank room, as the Transitions room shows its bank;
+- **per-engine rendering declared by the item**, never inferred: for example
+  `[render] natron = "project.ntp"`, `friction = "…"`, `blender = "…"`, and a
+  declared fallback. An item with no rendering for the available engine is
+  refused, not substituted, as transitions are;
+- the same layering: built-in, external path, production, and a reviewed or
+  unreviewed state for items imported in bulk;
+- a shot records only the id, its parameter values and the reason for the
+  choice (`effect: {id, params, reason}`, `title: {id, text, reason}`), and
+  checks report unknown ids.
+
+The external tools are engines behind these catalogs, like ModernGL and FFmpeg
+for transitions. The user picks an effect, not a tool.
+
 # Why
 
 The user asked to record it (2026-09-29). Composed shots are drawn today as
@@ -48,6 +74,9 @@ Pillow cards (`build.py`); a real title, a composite, or a graphic has no path.
 
 # To do
 
+0. Generalise the transition catalog's loader (layers, manifest, params,
+   per-engine render, reviewed state) so that effects and titles reuse it
+   rather than copying it.
 1. Decide the first need from a real production: title, composite, or
    graphic.
 2. Spike the matching tool headless: input files in, render out, project file
@@ -58,6 +87,8 @@ Pillow cards (`build.py`); a real title, a composite, or a graphic has no path.
 # Decisions
 
 - External tools only; no GPL code in the repository.
+- Effects and titles are catalog items chosen like transitions. The tools are
+  engines, not the interface.
 
 # Validation
 
