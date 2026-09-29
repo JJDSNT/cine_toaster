@@ -144,6 +144,10 @@ lifetime guarantees are explicit:
 - full application exit or operating-system restart: execution is not promised
   until a future detached-worker design is accepted.
 
+Implemented by [`SPEC-0008`](specs/SPEC-0008-jobs.md) (`jobs.py`): a durable
+SQLite store in `XDG_STATE_HOME`, heartbeat-based reconciliation, staged
+results, and adoption as the only write into the project.
+
 The job model must cover queueing, running, progress, cancellation requests,
 cancellation, success, failure, orphan detection, retry attempts, provider job
 identity, result staging, and reconciliation after restart.

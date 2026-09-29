@@ -679,7 +679,14 @@ function previsPlayer(scene, shotId) {
   scrub.max = "1000";
   scrub.value = "0";
   const clock = el("small", "muted", "");
-  controls.append(play, scrub, clock);
+  const render = button("Render video", () => {
+    render.disabled = true;
+    startJob("previs", { scene: scene.id, shot: shotId })
+      .catch((error) => alert(error.message))
+      .finally(() => { render.disabled = false; });
+  }, "blockout-chip");
+  render.title = "A background job: it keeps running if you leave this page, and you adopt the result when it is ready.";
+  controls.append(play, scrub, clock, render);
   figure.append(image, controls, el("figcaption", "", `${shotId} · previs`));
 
   let data = null;
@@ -1683,6 +1690,86 @@ async function refreshFromEvent(event) {
   }
 }
 
+const JOB_LABELS = {
+  queued: "Queued", running: "Running", succeeded: "Ready", failed: "Failed",
+  cancelled: "Cancelled", interrupted: "Interrupted",
+};
+
+async function jobAction(path, body) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error?.message || `Request failed (${response.status})`);
+  return payload;
+}
+
+async function startJob(kind, params) {
+  const job = await jobAction("/api/jobs", { kind, params });
+  await renderJobs(true);
+  return job;
+}
+
+// Background work this runtime holds for the production (SPEC-0008). It
+// lives outside the page: reloading or leaving the room does not stop it.
+async function renderJobs(open = false) {
+  let tray = byId("jobs-tray");
+  if (!tray) {
+    tray = el("aside", "jobs-tray");
+    tray.id = "jobs-tray";
+    document.body.append(tray);
+  }
+  const jobs = (await api("/api/jobs", { optional: true })) || [];
+  const recent = jobs.filter((job) => !job.adopted_at || ["queued", "running"].includes(job.state)).slice(0, 6);
+  tray.replaceChildren();
+  tray.hidden = !recent.length;
+  if (!recent.length) return;
+  const active = recent.filter((job) => ["queued", "running"].includes(job.state)).length;
+  const details = el("details");
+  details.open = open || tray.dataset.open === "true" || active > 0;
+  details.addEventListener("toggle", () => { tray.dataset.open = String(details.open); });
+  details.append(el("summary", "", active ? `Jobs · ${active} running` : `Jobs · ${recent.length} ready`));
+  for (const job of recent) {
+    const row = el("div", `job-row job-${job.state}`);
+    const title = Object.values(job.params || {}).join(" ");
+    row.append(el("strong", "", `${job.kind} ${title}`), el("span", "job-state", JOB_LABELS[job.state] || job.state));
+    const bar = el("div", "job-bar");
+    const fill = el("span");
+    fill.style.width = `${Math.round((job.progress || 0) * 100)}%`;
+    bar.append(fill);
+    row.append(bar, el("small", "muted", job.error || job.message || ""));
+    const actions = el("div", "job-actions");
+    const act = (text, path, body) => button(text, () => jobAction(path, body).then(() => renderJobs(true)).catch((error) => alert(error.message)), "blockout-chip");
+    if (["queued", "running"].includes(job.state)) actions.append(act("Cancel", `/api/jobs/${job.id}/cancel`));
+    if (job.state === "succeeded" && !job.adopted_at) {
+      const destination = (job.result?.files || []).map((file) => file.destination).join(", ");
+      const adopt = button(`Adopt → ${destination}`, async () => {
+        try {
+          await jobAction(`/api/jobs/${job.id}/adopt`);
+        } catch (error) {
+          // Adoption never replaces a file silently: the person decides.
+          if (!error.message.includes("exists") || !confirm(`${error.message}\n\nReplace it?`)) {
+            if (!error.message.includes("exists")) alert(error.message);
+            return;
+          }
+          await jobAction(`/api/jobs/${job.id}/adopt`, { overwrite: true }).catch((again) => alert(again.message));
+        }
+        renderJobs(true);
+      }, "blockout-chip");
+      actions.append(adopt);
+    }
+    if (["failed", "cancelled", "interrupted"].includes(job.state)) actions.append(act("Retry", `/api/jobs/${job.id}/retry`));
+    row.append(actions);
+    details.append(row);
+  }
+  tray.append(details);
+  // Progress arrives as events at most once a second; poll gently as a fallback.
+  clearTimeout(renderJobs.timer);
+  if (active) renderJobs.timer = setTimeout(() => renderJobs().catch(() => {}), 1500);
+}
+
 function startEventStream() {
   const source = new EventSource("/api/events/stream");
   source.addEventListener("message", (message) => {
@@ -1691,6 +1778,13 @@ function startEventStream() {
       event = JSON.parse(message.data);
     } catch {
       return;
+    }
+    // Job events move the tray only; a page re-render every second would
+    // restart videos and players. Adoption changed the production, so it
+    // refreshes like any committed change.
+    if (event.type && event.type.startsWith("job.")) {
+      renderJobs().catch(() => {});
+      if (event.type !== "job.adopted") return;
     }
     refreshFromEvent(event).catch(() => {});
   });
@@ -1710,6 +1804,7 @@ async function start() {
   state.knowledge = await api("/api/knowledge", { optional: true });
   updateChrome();
   startEventStream();
+  renderJobs().catch(() => {});
   const parameters = new URLSearchParams(window.location.search);
   const requestedTransition = parameters.get("transition");
   if (requestedTransition && state.transitions.some((item) => item.id === requestedTransition)) {

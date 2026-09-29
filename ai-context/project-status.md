@@ -155,7 +155,9 @@ Steps 1–4 are **done**: screenplay coverage (SPEC-0006), the cut record
 local-video review (`docs/brief.md`). Step 4b, light previs (`CT-0029`), is
 done too, and so is step 5, Final Draft interchange (ADR 0014: import to a new
 Fountain file with a loss report, export a derived `.fdx`). The next action is
-step 6, the jobs runtime.
+step 6, the jobs runtime, which is now done too (SPEC-0008: durable store,
+previs and build as jobs, cancel, reconcile, retry, adopt, jobs tray). The
+next action is step 7, the React stack decision and a read-only canvas.
 
 Earlier notes:
 

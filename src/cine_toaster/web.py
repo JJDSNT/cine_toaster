@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import re
+import threading
 import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -10,7 +11,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .commands import dispatch
-from .errors import CineToasterError, ValidationError
+from .errors import CineToasterError, ResourceNotFoundError, ValidationError
 from .events import read_events, tail_events
 from .index import ProjectIndex
 from .knowledge import coverage, load_practices, load_providers
@@ -431,7 +432,71 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/commands":
             self._handle_command()
             return
+        if parsed.path == "/api/jobs" or parsed.path.startswith("/api/jobs/"):
+            self._handle_job_post(parsed)
+            return
         self.send_error(HTTPStatus.NOT_FOUND)
+
+    # --- jobs (SPEC-0008) ---------------------------------------------------
+
+    @property
+    def job_manager(self):
+        """The runtime's Job Manager: one per server, created on first use."""
+
+        from .jobs import JobManager
+
+        server = self.server
+        with _JOB_MANAGER_LOCK:
+            if getattr(server, "job_manager", None) is None:
+                server.job_manager = JobManager()  # type: ignore[attr-defined]
+        return server.job_manager  # type: ignore[attr-defined]
+
+    def _project_id(self) -> str:
+        server = self.server
+        if getattr(server, "project_id", None) is None:
+            server.project_id = load_production(self.project_root)["id"]  # type: ignore[attr-defined]
+        return server.project_id  # type: ignore[attr-defined]
+
+    def _handle_job_get(self, parsed) -> None:
+        from .jobs import public_job
+
+        try:
+            if parsed.path == "/api/jobs":
+                self._send_json([public_job(job) for job in self.job_manager.list(project_id=self._project_id(), limit=30)])
+                return
+            job = self.job_manager.get(parsed.path.removeprefix("/api/jobs/"))
+            if job["project_id"] != self._project_id():
+                raise ResourceNotFoundError("No such job in this production")
+            self._send_json(public_job(job))
+        except CineToasterError as error:
+            self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+
+    def _handle_job_post(self, parsed) -> None:
+        from .jobs import public_job
+
+        try:
+            manager = self.job_manager
+            if parsed.path == "/api/jobs":
+                payload = self._read_json_body()
+                job = manager.submit(str(payload.get("kind", "")), self.project_root, payload.get("params") or {})
+                self._send_json(public_job(job), HTTPStatus.ACCEPTED)
+                return
+            job_id, _, action = parsed.path.removeprefix("/api/jobs/").partition("/")
+            if manager.get(job_id)["project_id"] != self._project_id():
+                raise ResourceNotFoundError("No such job in this production")
+            if action == "cancel":
+                job = manager.cancel(job_id)
+            elif action == "retry":
+                job = manager.retry(job_id)
+            elif action == "adopt":
+                length = int(self.headers.get("Content-Length", "0") or 0)
+                payload = self._read_json_body() if length else {}
+                job = manager.adopt(job_id, overwrite=bool(payload.get("overwrite")))
+            else:
+                raise ValidationError(f"Unknown job action {action!r}", available=["cancel", "retry", "adopt"])
+            self._send_json(public_job(job))
+        except CineToasterError as error:
+            self._send_json(error.public_dict(), HTTPStatus(error.http_status))
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
@@ -441,6 +506,8 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             self._send_static(parsed.path.removeprefix("/static/"))
         elif parsed.path == "/api/events/stream":
             self._stream_events(parsed)
+        elif parsed.path == "/api/jobs" or parsed.path.startswith("/api/jobs/"):
+            self._handle_job_get(parsed)
         elif parsed.path.startswith("/api/"):
             self._handle_api(parsed)
         elif parsed.path.startswith("/media/"):
@@ -449,6 +516,9 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             self._send_transition_file(parsed.path.removeprefix("/transition-assets/"))
         else:
             self.send_error(HTTPStatus.NOT_FOUND)
+
+
+_JOB_MANAGER_LOCK = threading.Lock()
 
 
 def serve_project(
@@ -461,6 +531,13 @@ def serve_project(
     server = ThreadingHTTPServer((host, port), ProjectBrowserHandler)
     server.project_index = project_index  # type: ignore[attr-defined]
     server.project_root = root.expanduser().resolve()  # type: ignore[attr-defined]
+    # The runtime owns its jobs, so they outlive any page that started them;
+    # starting it reconciles work an earlier runtime left unfinished.
+    from .jobs import JobManager
+
+    server.job_manager = JobManager()  # type: ignore[attr-defined]
+    for job in server.job_manager.reconciled:
+        print(f"Job {job['id']} ({job['kind']}) was interrupted: {job['message']}")
     print(f"Cine Toaster browsing {server.project_root}")
     print(f"Open http://{host}:{port}")
     print("Press Ctrl+C to stop.")
@@ -470,3 +547,4 @@ def serve_project(
         print("\nStopping control room.")
     finally:
         server.server_close()
+        server.job_manager.shutdown(wait=False)

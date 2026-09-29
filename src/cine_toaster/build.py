@@ -24,7 +24,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .errors import CineToasterError
 from .looks import load_looks
@@ -44,6 +44,13 @@ class BuildError(CineToasterError):
 
     code = "build_failed"
     http_status = 422
+
+
+class BuildCancelled(BuildError):
+    """The caller asked the build to stop."""
+
+    code = "build_cancelled"
+    http_status = 409
 
 
 class BuildNotPossible(BuildError):
@@ -227,8 +234,28 @@ def _engine(requested: str) -> bool:
     return reason is None
 
 
-def build(root: Path, output: Path | None = None, engine: str = "auto") -> BuildResult:
-    """Render the production's composed shots into one file."""
+def build(
+    root: Path,
+    output: Path | None = None,
+    engine: str = "auto",
+    *,
+    work: Path | None = None,
+    progress: Callable[[float, str], None] | None = None,
+    should_stop: Callable[[], bool] | None = None,
+) -> BuildResult:
+    """Render the production's composed shots into one file.
+
+    ``work`` moves the scratch directory out of the project, which a job does
+    so that its only write into the production is the adoption. ``progress``
+    and ``should_stop`` are called between steps: a running FFmpeg step
+    finishes before a stop is honoured.
+    """
+
+    def step(fraction: float, message: str) -> None:
+        if should_stop and should_stop():
+            raise BuildCancelled("The build was cancelled.")
+        if progress:
+            progress(fraction, message)
 
     root = Path(root).expanduser().resolve()
     ffmpeg = _ffmpeg()
@@ -244,7 +271,7 @@ def build(root: Path, output: Path | None = None, engine: str = "auto") -> Build
             "captured shots are assembled from takes, not rendered from data."
         )
 
-    work = root / RENDERS_DIRECTORY / ".work"
+    work = Path(work) if work else root / RENDERS_DIRECTORY / ".work"
     if work.exists():
         shutil.rmtree(work)
     work.mkdir(parents=True)
@@ -255,6 +282,7 @@ def build(root: Path, output: Path | None = None, engine: str = "auto") -> Build
     durations: list[float] = []
 
     for index, (scene, shot) in enumerate(pairs):
+        step(0.8 * index / len(pairs), f"Encoding shot {shot['id']}")
         # The card is kept, not discarded with the scratch directory. Without
         # it a composed scene is text on a screen: there is no take to look at,
         # so the frame the tool drew is the only visual feedback there is.
@@ -282,6 +310,7 @@ def build(root: Path, output: Path | None = None, engine: str = "auto") -> Build
         durations.append(seconds)
         transitions.append(_transition_for(shot, catalog, gl) if index else None)
 
+    step(0.8, "Cutting the shots together")
     video = work / "video.mp4"
     shaders = sum(1 for join in transitions if join and join.shader)
     if shaders:
@@ -289,6 +318,7 @@ def build(root: Path, output: Path | None = None, engine: str = "auto") -> Build
     else:
         _concatenate(ffmpeg, segments, transitions, durations, video)
 
+    step(0.95, "Mixing")
     audio = _production_audio(production, root)
     destination = Path(output) if output else root / RENDERS_DIRECTORY / f"{production['id']}.mp4"
     destination.parent.mkdir(parents=True, exist_ok=True)

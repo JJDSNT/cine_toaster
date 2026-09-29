@@ -578,5 +578,19 @@ dialog::backdrop { background: #000b; }
 .brief-cue.active { opacity: 1; background: #ffffff0d; }
 @media (max-width: 800px) { .brief-stage { grid-template-columns: 1fr; } .brief-slot { grid-template-columns: 70px 1fr; } .brief-slot .brief-source { grid-column: 2; } }
 .previs-player { grid-column: 1 / -1; max-width: 760px; }
-.previs-controls { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
+.previs-controls { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; }
 .previs-controls input { width: 100%; }
+
+/* --- Jobs tray (SPEC-0008) ------------------------------------------------ */
+.jobs-tray { position: fixed; right: 16px; bottom: 16px; width: min(360px, calc(100vw - 32px)); z-index: 50; background: var(--panel, #14181a); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 30px #0008; font-size: 12px; }
+.jobs-tray[hidden] { display: none; }
+.jobs-tray summary { cursor: pointer; padding: 10px 12px; font-weight: 700; }
+.job-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; padding: 8px 12px; border-top: 1px solid var(--border); }
+.job-row small, .job-bar, .job-actions { grid-column: 1 / -1; }
+.job-state { color: var(--muted); }
+.job-running .job-state { color: #6fb7d9; }
+.job-succeeded .job-state { color: #8fcf8a; }
+.job-failed .job-state, .job-interrupted .job-state { color: #ed6e68; }
+.job-bar { height: 4px; background: #ffffff14; border-radius: 2px; overflow: hidden; }
+.job-bar span { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+.job-actions { display: flex; gap: 6px; flex-wrap: wrap; }

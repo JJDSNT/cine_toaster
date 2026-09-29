@@ -288,24 +288,99 @@ def command_take_clear(args: argparse.Namespace) -> int:
     return 0
 
 
+def _foreground_job(kind: str, project: Path, params: dict, output: Path | None, *, quiet: bool = False) -> dict | None:
+    """Run a job in this process, show its progress, and adopt its result (SPEC-0008).
+
+    The CLI goes through the same Job Manager as the control room, so a
+    render started here is recorded, can be cancelled from elsewhere, and is
+    reconciled if this process dies.
+    """
+
+    from .jobs import JobManager
+
+    manager = JobManager()
+    job = manager.submit(kind, project, params)
+    shown = {"line": ""}
+
+    def show(current: dict) -> None:
+        if quiet or not sys.stderr.isatty():
+            return
+        line = f"  {current['progress']:5.0%}  {current['message']}"[:78]
+        if line != shown["line"]:
+            print("\r" + line.ljust(78), end="", file=sys.stderr, flush=True)
+            shown["line"] = line
+
+    try:
+        job = manager.wait(job["id"], on_progress=show)
+    except KeyboardInterrupt:
+        manager.cancel(job["id"])
+        job = manager.wait(job["id"])
+    finally:
+        if shown["line"]:
+            print(file=sys.stderr)
+        manager.shutdown()
+    if job["state"] != "succeeded":
+        print(f"{kind} {job['state']}: {job.get('error') or job['message']}  (job {job['id']})", file=sys.stderr)
+        return None
+    return manager.adopt(job["id"], overwrite=True, destination=output)
+
+
 def command_build(args: argparse.Namespace) -> int:
     """Render the production's composed shots into one watchable file."""
 
-    from .build import build
-
-    result = build(args.project, args.output, engine=args.engine)
+    job = _foreground_job("build", args.project, {"engine": args.engine}, args.output, quiet=args.json)
+    if job is None:
+        return 1
+    result = job["result"]["summary"]
+    adopted = job["message"].removeprefix("Adopted: ")
     if args.json:
-        print(json.dumps(result.public_dict(), indent=2))
+        print(json.dumps({**result, "output": adopted, "job": job["id"]}, indent=2))
     else:
         print(
-            f"Built {result.output}\n"
-            f"  {result.shots} shot(s), {result.transitions} transition(s), "
-            f"{result.duration_seconds:.1f}s, "
-            f"{'with audio' if result.audio else 'silent'}\n"
-            f"  engine {result.engine}: {result.shaders} transition(s) ran their own shader\n"
-            f"  {result.stills} still(s) kept for the storyboard"
+            f"Built {adopted}\n"
+            f"  {result['shots']} shot(s), {result['transitions']} transition(s), "
+            f"{result['duration_seconds']:.1f}s, "
+            f"{'with audio' if result['audio'] else 'silent'}\n"
+            f"  engine {result['engine']}: {result['shaders']} transition(s) ran their own shader\n"
+            f"  {result['stills']} still(s) kept for the storyboard\n"
+            f"  job {job['id']}"
         )
     return 0
+
+
+def command_jobs(args: argparse.Namespace) -> int:
+    """Background work: list, inspect, cancel, retry, adopt (SPEC-0008)."""
+
+    from .jobs import JobManager, public_job
+    from .project import load_production
+
+    manager = JobManager()
+    try:
+        if args.jobs_command == "list":
+            project_id = load_production(args.project)["id"] if args.project else None
+            jobs = manager.list(project_id=project_id, limit=args.limit)
+            if args.json:
+                print(json.dumps([public_job(job) for job in jobs], indent=2))
+            for job in [] if args.json else jobs:
+                params = " ".join(f"{k}={v}" for k, v in job["params"].items())
+                adopted = "  adopted" if job["adopted_at"] else ""
+                print(f"{job['id']}  {job['state']:<11} {job['progress']:4.0%}  {job['kind']:<7} "
+                      f"{job['project_id']}  {params}{adopted}")
+            if not jobs and not args.json:
+                print("No jobs.")
+            return 0
+        if args.jobs_command == "show":
+            job = manager.get(args.job)
+        elif args.jobs_command == "cancel":
+            job = manager.cancel(args.job)
+        elif args.jobs_command == "retry":
+            job = manager.retry(args.job)
+        else:
+            job = manager.adopt(args.job, overwrite=args.overwrite)
+        print(json.dumps(public_job(job), indent=2))
+        return 0
+    finally:
+        manager.shutdown(wait=False)
 
 
 def command_voice(args: argparse.Namespace) -> int:
@@ -430,39 +505,14 @@ def command_brief(args: argparse.Namespace) -> int:
 
 
 def command_previs(args: argparse.Namespace) -> int:
-    """Render a shot's light previs to video, from the scene geometry (CT-0029)."""
+    """Render a shot's light previs to video, as a job (CT-0029, SPEC-0008)."""
 
-    import shutil
-    import subprocess
-    import tempfile
-
-    from .blocking import PREVIS_FPS, previs
-    from .project import load_scene
-
-    scene = load_scene(args.project.expanduser().resolve(), args.scene)
-    shot = next((item for item in (scene or {}).get("shots", []) if item["id"] == args.shot), None)
-    result = previs(scene, shot) if shot else None
-    if result is None:
-        print(f"{args.scene} {args.shot} has no camera pose to look from.", file=sys.stderr)
+    job = _foreground_job("previs", args.project, {"scene": args.scene, "shot": args.shot}, args.output)
+    if job is None:
         return 1
-    ffmpeg = shutil.which("ffmpeg")
-    if not ffmpeg:
-        print("FFmpeg is needed to encode the previs.", file=sys.stderr)
-        return 1
-    with tempfile.TemporaryDirectory() as raw:
-        for index, svg in enumerate(result["frames"]):
-            (Path(raw) / f"{index:04d}.svg").write_text(svg, encoding="utf-8")
-        completed = subprocess.run(
-            [ffmpeg, "-y", "-loglevel", "error", "-framerate", str(PREVIS_FPS),
-             "-i", str(Path(raw) / "%04d.svg"), "-vf", "scale=1280:720,format=yuv420p",
-             "-c:v", "libx264", "-preset", "veryfast", "-r", "24", str(args.output)],
-            capture_output=True, text=True,
-        )
-    if completed.returncode != 0:
-        print("FFmpeg could not read the SVG frames; it needs to be built with librsvg. "
-              + completed.stderr.strip()[-200:], file=sys.stderr)
-        return 1
-    print(f"Wrote {args.output} ({len(result['frames'])} frames, {result['duration_seconds']:g} s)")
+    summary = job["result"]["summary"]
+    print(f"Wrote {job['message'].removeprefix('Adopted: ')} ({summary['frames']} frames, "
+          f"{summary['duration_seconds']:g} s, job {job['id']})")
     return 0
 
 
@@ -974,8 +1024,24 @@ def build_parser() -> argparse.ArgumentParser:
     previs_parser.add_argument("project", type=Path)
     previs_parser.add_argument("scene")
     previs_parser.add_argument("shot")
-    previs_parser.add_argument("--output", type=Path, required=True)
+    previs_parser.add_argument("--output", type=Path, help="default: renders/previs/<scene>-<shot>.mp4 in the project")
     previs_parser.set_defaults(function=command_previs)
+
+    jobs_parser = subparsers.add_parser("jobs", help="Background work: list, show, cancel, retry, adopt")
+    jobs_actions = jobs_parser.add_subparsers(dest="jobs_command", required=True)
+    listing = jobs_actions.add_parser("list", help="Recent jobs, newest first")
+    listing.add_argument("project", type=Path, nargs="?", help="only this production's jobs")
+    listing.add_argument("--limit", type=int, default=20)
+    listing.add_argument("--json", action="store_true")
+    listing.set_defaults(function=command_jobs)
+    for name, text in (("show", "One job's record"), ("cancel", "Ask a job to stop"),
+                       ("retry", "Run a failed, cancelled or interrupted job again"),
+                       ("adopt", "Copy a finished job's result into its production")):
+        action = jobs_actions.add_parser(name, help=text)
+        action.add_argument("job")
+        if name == "adopt":
+            action.add_argument("--overwrite", action="store_true")
+        action.set_defaults(function=command_jobs)
 
     frame_parser = subparsers.add_parser(
         "frame", help="Draw a shot's blocking frame from the scene geometry, as SVG"
