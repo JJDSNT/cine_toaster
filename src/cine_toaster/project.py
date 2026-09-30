@@ -521,6 +521,7 @@ def _load_scene(
     if not geometry.is_empty():
         for shot, motion in zip(shots, motions):
             shot["motion"] = motion.public_dict()
+        findings.extend(finding.public_dict() for finding in _check_hidden(geometry, shots, scene_id))
     findings.extend(finding.public_dict() for finding in _check_shot_fields(shots, scene_id))
     findings.extend(finding.public_dict() for finding in move_findings)
     findings.extend(finding.public_dict() for finding in location_findings)
@@ -695,6 +696,25 @@ def _check_shot_fields(shots: list[dict[str, Any]], scene_id: str) -> list[Findi
     return findings
 
 
+def _check_hidden(geometry, shots: list[dict[str, Any]], scene_id: str) -> list[Finding]:
+    """A camera following someone a set piece hides (CT-0025): the frame would show the piece."""
+
+    from .blocking import hidden_targets
+
+    if not geometry.set_pieces:
+        return []
+    plan = geometry.public_dict()
+    labels = {piece.id: piece.label for piece in geometry.set_pieces.values()}
+    findings = []
+    for shot in shots:
+        for moment, subject, piece in hidden_targets(plan, shot.get("motion") or {}):
+            findings.append(Finding(
+                code="subject_hidden", severity="warning", scene_id=scene_id, subjects=(subject,), shots=(shot["id"],),
+                message=f"{shot['id']}: at its {moment}, the camera follows {subject}, but the {labels.get(piece, piece)} "
+                        f"stands between them. Move the camera, the subject or the piece, or say the shot is on the {labels.get(piece, piece)}."))
+    return findings
+
+
 def _geometry_document(geography: dict[str, Any]) -> dict[str, Any] | None:
     """Translate the breakdown's plan into the Core's geometry vocabulary.
 
@@ -719,6 +739,9 @@ def _geometry_document(geography: dict[str, Any]) -> dict[str, Any] | None:
                 "label": name,
                 "position": [float(person["x"]), float(person["y"])],
                 "eye_height": field(person, "eye_height"),
+                "kind": field(person, "kind"),
+                "width": field(person, "width"),
+                "height": field(person, "height"),
             }
         )
 
@@ -761,11 +784,24 @@ def _geometry_document(geography: dict[str, Any]) -> dict[str, Any] | None:
         if isinstance(mark, dict) and "x" in mark
     ]
 
+    set_pieces = [
+        {
+            "id": _text(piece.get("id")),
+            "label": vtext(piece, "label") or _text(piece.get("id")),
+            "position": [float(piece["x"]), float(piece["y"])],
+            "width": field(piece, "width"), "depth": field(piece, "depth"), "height": field(piece, "height"),
+            "rotation_deg": field(piece, "rotation") or 0,
+        }
+        for piece in field(geography, "set_pieces") or []
+        if isinstance(piece, dict) and "x" in piece
+    ]
+
     document: dict[str, Any] = {
         "units": "m",
         "subjects": subjects,
         "cameras": cameras,
         "marks": marks,
+        "set_pieces": set_pieces,
     }
     if isinstance(room, (list, tuple)) and len(room) >= 2:
         document["room"] = {

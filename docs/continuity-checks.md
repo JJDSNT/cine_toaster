@@ -73,6 +73,26 @@ marks. Select a shot in the scene's blockout to see it, or run
 computed on demand and never stored, and whoever the checks call framed is
 inside it, on the same side (CT-0025).
 
+**What stands in the room** is part of the plan too. Set pieces are boxes
+the cameras see and that hide what is behind them; an object among the
+subjects (a speaker stack, a machine) is drawn as a block, not a person:
+
+```yaml
+geography:            # or a location's location.yaml
+  set_pieces:
+    - {id: CONSOLE, label: Console, x: 4.7, y: 2.6, width: 0.7, depth: 1.6, height: 0.95, rotation: 0}
+  subjects:
+    - {id: SPEAKER, label: Speaker stack, kind: object, width: 0.7, height: 1.8, x: 1.2, y: 2.4}
+```
+
+`width` runs along x and `depth` along y before `rotation` (degrees,
+counter-clockwise). The frame draws the pieces far to near with the
+figures, and a subject a piece stands in front of is reported as hidden
+(`hidden: full`, head and body) or partly hidden (the body only), and drawn
+as a dashed outline. When the subject a camera follows is fully hidden at a
+shot's start or end, the check says so (`subject_hidden`, warning): the
+generated frame would show the piece. The plan view draws the footprints.
+
 A shot that moves also plays as a **light previs**: the same frame sampled
 over the shot's duration, with the camera and subjects interpolated between
 their declared positions. Use `toast frame … --at 0.5` for one moment, or

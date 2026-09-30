@@ -46,6 +46,21 @@ class LocationTests(unittest.TestCase):
         findings = load_scene(self.root, "SC-030")["findings"]
         self.assertIn("location_override", [finding["code"] for finding in findings])
 
+    def test_the_sets_pieces_are_in_every_scene_and_a_scene_may_move_one(self) -> None:
+        from cine_toaster.locations import resolve
+
+        location = {"room": [6, 4], "marks": [], "cameras": [],
+                    "set_pieces": [{"id": "CONSOLE", "x": 4.7, "y": 2.6, "width": 0.7, "depth": 1.6, "height": 0.95}]}
+        merged, notes = resolve({}, location)
+        self.assertEqual([piece["id"] for piece in merged["set_pieces"]], ["CONSOLE"])
+        merged, notes = resolve({"set_pieces": [{"id": "CONSOLE", "x": 4.0, "y": 2.6},
+                                                {"id": "CHAIR", "x": 3, "y": 2, "width": 0.5, "depth": 0.5, "height": 0.9}]},
+                                location)
+        console = next(piece for piece in merged["set_pieces"] if piece["id"] == "CONSOLE")
+        self.assertEqual((console["x"], console["height"]), (4.0, 0.95))  # moved here, the rest from the set
+        self.assertIn("set piece CONSOLE stands elsewhere here than in the location", notes)
+        self.assertEqual(len(merged["set_pieces"]), 2)
+
     def test_an_unknown_location_is_an_error(self) -> None:
         self.scene.write_text(self.scene.read_text(encoding="utf-8").replace(
             "location: LISTENING-STATION", "location: LIGHTHOUSE"), encoding="utf-8")

@@ -9,6 +9,22 @@ marks:
     x: 2.6
     y: 2.3
     label: Two steps short of the stack
+# What stands in the room: the cameras see it, and it hides what is behind it.
+set_pieces:
+  - id: CONSOLE
+    label: Console
+    x: 4.7
+    y: 2.6
+    width: 0.7
+    depth: 1.6
+    height: 0.95
+  - id: RACK
+    label: Equipment rack
+    x: 2.3
+    y: 4.2
+    width: 1.3
+    depth: 0.45
+    height: 2.1
 cameras:
   - id: CAM-A
     x: 3.4

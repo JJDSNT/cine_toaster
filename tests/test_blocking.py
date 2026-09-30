@@ -30,6 +30,89 @@ def figures(scene: dict, shot_id: str, at: str) -> dict[str, dict]:
     return {figure["subject"]: figure for figure in frame["figures"]}
 
 
+def with_piece(piece: dict) -> dict:
+    """SC-030 with one more set piece in its plan."""
+
+    import copy
+
+    scene = copy.deepcopy(echo_chamber())
+    scene["geometry"]["set_pieces"] = [*scene["geometry"].get("set_pieces", []), piece]
+    return scene
+
+
+class SetPieceTests(unittest.TestCase):
+    """What stands in the room is seen, and hides what is behind it (CT-0025)."""
+
+    def test_the_set_is_drawn_and_the_stack_is_an_object(self) -> None:
+        scene = echo_chamber()
+        self.assertEqual({piece["id"] for piece in scene["geometry"]["set_pieces"]}, {"CONSOLE", "RACK"})
+        shot = next(item for item in scene["shots"] if item["id"] == "P2")
+        frame = public_frame(blocking_frame(scene, shot, "end"))
+        pieces = {piece["id"]: piece for piece in frame["set_pieces"]}
+        self.assertTrue(pieces["RACK"]["in_frame"])  # the back wall's rack, behind Mara at the mark
+        self.assertFalse(pieces["CONSOLE"]["in_frame"])
+        self.assertEqual(figures(scene, "P2", "end")["SPEAKER"]["kind"], "object")
+        drawing = render_svg(blocking_frame(scene, shot, "end"))
+        self.assertIn("Equipment rack", drawing)
+
+    def test_a_tall_piece_between_camera_and_subject_hides_them(self) -> None:
+        # P3: CAM-A at (3.4, 0.9) on Mara at the mark (2.6, 2.3); a pillar halfway.
+        scene = with_piece({"id": "PILLAR", "label": "Pillar", "position": [3.0, 1.6], "width": 0.5, "depth": 0.5,
+                            "height": 2.4, "rotation_deg": 0})
+        mara = figures(scene, "P3", "start")["MARA"]
+        self.assertEqual((mara["hidden"], mara["hidden_by"]), ("full", "PILLAR"))
+        shot = next(item for item in scene["shots"] if item["id"] == "P3")
+        self.assertIn("Mara Vale (hidden by Pillar)", render_svg(blocking_frame(scene, shot, "start")))
+
+    def test_a_low_piece_hides_the_body_only(self) -> None:
+        # Mara sits (eyes at 1.18 m): a desk-high piece covers her body, not her head.
+        scene = with_piece({"id": "DESK", "label": "Desk", "position": [3.0, 1.6], "width": 0.8, "depth": 0.5,
+                            "height": 0.95, "rotation_deg": 30})
+        mara = figures(scene, "P3", "start")["MARA"]
+        self.assertEqual((mara["hidden"], mara["hidden_by"]), ("partly", "DESK"))
+
+    def test_a_piece_beside_the_line_of_sight_hides_nothing(self) -> None:
+        scene = with_piece({"id": "CRATE", "label": "Crate", "position": [3.6, 1.6], "width": 0.3, "depth": 0.3,
+                            "height": 2.0, "rotation_deg": 0})
+        self.assertEqual(figures(scene, "P3", "start")["MARA"]["hidden"], "")
+
+    def test_the_check_says_when_the_camera_follows_someone_the_set_hides(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "film"
+            shutil.copytree(DEMO, root)
+            scene_file = root / "scenes" / "030-echo-chamber" / "scene.yaml"
+            scene_file.write_text(scene_file.read_text(encoding="utf-8").replace(
+                "  axis: [MARA, SPEAKER]\n",
+                "  axis: [MARA, SPEAKER]\n  set_pieces:\n"
+                "    - {id: PILLAR, label: Pillar, x: 3.0, y: 1.6, width: 0.5, depth: 0.5, height: 2.4}\n"),
+                encoding="utf-8")
+            scene = next(item for item in load_production(root)["scenes"] if item["id"] == "SC-030")
+            hidden = [finding for finding in scene["findings"] if finding["code"] == "subject_hidden"]
+            self.assertEqual([finding["shots"] for finding in hidden], [["P3"], ["P3"]])  # start and end
+            self.assertIn("the camera follows MARA, but the Pillar stands between them", hidden[0]["message"])
+        self.assertFalse([f for f in echo_chamber()["findings"] if f["code"] == "subject_hidden"])
+
+    def test_the_plan_is_checked(self) -> None:
+        from cine_toaster.errors import ValidationError
+        from cine_toaster.geometry import parse_geometry
+
+        geometry = parse_geometry({"set_pieces": [{"id": "T", "position": [1, 1], "width": 1, "depth": 2, "height": 0.7,
+                                                   "rotation_deg": 90}],
+                                   "subjects": [{"id": "BOX", "position": [2, 2], "kind": "object", "width": 0.5}]})
+        corners = geometry.set_pieces["T"].corners()
+        self.assertAlmostEqual(max(x for x, _ in corners) - min(x for x, _ in corners), 2.0)  # turned a quarter
+        self.assertEqual(geometry.subjects["BOX"].kind, "object")
+        for bad, message in (({"set_pieces": [{"id": "T", "position": [1, 1], "width": 1}]}, "needs a width"),
+                             ({"set_pieces": [{"id": "T", "position": [1, 1], "width": 1, "depth": 1, "height": -1}]},
+                              "positive"),
+                             ({"subjects": [{"id": "A", "position": [0, 0], "kind": "ghost"}]}, "unknown kind"),
+                             ({"subjects": [{"id": "A", "position": [0, 0]}],
+                               "set_pieces": [{"id": "A", "position": [1, 1], "width": 1, "depth": 1, "height": 1}]},
+                              "Duplicate")):
+            with self.assertRaisesRegex(ValidationError, message):
+                parse_geometry(bad)
+
+
 class EchoChamberGoldenTests(unittest.TestCase):
     """SC-030, measured once by hand against the plan."""
 
@@ -59,7 +142,9 @@ class EchoChamberGoldenTests(unittest.TestCase):
     def test_p3_holds_mara_centred_with_the_stack_off_left(self) -> None:
         start = figures(self.scene, "P3", "start")
         self.assertAlmostEqual(start["MARA"]["x"], 0.0, places=2)
-        self.assertFalse(start["SPEAKER"]["in_frame"])
+        # The stack's centre is off left; being 0.7 m wide (an object, CT-0025), its edge enters the frame.
+        self.assertLess(start["SPEAKER"]["x"], -1.0)
+        self.assertTrue(start["SPEAKER"]["in_frame"])
         self.assertEqual(start["SPEAKER"]["side"], "left")
 
 

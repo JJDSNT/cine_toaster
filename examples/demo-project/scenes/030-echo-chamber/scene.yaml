@@ -32,6 +32,9 @@ geography:
       eye_height: 1.18
     - label: Speaker stack
       id: SPEAKER
+      kind: object
+      width: 0.7
+      height: 1.8
       x: 1.2
       y: 2.4
       eye_height: 1.55

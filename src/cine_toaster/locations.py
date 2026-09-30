@@ -55,6 +55,7 @@ def _location(path: Path, root: Path | None) -> dict[str, Any]:
         "description": str(raw.get("description") or ""),
         "room": raw.get("room"),
         "marks": [dict(item) for item in raw.get("marks") or [] if isinstance(item, dict)],
+        "set_pieces": [dict(item) for item in raw.get("set_pieces") or [] if isinstance(item, dict)],
         "cameras": [dict(item) for item in raw.get("cameras") or [] if isinstance(item, dict)],
         "references": references,
         "look": str(raw.get("look") or ""),
@@ -97,6 +98,15 @@ def resolve(geography: dict[str, Any], location: dict[str, Any]) -> tuple[dict[s
         marks[key] = {**marks.get(key, {}), **mark}
     if marks:
         merged["marks"] = list(marks.values())
+
+    pieces = {_key(piece.get("id")): dict(piece) for piece in location.get("set_pieces") or []}
+    for piece in geography.get("set_pieces") or []:
+        key = _key(piece.get("id"))
+        if key in pieces and not _same(piece, pieces[key], ("x", "y")):
+            notes.append(f"set piece {key} stands elsewhere here than in the location")
+        pieces[key] = {**pieces.get(key, {}), **piece}
+    if pieces:
+        merged["set_pieces"] = list(pieces.values())
 
     cameras = {_key(camera.get("id")): dict(camera) for camera in location["cameras"]}
     order = list(cameras)

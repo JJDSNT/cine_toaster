@@ -5,7 +5,7 @@ type: work
 status: doing
 owner: development agent
 created_at: 2026-09-29
-updated_at: 2026-09-29
+updated_at: 2026-09-30
 tags:
   - storyboard
   - geometry
@@ -82,14 +82,28 @@ otherwise depend on prompt wording.
 5. **Revisit the blocking frame's limits** (recorded 2026-09-29 at the
    user's request). Most need schema fields, so they wait for a real shot
    that the frame gets wrong:
-   - every subject is drawn as a person, including the speaker stack. A
-     subject `kind` (person, object) and a size would fix it;
+   - ~~every subject is drawn as a person, including the speaker stack~~
+     done 2026-09-30: subject `kind: object` with `width` and `height`,
+     drawn as a block in the frame and a footprint on the plan;
    - silhouettes always face the camera. Subjects have no facing direction,
      although eyelines imply one;
    - a subject's height is fixed for the scene, so standing up or sitting down
      inside a shot cannot be shown;
-   - the set is an empty box: no furniture, doors, windows or occluders, so
-     nothing can hide a subject;
+   - ~~the set is an empty box~~ done 2026-09-30: `set_pieces` (id, label,
+     x, y, width, depth, height, rotation) in a scene's geography or a
+     location's, merged by id (`location_override` note when moved). The
+     frame draws visible faces far to near with the figures (painter's
+     order), reports each piece (`set_pieces`: depth, in_frame) and each
+     subject's `hidden` (full: head and body behind a piece; partly: body
+     only) and `hidden_by`, drawing a fully hidden subject as a dashed
+     outline. `toast check` warns `subject_hidden` when the camera's own
+     target is fully hidden at a shot's start or end. The plan view draws
+     footprints. The demo's listening station gains a console and an
+     equipment rack; its speaker stack is an object (the P3 golden changed:
+     the 0.7 m stack's edge now enters the frame). Tests: 5 in
+     `SetPieceTests`, 1 in `test_locations`. Still an approximation:
+     painter's order by centre depth, not per pixel; doors and windows are
+     not modelled;
    - only the start and end are drawn, not the move between them;
    - camera: no roll or dutch angle, no lens distortion, no depth of field,
      and a 16:9 full-frame sensor is assumed; there is no per-production

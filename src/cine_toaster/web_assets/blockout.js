@@ -62,7 +62,14 @@ function drawGrid(context, room, project) {
 function drawSubject(context, subject, project, { position = subject.position, ghost = false } = {}) {
   const [x, y] = project.point(position);
   context.beginPath();
-  context.arc(x, y, 9, 0, Math.PI * 2);
+  if (subject.kind === "object") {
+    // An object is its footprint, not a person's dot.
+    const side = subject.width || 0.6;
+    footprint(position, side, side).map(project.point).forEach(([px, py], index) => (index ? context.lineTo(px, py) : context.moveTo(px, py)));
+    context.closePath();
+  } else {
+    context.arc(x, y, 9, 0, Math.PI * 2);
+  }
   if (ghost) {
     // Where the subject was when the shot began: an outline, not a body.
     context.strokeStyle = COLORS.subject;
@@ -72,14 +79,44 @@ function drawSubject(context, subject, project, { position = subject.position, g
   }
   context.fillStyle = COLORS.subject;
   context.fill();
+  // Beside the body: past the footprint's edge for an object.
+  const gap = subject.kind === "object" ? ((subject.width || 0.6) / 2) * project.scale + 6 : 14;
   context.fillStyle = COLORS.text;
   context.font = "600 12px Inter, system-ui, sans-serif";
-  context.fillText(subject.label, x + 14, y + 4);
-  if (subject.eye_height != null) {
+  context.fillText(subject.label, x + gap, y + 4);
+  const note = subject.kind === "object" && subject.height ? `${subject.height} m tall`
+    : subject.eye_height != null ? `eye ${subject.eye_height} m` : "";
+  if (note) {
     context.fillStyle = COLORS.muted;
     context.font = "11px Inter, system-ui, sans-serif";
-    context.fillText(`eye ${subject.eye_height} m`, x + 14, y + 19);
+    context.fillText(note, x + gap, y + 19);
   }
+}
+
+// A set piece or an object subject: its footprint, turned, and its height (CT-0025).
+function footprint(position, width, depth, rotation = 0) {
+  const angle = (rotation * Math.PI) / 180;
+  const [cos, sin] = [Math.cos(angle), Math.sin(angle)];
+  return [[-width / 2, -depth / 2], [width / 2, -depth / 2], [width / 2, depth / 2], [-width / 2, depth / 2]]
+    .map(([dx, dy]) => [position[0] + dx * cos - dy * sin, position[1] + dx * sin + dy * cos]);
+}
+
+function drawPiece(context, piece, project) {
+  const corners = footprint(piece.position, piece.width, piece.depth, piece.rotation_deg || 0).map(project.point);
+  context.beginPath();
+  corners.forEach(([x, y], index) => (index ? context.lineTo(x, y) : context.moveTo(x, y)));
+  context.closePath();
+  context.fillStyle = "rgba(89, 99, 106, 0.55)";
+  context.fill();
+  context.strokeStyle = "#8a9499";
+  context.lineWidth = 1.2;
+  context.stroke();
+  const [x, y] = project.point(piece.position);
+  context.fillStyle = COLORS.muted;
+  context.font = "10px Inter, system-ui, sans-serif";
+  context.textAlign = "center";
+  context.fillText(`${piece.label} · ${piece.height} m`, x, y + 3);
+  context.textAlign = "left";
 }
 
 function drawMark(context, mark, project) {
@@ -230,6 +267,7 @@ export function drawBlockout(
   const active = activeShot ? motions.find((motion) => motion.shot_id === activeShot) : null;
   drawAxis(context, geometry, project, active ? active.start.subjects : {});
 
+  for (const piece of geometry.set_pieces || []) drawPiece(context, piece, project);
   for (const mark of geometry.marks || []) drawMark(context, mark, project);
 
   // Movement within shots (SPEC-0005): subject paths and camera paths. With a

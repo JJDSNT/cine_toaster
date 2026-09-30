@@ -2,7 +2,9 @@
 
 No model is called. The camera is a pinhole with the shot's lens on a
 full-frame 16:9 sensor, placed at the shot's start or end pose; subjects are
-silhouettes at their positions for that moment (SPEC-0005). Because the frame
+silhouettes at their positions for that moment (SPEC-0005); objects and set
+pieces are boxes, and a subject a set piece stands in front of is reported
+as hidden by it (and drawn as a dashed outline). Because the frame
 comes from the same numbers `toast check` reads, it cannot disagree with it:
 a subject the checks call "left" is on the left here.
 
@@ -200,11 +202,15 @@ def blocking_frame(scene: dict[str, Any], shot: dict[str, Any], at: str | float 
     aim = (pose["target"][0], pose["target"][1], aim_height)
     camera = _Camera(eye, aim, float(pose["lens_mm"]))
 
+    pieces = [item for item in geometry.get("set_pieces") or [] if item.get("position")]
     figures = []
     for order, subject_id in enumerate(sorted(positions)):
         x, y = positions[subject_id]
         info = subjects.get(subject_id, {"label": subject_id})
         eye_height = info.get("eye_height") or DEFAULT_EYE_HEIGHT
+        is_object = info.get("kind") == "object"
+        if is_object:
+            eye_height = info.get("height") or info.get("eye_height") or 1.0
         foot = camera.project((x, y, 0.0))
         head = camera.project((x, y, eye_height + 0.02))
         side, angle = screen_side(pose["position"], pose["target"], (x, y))
@@ -213,7 +219,12 @@ def blocking_frame(scene: dict[str, Any], shot: dict[str, Any], at: str | float 
                             "behind": True, "in_frame": False, "side": side, "angle": round(angle, 1)})
             continue
         depth = head[2]
-        half_width = camera.metres_to_frame(SHOULDER_WIDTH / 2, depth)
+        size = (info.get("width") or DEFAULT_OBJECT_WIDTH) if is_object else SHOULDER_WIDTH
+        half_width = camera.metres_to_frame(size / 2, depth)
+        # Hidden: a set piece stands between the camera and the head; partly: the body only.
+        seen_points = [(x, y, eye_height + 0.02), (x, y, eye_height * 0.55)]
+        blockers = [next((piece["id"] for piece in pieces if _blocks(eye, point, piece)), "") for point in seen_points]
+        hidden = "full" if all(blockers) else "partly" if any(blockers) else ""
         figures.append(
             {
                 "subject": subject_id,
@@ -229,9 +240,24 @@ def blocking_frame(scene: dict[str, Any], shot: dict[str, Any], at: str | float 
                 "side": side,
                 "angle": round(angle, 1),
                 "colour": PALETTE[order % len(PALETTE)],
-                "_shape": _figure_shape(camera, (x, y), eye_height),
+                "kind": "object" if is_object else "person",
+                "hidden": hidden,
+                "hidden_by": next((blocker for blocker in blockers if blocker), ""),
+                "_shape": ({"box": _box(camera, _footprint((x, y), size, size), eye_height), "top": head}
+                           if is_object else _figure_shape(camera, (x, y), eye_height)),
             }
         )
+
+    drawn_pieces = []
+    for piece in pieces:
+        corners = _footprint(tuple(piece["position"]), piece["width"], piece["depth"], float(piece.get("rotation_deg") or 0))
+        faces = _box(camera, corners, piece["height"])
+        centre = (piece["position"][0], piece["position"][1], piece["height"] / 2)
+        depth = camera.depth(centre)
+        in_frame = any(abs(px) <= 1.0 and abs(py) <= 1.0 for face in faces for px, py in face["points"])
+        drawn_pieces.append({"id": piece["id"], "label": piece.get("label") or piece["id"], "depth": round(depth, 2),
+                             "in_frame": in_frame, "_faces": faces,
+                             "_top": camera.project((centre[0], centre[1], piece["height"]))})
 
     room = geometry.get("room") or {}
     lines = _room_lines(camera, room) if room else []
@@ -262,11 +288,102 @@ def blocking_frame(scene: dict[str, Any], shot: dict[str, Any], at: str | float 
             "tilt_deg": round(camera.tilt_deg, 1),
         },
         "figures": sorted(figures, key=lambda item: -item.get("depth", 0.0)),
+        "set_pieces": sorted(drawn_pieces, key=lambda item: -item["depth"]),
         "_lines": lines,
         "_floor": _floor(camera, room) if room else [],
         "_axis": axis_line,
         "_marks": marks,
     }
+
+
+#: An object subject without a declared size: a footprint side and a height (m).
+DEFAULT_OBJECT_WIDTH = 0.6
+SHADES = {"top": "#59636a", "lit": "#48525a", "dark": "#353d43"}
+
+
+def _box(camera: _Camera, corners: list[tuple[float, float]], height: float) -> list[dict[str, Any]]:
+    """The faces of a box the camera sees, projected: a footprint (counter-clockwise) raised to a height."""
+
+    faces = [([(x, y, height) for x, y in corners], (0.0, 0.0, 1.0), "top")]
+    for index, (ax, ay) in enumerate(corners):
+        bx, by = corners[(index + 1) % 4]
+        normal = (by - ay, -(bx - ax), 0.0)
+        faces.append(([(ax, ay, 0.0), (bx, by, 0.0), (bx, by, height), (ax, ay, height)], normal, ""))
+    drawn = []
+    for points, normal, name in faces:
+        middle = tuple(sum(point[i] for point in points) / len(points) for i in range(3))
+        if _dot(normal, _sub(middle, camera.eye)) >= 0:
+            continue  # facing away
+        projected = [camera.project(point) for point in camera.clip_polygon(points)]
+        polygon = [(p[0], p[1]) for p in projected if p]
+        if len(polygon) >= 3:
+            # Sides facing the camera's right read lighter, as if lit from there.
+            shade = name or ("lit" if _dot(_unit(normal), camera.right) > 0 else "dark")
+            drawn.append({"points": polygon, "shade": shade})
+    return drawn
+
+
+def _footprint(position: tuple[float, float], width: float, depth: float, rotation_deg: float = 0.0) -> list[tuple[float, float]]:
+    angle = math.radians(rotation_deg)
+    cos, sin = math.cos(angle), math.sin(angle)
+    return [(position[0] + dx * cos - dy * sin, position[1] + dx * sin + dy * cos)
+            for dx, dy in ((-width / 2, -depth / 2), (width / 2, -depth / 2), (width / 2, depth / 2), (-width / 2, depth / 2))]
+
+
+def _blocks(eye: Vec, point: Vec, piece: dict[str, Any]) -> bool:
+    """Whether a set piece stands between the camera and a point (a ray through a turned box)."""
+
+    angle = -math.radians(float(piece.get("rotation_deg") or 0.0))
+    cos, sin = math.cos(angle), math.sin(angle)
+    cx, cy = piece["position"]
+
+    def local(p: Vec) -> Vec:
+        dx, dy = p[0] - cx, p[1] - cy
+        return (dx * cos - dy * sin, dx * sin + dy * cos, p[2])
+
+    a, b = local(eye), local(point)
+    bounds = ((-piece["width"] / 2, piece["width"] / 2), (-piece["depth"] / 2, piece["depth"] / 2), (0.0, piece["height"]))
+    if all(low <= b[i] <= high for i, (low, high) in enumerate(bounds)):
+        return False  # the point is inside the piece (standing at a desk): not hidden by it
+    enter, leave = 0.0, 1.0
+    for i, (low, high) in enumerate(bounds):
+        delta = b[i] - a[i]
+        if abs(delta) < 1e-9:
+            if not low <= a[i] <= high:
+                return False
+            continue
+        t1, t2 = (low - a[i]) / delta, (high - a[i]) / delta
+        enter, leave = max(enter, min(t1, t2)), min(leave, max(t1, t2))
+        if enter > leave:
+            return False
+    return 0.0 < enter < 0.999
+
+
+def hidden_targets(geometry: dict[str, Any], motion: dict[str, Any]) -> list[tuple[str, str, str]]:
+    """(moment, subject, set piece) where the subject the camera follows is hidden behind a piece.
+
+    The same test the frame draws with: head and body both behind the piece.
+    """
+
+    pieces = [item for item in geometry.get("set_pieces") or [] if item.get("position")]
+    subjects = {item["id"]: item for item in geometry.get("subjects", [])}
+    found = []
+    for moment in ("start", "end"):
+        state = motion.get(moment) or {}
+        pose = state.get("camera") or {}
+        target = pose.get("target_ref") or ""
+        where = (state.get("subjects") or {}).get(target)
+        if not pieces or not target or where is None:
+            continue
+        info = subjects.get(target, {})
+        height = (info.get("height") or info.get("eye_height") or 1.0) if info.get("kind") == "object" \
+            else info.get("eye_height") or DEFAULT_EYE_HEIGHT
+        eye = (pose["position"][0], pose["position"][1], pose.get("height") or DEFAULT_CAMERA_HEIGHT)
+        blockers = [next((piece["id"] for piece in pieces if _blocks(eye, point, piece)), "")
+                    for point in ((where[0], where[1], height + 0.02), (where[0], where[1], height * 0.55))]
+        if all(blockers):
+            found.append((moment, target, blockers[0]))
+    return found
 
 
 def _figure_shape(camera: _Camera, plan: tuple[float, float], eye_height: float) -> dict[str, Any]:
@@ -322,8 +439,8 @@ def public_frame(frame: dict[str, Any]) -> dict[str, Any]:
     """The frame's facts, without the drawing."""
 
     return {
-        key: value if key != "figures" else [
-            {k: v for k, v in figure.items() if not k.startswith("_")} for figure in value
+        key: value if key not in ("figures", "set_pieces") else [
+            {k: v for k, v in item.items() if not k.startswith("_")} for item in value
         ]
         for key, value in frame.items()
         if not key.startswith("_")
@@ -362,16 +479,43 @@ def render_svg(frame: dict[str, Any]) -> str:
         out.append(f'<line x1="0" y1="{HEIGHT * third / 3:.1f}" x2="{WIDTH}" y2="{HEIGHT * third / 3:.1f}" '
                    f'stroke="#ffffff" stroke-opacity="0.06"/>')
 
-    offscreen = []
-    for figure in frame["figures"]:
+    def polygon(points: list[tuple[float, float]], fill: str, extra: str = "") -> str:
+        return f'<polygon points="{" ".join(_px(p) for p in points)}" fill="{fill}" {extra}/>'
+
+    def label(x: float, y: float, text: str, colour: str = "#e8ecee") -> str:
+        cx, cy = (float(v) for v in _px((x, y)).split(","))
+        return (f'<text x="{min(max(cx, 40), WIDTH - 40):.1f}" y="{max(cy - 6, 12):.1f}" fill="{colour}" '
+                f'font-size="12" text-anchor="middle">{escape(text)}</text>')
+
+    offscreen, hidden = [], []
+    # Far to near, figures and set pieces together, so nearer things cover farther ones.
+    layers = [("figure", item) for item in frame["figures"]] + [("piece", item) for item in frame.get("set_pieces") or []]
+    layers.sort(key=lambda layer: -layer[1].get("depth", 0.0))
+    for kind, item in layers:
+        if kind == "piece":
+            for face in item["_faces"]:
+                out.append(polygon(face["points"], SHADES[face["shade"]], 'stroke="#1c2226" stroke-width="1"'))
+            if item["in_frame"] and item["_top"]:
+                out.append(label(item["_top"][0], item["_top"][1], item["label"], "#b8c2c7"))
+            continue
+        figure = item
         shape = figure.get("_shape")
         if figure["behind"] or not figure["in_frame"] or not shape:
             offscreen.append(figure)
             continue
+        if figure.get("hidden") == "full":
+            hidden.append(figure)
+            continue
         colour = figure["colour"]
+        if "box" in shape:
+            for face in shape["box"]:
+                out.append(polygon(face["points"], colour, f'fill-opacity="{0.95 if face["shade"] == "top" else 0.7}" '
+                                                           'stroke="#101315" stroke-width="1"'))
+            if shape["top"]:
+                out.append(label(shape["top"][0], shape["top"][1], figure["label"]))
+            continue
         if len(shape["body"]) >= 3:
-            out.append(f'<polygon points="{" ".join(_px(p) for p in shape["body"])}" '
-                       f'fill="{colour}" fill-opacity="0.85"/>')
+            out.append(polygon(shape["body"], colour, 'fill-opacity="0.85"'))
         if shape["head"]:
             hx, hy, radius = shape["head"]
             cx, cy = (float(v) for v in _px((hx, hy)).split(","))
@@ -379,6 +523,26 @@ def render_svg(frame: dict[str, Any]) -> str:
             label_y = max(cy - radius * WIDTH / 2 - 6, 12)
             out.append(f'<text x="{min(max(cx, 40), WIDTH - 40):.1f}" y="{label_y:.1f}" fill="#e8ecee" '
                        f'font-size="12" text-anchor="middle">{escape(figure["label"])}</text>')
+    # A hidden subject is still there: its outline, dashed, over what hides it.
+    for figure in hidden:
+        shape = figure["_shape"]
+        outline = f'fill="none" stroke="{figure["colour"]}" stroke-width="1.2" stroke-dasharray="4 3"'
+        blocker = next((piece["label"] for piece in frame.get("set_pieces") or [] if piece["id"] == figure["hidden_by"]),
+                       figure["hidden_by"])
+        if "box" in shape:
+            for face in shape["box"]:
+                out.append(polygon(face["points"], "none", outline))
+            anchor = shape["top"]
+        else:
+            if len(shape["body"]) >= 3:
+                out.append(polygon(shape["body"], "none", outline))
+            if shape["head"]:
+                hx, hy, radius = shape["head"]
+                cx, cy = (float(v) for v in _px((hx, hy)).split(","))
+                out.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{radius * WIDTH / 2:.1f}" {outline}/>')
+            anchor = shape["head"]
+        if anchor:
+            out.append(label(anchor[0], anchor[1], f'{figure["label"]} (hidden by {blocker})', "#8a9499"))
 
     for index, figure in enumerate(offscreen):
         left = figure["side"] == "left" or (figure["side"] == "centred" and figure["behind"])

@@ -58,6 +58,18 @@ CENTRED_ANGLE_TOLERANCE_DEG = 5.0
 SUBJECT_MIN_SEPARATION_M = 0.25
 
 
+def _positive(value: Any, label: str) -> float | None:
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as error:
+        raise ValidationError(f"{label} must be a number") from error
+    if number <= 0:
+        raise ValidationError(f"{label} must be positive")
+    return number
+
+
 def _point(value: Any, *, label: str) -> tuple[float, float]:
     if not isinstance(value, (list, tuple)) or len(value) != 2:
         raise ValidationError(f"{label} must be a two-number [x, y] position")
@@ -81,6 +93,9 @@ class Room:
         return {"width": self.width, "depth": self.depth, "height": self.height}
 
 
+SUBJECT_KINDS = ("person", "object")
+
+
 @dataclass(frozen=True, slots=True)
 class Subject:
     """A person or object the cameras are arranged around."""
@@ -91,6 +106,11 @@ class Subject:
     # Heights are optional: a plan drawn from measurements often has positions
     # long before anyone decides how high the camera sits.
     eye_height: float | None = None
+    #: An object (a speaker stack, a machine) is drawn as a block, not a figure (CT-0025).
+    kind: str = "person"
+    #: An object's footprint side and height, in metres.
+    width: float | None = None
+    height: float | None = None
 
     def public_dict(self) -> dict[str, Any]:
         return {
@@ -98,7 +118,41 @@ class Subject:
             "label": self.label,
             "position": list(self.position),
             "eye_height": self.eye_height,
+            "kind": self.kind,
+            "width": self.width,
+            "height": self.height,
         }
+
+
+@dataclass(frozen=True, slots=True)
+class SetPiece:
+    """Furniture, a wall, a machine: a box on the plan that the cameras see and that hides what is behind it.
+
+    `position` is the centre of its footprint; `width` runs along the plan's
+    x axis and `depth` along y before `rotation_deg` turns it
+    counter-clockwise.
+    """
+
+    id: str
+    label: str
+    position: tuple[float, float]
+    width: float
+    depth: float
+    height: float
+    rotation_deg: float = 0.0
+
+    def corners(self) -> list[tuple[float, float]]:
+        """The footprint, counter-clockwise, on the plan."""
+
+        angle = math.radians(self.rotation_deg)
+        cos, sin = math.cos(angle), math.sin(angle)
+        half_w, half_d = self.width / 2, self.depth / 2
+        return [(self.position[0] + dx * cos - dy * sin, self.position[1] + dx * sin + dy * cos)
+                for dx, dy in ((-half_w, -half_d), (half_w, -half_d), (half_w, half_d), (-half_w, half_d))]
+
+    def public_dict(self) -> dict[str, Any]:
+        return {"id": self.id, "label": self.label, "position": list(self.position), "width": self.width,
+                "depth": self.depth, "height": self.height, "rotation_deg": self.rotation_deg}
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,6 +217,7 @@ class SceneGeometry:
     cameras: dict[str, Camera] = field(default_factory=dict)
     axis: Axis | None = None
     marks: dict[str, Mark] = field(default_factory=dict)
+    set_pieces: dict[str, SetPiece] = field(default_factory=dict)
 
     def is_empty(self) -> bool:
         return self.room is None and not self.subjects and not self.cameras
@@ -175,6 +230,7 @@ class SceneGeometry:
             "cameras": [camera.public_dict() for camera in self.cameras.values()],
             "axis": self.axis.public_dict() if self.axis else None,
             "marks": [mark.public_dict() for mark in self.marks.values()],
+            "set_pieces": [piece.public_dict() for piece in self.set_pieces.values()],
         }
 
     def resolve_target(self, camera: Camera) -> tuple[float, float] | None:
@@ -216,11 +272,17 @@ def parse_geometry(document: dict[str, Any] | None) -> SceneGeometry:
             raise ValidationError("A geometry subject needs an id")
         if subject_id in subjects:
             raise ValidationError(f"Duplicate geometry subject id {subject_id!r}")
+        kind = str(raw.get("kind") or "person").strip().lower()
+        if kind not in SUBJECT_KINDS:
+            raise ValidationError(f"subject {subject_id} has an unknown kind {kind!r}", allowed=list(SUBJECT_KINDS))
         subjects[subject_id] = Subject(
             id=subject_id,
             label=str(raw.get("label", subject_id)),
             position=_point(raw.get("position"), label=f"subject {subject_id} position"),
             eye_height=float(raw["eye_height"]) if raw.get("eye_height") is not None else None,
+            kind=kind,
+            width=_positive(raw.get("width"), f"subject {subject_id} width"),
+            height=_positive(raw.get("height"), f"subject {subject_id} height"),
         )
 
     cameras: dict[str, Camera] = {}
@@ -265,6 +327,26 @@ def parse_geometry(document: dict[str, Any] | None) -> SceneGeometry:
             position=_point(raw.get("position"), label=f"mark {mark_id} position"),
         )
 
+    set_pieces: dict[str, SetPiece] = {}
+    for raw in document.get("set_pieces", []) or []:
+        if not isinstance(raw, dict):
+            raise ValidationError("Each geometry.set_pieces entry must be a table")
+        piece_id = str(raw.get("id", "")).strip()
+        if not piece_id:
+            raise ValidationError("A set piece needs an id")
+        if piece_id in set_pieces or piece_id in marks or piece_id in subjects or piece_id in cameras:
+            raise ValidationError(f"Duplicate geometry id {piece_id!r}")
+        size = [_positive(raw.get(key), f"set piece {piece_id} {key}") for key in ("width", "depth", "height")]
+        if None in size:
+            raise ValidationError(f"set piece {piece_id} needs a width, a depth and a height")
+        set_pieces[piece_id] = SetPiece(
+            id=piece_id,
+            label=str(raw.get("label", piece_id)),
+            position=_point(raw.get("position"), label=f"set piece {piece_id} position"),
+            width=size[0], depth=size[1], height=size[2],
+            rotation_deg=float(raw.get("rotation_deg") or 0.0),
+        )
+
     axis = None
     axis_document = document.get("axis")
     if isinstance(axis_document, dict):
@@ -280,6 +362,7 @@ def parse_geometry(document: dict[str, Any] | None) -> SceneGeometry:
         cameras=cameras,
         axis=axis,
         marks=marks,
+        set_pieces=set_pieces,
     )
 
 

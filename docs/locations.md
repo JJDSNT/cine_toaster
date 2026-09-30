@@ -27,7 +27,9 @@ geography:
     - {id: CAM-A, shots: "3"}   # the set's camera, covering shot 3 here
 ```
 
-- **What the scene takes from the location:** the room and the marks.
+- **What the scene takes from the location:** the room, the marks and the
+  set pieces (`set_pieces`, see continuity-checks.md). A scene may add a
+  piece or move one by id; a moved piece is reported like a moved mark.
 - **Cameras:** a scene camera entry with only an id takes the location's
   camera. An entry with a position replaces it for that scene.
 - **Checks:** a scene that moves one of the set's marks or cameras is told
