@@ -56,7 +56,13 @@ class _Camera:
         self.forward = _unit(_sub(aim, eye))
         # Screen right is the plan view vector turned a quarter clockwise --
         # the convention `screen_side` uses, so both agree on every side.
-        self.right = _unit((self.forward[1], -self.forward[0], 0.0))
+        # Looking straight down (a top shot), the plan view is the aim's
+        # own direction, or north when there is none.
+        horizontal = (aim[0] - eye[0], aim[1] - eye[1])
+        if math.hypot(*horizontal) < 1e-6:
+            horizontal = (0.0, 1.0)
+        flat = _unit((horizontal[0], horizontal[1], 0.0))
+        self.right = _unit((flat[1], -flat[0], 0.0))
         f, r = self.forward, self.right
         self.up = (r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0])
         self.lens_mm = lens_mm
@@ -70,7 +76,7 @@ class _Camera:
 
         d = _sub(point, self.eye)
         depth = _dot(d, self.forward)
-        if depth <= NEAR:
+        if depth < NEAR - 1e-9:  # a point clipped onto the near plane itself is kept
             return None
         x = _dot(d, self.right) / depth * self.lens_mm / (SENSOR_WIDTH_MM / 2)
         y = _dot(d, self.up) / depth * self.lens_mm / (SENSOR_HEIGHT_MM / 2)
@@ -100,7 +106,8 @@ class _Camera:
             if inside_now != inside_before:
                 segment = self.clip_segment(previous, current)
                 if segment:
-                    kept.append(segment[1] if inside_now else segment[0])
+                    # The crossing point: entering, it starts the kept segment; leaving, it ends it.
+                    kept.append(segment[0] if inside_now else segment[1])
             if inside_now:
                 kept.append(current)
         return kept
@@ -259,8 +266,12 @@ def blocking_frame(scene: dict[str, Any], shot: dict[str, Any], at: str | float 
         faces = _box(camera, corners, piece["height"])
         centre = (piece["position"][0], piece["position"][1], piece["height"] / 2)
         depth = camera.depth(centre)
-        in_frame = any(abs(px) <= 1.0 and abs(py) <= 1.0 for face in faces for px, py in face["points"])
-        drawn_pieces.append({"id": piece["id"], "label": piece.get("label") or piece["id"], "depth": round(depth, 2),
+        # In frame when a face's extent meets the frame: a road can cover it with every corner outside.
+        in_frame = any(min(x for x, _ in face["points"]) <= 1.0 and max(x for x, _ in face["points"]) >= -1.0
+                       and min(y for _, y in face["points"]) <= 1.0 and max(y for _, y in face["points"]) >= -1.0
+                       for face in faces)
+        drawn_pieces.append({"id": piece["id"], "label": piece.get("label", piece["id"]), "depth": round(depth, 2),
+                             "ground": piece["height"] < GROUND_HEIGHT,
                              "in_frame": in_frame, "_faces": faces,
                              "_top": camera.project((centre[0], centre[1], piece["height"]))})
 
@@ -301,6 +312,8 @@ def blocking_frame(scene: dict[str, Any], shot: dict[str, Any], at: str | float 
     }
 
 
+#: A piece lower than this lies on the ground (a road, a rug, a lake): drawn first, under everything.
+GROUND_HEIGHT = 0.3
 #: An object subject without a declared size: a footprint side and a height (m).
 DEFAULT_OBJECT_WIDTH = 0.6
 SHADES = {"top": "#59636a", "lit": "#48525a", "dark": "#353d43"}
@@ -421,8 +434,9 @@ def _room_lines(camera: _Camera, room: dict[str, float]) -> list[tuple[tuple[flo
     for index, (x, y) in enumerate(corners):
         nx, ny = corners[(index + 1) % 4]
         segments.append(((x, y, 0.0), (nx, ny, 0.0)))
-        segments.append(((x, y, h), (nx, ny, h)))
-        segments.append(((x, y, 0.0), (x, y, h)))
+        if not room.get("exterior"):  # outdoors there is only the ground's edge
+            segments.append(((x, y, h), (nx, ny, h)))
+            segments.append(((x, y, 0.0), (x, y, h)))
     lines = []
     for a, b in segments:
         clipped = camera.clip_segment(a, b)
@@ -495,12 +509,12 @@ def render_svg(frame: dict[str, Any]) -> str:
     offscreen, hidden = [], []
     # Far to near, figures and set pieces together, so nearer things cover farther ones.
     layers = [("figure", item) for item in frame["figures"]] + [("piece", item) for item in frame.get("set_pieces") or []]
-    layers.sort(key=lambda layer: -layer[1].get("depth", 0.0))
+    layers.sort(key=lambda layer: (not layer[1].get("ground"), -layer[1].get("depth", 0.0)))
     for kind, item in layers:
         if kind == "piece":
             for face in item["_faces"]:
                 out.append(polygon(face["points"], SHADES[face["shade"]], 'stroke="#1c2226" stroke-width="1"'))
-            if item["in_frame"] and item["_top"]:
+            if item["in_frame"] and item["_top"] and item["label"]:
                 out.append(label(item["_top"][0], item["_top"][1], item["label"], "#b8c2c7"))
             continue
         figure = item
@@ -531,9 +545,9 @@ def render_svg(frame: dict[str, Any]) -> str:
     # A hidden subject is still there: its outline, dashed, over what hides it.
     for figure in hidden:
         shape = figure["_shape"]
-        outline = f'fill="none" stroke="{figure["colour"]}" stroke-width="1.2" stroke-dasharray="4 3"'
-        blocker = next((piece["label"] for piece in frame.get("set_pieces") or [] if piece["id"] == figure["hidden_by"]),
-                       figure["hidden_by"])
+        outline = f'stroke="{figure["colour"]}" stroke-width="1.2" stroke-dasharray="4 3"'
+        blocker = next((piece["label"] or piece["id"] for piece in frame.get("set_pieces") or []
+                        if piece["id"] == figure["hidden_by"]), figure["hidden_by"])
         if "box" in shape:
             for face in shape["box"]:
                 out.append(polygon(face["points"], "none", outline))
@@ -544,7 +558,7 @@ def render_svg(frame: dict[str, Any]) -> str:
             if shape["head"]:
                 hx, hy, radius = shape["head"]
                 cx, cy = (float(v) for v in _px((hx, hy)).split(","))
-                out.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{radius * WIDTH / 2:.1f}" {outline}/>')
+                out.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{radius * WIDTH / 2:.1f}" fill="none" {outline}/>')
             anchor = shape["head"]
         if anchor:
             out.append(label(anchor[0], anchor[1], f'{figure["label"]} (hidden by {blocker})', "#8a9499"))

@@ -797,6 +797,7 @@ def _geometry_document(geography: dict[str, Any]) -> dict[str, Any] | None:
                 "height": field(camera, "height"),
                 "target": target,
                 "lens_mm": field(camera, "lens_mm", 50),
+                "target_height": field(camera, "target_height"),
             }
         )
 
@@ -834,6 +835,8 @@ def _geometry_document(geography: dict[str, Any]) -> dict[str, Any] | None:
             "width": float(room[0]),
             "depth": float(room[1]),
             "height": float(room[2]) if len(room) > 2 else 2.7,
+            # Outdoors (a city, a road): ground only, no walls or ceiling.
+            "exterior": bool(field(geography, "exterior")),
         }
     axis = field(geography, "axis")
     if isinstance(axis, (list, tuple)) and len(axis) == 2:

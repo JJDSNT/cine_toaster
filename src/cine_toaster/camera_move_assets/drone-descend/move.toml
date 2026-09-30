@@ -1,0 +1,20 @@
+schema_version = 1
+id = "drone-descend"
+name = "Drone descend"
+category = "drone/crane"
+says = "From the air down to one person: out of the whole world, this one."
+energy = "medium"
+use_when = [
+  "Opening a scene by finding its character",
+]
+avoid_when = [
+  "When the place does not matter",
+]
+
+[implies]
+kind = "crane"
+direction = "down"
+rig = "drone"
+
+[prompt]
+text = "an aerial shot descending from high above down to the character"

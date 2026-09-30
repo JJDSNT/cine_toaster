@@ -1,0 +1,20 @@
+schema_version = 1
+id = "aerial-orbit"
+name = "Aerial orbit"
+category = "drone/crane"
+says = "Circling high around a person or a place: the world turning around one point."
+energy = "medium"
+use_when = [
+  "A landmark, an arrival, a character alone in a large place",
+]
+avoid_when = [
+  "Dialogue",
+]
+
+[implies]
+kind = "arc"
+direction = "left"
+rig = "drone"
+
+[prompt]
+text = "an aerial shot circling slowly around the subject from high above"

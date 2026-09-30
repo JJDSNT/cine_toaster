@@ -1,0 +1,20 @@
+schema_version = 1
+id = "flyover"
+name = "Flyover"
+category = "drone/crane"
+says = "Flying over the place, looking down as it passes beneath."
+energy = "medium"
+use_when = [
+  "Establishing a city, a landscape, a distance travelled",
+]
+avoid_when = [
+  "Inside a scene's action",
+]
+
+[implies]
+kind = "dolly"
+direction = "in"
+rig = "drone"
+
+[prompt]
+text = "an aerial flyover, gliding forward high above the landscape"

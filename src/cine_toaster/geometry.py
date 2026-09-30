@@ -84,13 +84,15 @@ class Room:
     width: float
     depth: float
     height: float
+    #: Outdoors: ground with no walls or ceiling; a camera may rise as high as it likes.
+    exterior: bool = False
 
     def contains(self, position: tuple[float, float]) -> bool:
         x, y = position
         return 0.0 <= x <= self.width and 0.0 <= y <= self.depth
 
     def public_dict(self) -> dict[str, float]:
-        return {"width": self.width, "depth": self.depth, "height": self.height}
+        return {"width": self.width, "depth": self.depth, "height": self.height, "exterior": self.exterior}
 
 
 SUBJECT_KINDS = ("person", "object")
@@ -170,6 +172,9 @@ class Camera:
     height: float | None
     target: str | tuple[float, float]
     lens_mm: float
+    #: How high the camera aims (m): the ground from a drone, a rooftop from the street.
+    #: Without it, the camera aims at its target subject's eyes, or level.
+    target_height: float | None = None
 
     def horizontal_fov_degrees(self) -> float:
         return math.degrees(2 * math.atan(SENSOR_WIDTH_MM / (2 * self.lens_mm)))
@@ -183,6 +188,7 @@ class Camera:
             "height": self.height,
             "target": target,
             "lens_mm": self.lens_mm,
+            "target_height": self.target_height,
             "fov_degrees": round(self.horizontal_fov_degrees(), 2),
         }
 
@@ -259,6 +265,7 @@ def parse_geometry(document: dict[str, Any] | None) -> SceneGeometry:
                 width=float(room_document["width"]),
                 depth=float(room_document["depth"]),
                 height=float(room_document.get("height", 2.7)),
+                exterior=bool(room_document.get("exterior")),
             )
         except (KeyError, TypeError, ValueError) as error:
             raise ValidationError("geometry.room needs numeric width and depth") from error
@@ -310,6 +317,7 @@ def parse_geometry(document: dict[str, Any] | None) -> SceneGeometry:
             height=float(raw["height"]) if raw.get("height") is not None else None,
             target=target,
             lens_mm=lens,
+            target_height=float(raw["target_height"]) if raw.get("target_height") is not None else None,
         )
 
     marks: dict[str, Mark] = {}

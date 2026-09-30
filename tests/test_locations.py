@@ -70,7 +70,7 @@ class LocationTests(unittest.TestCase):
         self.assertEqual(station["id"], "LISTENING-STATION")
         self.assertEqual(station["appearances"], ["SC-010", "SC-030"])
         plan = station["plan"]
-        self.assertEqual(plan["room"], {"width": 6.0, "depth": 4.5, "height": 3.2})
+        self.assertEqual(plan["room"], {"width": 6.0, "depth": 4.5, "height": 3.2, "exterior": False})
         self.assertEqual([camera["id"] for camera in plan["cameras"]], ["CAM-A", "CAM-B", "CAM-C"])
         self.assertEqual({piece["id"] for piece in plan["set_pieces"]}, {"CONSOLE", "RACK"})
         self.assertIsNone(station["backlot"])

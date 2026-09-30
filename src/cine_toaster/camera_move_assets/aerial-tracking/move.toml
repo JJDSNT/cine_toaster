@@ -1,0 +1,20 @@
+schema_version = 1
+id = "aerial-tracking"
+name = "Aerial tracking"
+category = "drone/crane"
+says = "From the air, keeping pace with a vehicle or a runner: the journey and the land it crosses."
+energy = "medium"
+use_when = [
+  "A car on a road, a journey toward a place",
+]
+avoid_when = [
+  "When the traveller's face matters more than the road",
+]
+
+# The camera travels with a moving subject: a track, flown.
+[implies]
+kind = "track"
+rig = "drone"
+
+[prompt]
+text = "an aerial tracking shot following the car along the road from above and behind"

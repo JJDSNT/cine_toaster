@@ -56,3 +56,40 @@ dolly zoom sets the lens by the distance so the face keeps its size. A
 move whose feel is its rig (handheld, body-mounted) is said to hold still:
 the plan cannot show it. Previews are derived on request
 (`/api/camera-move-preview?id=…`) and never stored.
+
+## Aerial moves
+
+Six moves are flown (`rig: drone`): **top shot** (straight down), **rise and
+reveal** (from a person up over the place to the view beyond), **drone
+descend** (its reverse), **aerial orbit**, **flyover** and **aerial
+tracking** (keeping pace with a vehicle), beside the drone push in and pull
+back. They are previewed outdoors: a person on a street, buildings, a road
+with a car, a lake beyond.
+
+A scene flown over is outdoors, and its camera aims down. Two plan fields
+say so:
+
+```yaml
+geography:
+  room: [400, 300]          # the part of the city the plan covers, in metres
+  exterior: true            # ground only: no walls, no ceiling to rise through
+  subjects:
+    - {id: KAEL, label: Kael, x: 180, y: 120, eye_height: 1.7}
+  marks:
+    - {id: LAKE, x: 200, y: 280}
+  cameras:
+    - {id: DRONE, x: 180, y: 116, height: 1.8, target: KAEL, lens_mm: 28, shots: "1"}
+
+shots:
+  - n: 1                    # the rise from Kael over the city, framing the lake
+    move:
+      id: rise-and-reveal
+      to: {x: 180, y: 60, height: 60, target: LAKE, target_height: 0}
+```
+
+`target_height` is how high the camera aims: 0 is the ground (the lake,
+the road), and without it the camera aims at its subject's eyes, or level.
+A change of aim height with the camera in place is derived as a tilt. For a
+car on a road, the car is a subject of `kind: object` that moves
+(`subjects_move`), and a drone camera aimed at it with `target_height: 0`
+keeps pace with it (`move: {id: aerial-tracking, to: {...}}`).

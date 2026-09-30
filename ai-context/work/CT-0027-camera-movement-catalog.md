@@ -115,3 +115,25 @@ were before their catalog.
   widens, pans and trucks send the subject the other way, tilt-up tilts,
   dolly zoom holds the size while closing in; the handheld note).
   Headless: 32 cards, the dolly zoom plays from 35 to about 20 mm.
+
+# Aerial moves (2026-09-30, at the author's request for SINGULAR's scenes 4 and 5)
+
+- Catalog: `top-shot`, `rise-and-reveal`, `drone-descend`, `aerial-orbit`,
+  `flyover`, `aerial-tracking` (38 moves). Scene 4: the camera rises from
+  Kael over the city, framing the lake; scene 5: it follows Kael's car to
+  the Boreal station.
+- Geometry: `Room.exterior` (geography `exterior: true`: ground edge only);
+  `Camera.target_height` and a move's `to.target_height`, carried as
+  `Pose.target_height` (`aim_height` in the motion) and drawn by the frame;
+  `derive_kind` derives a tilt from an aim-height change in place.
+- Frame: a camera looking straight down gets a plan heading instead of a
+  degenerate right vector; pieces under 0.3 m are ground, drawn first.
+- Found and fixed while previewing outdoors: near-plane polygon clipping
+  kept the wrong vertex (large polygons crossing behind the camera
+  collapsed), the clipped point was then dropped by `project`, a piece's
+  `in_frame` needed its extent to meet the frame (a road covers it with
+  every corner outside), and a hidden subject's outline was invalid SVG
+  (two `fill` attributes; now a test parses the drawing).
+- Previews: `AERIAL_STAGE` (120 m ground, buildings, a road with a car, a
+  lake); drone moves are previewed there. Tests: `AerialTests` (6).
+- The plan view draws an exterior's edge dashed, and a 10 m grid past 30 m.

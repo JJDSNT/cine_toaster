@@ -85,6 +85,12 @@ geography:            # or a location's location.yaml
     - {id: SPEAKER, label: Speaker stack, kind: object, width: 0.7, height: 1.8, x: 1.2, y: 2.4}
 ```
 
+Outdoors, `exterior: true` beside `room` draws only the ground's edge, so a
+camera may rise as high as it likes; a camera's `target_height` (or a move's
+`to.target_height`) is how high it aims, so a drone can look down at a
+road or a lake (see camera-moves.md, Aerial moves). A piece lower than
+0.3 m (a road, a lake) is ground: drawn first, under everything.
+
 `width` runs along x and `depth` along y before `rotation` (degrees,
 counter-clockwise). The frame draws the pieces far to near with the
 figures, and a subject a piece stands in front of is reported as hidden

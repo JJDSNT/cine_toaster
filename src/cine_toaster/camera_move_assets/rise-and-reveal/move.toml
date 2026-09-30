@@ -1,0 +1,23 @@
+schema_version = 1
+id = "rise-and-reveal"
+name = "Rise and reveal"
+category = "drone/crane"
+says = "The camera rises from the person until the place opens beneath: the world they are part of."
+energy = "medium"
+use_when = [
+  "Leaving a character for the place they are in",
+  "Revealing a landscape, a city, a lake beyond the rooftops",
+]
+avoid_when = [
+  "When the next shot returns straight to a close-up",
+]
+
+# The camera rises and travels while its aim goes from the person to the far
+# place: a crane up on a drone, ending tilted down onto the view.
+[implies]
+kind = "crane"
+direction = "up"
+rig = "drone"
+
+[prompt]
+text = "the camera rises from the character, up over the rooftops, revealing the landscape beyond"

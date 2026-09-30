@@ -62,7 +62,11 @@ class SetPieceTests(unittest.TestCase):
         mara = figures(scene, "P3", "start")["MARA"]
         self.assertEqual((mara["hidden"], mara["hidden_by"]), ("full", "PILLAR"))
         shot = next(item for item in scene["shots"] if item["id"] == "P3")
-        self.assertIn("Mara Vale (hidden by Pillar)", render_svg(blocking_frame(scene, shot, "start")))
+        drawing = render_svg(blocking_frame(scene, shot, "start"))
+        self.assertIn("Mara Vale (hidden by Pillar)", drawing)
+        import xml.etree.ElementTree as ElementTree
+
+        ElementTree.fromstring(drawing)  # well-formed: a hidden outline once had two fills
 
     def test_a_low_piece_hides_the_body_only(self) -> None:
         # Mara sits (eyes at 1.18 m): a desk-high piece covers her body, not her head.

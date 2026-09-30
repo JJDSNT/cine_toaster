@@ -41,7 +41,9 @@ function projector(room, width, height) {
 function drawGrid(context, room, project) {
   context.strokeStyle = COLORS.grid;
   context.lineWidth = 1;
-  for (let x = 0; x <= room.width; x += 1) {
+  // A metre grid for a room; ten metres for a street or a landscape.
+  const step = Math.max(room.width, room.depth) > 30 ? 10 : 1;
+  for (let x = 0; x <= room.width; x += step) {
     const [sx, sy0] = project.point([x, 0]);
     const [, sy1] = project.point([x, room.depth]);
     context.beginPath();
@@ -49,7 +51,7 @@ function drawGrid(context, room, project) {
     context.lineTo(sx, sy1);
     context.stroke();
   }
-  for (let y = 0; y <= room.depth; y += 1) {
+  for (let y = 0; y <= room.depth; y += step) {
     const [sx0, sy] = project.point([0, y]);
     const [sx1] = project.point([room.width, y]);
     context.beginPath();
@@ -262,7 +264,10 @@ export function drawBlockout(
   drawGrid(context, room, project);
   context.strokeStyle = COLORS.room;
   context.lineWidth = 2;
+  // Outdoors the edge is only where the plan stops, not a wall.
+  if (room.exterior) context.setLineDash([8, 6]);
   context.strokeRect(originX, originY, room.width * project.scale, room.depth * project.scale);
+  context.setLineDash([]);
 
   const active = activeShot ? motions.find((motion) => motion.shot_id === activeShot) : null;
   drawAxis(context, geometry, project, active ? active.start.subjects : {});

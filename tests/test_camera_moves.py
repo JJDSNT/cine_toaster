@@ -121,3 +121,58 @@ class PreviewTests(unittest.TestCase):
 
         self.assertIn("cannot show a handheld's feel", preview(self.moves["handheld"])["note"])
         self.assertEqual(preview(self.moves["push-in"])["note"], "")
+
+
+class AerialTests(unittest.TestCase):
+    """Moves from the air, outdoors, with the camera aimed down (scene 4's rise, scene 5's car)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.moves = {move["id"]: move for move in list_moves(Path(BUILTIN).parent)}
+
+    def frames(self, move_id: str) -> tuple[dict, dict]:
+        from cine_toaster.blocking import blocking_frame, public_frame
+        from cine_toaster.camera_moves import AERIAL_STAGE, preview_motion
+
+        motion, _ = preview_motion(self.moves[move_id])
+        shot = {"id": move_id, "motion": motion}
+        return tuple(public_frame(blocking_frame(AERIAL_STAGE, shot, t)) for t in (0.0, 1.0))
+
+    def test_the_aerial_moves_are_in_the_catalog(self) -> None:
+        for move_id in ("top-shot", "rise-and-reveal", "drone-descend", "aerial-orbit", "flyover", "aerial-tracking"):
+            self.assertEqual(self.moves[move_id]["implies"]["rig"], "drone", move_id)
+
+    def test_a_rise_leaves_the_person_for_the_lake_below(self) -> None:
+        first, last = self.frames("rise-and-reveal")
+        self.assertGreater(last["camera"]["height"], 40)
+        self.assertLess(last["camera"]["tilt_deg"], -30)  # looking down at the view
+        self.assertTrue(next(p for p in last["set_pieces"] if p["id"] == "LAKE")["in_frame"])
+        self.assertLess(first["camera"]["height"], 2)  # it starts beside the person
+
+    def test_the_tracking_keeps_the_car_in_frame_along_the_road(self) -> None:
+        first, last = self.frames("aerial-tracking")
+        for frame in (first, last):
+            car = next(item for item in frame["figures"] if item["subject"] == "CAR")
+            self.assertTrue(car["in_frame"])
+            self.assertLess(abs(car["x"]), 0.3)
+            self.assertTrue(next(p for p in frame["set_pieces"] if p["id"] == "ROAD")["in_frame"])
+
+    def test_a_top_shot_looks_straight_down(self) -> None:
+        first, _ = self.frames("top-shot")
+        self.assertLess(first["camera"]["tilt_deg"], -85)
+
+    def test_a_declared_aim_height_is_a_tilt_the_plan_derives(self) -> None:
+        from cine_toaster.movement import Pose, derive_kind
+
+        level = Pose((0.0, 0.0), (0.0, 10.0), 35.0, 1.5, "", 1.5)
+        down = Pose((0.0, 0.0), (0.0, 10.0), 35.0, 1.5, "", 0.0)
+        self.assertEqual(derive_kind(level, down, target_moves=False)[:2], ("tilt", "down"))
+
+    def test_an_exterior_has_ground_and_no_walls(self) -> None:
+        from cine_toaster.blocking import _Camera, _room_lines
+
+        camera = _Camera((5.0, -5.0, 10.0), (5.0, 5.0, 0.0), 24.0)
+        outside = _room_lines(camera, {"width": 10.0, "depth": 10.0, "height": 3.0, "exterior": True})
+        inside = _room_lines(camera, {"width": 10.0, "depth": 10.0, "height": 3.0})
+        self.assertLessEqual(len(outside), 4)
+        self.assertGreater(len(inside), len(outside))

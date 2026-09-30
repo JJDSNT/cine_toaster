@@ -1,0 +1,23 @@
+schema_version = 1
+id = "top-shot"
+name = "Top shot"
+category = "drone/crane"
+says = "Straight down from above: the place as a map, people as marks on it."
+energy = "low"
+use_when = [
+  "Showing a layout, a pattern, where everyone stands",
+  "Making a person small and exposed",
+]
+avoid_when = [
+  "When faces must be read",
+]
+
+# What the move implies in the scene's plan (SPEC-0005). A top shot is a
+# camera position, not a move: the pose looks straight down (a target_height
+# far below the camera, over the target).
+[implies]
+kind = "static"
+rig = "drone"
+
+[prompt]
+text = "a top-down aerial shot looking straight down, the ground flat like a map"

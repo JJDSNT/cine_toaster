@@ -108,6 +108,27 @@ PREVIEW_STAGE = {
         "marks": [],
     },
 }
+#: Aerial moves are previewed outdoors: a person on a street, buildings, a road with a car, a lake beyond.
+AERIAL_STAGE = {
+    "id": "preview-aerial",
+    "geometry": {
+        "room": {"width": 120.0, "depth": 120.0, "height": 3.0, "exterior": True},
+        "subjects": [
+            {"id": "A", "label": "Subject", "position": [60.0, 54.0], "eye_height": 1.6, "kind": "person"},
+            {"id": "CAR", "label": "Car", "position": [30.0, 47.0], "kind": "object", "width": 2.0, "height": 1.5},
+        ],
+        "set_pieces": [
+            {"id": "ROAD", "label": "Road", "position": [60.0, 47.0], "width": 120.0, "depth": 6.0, "height": 0.02},
+            {"id": "LAKE", "label": "Lake", "position": [60.0, 100.0], "width": 70.0, "depth": 24.0, "height": 0.05},
+            {"id": "B1", "label": "", "position": [44.0, 64.0], "width": 12.0, "depth": 10.0, "height": 18.0},
+            {"id": "B2", "label": "", "position": [76.0, 66.0], "width": 14.0, "depth": 10.0, "height": 24.0},
+            {"id": "B3", "label": "", "position": [58.0, 74.0], "width": 10.0, "depth": 8.0, "height": 14.0},
+            {"id": "B4", "label": "", "position": [40.0, 30.0], "width": 12.0, "depth": 12.0, "height": 16.0},
+            {"id": "B5", "label": "", "position": [82.0, 28.0], "width": 12.0, "depth": 10.0, "height": 20.0},
+        ],
+        "marks": [],
+    },
+}
 PREVIEW_SECONDS = 2.0
 PREVIEW_FPS = 12
 
@@ -118,11 +139,46 @@ def _turn(point: tuple[float, float], pivot: tuple[float, float], degrees: float
     return [pivot[0] + dx * math.cos(angle) - dy * math.sin(angle), pivot[1] + dx * math.sin(angle) + dy * math.cos(angle)]
 
 
+def _aerial_motion(move_id: str, kind: str, direction: str) -> dict[str, Any]:
+    """A drone move on the outdoor stage: poses high above the ground, aimed down at it."""
+
+    person, lake = [60.0, 54.0], [60.0, 100.0]
+
+    def pose(position, target, height, aim, lens=24.0):
+        return {"position": list(position), "target": list(target), "target_ref": "", "lens_mm": lens,
+                "height": height, "aim_height": aim}
+
+    subjects = {"A": person, "CAR": [30.0, 47.0]}
+    end_subjects = dict(subjects)
+    if move_id == "top-shot":
+        start = end = pose([60.0, 53.5], person, 35.0, 0.0)
+    elif kind == "crane":  # a rise from the person to the view beyond, or its reverse
+        low, high = pose([60.0, 49.0], person, 1.7, 1.6, 28.0), pose([60.0, 30.0], lake, 55.0, 0.0)
+        start, end = (low, high) if direction == "up" else (high, low)
+    elif kind == "arc":
+        start = pose([60.0, 14.0], person, 30.0, 0.0)
+        end = pose(_turn((60.0, 14.0), tuple(person), -60.0 if direction == "left" else 60.0), person, 30.0, 0.0)
+    elif kind == "track":  # keeping pace with the car along the road
+        end_subjects["CAR"] = [90.0, 47.0]
+        start = pose([18.0, 34.0], [30.0, 47.0], 18.0, 0.0)
+        end = pose([78.0, 34.0], [90.0, 47.0], 18.0, 0.0)
+    elif move_id == "flyover":
+        start = pose([60.0, 0.0], [60.0, 50.0], 45.0, 0.0)
+        end = pose([60.0, 60.0], [60.0, 110.0], 45.0, 0.0)
+    else:  # a drone push in or pull back: high, toward or away from the person
+        near, far = pose([60.0, 30.0], person, 12.0, 1.0), pose([60.0, 0.0], person, 40.0, 1.0)
+        start, end = (far, near) if direction == "in" else (near, far)
+    return {"kind": kind or "static", "speed": "", "start": {"camera": start, "subjects": subjects},
+            "end": {"camera": end, "subjects": end_subjects}}
+
+
 def preview_motion(move: dict[str, Any]) -> tuple[dict[str, Any], str]:
     """The start and end of a move on the preview stage, and what the plan cannot show of it."""
 
     implies = move.get("implies") or {}
     kind, direction = implies.get("kind") or "", implies.get("direction") or ""
+    if implies.get("rig") == "drone":
+        return _aerial_motion(move["id"], kind, direction), ""
     subject = (3.5, 3.2)
     start = {"position": [3.5, 0.8], "target": list(subject), "target_ref": "", "lens_mm": 35.0, "height": 1.5,
              "aim_height": 1.6}
@@ -177,7 +233,8 @@ def preview(move: dict[str, Any]) -> dict[str, Any]:
     from .blocking import blocking_frame, render_svg
 
     motion, note = preview_motion(move)
+    stage = AERIAL_STAGE if (move.get("implies") or {}).get("rig") == "drone" else PREVIEW_STAGE
     shot = {"id": move["id"], "motion": motion}
     count = int(PREVIEW_SECONDS * PREVIEW_FPS) + 1
-    frames = [render_svg(blocking_frame(PREVIEW_STAGE, shot, index / (count - 1))) for index in range(count)]
+    frames = [render_svg(blocking_frame(stage, shot, index / (count - 1))) for index in range(count)]
     return {"id": move["id"], "fps": PREVIEW_FPS, "frames": frames, "note": note}

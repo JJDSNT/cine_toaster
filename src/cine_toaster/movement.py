@@ -55,6 +55,8 @@ class Pose:
     lens_mm: float
     height: float | None = None
     target_ref: str = ""
+    #: How high the camera aims, when declared (a drone looking down at a lake).
+    target_height: float | None = None
 
     def half_fov(self) -> float:
         return math.degrees(math.atan(36.0 / (2 * self.lens_mm)))
@@ -66,6 +68,7 @@ class Pose:
             "target_ref": self.target_ref,
             "lens_mm": self.lens_mm,
             "height": self.height,
+            "aim_height": self.target_height,
         }
 
 
@@ -175,7 +178,7 @@ def _pose(camera: Camera, geometry: SceneGeometry, positions: dict[str, Point]) 
     target = _resolve(geometry, camera.target, positions)
     if target is None:
         return None
-    return Pose(camera.position, target, camera.lens_mm, camera.height, target_ref)
+    return Pose(camera.position, target, camera.lens_mm, camera.height, target_ref, camera.target_height)
 
 
 def _declared(value: str) -> tuple[str, str]:
@@ -199,6 +202,14 @@ def _bearing(origin: Point, point: Point) -> float:
 
 def _angle_delta(start: float, end: float) -> float:
     return (end - start + 180.0) % 360.0 - 180.0
+
+
+def _tilt(pose: Pose) -> float | None:
+    """How far the camera looks up (positive) or down, when both heights are known."""
+
+    if pose.height is None or pose.target_height is None:
+        return None
+    return math.degrees(math.atan2(pose.target_height - pose.height, math.dist(pose.position, pose.target) or 1e-6))
 
 
 def derive_kind(
@@ -264,6 +275,9 @@ def derive_kind(
     if not moved and abs(aim_change) > PAN_EPSILON_DEG:
         side, _ = screen_side(start.position, start.target, end.target)
         components.append(("pan", side if side != "centred" else ""))
+    tilt = _tilt(end) - _tilt(start) if None not in (_tilt(start), _tilt(end)) else 0.0
+    if abs(tilt) > PAN_EPSILON_DEG and not height_change:
+        components.append(("tilt", "up" if tilt > 0 else "down"))
     if abs(lens_change) > 0.5:
         components.append(("zoom", "in" if lens_change > 0 else "out"))
 
@@ -379,6 +393,7 @@ def shot_motions(
                     start_pose.lens_mm,
                     start_pose.height,
                     start_pose.target_ref,
+                    start_pose.target_height,
                 )
             motion.end_pose = end_pose
             target_moves = bool(end_pose.target_ref) and end_pose.target_ref in moved
@@ -488,7 +503,9 @@ def _end_pose(
         target = end_positions[target_ref]
     lens = float(destination.get("lens_mm", start.lens_mm))
     height = destination.get("height", start.height)
-    return Pose(position, target, lens, float(height) if height is not None else None, target_ref)
+    aim = destination.get("target_height", start.target_height)
+    return Pose(position, target, lens, float(height) if height is not None else None, target_ref,
+                float(aim) if aim is not None else None)
 
 
 def check_movement(
