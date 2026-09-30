@@ -187,9 +187,17 @@ remains:
   only through commands after a yes, never on a gate. Step 13 is done too
   (CT-0046): the canvas edits cuts (a decision over the breakdown, never a
   rewrite) and starts workflows, through the same commands. Step 14 (Tauri) was
-  cancelled by the user (ADR 0019): the plan ends at 13. Next: the pending
-  hardening items. The author
-  will re-check later whether Kael's converted voice still sounds ill.
+  cancelled by the user (ADR 0019): the plan ends at 13. The hardening items
+  after it are done (2026-09-30): references edited on the canvas and cut
+  sets taken whole (CT-0046); a cross-interface conflict test, which found
+  lost decisions and led to `state.scene_lock` (ADR 0006 amendment); set
+  pieces and object subjects in the blocking frame with a `subject_hidden`
+  check (CT-0025); master pictures from a location's plate, and a
+  Locations room (SPEC-0010, CT-0030); camera-move previews (CT-0027).
+  Noted for later, not started: RL beyond the refusal reasons (CT-0041),
+  Claude Code acting through Cine Toaster by MCP (CT-0045), Video Toaster
+  transitions (CT-0028), VFX and titles (CT-0031). The author will re-check
+  later whether Kael's converted voice still sounds ill.
 
 Earlier notes:
 
