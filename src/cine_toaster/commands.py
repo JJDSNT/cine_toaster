@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import os
 import uuid
 from dataclasses import dataclass, replace
@@ -23,6 +24,7 @@ from .state import (
     decision_record,
     load_scene_state,
     now,
+    scene_lock,
     write_scene_state,
 )
 
@@ -111,6 +113,18 @@ def _check_writable(directory: Path, scene_id: str) -> None:
         )
 
 
+def _locked(command):
+    """Run a scene command holding the scene's state (`scene_lock`): read, decide, write, as one."""
+
+    @functools.wraps(command)
+    def locked(root: Path, *, scene_id: str, **arguments: Any) -> CommandResult:
+        with scene_lock(scene_directory(Path(root).expanduser().resolve(), scene_id)):
+            return command(root, scene_id=scene_id, **arguments)
+
+    return locked
+
+
+@_locked
 def select_take(
     root: Path,
     *,
@@ -223,6 +237,7 @@ def select_take(
     )
 
 
+@_locked
 def clear_selection(
     root: Path,
     *,
@@ -321,6 +336,7 @@ def _validated_cut(root: Path, scene: dict[str, Any], shot_id: str, cut: dict[st
     return {"type": cut_type, "chain": chain, "reason": _clean_rationale(cut.get("reason")), "transition": transition}
 
 
+@_locked
 def set_cut(
     root: Path,
     *,
@@ -363,6 +379,7 @@ def set_cut(
                          event=event.public_dict())
 
 
+@_locked
 def set_cuts(
     root: Path,
     *,
@@ -423,6 +440,7 @@ def set_cuts(
                          event=event.public_dict())
 
 
+@_locked
 def clear_cut(
     root: Path,
     *,
@@ -489,6 +507,7 @@ def _check_no_cycle(scene: dict[str, Any], shot: dict[str, Any], ref: str) -> No
         current = str(lineage[0].get("ref") or "") if other and lineage and isinstance(lineage[0], dict) else ""
 
 
+@_locked
 def set_reference(
     root: Path,
     *,
@@ -556,6 +575,7 @@ def set_reference(
                          event=event.public_dict())
 
 
+@_locked
 def clear_reference(
     root: Path,
     *,
@@ -592,6 +612,7 @@ def clear_reference(
                          revision=committed.revision, event=event.public_dict())
 
 
+@_locked
 def set_voice(
     root: Path,
     *,
@@ -643,6 +664,7 @@ def set_voice(
                          event=event.public_dict())
 
 
+@_locked
 def record_assembly(
     root: Path,
     *,
@@ -739,6 +761,7 @@ def record_assembly(
     )
 
 
+@_locked
 def review_assembly(
     root: Path,
     *,
@@ -841,6 +864,7 @@ def review_assembly(
     )
 
 
+@_locked
 def restore_assembly(
     root: Path,
     *,
@@ -977,18 +1001,20 @@ def record_sequence_version(
     production = load_production(root)
     if not any(item["id"] == sequence_id for item in production["sequences"]):
         raise ResourceNotFoundError(f"No sequence {sequence_id!r}")
-    data = sequence_state.load(root)
-    entry = data["sequences"].setdefault(sequence_id, {"versions": []})
-    if any(item["id"] == version_id for item in entry["versions"]):
-        raise ValidationError(f"Sequence {sequence_id!r} already has a version {version_id!r}")
-    version = {
-        "id": version_id, "created_at": now(), "media": media, "summary": summary.strip(),
-        "duration_seconds": float(duration_seconds or 0), "scenes": dict(scenes),
-        "verdict": "pending", "note": "", "reviewed_by": None,
-    }
-    entry["versions"].append(version)
-    data["revision"] += 1
-    sequence_state.write(root, data)
+    # The sequences' state is one file for the production: held like a scene's.
+    with scene_lock(root):
+        data = sequence_state.load(root)
+        entry = data["sequences"].setdefault(sequence_id, {"versions": []})
+        if any(item["id"] == version_id for item in entry["versions"]):
+            raise ValidationError(f"Sequence {sequence_id!r} already has a version {version_id!r}")
+        version = {
+            "id": version_id, "created_at": now(), "media": media, "summary": summary.strip(),
+            "duration_seconds": float(duration_seconds or 0), "scenes": dict(scenes),
+            "verdict": "pending", "note": "", "reviewed_by": None,
+        }
+        entry["versions"].append(version)
+        data["revision"] += 1
+        sequence_state.write(root, data)
     event = append_event(root, Event.create(
         "sequence.version.recorded", production["id"], sequence_id=sequence_id,
         version_id=version_id, actor=actor.public_dict(), revision=data["revision"],
@@ -1007,14 +1033,16 @@ def review_sequence_version(
         raise ValidationError(f"Unknown verdict {verdict!r}", allowed=list(SEQUENCE_VERDICTS))
     root = root.expanduser().resolve()
     production = load_production(root)
-    data = sequence_state.load(root)
-    entry = data["sequences"].get(sequence_id) or {"versions": []}
-    version = next((item for item in entry["versions"] if item["id"] == version_id), None)
-    if version is None:
-        raise ResourceNotFoundError(f"Sequence {sequence_id!r} has no version {version_id!r}")
-    version.update(verdict=verdict, note=_clean_rationale(note), reviewed_by=actor.public_dict(), reviewed_at=now())
-    data["revision"] += 1
-    sequence_state.write(root, data)
+    # The sequences' state is one file for the production: held like a scene's.
+    with scene_lock(root):
+        data = sequence_state.load(root)
+        entry = data["sequences"].get(sequence_id) or {"versions": []}
+        version = next((item for item in entry["versions"] if item["id"] == version_id), None)
+        if version is None:
+            raise ResourceNotFoundError(f"Sequence {sequence_id!r} has no version {version_id!r}")
+        version.update(verdict=verdict, note=_clean_rationale(note), reviewed_by=actor.public_dict(), reviewed_at=now())
+        data["revision"] += 1
+        sequence_state.write(root, data)
     event = append_event(root, Event.create(
         "sequence.version.reviewed", production["id"], sequence_id=sequence_id,
         version_id=version_id, verdict=verdict, actor=actor.public_dict(), revision=data["revision"],

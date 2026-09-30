@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -37,7 +38,7 @@ def load(root: Path) -> dict[str, Any]:
 def write(root: Path, data: dict[str, Any]) -> None:
     path = state_path(root)
     payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
-    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{threading.get_ident()}")
     try:
         with temporary.open("w", encoding="utf-8") as handle:
             handle.write(payload)

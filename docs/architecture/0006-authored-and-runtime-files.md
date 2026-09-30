@@ -44,6 +44,16 @@ diffs readably, and nothing in it was typed by a person.
 Writes are atomic: a temporary sibling file, `fsync`, then `os.replace`. A
 failed write leaves the previous committed state readable and unchanged.
 
+Amendment (2026-09-30, CT-0046): a command's read, revision check and write
+happen under one lock per scene (`state.scene_lock`): `flock` on the scene
+directory, so no file is added to the project, and reentrant within a
+process. Without it the canvas, the CLI and an agent deciding at the same
+moment each read revision N and wrote N+1, and one decision was lost with
+every interface reporting success (reproduced: 53 of 60 decisions kept).
+Scene commands take it through `@_locked`, workflows through the same lock,
+and the sequences' state file holds the production root the same way. On a
+platform without `fcntl` the lock covers one process only.
+
 ## Consequences
 
 An external tool can regenerate `scene.toml` from its own source of truth as

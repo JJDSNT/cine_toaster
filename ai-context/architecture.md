@@ -205,8 +205,9 @@ Require spikes before adoption:
   directory, including rejected ones and the reason in their filename.
 - `src/cine_toaster/commands.py` is the single write boundary. `select_take` and
   `clear_selection` are reached identically by CLI, HTTP, and the browser.
-- `src/cine_toaster/state.py` owns revisions, selections, decision history, and
-  the atomic commit.
+- `src/cine_toaster/state.py` owns revisions, selections, decision history, the
+  atomic commit, and `scene_lock`: every read-check-write of a scene's state
+  holds it, across threads and processes (ADR 0006 amendment).
 - `src/cine_toaster/errors.py` defines the typed domain errors every interface
   reports with the same code.
 - `src/cine_toaster/events.py` records committed events and tails them for live

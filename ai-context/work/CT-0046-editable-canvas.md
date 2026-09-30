@@ -112,5 +112,16 @@ Plan step 13: the canvas becomes editable, and every edit is a command.
   together: it proposed action and J with reasons, the confirmation listed
   both, and one "sim" wrote both at revision 1 (45 s). Sets that mix cuts
   and references are not offered.
-- **A cross-interface conflict test** (canvas, CLI and agent at once). The
-  revision check is shared and tested per command.
+- ~~**A cross-interface conflict test**~~ done 2026-09-30, and it found a
+  real defect. `tests/test_concurrent_interfaces.py`: the canvas (HTTP,
+  `set_cut`) and an agent (HTTP, `select_take`) from threads, and the CLI's
+  commands from a separate process, 20 decisions each on one scene. Before
+  the fix: 53 of 60 decisions kept, plus HTTP 500s (two threads shared the
+  temporary file name `.state.json.tmp-<pid>`); commands had no lock at all
+  and workflows only an in-process one. Fix: `state.scene_lock` (`flock` on
+  the scene directory, reentrant in-process), taken by every scene command
+  (`@_locked`), by workflows, and around the sequences' state; temporary
+  names carry the thread id. After: 60 of 60, each at its own revision, the
+  last word of each interface standing, 8 runs in a row. A second test: a
+  canvas edit drawn before a CLI decision is refused with
+  `revision_conflict` and changes nothing.

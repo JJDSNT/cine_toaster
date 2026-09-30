@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import json
 import os
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
+
+try:  # POSIX: one lock across processes (the CLI beside `toast serve`)
+    import fcntl
+except ImportError:  # pragma: no cover - Windows keeps the in-process lock only
+    fcntl = None
 
 from .errors import PersistenceError, ValidationError
 
@@ -221,6 +228,42 @@ def with_progress(state: SceneState, *, gates: dict[str, dict[str, Any]],
     return replace(state, revision=state.revision + 1, updated_at=now(), gates=gates, workflows=workflows)
 
 
+_GUARD = threading.Lock()
+_LOCKS: dict[str, threading.RLock] = {}
+_DEPTH: dict[str, int] = {}
+
+
+@contextmanager
+def scene_lock(scene_directory: Path) -> Iterator[None]:
+    """Hold one scene's state for a read-decide-write, against every other writer.
+
+    A mutation reads `state.json`, checks the revision, and writes the next
+    one. Without this, two writers (the canvas and the CLI, an agent and a
+    workflow step) could both read revision N and both write N+1: one
+    decision silently lost. The lock is the scene directory itself, locked
+    with `flock`, so no file is added to the project; within a process it is
+    reentrant, so a command may call another on the same scene.
+    """
+
+    key = str(scene_directory.resolve())
+    with _GUARD:
+        lock = _LOCKS.setdefault(key, threading.RLock())
+    with lock:
+        depth = _DEPTH.get(key, 0)
+        handle = None
+        if depth == 0 and fcntl is not None and scene_directory.is_dir():
+            handle = os.open(scene_directory, os.O_RDONLY)
+            fcntl.flock(handle, fcntl.LOCK_EX)
+        _DEPTH[key] = depth + 1
+        try:
+            yield
+        finally:
+            _DEPTH[key] = depth
+            if handle is not None:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+                os.close(handle)
+
+
 def state_path(scene_directory: Path) -> Path:
     return scene_directory / STATE_FILENAME
 
@@ -313,7 +356,7 @@ def write_scene_state(scene_directory: Path, state: SceneState) -> None:
 
     path = state_path(scene_directory)
     payload = json.dumps(state.public_dict(), ensure_ascii=False, indent=2) + "\n"
-    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{threading.get_ident()}")
     try:
         scene_directory.mkdir(parents=True, exist_ok=True)
         with temporary.open("w", encoding="utf-8") as handle:

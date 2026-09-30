@@ -10,9 +10,7 @@ again never repeats work.
 
 from __future__ import annotations
 
-import threading
 import uuid
-from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +18,7 @@ from .commands import CommandResult, _check_revision, _check_writable, _clean_ra
 from .errors import ResourceNotFoundError, ValidationError
 from .events import Event, append_event
 from .project import load_production, scene_directory
-from .state import Actor, load_scene_state, now, with_progress, write_scene_state
+from .state import Actor, load_scene_state, now, scene_lock, with_progress, write_scene_state
 
 TEMPLATES = ("block", "shot")
 GATE_OUTCOMES = ("approved", "changes_requested", "rejected")
@@ -31,7 +29,6 @@ REJECTION_REASONS = ("subject_moved", "identity", "geometry", "light", "detail_l
 FINISHED_RUN = ("done", "failed", "cancelled")
 FINISHED_STEP = ("done", "skipped")
 
-_LOCKS: defaultdict[str, threading.Lock] = defaultdict(threading.Lock)
 _RUNTIME: dict[str, Any] = {"manager": None}
 
 
@@ -154,7 +151,7 @@ def start_workflow(root: Path, *, scene_id: str, block_id: str, actor: Actor, te
     directory = scene_directory(root, scene_id)
     _check_writable(directory, scene_id)
     command_id = _new_command_id()
-    with _LOCKS[str(directory)]:
+    with scene_lock(directory):
         state = load_scene_state(directory, scene_id)
         _check_revision(expected_revision, state.revision)
         subject = {"scene": scene_id, "block": "" if template == "shot" else block_id, "shot": shot_id}
@@ -195,7 +192,7 @@ def decide_gate(root: Path, *, scene_id: str, gate_id: str, outcome: str, actor:
     _check_writable(directory, scene_id)
     text = _clean_rationale(rationale)
     command_id = _new_command_id()
-    with _LOCKS[str(directory)]:
+    with scene_lock(directory):
         state = load_scene_state(directory, scene_id)
         _check_revision(expected_revision, state.revision)
         gate = state.gates.get(gate_id)
@@ -249,7 +246,7 @@ def decide_storyboard(root: Path, *, scene_id: str, approved: bool, actor: Actor
     _check_writable(directory, scene_id)
     text = _clean_rationale(rationale)
     command_id = _new_command_id()
-    with _LOCKS[str(directory)]:
+    with scene_lock(directory):
         state = load_scene_state(directory, scene_id)
         _check_revision(expected_revision, state.revision)
         stamp = now()
@@ -287,7 +284,7 @@ def cancel_workflow(root: Path, *, scene_id: str, workflow_id: str, actor: Actor
     directory = scene_directory(root, scene_id)
     _check_writable(directory, scene_id)
     command_id = _new_command_id()
-    with _LOCKS[str(directory)]:
+    with scene_lock(directory):
         state = load_scene_state(directory, scene_id)
         _check_revision(expected_revision, state.revision)
         run = state.workflows.get(workflow_id)
@@ -334,7 +331,7 @@ def advance(root: Path, scene_id: str, run_id: str) -> dict[str, Any]:
     """Move the run as far as it can go now; return it."""
 
     directory = scene_directory(root, scene_id)
-    with _LOCKS[str(directory)]:
+    with scene_lock(directory):
         while True:
             production, scene = _scene(root, scene_id)
             state = load_scene_state(directory, scene_id)
