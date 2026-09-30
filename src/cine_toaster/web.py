@@ -260,6 +260,18 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             self._send_json(locations_view(self.project_root, cached_production(self.project_root),
                                            {item["id"]: item for item in backlot_status(self.project_root)}))
             return
+        if parsed.path == "/api/camera-move-preview":
+            # A move on the preview stage, as blocking frames (CT-0027): derived, never stored.
+            from .camera_moves import list_moves, preview
+
+            wanted = query.get("id", [""])[0]
+            move = next((item for item in list_moves(self.project_root) if item["id"] == wanted), None)
+            if move is None:
+                self._send_json({"error": {"code": "not_found", "message": f"No camera move {wanted!r}"}},
+                                HTTPStatus.NOT_FOUND)
+                return
+            self._send_json(preview(move))
+            return
         if parsed.path == "/api/camera-moves":
             # The camera-move catalog (CT-0027): built in, external, the production's.
             from .camera_moves import list_moves

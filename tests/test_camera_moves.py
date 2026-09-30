@@ -75,3 +75,49 @@ class ShotMoveTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PreviewTests(unittest.TestCase):
+    """Each move played on the preview stage, from the same blocking frames a shot's previs uses."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.moves = {move["id"]: move for move in list_moves(Path(BUILTIN).parent)}
+
+    def ends(self, move_id: str) -> tuple[dict, dict]:
+        from cine_toaster.blocking import blocking_frame, public_frame
+        from cine_toaster.camera_moves import PREVIEW_STAGE, preview_motion
+
+        motion, _ = preview_motion(self.moves[move_id])
+        shot = {"id": move_id, "motion": motion}
+        first, last = (public_frame(blocking_frame(PREVIEW_STAGE, shot, t)) for t in (0.0, 1.0))
+        return first, last
+
+    def test_every_move_previews(self) -> None:
+        from cine_toaster.camera_moves import preview
+
+        for move in self.moves.values():
+            result = preview(move)
+            self.assertEqual(len(result["frames"]), 25, move["id"])
+            self.assertTrue(result["frames"][0].startswith("<svg"), move["id"])
+
+    def test_the_moves_do_what_they_say(self) -> None:
+        subject = lambda frame: next(item for item in frame["figures"] if item["subject"] == "A")  # noqa: E731
+        first, last = self.ends("push-in")
+        self.assertGreater(subject(last)["height_fraction"], subject(first)["height_fraction"])
+        first, last = self.ends("zoom-out")
+        self.assertLess(last["camera"]["lens_mm"], first["camera"]["lens_mm"])
+        for move_id, side in (("pan-left", "right"), ("truck-left", "right"), ("pan-right", "left")):
+            _, last = self.ends(move_id)
+            self.assertEqual(subject(last)["side"], side, move_id)  # the subject slides the other way
+        first, last = self.ends("tilt-up")
+        self.assertGreater(last["camera"]["tilt_deg"], first["camera"]["tilt_deg"] + 20)
+        first, last = self.ends("dolly-zoom")  # the face holds its size while the camera closes in
+        self.assertAlmostEqual(subject(last)["height_fraction"], subject(first)["height_fraction"], delta=0.15)
+        self.assertLess(subject(last)["depth"], subject(first)["depth"])
+
+    def test_a_rig_the_plan_cannot_see_is_said(self) -> None:
+        from cine_toaster.camera_moves import preview
+
+        self.assertIn("cannot show a handheld's feel", preview(self.moves["handheld"])["note"])
+        self.assertEqual(preview(self.moves["push-in"])["note"], "")

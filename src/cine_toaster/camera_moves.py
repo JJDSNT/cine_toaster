@@ -16,6 +16,8 @@ come from the catalog unless the shot says otherwise.
 
 from __future__ import annotations
 
+import math
+
 import os
 import tomllib
 from pathlib import Path
@@ -89,3 +91,93 @@ def expand(move: dict[str, Any], catalog: dict[str, dict[str, Any]]) -> tuple[di
     filled["name"] = found["name"]
     filled["prompt"] = found["prompt"]
     return filled, ""
+
+
+# --- previews ---------------------------------------------------------------------
+
+#: The stage every move is previewed on: one person, a column and a cabinet behind for parallax.
+PREVIEW_STAGE = {
+    "id": "preview",
+    "geometry": {
+        "room": {"width": 7.0, "depth": 6.0, "height": 3.0},
+        "subjects": [{"id": "A", "label": "Subject", "position": [3.5, 3.2], "eye_height": 1.6, "kind": "person"}],
+        "set_pieces": [
+            {"id": "COLUMN", "label": "", "position": [2.1, 4.7], "width": 0.4, "depth": 0.4, "height": 3.0},
+            {"id": "CABINET", "label": "", "position": [5.1, 5.1], "width": 1.2, "depth": 0.5, "height": 1.4},
+        ],
+        "marks": [],
+    },
+}
+PREVIEW_SECONDS = 2.0
+PREVIEW_FPS = 12
+
+
+def _turn(point: tuple[float, float], pivot: tuple[float, float], degrees: float) -> list[float]:
+    angle = math.radians(degrees)
+    dx, dy = point[0] - pivot[0], point[1] - pivot[1]
+    return [pivot[0] + dx * math.cos(angle) - dy * math.sin(angle), pivot[1] + dx * math.sin(angle) + dy * math.cos(angle)]
+
+
+def preview_motion(move: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    """The start and end of a move on the preview stage, and what the plan cannot show of it."""
+
+    implies = move.get("implies") or {}
+    kind, direction = implies.get("kind") or "", implies.get("direction") or ""
+    subject = (3.5, 3.2)
+    start = {"position": [3.5, 0.8], "target": list(subject), "target_ref": "", "lens_mm": 35.0, "height": 1.5,
+             "aim_height": 1.6}
+    end = dict(start)
+    subjects_start, subjects_end = {"A": list(subject)}, {"A": list(subject)}
+    note = ""
+    sign = 1 if direction in ("in", "up", "left") else -1
+    if kind == "dolly":
+        end["position"] = [3.5, 0.8 + 1.2 * sign]
+        if implies.get("rig") == "drone":
+            start["height"] = end["height"] = 2.8
+    elif kind == "zoom":
+        start["lens_mm"], end["lens_mm"] = (28.0, 70.0) if sign > 0 else (70.0, 28.0)
+    elif kind == "truck":
+        end["position"] = [3.5 - 1.2 * sign, 0.8]  # screen left is -x from this camera
+        end["target"] = [3.5 - 1.2 * sign, subject[1]]
+    elif kind == "pan":
+        degrees = 80.0 if implies.get("speed") == "snap" else 35.0
+        end["target"] = _turn(subject, tuple(start["position"]), degrees * sign)
+    elif kind == "tilt":
+        end["aim_height"] = 1.6 + 1.1 * sign
+    elif kind == "arc":
+        end["position"] = _turn(tuple(start["position"]), subject, -60.0 * sign)
+    elif kind == "pedestal":
+        end["height"] = 1.5 + 0.8 * sign
+        start["aim_height"], end["aim_height"] = start["height"], end["height"]  # a pedestal stays level
+    elif kind == "crane":
+        end["height"] = 1.5 + 1.4 * sign if sign > 0 else 0.6
+    elif kind == "track":
+        subjects_start["A"], subjects_end["A"] = [2.3, 3.2], [4.7, 3.2]
+        start.update(position=[2.3, 0.8], target=[2.3, 3.2])
+        end.update(position=[4.7, 0.8], target=[4.7, 3.2])
+    else:
+        note = (f"The plan cannot show a {implies.get('rig') or 'rig'}'s feel: the preview holds still."
+                if kind != "static" else "")
+    for secondary in implies.get("secondary") or []:
+        if secondary.startswith("zoom") and kind == "dolly":
+            # A dolly zoom: the lens follows the distance, so the subject keeps its size.
+            end["lens_mm"] = round(start["lens_mm"] * math.dist(end["position"], subject)
+                                   / math.dist(start["position"], subject), 1)
+        elif secondary.startswith("zoom"):
+            end["lens_mm"] = 20.0 if secondary.endswith("out") else 70.0
+    motion = {"kind": kind or "static", "speed": implies.get("speed") or "",
+              "start": {"camera": start, "subjects": subjects_start},
+              "end": {"camera": end, "subjects": subjects_end}}
+    return motion, note
+
+
+def preview(move: dict[str, Any]) -> dict[str, Any]:
+    """A move as a short animatic on the preview stage: blocking frames, derived, never stored."""
+
+    from .blocking import blocking_frame, render_svg
+
+    motion, note = preview_motion(move)
+    shot = {"id": move["id"], "motion": motion}
+    count = int(PREVIEW_SECONDS * PREVIEW_FPS) + 1
+    frames = [render_svg(blocking_frame(PREVIEW_STAGE, shot, index / (count - 1))) for index in range(count)]
+    return {"id": move["id"], "fps": PREVIEW_FPS, "frames": frames, "note": note}

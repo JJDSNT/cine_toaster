@@ -157,6 +157,9 @@ def state_at(motion: dict[str, Any], t: float) -> dict[str, Any]:
             "lens_mm": _mix(float(a["lens_mm"]), float(b["lens_mm"]), k),
             "height": _mix(*heights, k) if None not in heights else (heights[0] if k < 0.5 else heights[1]),
         }
+        aims = (a.get("aim_height"), b.get("aim_height"))
+        if None not in aims:
+            camera["aim_height"] = _mix(*aims, k)
     walk = _ease(t, "")
     subjects = {}
     for subject_id, begin in (start.get("subjects") or {}).items():
@@ -198,6 +201,8 @@ def blocking_frame(scene: dict[str, Any], shot: dict[str, Any], at: str | float 
     aim_height = camera_height
     if target_ref in subjects:
         aim_height = subjects[target_ref].get("eye_height") or DEFAULT_EYE_HEIGHT
+    if pose.get("aim_height") is not None:  # an explicit aim (a tilt), over the subject's eyes
+        aim_height = float(pose["aim_height"])
     eye = (pose["position"][0], pose["position"][1], camera_height)
     aim = (pose["target"][0], pose["target"][1], aim_height)
     camera = _Camera(eye, aim, float(pose["lens_mm"]))
@@ -556,8 +561,8 @@ def render_svg(frame: dict[str, Any]) -> str:
     camera = frame["camera"]
     height = f'{camera["height"]:.2f} m' + ("" if camera["height_declared"] else " (assumed)")
     moment = frame["at"] if isinstance(frame["at"], str) else f'{frame["at"]:.0%}'
-    caption = (f'{frame["shot"]} · {moment} · {camera["id"]} · {camera["lens_mm"]:g} mm · '
-               f'height {height} · tilt {camera["tilt_deg"]:+.0f}°')
+    caption = " · ".join(part for part in (frame["shot"], moment, camera["id"], f'{camera["lens_mm"]:g} mm',
+                                            f"height {height}", f'tilt {camera["tilt_deg"]:+.0f}°') if part)
     out.append(f'<text x="8" y="{HEIGHT - 8}" fill="#8a9499" font-size="11">{escape(caption)}</text>')
     out.append("</svg>")
     return "\n".join(out)

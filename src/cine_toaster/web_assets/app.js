@@ -1384,6 +1384,40 @@ async function renderLocations() {
   tellAssistant();
 }
 
+// A move played on a fixed stage (a person, a column, a cabinet), from the
+// same blocking frames a shot's previs uses. Fetched when first wanted, played
+// while the pointer rests on it.
+function movePreview(move) {
+  const box = el("div", "move-preview");
+  box.append(el("span", "muted", "Preview"));
+  let frames = null;
+  let timer = null;
+  let note = "";
+  const show = (index) => { box.innerHTML = frames[index]; if (note) box.append(el("small", "move-note", note)); };
+  const play = async () => {
+    if (timer) return;
+    if (!frames) {
+      const answer = await api(`/api/camera-move-preview?id=${encodeURIComponent(move.id)}`, { optional: true });
+      if (!answer) return;
+      ({ frames, note } = answer);
+      show(0);
+    }
+    let index = 0;
+    timer = setInterval(() => {
+      index = (index + 1) % (frames.length + 6);  // a short hold on the last frame
+      show(Math.min(index, frames.length - 1));
+    }, 1000 / 12);
+  };
+  const stop = () => { clearInterval(timer); timer = null; if (frames) show(0); };
+  box.addEventListener("mouseenter", play);
+  box.addEventListener("mouseleave", stop);
+  box.addEventListener("focus", play);
+  box.addEventListener("blur", stop);
+  box.tabIndex = 0;
+  box.title = "Rest the pointer here to play the move";
+  return box;
+}
+
 async function renderMoves() {
   const root = byId("workspace");
   root.replaceChildren();
@@ -1408,6 +1442,7 @@ async function renderMoves() {
         ? [`${implied.kind} ${implied.direction}`.trim(), implied.rig, implied.speed, ...(implied.secondary || [])].filter(Boolean).join(" · ")
         : `rig: ${implied.rig || "any"} (the plan cannot see it)`;
       card.append(
+        movePreview(move),
         el("strong", "", move.name),
         el("code", "move-id", `move: {id: ${move.id}}`),
         el("p", "", move.says),

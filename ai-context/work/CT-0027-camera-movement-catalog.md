@@ -99,3 +99,19 @@ were before their catalog.
 
 - Looping previews of each move rendered from the blockout. The light previs
   can animate a shot, but not yet a move in the abstract.
+
+# Previews (2026-09-30)
+
+- `camera_moves.preview_motion(move)` turns a move's `implies` into start and
+  end poses on `PREVIEW_STAGE` (one person, a column, a cabinet); `preview`
+  renders 25 blocking frames (2 s at 12 fps). Tilt needed an explicit aim
+  height: `state_at` and `blocking_frame` now honour a pose's `aim_height`.
+  A dolly zoom's lens follows the distance, so the face keeps its size.
+  Rigs the plan cannot see (handheld, body, first-person) return a note.
+- `/api/camera-move-preview?id=` (404 for an unknown move); the moves room
+  plays a card's preview while the pointer rests on it, fetched on first
+  hover.
+- Tests: `PreviewTests` (every move previews; push-in grows, zoom-out
+  widens, pans and trucks send the subject the other way, tilt-up tilts,
+  dolly zoom holds the size while closing in; the handheld note).
+  Headless: 32 cards, the dolly zoom plays from 35 to about 20 mm.
