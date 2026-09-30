@@ -296,6 +296,20 @@ def _color() -> Capability:
     )
 
 
+def _splat() -> Capability:
+    from .splat import available
+
+    reason = available()
+    return Capability(
+        name="Gaussian splats",
+        what_it_enables="splats drawn by Spark in a headless browser: plates through a location's splat, splat elements",
+        required=False,
+        status=OK if not reason else MISSING,
+        detail=reason,
+        remedy="" if not reason else "make install-splat",
+    )
+
+
 def _natron() -> Capability:
     from .vfx import natron_binary
 
@@ -371,6 +385,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _color,
     _usd,
     _natron,
+    _splat,
     # Detected, not yet used. See `report`.
     _sox,
     _blender,

@@ -660,6 +660,27 @@ def command_cut(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_splat(args: argparse.Namespace) -> int:
+    """A shot's camera move through its location's Gaussian splat, as a plate (CT-0047)."""
+
+    from .project import load_scene
+    from .splat import plate
+
+    root = Path(args.project).expanduser().resolve()
+    scene = load_scene(root, args.scene)
+    shot = next((item for item in (scene or {}).get("shots", []) if item["id"] == args.shot), None)
+    if shot is None:
+        print(f"No shot {args.scene} {args.shot}", file=sys.stderr)
+        return 1
+    output = root / "renders" / "splat" / args.scene / f"{args.shot}.mp4"
+    made = plate(root, scene, shot, output, frames=args.frames, width=args.width, height=args.height)
+    print(f"Made {Path(made['video']).relative_to(root)} and its first frame {Path(made['still']).relative_to(root)}")
+    camera = (shot.get("motion") or {}).get("camera_id") or "<camera>"
+    print(f"To start pictures from it, list it in the location: references: [{{path: <copy of the still>, "
+          f"kind: plate, camera: {camera}}}]")
+    return 0
+
+
 def command_usd(args: argparse.Namespace) -> int:
     """A scene's plan as an OpenUSD stage, for Blender, Unreal and Unity (CT-0047)."""
 
@@ -1693,6 +1714,17 @@ def build_parser() -> argparse.ArgumentParser:
             item.add_argument("--ms", type=int, help="the transition's duration in milliseconds")
             item.add_argument("--transition-why", default="", help="why this transition")
     cut_parser.set_defaults(function=command_cut)
+
+    splat_parser = subparsers.add_parser("splat", help="Gaussian splats: a shot's move through its location's splat")
+    splat_sub = splat_parser.add_subparsers(dest="splat_command", required=True)
+    splat_plate = splat_sub.add_parser("plate", help="Render the shot's camera move through the location's splat")
+    splat_plate.add_argument("project", type=Path)
+    splat_plate.add_argument("scene")
+    splat_plate.add_argument("shot")
+    splat_plate.add_argument("--frames", type=int, default=24)
+    splat_plate.add_argument("--width", type=int, default=640)
+    splat_plate.add_argument("--height", type=int, default=360)
+    splat_parser.set_defaults(function=command_splat)
 
     usd_parser = subparsers.add_parser("usd", help="Export a scene's plan as an OpenUSD stage (CT-0047)")
     usd_sub = usd_parser.add_subparsers(dest="usd_command", required=True)

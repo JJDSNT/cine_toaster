@@ -48,7 +48,7 @@ user may have forgotten is left to the development agent's judgement.
 | 12 | OpenUSD scenes | Blender imports USD; Cine Toaster exports its plan (room, cameras, marks, set pieces) as USD | usd-wg Teapot; the demo's set as USD | done |
 | 13 | OpenFX plugins | Natron (an OFX host) run headless (`NatronRenderer`) on a generated project | bloom, lens distortion, glow | done |
 | 14 | Alembic caches (added) | Blender imports `.abc` | a cache rendered as an element | later |
-| 15 | Gaussian splats | Spark (three.js, MIT) viewer + camera path rendered headless; Blender 5.3 native | a `.ply`/`.spz` scene as a location plate / moving camera | study + example |
+| 15 | Gaussian splats | Spark (three.js, MIT) viewer + camera path rendered headless; Blender 5.3 native | a `.spz` as a location plate / element | done |
 
 Engines are external programs run on files, never linked (ADR 0011): FFmpeg,
 Blender (4.5 LTS in `~/ferramentas-ext`, 5.2 LTS in `~/.local/opt`),
@@ -217,3 +217,22 @@ Each step ships its example, a test, and the line in this table.
   FFmpeg effects. Items: ofx-bloom (with `mix`), ofx-lens-distortion,
   ofx-glow. `toast doctor` reports Natron.
 - Test: `OpenFxTests` (lens distortion bends the grid; the sound survives).
+
+# Done: phase 6, Gaussian splats (2026-09-30)
+
+- `splat.py`: Spark 2.3 + three.js 0.180 (fetched once into the shared asset
+  folder, with the one three.js addon Spark imports), a page rendered in
+  Playwright's Chromium with SwiftShader WebGL2, a transparent background;
+  poses as position/target/lens; the plan (Z up) mapped to three.js (Y up);
+  a location's `splat:` transform (position, rotation, scale); `centre`
+  frames an element on its bounds; the first frame waits until something is
+  drawn (Spark sorts in a worker).
+- `toast splat plate <project> <scene> <shot>`: the shot's move through the
+  location's splat → video + first frame (the plate), without rewriting
+  the location. Element `splat = ...` (format `gaussian-splat`, turntable,
+  cached).
+- Speed on CPU: about 10–13 s a frame at 480×270 for Spark's butterfly
+  sample; real time on a GPU.
+- Tests: `tests/test_splat.py` (axis mapping, shot poses from the plan,
+  rotations and turntables; a real render when Chromium and the sample are
+  present).

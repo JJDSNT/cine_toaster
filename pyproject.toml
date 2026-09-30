@@ -40,6 +40,8 @@ mcp = ["mcp>=2.2"]
 vfx = ["opencolorio>=2.3", "OpenEXR>=3.2", "numpy>=1.26", "pillow>=10"]
 # The plan as an OpenUSD stage (CT-0047): Pixar's USD (modified Apache 2.0).
 usd = ["usd-core>=25.5"]
+# Gaussian splats drawn by Spark in a headless Chromium (CT-0047).
+splat = ["playwright>=1.50"]
 
 [project.scripts]
 toast = "cine_toaster.cli:main"

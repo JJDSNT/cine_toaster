@@ -102,12 +102,14 @@ def list_elements(project_root: Path | None = None) -> list[dict[str, Any]]:
             project = str((folder / str(raw["project"])).resolve()) if raw.get("project") else ""
             volume = str((folder / str(raw["volume"])).resolve()) if raw.get("volume") else ""
             usd = str((folder / str(raw["usd"])).resolve()) if raw.get("usd") else ""
+            splat = str((folder / str(raw["splat"])).resolve()) if raw.get("splat") else ""
             matte = str((folder / str(raw["matte"])).resolve()) if raw.get("matte") else ""
             element = {
                 "id": str(raw.get("id") or folder.name), "label": str(raw.get("label") or folder.name),
                 "category": str(raw.get("category") or "other"), "blend": str(raw.get("blend") or "screen"),
                 "key_color": str(raw.get("key_color") or "0x00FF00"), "file": file, "matte": matte,
-                "project": project, "volume": volume, "usd": usd, "frames": int(raw.get("frames") or 0),
+                "project": project, "volume": volume, "usd": usd, "splat": splat,
+                "frames": int(raw.get("frames") or 0),
                 # How the renderer shades it (a volume's density, fire, spin...), overridable per shot.
                 "params": dict(raw.get("params") or {}),
                 # Scene-linear EXR by default; display-encoded otherwise. `view` picks the OCIO view.
@@ -130,6 +132,8 @@ def _format(element: dict[str, Any]) -> str:
         return "openvdb"
     if element.get("usd"):
         return "openusd"
+    if element.get("splat"):
+        return "gaussian-splat"
     name = element["file"].lower()
     if name.endswith(".exr"):
         return "exr-sequence" if "%" in name else "exr"
@@ -149,6 +153,8 @@ def _exists(element: dict[str, Any]) -> bool:
         return bool(_frames(element["volume"])) if "%" in element["volume"] else Path(element["volume"]).is_file()
     if element.get("usd"):
         return Path(element["usd"]).is_file()
+    if element.get("splat"):
+        return Path(element["splat"]).is_file()
     if not element["file"]:
         return False
     present = bool(_frames(element["file"])) if "%" in element["file"] else Path(element["file"]).is_file()
@@ -373,6 +379,9 @@ def _element_input(element: dict[str, Any], file: str, duration: float, width: i
     cache = state_root() / "vfx-elements"
     loop = bool(element.get("loop"))
     kind = element.get("format")
+    if not matte and kind == "gaussian-splat":
+        return _sequence_input(_splat_element(element, params, max(2, round(duration * fps)), width, height, cache),
+                               fps, loop)
     if not matte and kind in ("generated", "blender-project", "openvdb", "openusd"):
         frames = element.get("frames") or max(2, round(duration * fps))
         rendered = _blender_element(element, params, frames, width, height, fps, cache, run)
@@ -386,6 +395,34 @@ def _element_input(element: dict[str, Any], file: str, duration: float, width: i
     if Path(file).suffix.lower() in VIDEO_SUFFIXES:
         return [*(["-stream_loop", "-1"] if loop else []), "-i", file]
     return ["-loop", "1", "-framerate", str(fps), "-t", f"{duration:.3f}", "-i", file]
+
+
+def _splat_element(element: dict[str, Any], params: dict[str, Any], frames: int, width: int, height: int,
+                   cache: Path) -> str:
+    """A Gaussian splat on a turntable, drawn by Spark in a headless browser (cached)."""
+
+    import hashlib
+    import json
+
+    from .splat import render as render_splat, turntable_poses
+
+    settings = {**(element.get("params") or {}), **params}
+    source = Path(element["splat"])
+    stat = source.stat()
+    hashed = hashlib.sha256(json.dumps([settings, frames, width, height, str(source), stat.st_size, stat.st_mtime_ns],
+                                       sort_keys=True, default=str).encode())
+    hashed.update(Path(__file__).with_name("splat.py").read_bytes())
+    folder = cache / "splat" / hashed.hexdigest()[:16]
+    pattern = folder / "f_%04d.png"
+    if not (folder / "done").is_file():
+        folder.mkdir(parents=True, exist_ok=True)
+        poses = turntable_poses(frames, radius=float(settings.get("radius", 2.5)), height=float(settings.get("height", 0.3)),
+                                degrees=float(settings.get("spin", 60)), lens_mm=float(settings.get("lens_mm", 35)))
+        render_splat(source, poses, folder, width=width, height=height,
+                     transform={"rotation": settings.get("rotation", [180, 0, 0]), "scale": settings.get("scale", 1.0),
+                                "centre": True})
+        (folder / "done").write_text("", encoding="utf-8")
+    return str(pattern)
 
 
 def _blender_element(element: dict[str, Any], params: dict[str, Any], frames: int, width: int, height: int,

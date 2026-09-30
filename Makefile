@@ -12,7 +12,7 @@ RUN = $(VENV)/bin/python
 TOAST = $(VENV)/bin/toast
 
 .DEFAULT_GOAL := setup
-.PHONY: ui ui-test setup environment submodules install install-media install-audio install-gpu install-voice install-agents install-mcp install-vfx install-usd test check demo doctor serve clean help voice build
+.PHONY: ui ui-test setup environment submodules install install-media install-audio install-gpu install-voice install-agents install-mcp install-vfx install-usd install-splat test check demo doctor serve clean help voice build
 
 help:
 	@echo "make setup     install and report what works"
@@ -79,6 +79,11 @@ install-agents: install
 install-vfx: install
 	@echo "==> Installing VFX colour management (OpenColorIO, OpenEXR)"
 	@$(RUN) -m pip install --quiet -e '.[vfx]'
+
+install-splat: install
+	@echo "==> Installing Playwright and Chromium (Gaussian splats, drawn by Spark)"
+	@$(RUN) -m pip install --quiet -e '.[splat]'
+	@$(RUN) -m playwright install chromium
 
 install-usd: install
 	@echo "==> Installing OpenUSD (the plan exported as a USD stage)"
