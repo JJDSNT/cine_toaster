@@ -117,6 +117,23 @@ class AssistantTests(unittest.TestCase):
         self.assertEqual(runtime.commands, [("set_cut", {"scene_id": "SC-030", "shot_id": "P2", "cut": {
             "type": "action", "reason": "cortar no passo", "transition": None}})])
 
+    def test_several_cuts_are_proposed_and_taken_as_one(self) -> None:
+        model = FakeModel({"reply": "Três cortes para apertar a resposta.", "action": "set_cuts", "scene": "SC-030",
+                           "reason": "apertar a resposta",
+                           "cuts": [{"shot": "P2", "cut_type": "match", "reason": "a luz da pilha"},
+                                    {"shot": "P3", "cut_type": "l", "transition": "cross-dissolve"}]})
+        runtime = FakeRuntime()
+        graph = build(model, runtime, MemorySaver())
+        state, config = self.run_turn(graph, "Retrabalhe os cortes da resposta")
+        message = state["__interrupt__"][0].value["message"]
+        self.assertIn("Aplicar juntos estes 2 cortes na cena SC-030? Ou todos, ou nenhum.", message)
+        self.assertIn("- o corte para P3 para l com a transição cross-dissolve", message)
+        self.assertEqual(runtime.commands, [])
+        graph.invoke(Command(resume={"approved": True}), config)
+        self.assertEqual(runtime.commands, [("set_cuts", {"scene_id": "SC-030", "rationale": "apertar a resposta", "cuts": [
+            {"shot": "P2", "cut": {"type": "match", "reason": "a luz da pilha", "transition": None}},
+            {"shot": "P3", "cut": {"type": "l", "reason": "", "transition": {"id": "cross-dissolve"}}}]})])
+
     def test_a_no_changes_nothing(self) -> None:
         model = FakeModel({"reply": "Posso iniciar.", "action": "start_workflow", "block": "A"})
         runtime = FakeRuntime()

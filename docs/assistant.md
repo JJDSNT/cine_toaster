@@ -46,10 +46,14 @@ It knows nothing else, and says so rather than guess.
 - **Take you somewhere:** it can open any room, a scene, a shot's comparison
   of takes, the canvas or the screenplay editor. That only moves the screen,
   so it does it without asking and tells you where it took you.
-- **Propose:** it can offer to start a block's workflow, or resume a stopped
-  run. The question appears in the chat, and nothing happens until you
-  answer **Sim**. The command is then recorded with the actor `assistant`
-  (an agent), and it reports what the run actually did.
+- **Propose:** it can offer to start a block's workflow, resume a stopped
+  run, change a cut, or change **several cuts of a scene together** (a
+  passage reworked as one idea). The question appears in the chat, listing
+  every cut of a set, and nothing happens until you answer **Sim**. A set is
+  taken whole or not at all: one cut the runtime refuses refuses the set,
+  and an accepted set is one decision with one revision. The command is
+  recorded with the actor `assistant` (an agent), and it reports what the
+  run actually did.
 - **Not decide:** gates stay yours (SPEC-0009). It can explain the
   candidates; it cannot choose one.
 

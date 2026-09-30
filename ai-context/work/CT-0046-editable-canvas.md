@@ -99,7 +99,18 @@ Plan step 13: the canvas becomes editable, and every edit is a command.
   typecheck, build, 11 tests; headless on a demo copy: P3 set to "from 1",
   Mara unchecked, saved, `state.json` holds it with actor `canvas`.
   Not done: the assistant cannot propose a reference yet.
-- **Agent-proposed graphs as a whole**, several cuts at once accepted or
-  rejected together; today each proposal is one cut.
+- ~~**Agent-proposed graphs as a whole**~~ done 2026-09-30 for cuts.
+  Command `set_cuts` (scene level): every cut validated by the same
+  `_validated_cut` as `set_cut` before anything is written; one refusal
+  refuses the set ("none of the set was applied"); an accepted set is one
+  revision and one `cuts.set` history entry and event. The assistant's
+  `set_cuts` action lists every cut in one confirmation ("Ou todos, ou
+  nenhum"). Validated: `tests/test_cut_decisions.py` (a bad cut writes
+  nothing, a duplicate is refused, an accepted set is revision 1 with actor
+  kind `agent`), `tests/test_assistant.py` (proposal and payload); with the
+  real model (claude CLI) on a demo copy, asked to propose P2 and P3
+  together: it proposed action and J with reasons, the confirmation listed
+  both, and one "sim" wrote both at revision 1 (45 s). Sets that mix cuts
+  and references are not offered.
 - **A cross-interface conflict test** (canvas, CLI and agent at once). The
   revision check is shared and tested per command.

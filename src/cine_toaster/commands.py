@@ -292,6 +292,35 @@ def clear_selection(
     )
 
 
+def _validated_cut(root: Path, scene: dict[str, Any], shot_id: str, cut: dict[str, Any]) -> dict[str, Any]:
+    """A cut as it will be recorded, or refused: the SPEC-0007 vocabulary and a catalogue transition."""
+
+    from .cuts import CHAINS, CUT_TYPES
+    from .transitions import list_transitions
+
+    if not any(item["id"] == shot_id for item in scene["shots"]):
+        raise ResourceNotFoundError(f"Shot {shot_id!r} is not part of scene {scene['id']!r}", scene_id=scene["id"])
+    if scene["shots"] and scene["shots"][0]["id"] == shot_id:
+        raise ValidationError(f"{shot_id} opens the scene: there is no cut into it (cuts between scenes belong "
+                              "to the sequence)", scene_id=scene["id"], shot_id=shot_id)
+    cut_type = str(cut.get("type") or "hard").strip().lower()
+    if cut_type not in CUT_TYPES:
+        raise ValidationError(f"Unknown cut type {cut_type!r}", allowed=list(CUT_TYPES))
+    chain = str(cut.get("chain") or "").strip().lower()
+    if chain and chain not in CHAINS:
+        raise ValidationError(f"Unknown chain {chain!r}", allowed=list(CHAINS))
+    transition = None
+    raw = cut.get("transition") or {}
+    if isinstance(raw, dict) and raw.get("id"):
+        known = {item["id"] for item in list_transitions(root)}
+        if raw["id"] not in known:
+            raise ValidationError(f"No transition {raw['id']!r} in the catalog")
+        milliseconds = raw.get("duration_ms")
+        transition = {"id": str(raw["id"]), "duration_ms": int(milliseconds) if milliseconds else None,
+                      "reason": _clean_rationale(raw.get("reason"))}
+    return {"type": cut_type, "chain": chain, "reason": _clean_rationale(cut.get("reason")), "transition": transition}
+
+
 def set_cut(
     root: Path,
     *,
@@ -309,29 +338,9 @@ def set_cut(
     breakdown's own cut without rewriting it (ADR 0006).
     """
 
-    from .cuts import CHAINS, CUT_TYPES
-    from .transitions import list_transitions
-
     root = root.expanduser().resolve()
     production, scene, _shot = _locate(root, scene_id, shot_id)
-    if scene["shots"] and scene["shots"][0]["id"] == shot_id:
-        raise ValidationError(f"{shot_id} opens the scene: there is no cut into it (cuts between scenes belong "
-                              "to the sequence)", scene_id=scene_id, shot_id=shot_id)
-    cut_type = str(cut.get("type") or "hard").strip().lower()
-    if cut_type not in CUT_TYPES:
-        raise ValidationError(f"Unknown cut type {cut_type!r}", allowed=list(CUT_TYPES))
-    chain = str(cut.get("chain") or "").strip().lower()
-    if chain and chain not in CHAINS:
-        raise ValidationError(f"Unknown chain {chain!r}", allowed=list(CHAINS))
-    transition = None
-    raw = cut.get("transition") or {}
-    if isinstance(raw, dict) and raw.get("id"):
-        known = {item["id"] for item in list_transitions(root)}
-        if raw["id"] not in known:
-            raise ValidationError(f"No transition {raw['id']!r} in the catalog")
-        milliseconds = raw.get("duration_ms")
-        transition = {"id": str(raw["id"]), "duration_ms": int(milliseconds) if milliseconds else None,
-                      "reason": _clean_rationale(raw.get("reason"))}
+    validated = _validated_cut(root, scene, shot_id, cut)
     rationale_text = _clean_rationale(rationale)
     directory = scene_directory(root, scene_id)
     _check_writable(directory, scene_id)
@@ -340,9 +349,8 @@ def set_cut(
 
     command_id = _new_command_id()
     stamp = now()
-    decision = {"type": cut_type, "chain": chain, "reason": _clean_rationale(cut.get("reason")),
-                "transition": transition, "decided_at": stamp, "decided_by": actor.public_dict()}
-    record = {"kind": "cut.set", "shot_id": shot_id, "cut": {k: v for k, v in decision.items() if k not in ("decided_at", "decided_by")},
+    decision = {**validated, "decided_at": stamp, "decided_by": actor.public_dict()}
+    record = {"kind": "cut.set", "shot_id": shot_id, "cut": validated,
               "previous": state.cuts.get(shot_id), "actor": actor.public_dict(), "rationale": rationale_text,
               "decided_at": stamp, "command_id": command_id}
     committed = state.with_decision(decision=record, cuts={**state.cuts, shot_id: decision})
@@ -352,6 +360,66 @@ def set_cut(
                                             rationale=rationale_text, command_id=command_id))
     return CommandResult(command_id=command_id, type="cut.set", project_id=production["id"], scene_id=scene_id,
                          shot_id=shot_id, take_id=None, previous_take_id=None, revision=committed.revision,
+                         event=event.public_dict())
+
+
+def set_cuts(
+    root: Path,
+    *,
+    scene_id: str,
+    cuts: list[dict[str, Any]],
+    actor: Actor,
+    expected_revision: int | None = None,
+    rationale: str | None = None,
+) -> CommandResult:
+    """Decide several cuts of a scene as one decision: all of them, or none (CT-0046).
+
+    `cuts` is `[{shot, cut}]`, each `cut` as for `set_cut`. Every cut is
+    checked before anything is written; one refusal refuses the set, and an
+    accepted set is one revision with one entry in the history. This is how
+    a proposal of several cuts (an agent's, a person's) is taken or left whole.
+    """
+
+    root = root.expanduser().resolve()
+    production = load_production(root)
+    scene = next((item for item in production["scenes"] if item["id"] == scene_id), None)
+    if scene is None:
+        raise ResourceNotFoundError(f"Scene {scene_id!r} is not part of this production")
+    if not cuts:
+        raise ValidationError("A set of cuts needs at least one cut")
+    validated: dict[str, dict[str, Any]] = {}
+    for index, item in enumerate(cuts):
+        shot_id = str((item or {}).get("shot") or "").strip()
+        if not shot_id:
+            raise ValidationError(f"Cut {index + 1} of the set names no shot")
+        if shot_id in validated:
+            raise ValidationError(f"The set decides the cut into {shot_id} twice")
+        try:
+            validated[shot_id] = _validated_cut(root, scene, shot_id, (item or {}).get("cut") or {})
+        except ValidationError as error:
+            raise ValidationError(f"Cut into {shot_id}: {error.message}; none of the set was applied",
+                                  shot_id=shot_id) from error
+    rationale_text = _clean_rationale(rationale)
+    directory = scene_directory(root, scene_id)
+    _check_writable(directory, scene_id)
+    state = load_scene_state(directory, scene_id)
+    _check_revision(expected_revision, state.revision)
+
+    command_id = _new_command_id()
+    stamp = now()
+    decided = {shot_id: {**cut, "decided_at": stamp, "decided_by": actor.public_dict()}
+               for shot_id, cut in validated.items()}
+    record = {"kind": "cuts.set", "shot_id": "", "shots": list(validated), "cuts": validated,
+              "previous": {shot_id: state.cuts.get(shot_id) for shot_id in validated},
+              "actor": actor.public_dict(), "rationale": rationale_text, "decided_at": stamp,
+              "command_id": command_id}
+    committed = state.with_decision(decision=record, cuts={**state.cuts, **decided})
+    write_scene_state(directory, committed)
+    event = append_event(root, Event.create("cuts.set", production["id"], scene_id=scene_id, shots=list(validated),
+                                            cuts=validated, revision=committed.revision, actor=actor.public_dict(),
+                                            rationale=rationale_text, command_id=command_id))
+    return CommandResult(command_id=command_id, type="cuts.set", project_id=production["id"], scene_id=scene_id,
+                         shot_id="", take_id=None, previous_take_id=None, revision=committed.revision,
                          event=event.public_dict())
 
 
@@ -961,6 +1029,7 @@ COMMANDS = {
     "review_assembly": review_assembly,
     "restore_assembly": restore_assembly,
     "set_cut": set_cut,
+    "set_cuts": set_cuts,
     "clear_cut": clear_cut,
     "set_voice": set_voice,
     "set_reference": set_reference,
@@ -968,7 +1037,7 @@ COMMANDS = {
 }
 
 # Commands act on a shot; these act on a whole scene version instead.
-SCENE_LEVEL_COMMANDS = {"record_assembly", "review_assembly", "restore_assembly"}
+SCENE_LEVEL_COMMANDS = {"record_assembly", "review_assembly", "restore_assembly", "set_cuts"}
 
 # SPEC-0009: workflow runs and the gates they open.
 WORKFLOW_COMMANDS = {"start_workflow", "decide_gate", "cancel_workflow", "resume_workflow",
@@ -1054,6 +1123,10 @@ def dispatch(root: Path, command_type: str, payload: dict[str, Any]) -> CommandR
     if not scene_id:
         raise ValidationError("scene_id is required")
 
+    if command_type == "set_cuts":
+        cuts = payload.get("cuts")
+        return set_cuts(root, scene_id=scene_id, cuts=cuts if isinstance(cuts, list) else [], actor=actor,
+                        expected_revision=expected_revision, rationale=payload.get("rationale"))
     if command_type in SCENE_LEVEL_COMMANDS:
         arguments: dict[str, Any] = {
             "scene_id": scene_id,
@@ -1108,6 +1181,7 @@ __all__ = [
     "review_assembly",
     "select_take",
     "set_cut",
+    "set_cuts",
     "set_reference",
     "set_voice",
 ]

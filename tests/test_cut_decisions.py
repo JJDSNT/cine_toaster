@@ -81,6 +81,29 @@ class CutDecisionTests(unittest.TestCase):
             dispatch(self.root, "set_cut", {"scene_id": "SC-030", "shot_id": "P2", "actor": HUMAN,
                                             "cut": {"type": "match"}, "expected_revision": 99})
 
+    def test_a_set_of_cuts_is_taken_whole_or_not_at_all(self) -> None:
+        state = self.root / "scenes" / "030-echo-chamber" / "state.json"
+        # One bad cut in the set: nothing is written.
+        with self.assertRaisesRegex(ValidationError, "Cut into P3: Unknown cut type 'wipe'; none of the set"):
+            dispatch(self.root, "set_cuts", {"scene_id": "SC-030", "actor": {"id": "assistant", "kind": "agent"},
+                                             "cuts": [{"shot": "P2", "cut": {"type": "match"}},
+                                                      {"shot": "P3", "cut": {"type": "wipe"}}]})
+        self.assertFalse(state.exists())
+        self.assertEqual(self.cut_into("P2")["type"], "hard")
+        with self.assertRaisesRegex(ValidationError, "twice"):
+            dispatch(self.root, "set_cuts", {"scene_id": "SC-030", "actor": HUMAN,
+                                             "cuts": [{"shot": "P2", "cut": {}}, {"shot": "P2", "cut": {}}]})
+        result = dispatch(self.root, "set_cuts", {
+            "scene_id": "SC-030", "actor": {"id": "assistant", "kind": "agent"}, "rationale": "Tighten the reply",
+            "cuts": [{"shot": "P2", "cut": {"type": "match", "reason": "the stack's light"}},
+                     {"shot": "P3", "cut": {"type": "l", "transition": {"id": "cross-dissolve", "duration_ms": 200}}}]})
+        self.assertEqual((result.type, result.revision), ("cuts.set", 1))  # one decision, one revision
+        self.assertEqual(self.cut_into("P2")["type"], "match")
+        self.assertEqual(self.cut_into("P3")["type"], "l")
+        entry = load_scene(self.root, "SC-030")["decision_log"][0]
+        self.assertEqual((entry["kind"], entry["shots"], entry["actor"]["kind"]), ("cuts.set", ["P2", "P3"], "agent"))
+        self.assertEqual(self.scene_file.read_bytes(), self.authored)
+
     def test_the_checks_read_the_decided_cut(self) -> None:
         # A continuation without a chain is advised against, whoever declared it.
         dispatch(self.root, "set_cut", {"scene_id": "SC-030", "shot_id": "P2", "actor": HUMAN,

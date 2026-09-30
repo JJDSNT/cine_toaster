@@ -57,6 +57,9 @@ ACTIONS = {
     "resume_workflow": "move a stopped workflow run on (needs `workflow`)",
     "set_cut": "decide the cut into a shot (needs `scene`, `shot` = the incoming shot, `cut_type`; optional "
                "`reason`, `transition` = a catalog id)",
+    "set_cuts": "decide several cuts of one scene together, accepted or refused as a whole (needs `scene` and "
+                "`cuts`, each with `shot` = the incoming shot, `cut_type`, optional `reason` and `transition`); "
+                "use it when the cuts belong to one idea, like reworking a passage",
 }
 
 SYSTEM = (
@@ -90,6 +93,10 @@ SCHEMA = {
         "cut_type": {"type": "string", "enum": ["", "hard", "match", "action", "j", "l", "smash", "jump", "continuation"]},
         "reason": {"type": "string"},
         "transition": {"type": "string"},
+        "cuts": {"type": "array", "items": {"type": "object", "properties": {
+            "shot": {"type": "string"},
+            "cut_type": {"type": "string", "enum": ["hard", "match", "action", "j", "l", "smash", "jump", "continuation"]},
+            "reason": {"type": "string"}, "transition": {"type": "string"}}, "required": ["shot", "cut_type"]}},
         "navigate": {"type": "object", "properties": {
             "room": {"type": "string", "enum": ["", *ROOMS]}, "scene": {"type": "string"}, "shot": {"type": "string"}}},
     },
@@ -208,6 +215,13 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None):
             if action == "set_cut":
                 proposal.update(shot=answer.get("shot", ""), cut_type=answer.get("cut_type") or "hard",
                                 reason=answer.get("reason", ""), transition=answer.get("transition", ""))
+            if action == "set_cuts":
+                proposal["cuts"] = [{"shot": str(item.get("shot", "")), "cut_type": item.get("cut_type") or "hard",
+                                     "reason": item.get("reason", ""), "transition": item.get("transition", "")}
+                                    for item in answer.get("cuts") or [] if isinstance(item, dict) and item.get("shot")]
+                proposal["reason"] = answer.get("reason", "")
+                if not proposal["cuts"]:
+                    proposal = {}
         update: dict[str, Any] = {"messages": [AIMessage(content=answer.get("reply", ""))],
                                   "highlight": answer.get("highlight", ""), "proposal": proposal, "notes": notes,
                                   "turn": turn}
@@ -229,11 +243,20 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None):
         """Put the proposal to the person; act only on their yes, only through a command."""
 
         proposal = state["proposal"]
-        if proposal["action"] == "set_cut":
+
+        def described(item: dict[str, Any]) -> str:
+            return (f"o corte para {item['shot']} para {item['cut_type']}"
+                    + (f" com a transição {item['transition']}" if item.get("transition") else "")
+                    + (f" ({item['reason']})" if item.get("reason") else ""))
+
+        if proposal["action"] == "set_cuts":
+            verb = "Aplicar juntos"
+            target = f"{len(proposal['cuts'])} cortes"
+            question = (f"Aplicar juntos estes {len(proposal['cuts'])} cortes na cena {proposal['scene']}? "
+                        "Ou todos, ou nenhum.\n" + "\n".join(f"- {described(item)}" for item in proposal["cuts"]))
+        elif proposal["action"] == "set_cut":
             verb = "Mudar"
-            target = (f"o corte para {proposal['shot']} para {proposal['cut_type']}"
-                      + (f" com a transição {proposal['transition']}" if proposal.get("transition") else "")
-                      + (f" ({proposal['reason']})" if proposal.get("reason") else ""))
+            target = described(proposal)
         else:
             verb = "Iniciar" if proposal["action"] == "start_workflow" else "Retomar"
             if proposal["action"] != "start_workflow":
@@ -242,11 +265,18 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None):
                 target = f"o workflow do bloco {proposal['block']}"
             else:
                 target = f"o workflow do plano {proposal['shot']}"
-        answer = interrupt({"message": f"{verb} {target} na cena {proposal['scene']}?", "proposal": proposal})
+        if proposal["action"] != "set_cuts":
+            question = f"{verb} {target} na cena {proposal['scene']}?"
+        answer = interrupt({"message": question, "proposal": proposal})
         if not (isinstance(answer, dict) and answer.get("approved")):
             return {"messages": [AIMessage(content="Certo, não fiz nada.")], "proposal": {}}
         payload = {"scene_id": proposal["scene"]}
-        if proposal["action"] == "set_cut":
+        if proposal["action"] == "set_cuts":
+            payload.update(rationale=proposal.get("reason", ""), cuts=[
+                {"shot": item["shot"], "cut": {"type": item["cut_type"], "reason": item.get("reason", ""),
+                                               "transition": {"id": item["transition"]} if item.get("transition") else None}}
+                for item in proposal["cuts"]])
+        elif proposal["action"] == "set_cut":
             payload.update(shot_id=proposal["shot"], cut={
                 "type": proposal["cut_type"], "reason": proposal.get("reason", ""),
                 "transition": {"id": proposal["transition"]} if proposal.get("transition") else None})
@@ -260,7 +290,7 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None):
             return {"messages": [AIMessage(content=f"O runtime recusou: {getattr(error, 'message', error)}")],
                     "proposal": {}}
         # Say what actually happened, read back from the records, not what was hoped for.
-        status = run_status(runtime, proposal) if proposal["action"] != "set_cut" else ""
+        status = run_status(runtime, proposal) if proposal["action"] not in ("set_cut", "set_cuts") else ""
         return {"messages": [AIMessage(content=f"Feito: {verb.lower()} {target} (revisão {result.get('revision')}). "
                                                + status)],
                 "proposal": {}}

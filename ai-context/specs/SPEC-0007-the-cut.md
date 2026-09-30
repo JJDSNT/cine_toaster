@@ -132,3 +132,8 @@ A cut may also be **decided** through `set_cut` (canvas, CLI, assistant with
 a yes). The decision is kept in the scene's `state.json` and stands over the
 breakdown's `cut`/`transition` without rewriting it (ADR 0006); `clear_cut`
 returns to the breakdown. The record and every check read the decided cut.
+
+Several cuts of one scene may be decided together through `set_cuts`: every
+cut is checked first, one refusal refuses the set, and an accepted set is
+one revision with one `cuts.set` entry in the history. It is how an agent's
+proposal of several cuts is accepted or refused as a whole.
