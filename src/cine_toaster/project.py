@@ -407,6 +407,30 @@ def _apply_cut_decisions(shots: list[dict[str, Any]], state: SceneState) -> None
         shot["transition"] = decision.get("transition") or None
 
 
+def _apply_reference_decisions(shots: list[dict[str, Any]], state: SceneState) -> None:
+    """What a shot is made from, decided in the runtime, stands over the breakdown's (CT-0046).
+
+    The breakdown's lineage stays visible as `authored_from` (and a derived
+    picture's cast as `authored_with`); clearing the decision returns to it.
+    """
+
+    for shot in shots:
+        decision = state.references.get(shot["id"])
+        shot["reference_decision"] = decision
+        if not decision:
+            continue
+        authored = shot.get("from") or []
+        shot["authored_from"] = authored
+        # How it is made from it (the same picture, its last frame...) stays the breakdown's.
+        relation = str((authored[0] if authored else {}).get("relation") or "")
+        shot["from"] = [{"ref": decision["from"], "relation": relation, "decided": True}] if decision.get("from") else []
+        derive = shot.get("derive")
+        if derive:
+            shot["authored_with"] = list(derive.get("with") or [])
+            shot["derive"] = {**derive, "from": decision.get("from") or derive.get("from") or "",
+                              "with": decision["with"] if decision.get("with") is not None else derive.get("with") or []}
+
+
 def _apply_state(shots: list[dict[str, Any]], state: SceneState) -> None:
     """Overlay committed decisions on what the breakdown and the disk describe."""
 
@@ -475,6 +499,7 @@ def _load_scene(
     for shot in shots:
         shot["approved_picture"] = approved.get(shot["id"], "")
     _apply_cut_decisions(shots, state)
+    _apply_reference_decisions(shots, state)
 
     try:
         geometry = parse_geometry(_geometry_document(geography))

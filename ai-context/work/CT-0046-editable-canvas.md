@@ -81,8 +81,24 @@ Plan step 13: the canvas becomes editable, and every edit is a command.
 
 # Remaining
 
-- **Editing references on the canvas** (lineage `from`, cast), which needs
-  a reference record decided the same way.
+- ~~**Editing references on the canvas**~~ done 2026-09-30.
+  `SceneState.references` (schema 5), overlaid by
+  `project._apply_reference_decisions` on the shot's `from` (keeping the
+  breakdown's relation) and a derived picture's `derive.from`/`with`, with
+  `authored_from`/`authored_with` kept. Commands `set_reference` (a shot by
+  number or id, a master, or a picture file; `with` only for a derived
+  picture, each name a cast sheet; refuses self, loops, unknown sources,
+  stale revisions) and `clear_reference`; CLI `toast reference set|clear
+  [--from] [--with]`. The graph draws `lineage` edges (deduplicated: SINGULAR
+  declares some twice, 150 remain) and carries `from`, `derived`, `with`,
+  `reference_decided` on shots and the cast list; the canvas draws them
+  faint above the cards (toggle **Made from**), tags `from N ✎`, and the
+  shot details hold `ReferenceEditor`. Validated:
+  `tests/test_reference_decisions.py` (3 tests: overlay and untouched
+  breakdown, lineage edges, clearing, cast alone, every refusal); frontend
+  typecheck, build, 11 tests; headless on a demo copy: P3 set to "from 1",
+  Mara unchecked, saved, `state.json` holds it with actor `canvas`.
+  Not done: the assistant cannot propose a reference yet.
 - **Agent-proposed graphs as a whole**, several cuts at once accepted or
   rejected together; today each proposal is one cut.
 - **A cross-interface conflict test** (canvas, CLI and agent at once). The

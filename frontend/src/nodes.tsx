@@ -30,6 +30,7 @@ export function ShotCard({ data, selected }: NodeProps<ShotNode>) {
   return (
     <div className={`card shot-card ${selected ? "selected" : ""} ${data.severity}`}>
       <Handle type="target" position={Position.Left} />
+      <Handle type="target" position={Position.Top} id="made-from" style={{ left: "65%" }} />
       <div className="frame">
         {picture.image && <img src={picture.image} alt="" loading="lazy" />}
         {!picture.image && picture.video && <video src={`${picture.video}#t=0.1`} muted preload="metadata" />}
@@ -47,10 +48,12 @@ export function ShotCard({ data, selected }: NodeProps<ShotNode>) {
         {data.walks && <span className="tag move">walk</span>}
         {data.speakers.map((who) => <span key={who} className="tag speaker">{who}</span>)}
         {data.takes > 0 && <span className="tag">{data.takes} take{data.takes > 1 ? "s" : ""}</span>}
+        {data.from.length > 0 && <span className="tag lineage">from {data.from.join(", ")}{data.reference_decided ? " ✎" : ""}</span>}
         {data.findings > 0 && <span className={`flag ${data.severity}`}>{data.findings}</span>}
       </div>
       <Handle type="source" position={Position.Right} />
       <Handle type="source" position={Position.Bottom} id="takes" />
+      <Handle type="source" position={Position.Top} id="lineage" style={{ left: "35%" }} />
     </div>
   );
 }

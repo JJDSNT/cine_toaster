@@ -7,6 +7,7 @@ import { layout } from "./layout.ts";
 import { nodeTypes } from "./nodes.tsx";
 import { CUT_NAMES, edgeTypes } from "./edges.tsx";
 import { CutEditor, startWorkflow } from "./CutEditor.tsx";
+import { ReferenceEditor } from "./ReferenceEditor.tsx";
 import type { GraphEdge, GraphNode, ProductionGraph } from "./types.ts";
 
 // The assistant is its own chunk, fetched only when the runtime has it on (ADR 0018).
@@ -37,7 +38,7 @@ function initialFocus(graph: ProductionGraph): Focus {
   return first ? { kind: "scene", id: first.scene } : { kind: "all" };
 }
 
-function toFlow(graph: ProductionGraph, showTakes: boolean, focus: Focus): { nodes: Node[]; edges: Edge[] } {
+function toFlow(graph: ProductionGraph, showTakes: boolean, focus: Focus, showLineage = true): { nodes: Node[]; edges: Edge[] } {
   const only = scenesIn(graph, focus);
   const visible = graph.nodes.filter((node) => (showTakes || node.type !== "take") && (!only || only.has(node.scene)));
   const shown = new Set(visible.map((node) => node.id));
@@ -49,8 +50,14 @@ function toFlow(graph: ProductionGraph, showTakes: boolean, focus: Focus): { nod
     data: node.data as unknown as Record<string, unknown>,
   }));
   const edges: Edge[] = graph.edges
-    .filter((edge) => (showTakes || edge.type !== "take") && shown.has(edge.source) && shown.has(edge.target))
+    .filter((edge) => (showTakes || edge.type !== "take") && (showLineage || edge.type !== "lineage")
+      && shown.has(edge.source) && shown.has(edge.target))
     .map((edge) => {
+      if (edge.type === "lineage") {
+        // What a picture is made from: drawn above the cards, faint, so the cuts stay readable.
+        return { id: edge.id, source: edge.source, sourceHandle: "lineage", target: edge.target, targetHandle: "made-from",
+                 type: "default", className: `lineage-line ${edge.data.decided ? "decided" : ""}`, selectable: false };
+      }
       if (edge.type === "cut") {
         return { id: edge.id, source: edge.source, target: edge.target, type: "cut", data: edge.data as unknown as Record<string, unknown> };
       }
@@ -136,6 +143,10 @@ function Details({ selection, graph, onChanged }: { selection: Selection; graph:
   }
   if (node.type === "shot") {
     const d = node.data;
+    const sceneShots = (graph?.nodes ?? []).filter((item) => item.type === "shot" && item.scene === d.scene)
+      .map((item) => item.data as typeof d);
+    const sceneNode = graph?.nodes.find((item) => item.type === "scene" && item.scene === d.scene);
+    const revision = sceneNode?.type === "scene" ? sceneNode.data.revision : 0;
     return (
       <div>
         <span className="eyebrow">Shot · {d.scene}</span>
@@ -149,7 +160,13 @@ function Details({ selection, graph, onChanged }: { selection: Selection; graph:
           <dt>Picture</dt><dd>{d.picture.level}</dd>
           <dt>Selected take</dt><dd>{d.selected_take || "—"}</dd>
           {d.block && (<><dt>Block</dt><dd>{d.block}</dd></>)}
+          <dt>Made from</dt><dd>{d.from.join(", ") || "—"}{d.derived && d.with.length ? ` · faces of ${d.with.join(", ")}` : ""}{d.reference_decided ? " ✎" : ""}</dd>
         </dl>
+        <details className="reference-details">
+          <summary>Change what it is made from</summary>
+          <ReferenceEditor key={`${node.id}@${revision}`} shot={d} shots={sceneShots} cast={graph?.production.cast ?? []}
+                           revision={revision} onSaved={onChanged} />
+        </details>
         {d.block && <StartBlock graph={graph} scene={d.scene} block={d.block} onChanged={onChanged} />}
         {!d.block && d.source === "generated" && <StartBlock graph={graph} scene={d.scene} shot={d.shot} onChanged={onChanged} />}
         <a href={`/?scene=${encodeURIComponent(d.scene)}&shot=${encodeURIComponent(d.shot)}`}>Compare takes</a>
@@ -172,6 +189,7 @@ export function App() {
   const [graph, setGraph] = useState<ProductionGraph | null>(null);
   const [error, setError] = useState("");
   const [showTakes, setShowTakes] = useState(true);
+  const [showLineage, setShowLineage] = useState(true);
   const [selection, setSelection] = useState<Selection>(null);
   const [focus, setFocus] = useState<Focus | null>(null);
   const [assistantOn, setAssistantOn] = useState(false);
@@ -220,8 +238,8 @@ export function App() {
   }, [load]);
 
   const flow = useMemo(
-    () => (graph && focus ? toFlow(graph, showTakes, focus) : { nodes: [], edges: [] }),
-    [graph, showTakes, focus],
+    () => (graph && focus ? toFlow(graph, showTakes, focus, showLineage) : { nodes: [], edges: [] }),
+    [graph, showTakes, focus, showLineage],
   );
   // What the person is looking at, for the assistant: the room, the scene, the selection.
   const seen = useMemo(() => {
@@ -282,7 +300,7 @@ export function App() {
       <header>
         <a className="back" href="/">← Control room</a>
         <div>
-          <span className="eyebrow">Production canvas · cuts and workflows editable</span>
+          <span className="eyebrow">Production canvas · cuts, references and workflows editable</span>
           <h1>{graph?.production.title ?? "…"}</h1>
         </div>
         {graph && (
@@ -301,6 +319,7 @@ export function App() {
           </select>
         )}
         <label className="toggle"><input type="checkbox" checked={showTakes} onChange={(e) => setShowTakes(e.target.checked)} /> Takes</label>
+        <label className="toggle"><input type="checkbox" checked={showLineage} onChange={(e) => setShowLineage(e.target.checked)} /> Made from</label>
         {assistantOn && (
           <button type="button" className={`toggle assistant-toggle ${talking ? "on" : ""}`} onClick={() => setTalking((value) => !value)}>
             Assistant

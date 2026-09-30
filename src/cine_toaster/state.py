@@ -142,6 +142,9 @@ class SceneState:
     #: Shots whose speech the cut hears in the cast's own recorded voices
     #: (CT-0040), by shot: converted when the scene is assembled, whatever take is chosen.
     voices: dict[str, dict[str, Any]] = field(default_factory=dict)
+    #: What a shot's picture is made from, and whose faces a derived picture
+    #: takes, decided here over the breakdown (CT-0046), by shot.
+    references: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def approved_pictures(self) -> dict[str, str]:
         """The picture each shot's latest approved gate chose (SPEC-0009)."""
@@ -176,6 +179,7 @@ class SceneState:
             "workflows": self.workflows,
             "cuts": self.cuts,
             "voices": self.voices,
+            "references": self.references,
         }
 
     def with_decision(
@@ -188,6 +192,7 @@ class SceneState:
         workflows: dict[str, dict[str, Any]] | None = None,
         cuts: dict[str, dict[str, Any]] | None = None,
         voices: dict[str, dict[str, Any]] | None = None,
+        references: dict[str, dict[str, Any]] | None = None,
     ) -> SceneState:
         history = [*self.decisions, decision][-MAX_DECISION_HISTORY:]
         return replace(
@@ -201,6 +206,7 @@ class SceneState:
             workflows=self.workflows if workflows is None else workflows,
             cuts=self.cuts if cuts is None else cuts,
             voices=self.voices if voices is None else voices,
+            references=self.references if references is None else references,
         )
 
 
@@ -282,6 +288,7 @@ def load_scene_state(scene_directory: Path, scene_id: str) -> SceneState:
     workflows = document.get("workflows")
     cuts = document.get("cuts")
     voices = document.get("voices")
+    references = document.get("references")
     return SceneState(
         scene_id=str(document.get("scene_id", scene_id)),
         revision=int(document.get("revision", 0)),
@@ -293,6 +300,7 @@ def load_scene_state(scene_directory: Path, scene_id: str) -> SceneState:
         workflows=dict(workflows) if isinstance(workflows, dict) else {},
         cuts=dict(cuts) if isinstance(cuts, dict) else {},
         voices=dict(voices) if isinstance(voices, dict) else {},
+        references=dict(references) if isinstance(references, dict) else {},
     )
 
 

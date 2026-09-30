@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from .project import load_production
+from .takes import shot_key
 
 #: What a shot shows on its card, most finished first.
 PICTURE_LEVELS = ("still", "take", "blocking", "none")
@@ -120,6 +121,16 @@ def production_graph(production: dict[str, Any], root: Path | None = None) -> di
                     "picture": _picture(scene, shot, root),
                     "block": shot.get("block") or "",
                     "findings": len(found), "severity": _severity(found),
+                    # What the picture is made from, and whose faces a derived one takes (CT-0046).
+                    "number": str(shot.get("number") or ""),
+                    "from": list(dict.fromkeys(str(item.get("ref") or "") for item in shot.get("from") or []
+                                               if isinstance(item, dict))),
+                    "derived": bool(shot.get("derive")),
+                    "with": list((shot.get("derive") or {}).get("with") or []),
+                    "reference_decided": bool(shot.get("reference_decision")),
+                    "authored_from": list(dict.fromkeys(str(item.get("ref") or "") for item in shot.get("authored_from") or []
+                                                        if isinstance(item, dict))),
+                    "authored_with": list(shot.get("authored_with") or []),
                 },
             })
             for take in shot.get("takes") or []:
@@ -165,6 +176,21 @@ def production_graph(production: dict[str, Any], root: Path | None = None) -> di
                 edges.append({"id": f"runs:{run_node}", "type": "run", "source": run_node,
                               "target": f"shot:{scene['id']}/{shots[0]}", "data": {"state": run["state"]}})
 
+        # Lineage: a shot made from another shot of the scene (CT-0046).
+        by_number = {shot_key(shot.get("number")): shot for shot in scene["shots"]}
+        drawn: set[str] = set()
+        for shot in scene["shots"]:
+            for item in shot.get("from") or []:
+                ref = str(item.get("ref") or "") if isinstance(item, dict) else ""
+                source = by_number.get(shot_key(ref)) if ref else None
+                edge_id = f"from:{scene['id']}/{source['id']}-{shot['id']}" if source else ""
+                if source is None or source["id"] == shot["id"] or edge_id in drawn:
+                    continue
+                drawn.add(edge_id)
+                edges.append({"id": f"from:{scene['id']}/{source['id']}-{shot['id']}", "type": "lineage",
+                              "source": f"shot:{scene['id']}/{source['id']}", "target": f"shot:{scene['id']}/{shot['id']}",
+                              "data": {"relation": str(item.get("relation") or ""), "decided": bool(item.get("decided"))}})
+
         # Within a scene every join is a cut record (SPEC-0007).
         by_pair = {(cut["from"], cut["to"]): cut for cut in scene.get("cuts") or []}
         for (before, after) in zip(scene["shots"], scene["shots"][1:]):
@@ -203,6 +229,8 @@ def production_graph(production: dict[str, Any], root: Path | None = None) -> di
             "id": production["id"],
             "title": production["title"],
             "active_scene": active.get("id") if isinstance(active, dict) else "",
+            "cast": [{"id": member["id"], "label": member.get("label") or member["id"]}
+                     for member in (production.get("cast") or {}).values()],
             "sequences": [
                 {"id": item["id"], "label": item.get("label") or item["id"], "scenes": list(item.get("scene_ids") or [])}
                 for item in production.get("sequences") or []

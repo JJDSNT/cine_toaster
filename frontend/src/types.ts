@@ -39,6 +39,16 @@ export interface ShotData {
   block: string;
   findings: number;
   severity: Severity;
+  /** The shot's number as the breakdown writes it: what a lineage names. */
+  number: string;
+  /** What the picture is made from, and whose faces a derived one takes (CT-0046). */
+  from: string[];
+  derived: boolean;
+  with: string[];
+  reference_decided: boolean;
+  /** What the breakdown says, when a decision stands over it. */
+  authored_from: string[];
+  authored_with: string[];
 }
 
 export interface TakeData {
@@ -98,7 +108,8 @@ export type GraphEdge =
   | { id: string; type: "cut"; source: string; target: string; data: CutData }
   | { id: string; type: "take"; source: string; target: string; data: { selected: boolean } }
   | { id: string; type: "scene-order"; source: string; target: string; data: Record<string, never> }
-  | { id: string; type: "run"; source: string; target: string; data: { state: string } };
+  | { id: string; type: "run"; source: string; target: string; data: { state: string } }
+  | { id: string; type: "lineage"; source: string; target: string; data: { relation: string; decided: boolean } };
 
 export interface Sequence {
   id: string;
@@ -107,7 +118,7 @@ export interface Sequence {
 }
 
 export interface ProductionGraph {
-  production: { id: string; title: string; active_scene: string; sequences: Sequence[] };
+  production: { id: string; title: string; active_scene: string; sequences: Sequence[]; cast: { id: string; label: string }[] };
   nodes: GraphNode[];
   edges: GraphEdge[];
 }

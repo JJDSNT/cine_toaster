@@ -12,7 +12,8 @@ const shot = (sceneId: string, id: string, order: number): GraphNode => ({
   data: {
     scene: sceneId, shot: id, order, label: "", camera: "", duration_seconds: 1, status: "", source: "",
     selected_take: "", takes: 0, speakers: [], move: "", walks: false, picture: { level: "none" }, block: "",
-    findings: 0, severity: "",
+    findings: 0, severity: "", number: id.replace(/^P/, ""), from: [], derived: false, with: [],
+    reference_decided: false, authored_from: [], authored_with: [],
   },
 });
 const take = (sceneId: string, shotId: string, id: string): GraphNode => ({

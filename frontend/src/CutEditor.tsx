@@ -14,7 +14,7 @@ function transitions(): Promise<Transition[]> {
   return catalog;
 }
 
-async function command(name: string, payload: Record<string, unknown>): Promise<void> {
+export async function command(name: string, payload: Record<string, unknown>): Promise<void> {
   const response = await fetch("/api/commands", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

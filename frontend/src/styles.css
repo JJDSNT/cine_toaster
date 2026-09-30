@@ -113,3 +113,11 @@ main { display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
 .cut-line.decided path, path.cut-line.decided { stroke-dasharray: none; stroke-width: 2.5; }
 /* A cut's label reads above the cards it sits between. */
 .react-flow__edgelabel-renderer { z-index: 1001; }
+
+.lineage-line path, path.lineage-line { stroke: #6f8fa8; stroke-width: 1.2; stroke-dasharray: 3 5; opacity: 0.55; }
+.lineage-line.decided path, path.lineage-line.decided { stroke: #9cc3e0; opacity: 0.9; stroke-dasharray: none; }
+.tag.lineage { color: #9cc3e0; }
+.reference-details { margin: 10px 0; font-size: 12px; }
+.reference-details summary { cursor: pointer; color: var(--muted, #8c9597); }
+.reference-editor fieldset { border: 1px solid #2b3134; border-radius: 6px; padding: 6px 8px; display: grid; gap: 4px; }
+.reference-editor legend { color: var(--muted, #8c9597); padding: 0 4px; }

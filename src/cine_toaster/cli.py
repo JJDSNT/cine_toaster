@@ -660,6 +660,30 @@ def command_cut(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_reference(args: argparse.Namespace) -> int:
+    """Decide what a shot's picture is made from, over the breakdown; or return to it (CT-0046)."""
+
+    from .commands import dispatch
+
+    root = Path(args.project).expanduser().resolve()
+    payload = {"scene_id": args.scene, "shot_id": args.shot, "rationale": args.why,
+               "actor": {"id": args.actor, "kind": "human"}}
+    if args.reference_command == "clear":
+        result = dispatch(root, "clear_reference", payload)
+    else:
+        payload["from"] = args.made_from
+        if args.cast is not None:
+            payload["with"] = [name.strip() for name in args.cast.split(",") if name.strip()]
+        result = dispatch(root, "set_reference", payload)
+    scene = next(item for item in load_production(root)["scenes"] if item["id"] == args.scene)
+    shot = next(item for item in scene["shots"] if item["id"] == args.shot)
+    made = ", ".join(dict.fromkeys(str(item.get("ref")) for item in shot.get("from") or [])) or "nothing"
+    faces = ", ".join((shot.get("derive") or {}).get("with") or [])
+    print(f"{result.type}: {args.shot} is made from {made}" + (f", with {faces}" if faces else "")
+          + f" (revision {result.revision})")
+    return 0
+
+
 def command_picture(args: argparse.Namespace) -> int:
     """A master picture made by editing its source with the cast, within the budget."""
 
@@ -1610,6 +1634,23 @@ def build_parser() -> argparse.ArgumentParser:
             item.add_argument("--ms", type=int, help="the transition's duration in milliseconds")
             item.add_argument("--transition-why", default="", help="why this transition")
     cut_parser.set_defaults(function=command_cut)
+
+    reference_parser = subparsers.add_parser(
+        "reference", help="Decide what a shot's picture is made from, over the breakdown (CT-0046)")
+    reference_sub = reference_parser.add_subparsers(dest="reference_command", required=True)
+    for name, text in (("set", "Decide what the shot is made from, and whose faces it takes"),
+                       ("clear", "Return to what the breakdown says")):
+        item = reference_sub.add_parser(name, help=text)
+        item.add_argument("project", type=Path)
+        item.add_argument("scene")
+        item.add_argument("shot")
+        item.add_argument("--why", help="why the decision was made (kept in the history)")
+        item.add_argument("--actor", default=os.environ.get("USER", "director"))
+        if name == "set":
+            item.add_argument("--from", dest="made_from", default="",
+                              help="a shot of the scene (number or id), a master, or a picture file")
+            item.add_argument("--with", dest="cast", help="a derived picture's cast, comma-separated (empty: none)")
+    reference_parser.set_defaults(function=command_reference)
 
     workflow_parser = subparsers.add_parser(
         "workflow", help="The built-in workflow: picture, a person's approval, video, takes (SPEC-0009)")

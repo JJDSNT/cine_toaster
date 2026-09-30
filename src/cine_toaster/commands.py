@@ -388,6 +388,142 @@ def clear_cut(
                          event=event.public_dict())
 
 
+def _made_from(root: Path, scene: dict[str, Any], shot: dict[str, Any], ref: str) -> str:
+    """A reference as the breakdown writes it (a shot's number, a master, a file), or refused."""
+
+    from .pictures import source_picture
+    from .takes import shot_key
+
+    match = next((item for item in scene["shots"]
+                  if item["id"] == ref or shot_key(item.get("number")) == shot_key(ref)), None)
+    if match is not None:
+        if match["id"] == shot["id"]:
+            raise ValidationError(f"{shot['id']} cannot be made from itself")
+        return str(match.get("number") or match["id"])
+    if source_picture(root, scene, ref) is None:
+        raise ValidationError(f"{ref!r} is neither a shot of {scene['id']} nor a picture file",
+                              scene_id=scene["id"], shot_id=shot["id"])
+    return ref
+
+
+def _check_no_cycle(scene: dict[str, Any], shot: dict[str, Any], ref: str) -> None:
+    from .takes import shot_key
+
+    by_number = {shot_key(item.get("number")): item for item in scene["shots"]}
+    seen, current = {shot_key(shot.get("number"))}, ref
+    while current:
+        key = shot_key(current)
+        if key in seen:
+            raise ValidationError(f"{shot['id']} made from {ref} would be made from itself, through {current}")
+        seen.add(key)
+        other = by_number.get(key)
+        lineage = (other or {}).get("from") or []
+        current = str(lineage[0].get("ref") or "") if other and lineage and isinstance(lineage[0], dict) else ""
+
+
+def set_reference(
+    root: Path,
+    *,
+    scene_id: str,
+    shot_id: str,
+    actor: Actor,
+    made_from: str = "",
+    cast: list[str] | None = None,
+    expected_revision: int | None = None,
+    rationale: str | None = None,
+) -> CommandResult:
+    """Decide what a shot's picture is made from, and whose faces a derived picture takes (CT-0046).
+
+    `made_from` is a shot of the scene (its number or id), a master, or a
+    picture file; `cast` (for a derived picture only) replaces the cast
+    lending faces. The breakdown is not rewritten (ADR 0006).
+    """
+
+    from .cast import cast_key
+
+    root = root.expanduser().resolve()
+    production, scene, shot = _locate(root, scene_id, shot_id)
+    made_from = (made_from or "").strip()
+    if not made_from and cast is None:
+        raise ValidationError("Say what the shot is made from, or whose faces it takes")
+    ref = _made_from(root, scene, shot, made_from) if made_from else ""
+    if ref:
+        _check_no_cycle(scene, shot, ref)
+    names = None
+    if cast is not None:
+        if not shot.get("derive"):
+            raise ValidationError(f"{shot_id} is not a derived picture (derive: {{from, with, request}}); "
+                                  "only a derived picture takes faces from the cast")
+        members = production.get("cast") or {}
+        names = []
+        for name in cast:
+            name = str(name).strip()
+            if not name:
+                continue
+            if not any(cast_key(name) in {cast_key(n) for n in [m["id"], m["label"], *m.get("names", [])]}
+                       for m in members.values()):
+                raise ValidationError(f"{name} has no cast sheet (cast/<id>/character.yaml)", allowed=sorted(members))
+            names.append(name)
+    rationale_text = _clean_rationale(rationale)
+    directory = scene_directory(root, scene_id)
+    _check_writable(directory, scene_id)
+    state = load_scene_state(directory, scene_id)
+    _check_revision(expected_revision, state.revision)
+
+    command_id = _new_command_id()
+    stamp = now()
+    previous = state.references.get(shot_id) or {}
+    decision = {"from": ref or previous.get("from", ""), "with": names if names is not None else previous.get("with"),
+                "decided_at": stamp, "decided_by": actor.public_dict()}
+    record = {"kind": "reference.set", "shot_id": shot_id, "from": decision["from"], "with": decision["with"],
+              "previous": state.references.get(shot_id), "actor": actor.public_dict(), "rationale": rationale_text,
+              "decided_at": stamp, "command_id": command_id}
+    committed = state.with_decision(decision=record, references={**state.references, shot_id: decision})
+    write_scene_state(directory, committed)
+    event = append_event(root, Event.create("reference.set", production["id"], scene_id=scene_id, shot_id=shot_id,
+                                            revision=committed.revision, actor=actor.public_dict(),
+                                            rationale=rationale_text, command_id=command_id))
+    return CommandResult(command_id=command_id, type="reference.set", project_id=production["id"], scene_id=scene_id,
+                         shot_id=shot_id, take_id=None, previous_take_id=None, revision=committed.revision,
+                         event=event.public_dict())
+
+
+def clear_reference(
+    root: Path,
+    *,
+    scene_id: str,
+    shot_id: str,
+    actor: Actor,
+    expected_revision: int | None = None,
+    rationale: str | None = None,
+) -> CommandResult:
+    """Return a shot's references to what the breakdown says, keeping the decision in the history."""
+
+    root = root.expanduser().resolve()
+    production, _scene, _shot = _locate(root, scene_id, shot_id)
+    directory = scene_directory(root, scene_id)
+    _check_writable(directory, scene_id)
+    state = load_scene_state(directory, scene_id)
+    _check_revision(expected_revision, state.revision)
+    if shot_id not in state.references:
+        raise ValidationError(f"{shot_id}'s references were not decided here; they are the breakdown's",
+                              scene_id=scene_id, shot_id=shot_id)
+    command_id = _new_command_id()
+    stamp = now()
+    record = {"kind": "reference.cleared", "shot_id": shot_id, "previous": state.references[shot_id],
+              "actor": actor.public_dict(), "rationale": _clean_rationale(rationale), "decided_at": stamp,
+              "command_id": command_id}
+    committed = state.with_decision(decision=record,
+                                    references={k: v for k, v in state.references.items() if k != shot_id})
+    write_scene_state(directory, committed)
+    event = append_event(root, Event.create("reference.cleared", production["id"], scene_id=scene_id, shot_id=shot_id,
+                                            revision=committed.revision, actor=actor.public_dict(),
+                                            command_id=command_id))
+    return CommandResult(command_id=command_id, type="reference.cleared", project_id=production["id"],
+                         scene_id=scene_id, shot_id=shot_id, take_id=None, previous_take_id=None,
+                         revision=committed.revision, event=event.public_dict())
+
+
 def set_voice(
     root: Path,
     *,
@@ -827,6 +963,8 @@ COMMANDS = {
     "set_cut": set_cut,
     "clear_cut": clear_cut,
     "set_voice": set_voice,
+    "set_reference": set_reference,
+    "clear_reference": clear_reference,
 }
 
 # Commands act on a shot; these act on a whole scene version instead.
@@ -948,6 +1086,10 @@ def dispatch(root: Path, command_type: str, payload: dict[str, Any]) -> CommandR
         arguments["take_id"] = str(payload.get("take_id", "")).strip()
     elif command_type == "set_cut":
         arguments["cut"] = payload.get("cut") if isinstance(payload.get("cut"), dict) else {}
+    elif command_type == "set_reference":
+        arguments["made_from"] = str(payload.get("from") or "")
+        cast = payload.get("with")
+        arguments["cast"] = [str(item) for item in cast] if isinstance(cast, list) else None
     elif command_type == "set_voice":
         arguments["converted"] = payload.get("converted", True) not in (False, "false", "0", 0)
 
@@ -957,6 +1099,7 @@ def dispatch(root: Path, command_type: str, payload: dict[str, Any]) -> CommandR
 __all__ = [
     "CommandResult",
     "clear_cut",
+    "clear_reference",
     "clear_selection",
     "dispatch",
     "now",
@@ -965,5 +1108,6 @@ __all__ = [
     "review_assembly",
     "select_take",
     "set_cut",
+    "set_reference",
     "set_voice",
 ]
