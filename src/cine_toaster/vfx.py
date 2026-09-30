@@ -33,9 +33,14 @@ from typing import Any
 from .errors import ValidationError
 
 BUILTIN = Path(__file__).with_name("vfx_assets")
-CATEGORIES = ("texture", "lens", "light", "motion", "glitch", "elements")
+CATEGORIES = ("texture", "lens", "light", "motion", "glitch", "particles", "elements")
 EFFECTS = ("grain", "vignette", "light-leak", "aberration", "glitch", "shake", "flash", "defocus", "old-film",
-           "element")
+           "element", "sparks-burst", "disintegrate", "look")
+ENGINES = ("ffmpeg", "blender")
+#: Effects Blender renders as an element on the fly (vfx_assets/_blender/element.py).
+BLENDER_EFFECTS = ("sparks-burst", "disintegrate")
+BLENDER_ELEMENT_SCRIPT = BUILTIN / "_blender" / "element.py"
+VIDEO_SUFFIXES = (".mp4", ".mov", ".webm", ".mkv", ".avi")
 BLENDS = ("screen", "add", "alpha", "key")
 ELEMENT_CATEGORIES = ("fire", "smoke", "sparks", "explosion", "muzzle-flash", "dust", "debris", "water", "weather",
                       "light", "other")
@@ -73,6 +78,7 @@ def list_effects(project_root: Path | None = None) -> list[dict[str, Any]]:
                 "use_when": [str(item) for item in raw.get("use_when") or []],
                 "avoid_when": [str(item) for item in raw.get("avoid_when") or []],
                 "params": dict(raw.get("params") or {}), "effect": str(render.get("effect") or "grain"),
+                "engine": str(render.get("engine") or "ffmpeg"),
                 "element_category": str(render.get("element_category") or ""), "origin": origin,
                 "directory": str(manifest.parent),
             }
@@ -88,15 +94,50 @@ def list_elements(project_root: Path | None = None) -> list[dict[str, Any]]:
     for origin, root in _layers(None, "CINE_TOASTER_VFX_ELEMENTS_PATH", project_root, "vfx_elements"):
         for manifest in sorted(root.glob("*/element.toml")) if root.is_dir() else []:
             raw = _toml(manifest, "element")
-            file = (manifest.parent / str(raw.get("file") or "")).resolve()
-            by_id[str(raw.get("id") or manifest.parent.name)] = {
-                "id": str(raw.get("id") or manifest.parent.name), "label": str(raw.get("label") or manifest.parent.name),
+            folder = manifest.parent
+            file = str((folder / str(raw.get("file") or "")).resolve()) if raw.get("file") else ""
+            project = str((folder / str(raw["project"])).resolve()) if raw.get("project") else ""
+            matte = str((folder / str(raw["matte"])).resolve()) if raw.get("matte") else ""
+            element = {
+                "id": str(raw.get("id") or folder.name), "label": str(raw.get("label") or folder.name),
                 "category": str(raw.get("category") or "other"), "blend": str(raw.get("blend") or "screen"),
-                "key_color": str(raw.get("key_color") or "0x00FF00"), "file": str(file), "exists": file.is_file(),
+                "key_color": str(raw.get("key_color") or "0x00FF00"), "file": file, "matte": matte,
+                "project": project, "frames": int(raw.get("frames") or 0),
+                # Scene-linear EXR by default; display-encoded otherwise. `view` picks the OCIO view.
+                "colorspace": str(raw.get("colorspace") or ""), "view": str(raw.get("view") or ""),
                 "source": str(raw.get("source") or ""), "license": str(raw.get("license") or ""),
                 "loop": bool(raw.get("loop")), "origin": origin,
             }
+            element["format"] = _format(element)
+            element["exists"] = _exists(element)
+            by_id[element["id"]] = element
     return sorted(by_id.values(), key=lambda item: (item["category"], item["id"]))
+
+
+def _format(element: dict[str, Any]) -> str:
+    """How the element is delivered: video, png or exr sequence, or a Blender project to render."""
+
+    if element["project"]:
+        return "blender-project"
+    name = element["file"].lower()
+    if name.endswith(".exr"):
+        return "exr-sequence" if "%" in name else "exr"
+    if "%" in name:
+        return "image-sequence"
+    if name.endswith((".png", ".tif", ".tiff")):
+        return "image"
+    return "video"
+
+
+def _exists(element: dict[str, Any]) -> bool:
+    from .color import _frames
+
+    if element["project"]:
+        return Path(element["project"]).is_file()
+    if not element["file"]:
+        return False
+    present = bool(_frames(element["file"])) if "%" in element["file"] else Path(element["file"]).is_file()
+    return present and (not element["matte"] or bool(_frames(element["matte"])) or Path(element["matte"]).is_file())
 
 
 def expand(raw: Any, catalog: dict[str, dict[str, Any]], elements: dict[str, dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
@@ -112,7 +153,13 @@ def expand(raw: Any, catalog: dict[str, dict[str, Any]], elements: dict[str, dic
             continue
         params = {**item["params"], **{key: value for key, value in entry.items() if key not in ("id", "reason")}}
         effect = {"id": item["id"], "effect": item["effect"], "params": params, "reason": str(entry.get("reason") or "")}
-        if item["effect"] == "element":
+        if item.get("engine") == "blender":
+            # Rendered by Blender when the shot is drawn, then composited like an element with alpha.
+            effect["effect"] = "element"
+            effect["element"] = {"id": f"{item['id']} (Blender)", "blend": "alpha", "format": "generated",
+                                 "generated": item["effect"], "file": "", "matte": "", "colorspace": "",
+                                 "view": str(params.get("view") or ""), "loop": False}
+        elif item["effect"] == "element":
             element = elements.get(str(params.get("element") or ""))
             if element is None:
                 wanted = item["element_category"]
@@ -190,6 +237,20 @@ def _chain(effect: dict[str, Any], label: str, out: str, duration: float, width:
         return (f"[{label}]colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131,"
                 f"noise=alls={max(1, round(strength * 30))}:allf=t+u,vignette=angle=0.6,"
                 f"eq=brightness='0.03*sin(t*23)':eval=frame[{out}]")
+    if kind == "look":
+        # An OpenColorIO view baked to a 3D LUT (cached), for FFmpeg to apply.
+        from .color import bake_look
+        from .jobs import state_root
+
+        view = str(params.get("view") or "ACES 2.0 - SDR 100 nits (Rec.709)")
+        name = "".join(ch if ch.isalnum() else "-" for ch in view).strip("-").lower()
+        lut = state_root() / "looks" / f"{name}.cube"
+        if not lut.is_file():
+            bake_look(lut, view=view)
+        path = str(lut).replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
+        mix = min(1.0, max(0.0, strength))
+        return (f"[{label}]split[{label}o][{label}l];[{label}l]lut3d=file='{path}'[{label}g];"
+                f"[{label}o][{label}g]blend=all_expr='A*(1-{mix:.3f})+B*{mix:.3f}'[{out}]")
     if kind == "element":
         element = effect["element"]
         scale = _number(params, "scale", 1.0)
@@ -198,7 +259,12 @@ def _chain(effect: dict[str, Any], label: str, out: str, duration: float, width:
         # Fitted inside `scale` of the frame, its proportion kept, never larger than the frame.
         box_w, box_h = max(2, round(width * min(scale, 1.0) / 2) * 2), max(2, round(height * min(scale, 1.0) / 2) * 2)
         size = f"{box_w}:{box_h}:force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2"
-        source = f"[{element_input}:v]setpts=PTS-STARTPTS+{start:.3f}/TB,scale={size}"
+        source = f"[{element_input}:v]setpts=PTS-STARTPTS+{start:.3f}/TB"
+        if element.get("_matte_input") is not None:
+            # A separate matte: its brightness is the element's opacity.
+            matte = f"[{element['_matte_input']}:v]setpts=PTS-STARTPTS+{start:.3f}/TB,format=gray[{label}m]"
+            source = f"{matte};{source},format=rgba[{label}c];[{label}c][{label}m]alphamerge"
+        source += f",scale={size}"
         place = f"x='W*{x:.3f}-w/2':y='H*{y:.3f}-h/2'"
         if element["blend"] in ("screen", "add"):
             mode = "screen" if element["blend"] == "screen" else "addition"
@@ -211,6 +277,79 @@ def _chain(effect: dict[str, Any], label: str, out: str, duration: float, width:
         return (f"{source},format=yuva420p,colorchannelmixer=aa={opacity:.3f}[{label}e];"
                 f"[{label}][{label}e]overlay={place}:eof_action=pass:format=auto[{out}]")
     raise ValidationError(f"The effect {kind!r} is not one Cine Toaster draws", effects=list(EFFECTS))
+
+
+def _sequence_input(pattern: str, fps: int, loop: bool) -> list[str]:
+    from .color import _frames
+
+    frames = _frames(pattern)
+    first = int("".join(ch for ch in frames[0].stem if ch.isdigit())[-6:] or 0) if frames else 1
+    return [*(["-stream_loop", "-1"] if loop else []), "-framerate", str(fps), "-start_number", str(first),
+            "-i", pattern]
+
+
+def _element_input(element: dict[str, Any], file: str, duration: float, width: int, height: int, fps: int,
+                   params: dict[str, Any], run, *, matte: bool = False) -> list[str]:
+    """The FFmpeg input for an element, rendering or converting it first when it needs it.
+
+    Blender projects and generated effects are rendered (cached); EXR frames
+    go through OpenColorIO to the picture's encoding (cached); video and
+    display-encoded image sequences are read as they are.
+    """
+
+    from .color import LINEAR_SPACE, VIEW, exr_to_display
+    from .jobs import state_root
+
+    cache = state_root() / "vfx-elements"
+    loop = bool(element.get("loop"))
+    kind = element.get("format")
+    if not matte and kind in ("generated", "blender-project"):
+        frames = element.get("frames") or max(2, round(duration * fps))
+        rendered = _blender_element(element, params, frames, width, height, fps, cache, run)
+        file, kind = rendered, "exr-sequence"
+    if not matte and kind in ("exr", "exr-sequence"):
+        pattern, _ = exr_to_display(file, cache / "display", colorspace=element.get("colorspace") or LINEAR_SPACE,
+                                    view=element.get("view") or VIEW)
+        return _sequence_input(pattern, fps, loop)
+    if "%" in file:
+        return _sequence_input(file, fps, loop)
+    if Path(file).suffix.lower() in VIDEO_SUFFIXES:
+        return [*(["-stream_loop", "-1"] if loop else []), "-i", file]
+    return ["-loop", "1", "-framerate", str(fps), "-t", f"{duration:.3f}", "-i", file]
+
+
+def _blender_element(element: dict[str, Any], params: dict[str, Any], frames: int, width: int, height: int,
+                     fps: int, cache: Path, run) -> str:
+    """Render a generated effect or a production's .blend to an EXR sequence with alpha, once."""
+
+    import hashlib
+    import json
+
+    from .titles import blender_binary
+
+    blender = blender_binary()
+    if not blender:
+        raise ValidationError(f"{element['id']} is rendered by Blender, which is not found "
+                              "(install it, or set CINE_TOASTER_BLENDER)")
+    spec = {"effect": element.get("generated") or "", "params": params, "width": width, "height": height,
+            "fps": fps, "frames": frames, "formats": ["exr"]}
+    hashed = hashlib.sha256(json.dumps(spec, sort_keys=True, default=str).encode())
+    script = BLENDER_ELEMENT_SCRIPT if element.get("generated") else BUILTIN / "_blender" / "project.py"
+    hashed.update(script.read_bytes())
+    if element.get("project"):
+        hashed.update(Path(element["project"]).read_bytes())
+    folder = cache / "blender" / hashed.hexdigest()[:16]
+    pattern = folder / "exr" / "f_%04d.exr"
+    if not (folder / "done").is_file():
+        folder.mkdir(parents=True, exist_ok=True)
+        spec["output"] = str(folder)
+        (folder / "spec.json").write_text(json.dumps(spec, default=str), encoding="utf-8")
+        command = [blender, "--background", "--factory-startup"]
+        if element.get("project"):
+            command += [element["project"]]
+        run([*command, "--python", str(script), "--", str(folder / "spec.json")])
+        (folder / "done").write_text("", encoding="utf-8")
+    return str(pattern)
 
 
 def render(effects: list[dict[str, Any]], duration: float, output: Path, *, background: Path | None = None,
@@ -237,9 +376,14 @@ def render(effects: list[dict[str, Any]], duration: float, output: Path, *, back
     for index, effect in enumerate(effects, 1):
         element_input = None
         if effect["effect"] == "element":
+            element = effect["element"] = dict(effect["element"])
             element_input = len([part for part in inputs if part == "-i"])
-            loop = ["-stream_loop", "-1"] if effect["element"].get("loop") else []
-            inputs += [*loop, "-i", effect["element"]["file"]]
+            inputs += _element_input(element, element["file"], duration, width, height, fps, effect["params"], run)
+            element["_matte_input"] = None
+            if element.get("matte"):
+                element["_matte_input"] = element_input + 1
+                inputs += _element_input(element, element["matte"], duration, width, height, fps, {}, run,
+                                         matte=True)
         graph.append(_chain(effect, label, f"v{index}", duration, width, height, element_input))
         label = f"v{index}"
     output.parent.mkdir(parents=True, exist_ok=True)

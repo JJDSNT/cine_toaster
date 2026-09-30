@@ -660,6 +660,29 @@ def command_cut(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_vfx(args: argparse.Namespace) -> int:
+    """The VFX catalog and the production's elements; build the example elements (CT-0047)."""
+
+    from .vfx import list_effects, list_elements
+
+    root = Path(args.project).expanduser().resolve()
+    if args.vfx_command == "examples":
+        from .vfx_examples import build
+
+        for element_id in build(root):
+            print(f"made vfx_elements/{element_id}")
+        return 0
+    for item in list_effects(root):
+        print(f"{item['id']:24} {item['category']:10} {item.get('engine', 'ffmpeg'):8} {item['says'][:70]}")
+    elements = list_elements(root)
+    if elements:
+        print()
+    for element in elements:
+        state = "" if element["exists"] else "  (missing)"
+        print(f"{element['id']:26} {element['category']:10} {element['format']:16} {element['blend']}{state}")
+    return 0
+
+
 def command_mcp(args: argparse.Namespace) -> int:
     """Serve the project to Claude Code over MCP, on stdio (CT-0045)."""
 
@@ -1651,6 +1674,14 @@ def build_parser() -> argparse.ArgumentParser:
             item.add_argument("--ms", type=int, help="the transition's duration in milliseconds")
             item.add_argument("--transition-why", default="", help="why this transition")
     cut_parser.set_defaults(function=command_cut)
+
+    vfx_parser = subparsers.add_parser("vfx", help="The VFX catalog and the production's stock elements (CT-0047)")
+    vfx_sub = vfx_parser.add_subparsers(dest="vfx_command", required=True)
+    for name, text in (("list", "Effects and elements"),
+                       ("examples", "Render one example element per delivery form into vfx_elements/ (Blender, FFmpeg)")):
+        item = vfx_sub.add_parser(name, help=text)
+        item.add_argument("project", type=Path)
+    vfx_parser.set_defaults(function=command_vfx)
 
     mcp_parser = subparsers.add_parser(
         "mcp", help="Serve a project to Claude Code over MCP (stdio): claude mcp add cine-toaster -- toast mcp <project>")

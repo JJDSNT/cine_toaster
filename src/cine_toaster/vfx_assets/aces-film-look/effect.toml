@@ -1,0 +1,16 @@
+schema_version = 1
+id = "aces-film-look"
+name = "ACES film look"
+category = "lens"
+says = "The picture seen through ACES 2.0's film response: highlights roll off, contrast settles. An OpenColorIO transform baked to a LUT."
+energy = "low"
+use_when = ["Making generated shots share one filmic response", "Taming harsh highlights"]
+avoid_when = ["Shots already graded"]
+
+[params]
+strength = 1.0
+view = "ACES 2.0 - SDR 100 nits (Rec.709)"
+
+[render]
+engine = "ffmpeg"
+effect = "look"

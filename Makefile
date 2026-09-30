@@ -12,7 +12,7 @@ RUN = $(VENV)/bin/python
 TOAST = $(VENV)/bin/toast
 
 .DEFAULT_GOAL := setup
-.PHONY: ui ui-test setup environment submodules install install-media install-audio install-gpu install-voice install-agents install-mcp test check demo doctor serve clean help voice build
+.PHONY: ui ui-test setup environment submodules install install-media install-audio install-gpu install-voice install-agents install-mcp install-vfx test check demo doctor serve clean help voice build
 
 help:
 	@echo "make setup     install and report what works"
@@ -75,6 +75,10 @@ install-gpu: install
 install-agents: install
 	@echo "==> Installing the agents extra (the assistant)"
 	@$(RUN) -m pip install --quiet -e '.[agents]'
+
+install-vfx: install
+	@echo "==> Installing VFX colour management (OpenColorIO, OpenEXR)"
+	@$(RUN) -m pip install --quiet -e '.[vfx]'
 
 install-mcp: install
 	@echo "==> Installing the MCP server (Claude Code through Cine Toaster)"

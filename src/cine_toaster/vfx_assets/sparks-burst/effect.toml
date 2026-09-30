@@ -1,0 +1,23 @@
+schema_version = 1
+id = "sparks-burst"
+name = "Sparks burst"
+category = "particles"
+says = "Hot sparks thrown from a point, falling under gravity: rendered by Blender for this shot, then composited."
+energy = "high"
+use_when = ["A short circuit, a blade on metal, an impact"]
+avoid_when = ["When Blender is not installed (refused, not faked)"]
+
+[params]
+x = 0.5
+y = 0.5
+scale = 1.0
+count = 400
+speed = 6.0
+gravity = 1.0
+glow = 3.0
+color = "#FFB347"
+view = "ACES 2.0 - SDR 100 nits (Rec.709)"
+
+[render]
+engine = "blender"
+effect = "sparks-burst"

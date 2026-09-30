@@ -1,0 +1,22 @@
+schema_version = 1
+id = "disintegrate"
+name = "Disintegrate"
+category = "particles"
+says = "A word or an object comes apart into drifting dust while it vanishes: for titles and things that cease to be."
+energy = "medium"
+use_when = ["A title that dissolves, a memory falling apart, an object erased"]
+avoid_when = ["When Blender is not installed (refused, not faked)"]
+
+[params]
+text = ""
+x = 0.5
+y = 0.5
+scale = 1.0
+count = 3000
+begin = 0.25
+drift = 0.8
+body_color = "#E6E6E6"
+
+[render]
+engine = "blender"
+effect = "disintegrate"

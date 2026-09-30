@@ -282,6 +282,20 @@ def _assistant() -> Capability:
     )
 
 
+def _color() -> Capability:
+    from .color import available
+
+    reason = available()
+    return Capability(
+        name="Colour management",
+        what_it_enables="OpenEXR elements through OpenColorIO, and OCIO looks (CT-0047)",
+        required=False,
+        status=OK if not reason else MISSING,
+        detail=reason,
+        remedy="" if not reason else "make install-vfx",
+    )
+
+
 def _mcp() -> Capability:
     ok = _module("mcp")
     return Capability(
@@ -325,6 +339,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _voice,
     _assistant,
     _mcp,
+    _color,
     # Detected, not yet used. See `report`.
     _sox,
     _blender,

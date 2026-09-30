@@ -36,6 +36,8 @@ agents = ["langgraph>=1.2", "langgraph-checkpoint-sqlite>=3.1", "ag-ui-langgraph
           "fastapi>=0.140", "uvicorn>=0.50", "anthropic>=1.0"]
 # Claude Code working on a film through Cine Toaster's commands (CT-0045): `toast mcp <project>`.
 mcp = ["mcp>=2.2"]
+# VFX colour management (CT-0047): OpenColorIO and OpenEXR, both BSD-3.
+vfx = ["opencolorio>=2.3", "OpenEXR>=3.2", "numpy>=1.26", "pillow>=10"]
 
 [project.scripts]
 toast = "cine_toaster.cli:main"

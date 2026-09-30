@@ -141,3 +141,99 @@ class AssemblyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(HAS_FFMPEG, "FFmpeg is missing")
+class ModalityTests(unittest.TestCase):
+    """Each form an element arrives in, composited the same way (CT-0047)."""
+
+    def setUp(self) -> None:
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.previous = os.environ.get("XDG_STATE_HOME")
+        os.environ["XDG_STATE_HOME"] = str(self.root / "state")
+        self.addCleanup(self._restore)
+
+    def _restore(self) -> None:
+        if self.previous is None:
+            os.environ.pop("XDG_STATE_HOME", None)
+        else:
+            os.environ["XDG_STATE_HOME"] = self.previous
+
+    def bright(self, element_id: str) -> int:
+        catalog = {item["id"]: item for item in list_effects(self.root)}
+        effects, problems = expand([{"id": "sparks-over", "element": element_id}], catalog,
+                                   {item["id"]: item for item in list_elements(self.root)})
+        self.assertEqual(problems, [], element_id)
+        out = render(effects, 0.5, self.root / f"{element_id}.mp4", width=320, height=180)
+        centre = subprocess.run(["ffmpeg", "-v", "error", "-ss", "0.2", "-i", str(out), "-frames:v", "1", "-vf",
+                                 "crop=40:40:140:70,format=gray", "-f", "rawvideo", "-"], capture_output=True,
+                                check=True).stdout
+        return max(centre)
+
+    def test_png_sequence_video_with_a_matte_and_exr_through_opencolorio(self) -> None:
+        import numpy as np
+
+        # A white square, as PNG frames with alpha, as a colour video with a separate matte, and as linear EXR.
+        frames = self.root / "vfx_elements" / "square-png" / "frames"
+        frames.mkdir(parents=True)
+        ffmpeg("-f", "lavfi", "-i", "color=c=white:s=320x180:d=0.5:r=24,format=rgba,"
+                                    "geq=r=255:g=255:b=255:a='if(between(X,120,200)*between(Y,50,130),255,0)'",
+               str(frames / "f_%04d.png"))
+        element(self.root, "square-png-seq", "sparks", "alpha", lambda folder: "../square-png/frames/f_%04d.png")
+        element(self.root, "square-matte", "sparks", "alpha", lambda folder: ffmpeg(
+            "-f", "lavfi", "-i", "color=c=white:s=320x180:d=0.5:r=24", str(folder / "colour.mp4")) or "colour.mp4")
+        ffmpeg("-f", "lavfi", "-i", "color=c=black:s=320x180:d=0.5:r=24,drawbox=x=120:y=50:w=80:h=80:color=white:t=fill",
+               str(self.root / "vfx_elements" / "square-matte" / "matte.mp4"))
+        manifest = self.root / "vfx_elements" / "square-matte" / "element.toml"
+        manifest.write_text(manifest.read_text() + 'matte = "matte.mp4"\n', encoding="utf-8")
+
+        import OpenEXR
+
+        exr = self.root / "vfx_elements" / "square-exr" / "frames"
+        exr.mkdir(parents=True)
+        pixels = np.zeros((180, 320, 4), np.float32)
+        pixels[50:130, 120:200] = (4.0, 4.0, 4.0, 1.0)  # brighter than white: scene-linear light
+        for index in range(1, 13):
+            OpenEXR.File({"type": OpenEXR.scanlineimage, "compression": OpenEXR.ZIP_COMPRESSION},
+                         {"RGBA": pixels.astype(np.float16)}).write(str(exr / f"f_{index:04d}.exr"))
+        element(self.root, "square-exr-seq", "sparks", "alpha", lambda folder: "../square-exr/frames/f_%04d.exr")
+
+        formats = {item["id"]: item["format"] for item in list_elements(self.root)}
+        self.assertEqual((formats["square-png-seq"], formats["square-exr-seq"], formats["square-matte"]),
+                         ("image-sequence", "exr-sequence", "video"))
+        for element_id in ("square-png-seq", "square-matte", "square-exr-seq"):
+            self.assertGreater(self.bright(element_id), 200, element_id)
+        # The matte decided the opacity: outside the square the colour video is not seen.
+        catalog = {item["id"]: item for item in list_effects(self.root)}
+        effects, _ = expand([{"id": "sparks-over", "element": "square-matte"}], catalog,
+                            {item["id"]: item for item in list_elements(self.root)})
+        out = render(effects, 0.5, self.root / "matte-edge.mp4", width=320, height=180)
+        corner = subprocess.run(["ffmpeg", "-v", "error", "-ss", "0.2", "-i", str(out), "-frames:v", "1", "-vf",
+                                 "crop=20:20:10:10,format=gray", "-f", "rawvideo", "-"], capture_output=True).stdout
+        self.assertLess(max(corner), 180)
+
+    def test_a_look_is_an_opencolorio_transform_baked_for_ffmpeg(self) -> None:
+        from cine_toaster.color import bake_look
+
+        lut = bake_look(self.root / "look.cube", size=9)
+        lines = lut.read_text().splitlines()
+        self.assertEqual(lines[1], "LUT_3D_SIZE 9")
+        self.assertEqual(len(lines), 2 + 9 ** 3)
+        black, white = lines[2].split(), lines[-1].split()
+        self.assertLess(float(black[0]), 0.05)
+        # ACES 2.0's tone scale compresses the highlights: display white comes out below white.
+        self.assertTrue(0.6 < float(white[0]) < 0.95, white)
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and __import__("cine_toaster.titles").titles.blender_binary(),
+                         "Blender is not installed")
+    def test_every_example_modality_is_built_and_composited(self) -> None:
+        from cine_toaster.vfx_examples import build
+
+        made = build(self.root)
+        formats = {item["id"]: item["format"] for item in list_elements(self.root)}
+        self.assertEqual({formats[element_id] for element_id in made},
+                         {"image-sequence", "exr-sequence", "video", "blender-project"})
+        for element_id in made:
+            self.assertGreater(self.bright(element_id), 120, element_id)
