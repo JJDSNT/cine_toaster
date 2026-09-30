@@ -35,7 +35,8 @@ export async function runCommand(command, payload) {
   const response = await fetch("/api/commands", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ command, ...payload }),
+    // A decision made in the control room is a person's, unless the caller says who.
+    body: JSON.stringify({ command, actor: { id: "control-room", kind: "human" }, ...payload }),
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {

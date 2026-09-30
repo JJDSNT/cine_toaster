@@ -194,8 +194,10 @@ remains:
   pieces and object subjects in the blocking frame with a `subject_hidden`
   check (CT-0025); master pictures from a location's plate, and a
   Locations room (SPEC-0010, CT-0030); camera-move previews (CT-0027).
-  Noted for later, not started: RL beyond the refusal reasons (CT-0041),
-  Claude Code acting through Cine Toaster by MCP (CT-0045), Video Toaster
+  Aerial camera moves and outdoor plans followed (CT-0027). Claude Code now
+  works on a film through an MCP server of Cine Toaster (ADR 0020, CT-0045
+  option 1: `toast mcp`). Noted for later, not started: RL beyond the
+  refusal reasons (CT-0041), CT-0045 options 2 and 3, Video Toaster
   transitions (CT-0028), VFX and titles (CT-0031). The author will re-check
   later whether Kael's converted voice still sounds ill.
 

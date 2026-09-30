@@ -12,7 +12,7 @@ RUN = $(VENV)/bin/python
 TOAST = $(VENV)/bin/toast
 
 .DEFAULT_GOAL := setup
-.PHONY: ui ui-test setup environment submodules install install-media install-audio install-gpu install-voice install-agents test check demo doctor serve clean help voice build
+.PHONY: ui ui-test setup environment submodules install install-media install-audio install-gpu install-voice install-agents install-mcp test check demo doctor serve clean help voice build
 
 help:
 	@echo "make setup     install and report what works"
@@ -75,6 +75,10 @@ install-gpu: install
 install-agents: install
 	@echo "==> Installing the agents extra (the assistant)"
 	@$(RUN) -m pip install --quiet -e '.[agents]'
+
+install-mcp: install
+	@echo "==> Installing the MCP server (Claude Code through Cine Toaster)"
+	@$(RUN) -m pip install --quiet -e '.[mcp]'
 
 # Voice conversion (CT-0040) runs in its own environment: its engines pin
 # their own numpy and torch. CPU is enough; nothing here needs a GPU.

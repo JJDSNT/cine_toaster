@@ -279,6 +279,19 @@ def _assistant() -> Capability:
     )
 
 
+def _mcp() -> Capability:
+    ok = _module("mcp")
+    return Capability(
+        name="MCP server",
+        what_it_enables="Claude Code working on a film through Cine Toaster's commands: "
+                        "`claude mcp add cine-toaster -- toast mcp <project>` (CT-0045)",
+        required=False,
+        status=OK if ok else MISSING,
+        detail="",
+        remedy="" if ok else "make install-mcp",
+    )
+
+
 def _whisper() -> Capability:
     path = _binary("whisper-cli") or _binary("whisper-cpp") or _binary("main")
     ok = bool(path) or _module("faster_whisper")
@@ -308,6 +321,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _ffprobe,
     _voice,
     _assistant,
+    _mcp,
     # Detected, not yet used. See `report`.
     _sox,
     _blender,

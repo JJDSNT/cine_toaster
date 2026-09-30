@@ -660,6 +660,23 @@ def command_cut(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_mcp(args: argparse.Namespace) -> int:
+    """Serve the project to Claude Code over MCP, on stdio (CT-0045)."""
+
+    import importlib.util
+
+    if importlib.util.find_spec("mcp") is None:
+        print("The MCP server needs the mcp extra: make install-mcp", file=sys.stderr)
+        return 1
+    from .mcp_server import serve
+    from .providers.runpod import load_credentials
+
+    if args.env_file:
+        load_credentials(Path(args.env_file).expanduser())  # never printed
+    serve(Path(args.project))
+    return 0
+
+
 def command_reference(args: argparse.Namespace) -> int:
     """Decide what a shot's picture is made from, over the breakdown; or return to it (CT-0046)."""
 
@@ -1634,6 +1651,12 @@ def build_parser() -> argparse.ArgumentParser:
             item.add_argument("--ms", type=int, help="the transition's duration in milliseconds")
             item.add_argument("--transition-why", default="", help="why this transition")
     cut_parser.set_defaults(function=command_cut)
+
+    mcp_parser = subparsers.add_parser(
+        "mcp", help="Serve a project to Claude Code over MCP (stdio): claude mcp add cine-toaster -- toast mcp <project>")
+    mcp_parser.add_argument("project", type=Path)
+    mcp_parser.add_argument("--env-file", help="credentials for paid generation (read, never printed)")
+    mcp_parser.set_defaults(function=command_mcp)
 
     reference_parser = subparsers.add_parser(
         "reference", help="Decide what a shot's picture is made from, over the breakdown (CT-0046)")

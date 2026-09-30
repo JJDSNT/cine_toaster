@@ -2,7 +2,7 @@
 id: CT-0045
 title: Letting Claude Code do the work through Cine Toaster, as in SINGULAR (later)
 type: work
-status: proposed
+status: doing
 owner: unassigned
 created_at: 2026-09-30
 updated_at: 2026-09-30
@@ -56,3 +56,37 @@ the user asked.
 - Authored files are changed by a person, or accepted by a person as a
   diff.
 - Gates are never decided by an agent (SPEC-0009).
+
+# Done (2026-09-30): option 1, the MCP server
+
+- `src/cine_toaster/mcp_server.py`: `MCPServer` (mcp 2.2, the optional
+  `mcp` extra, `make install-mcp`) with 27 tools over a `LocalRuntime` that
+  gives the assistant's reads (`agents/reads.py`) the same surface as its
+  HTTP client, and runs commands through `dispatch` with the actor
+  `claude-code` (agent). Tools carry MCP annotations (read-only, paid as
+  open-world). Refusals return `{"refused": message}`.
+- `toast mcp <project> [--env-file]`; `toast doctor` reports "MCP server";
+  ADR 0020; `docs/mcp.md`.
+- Paid tools need `max_usd` covering the plan's estimate, checked before
+  anything is submitted.
+- Not offered, by design: gates, take selection, storyboard approval,
+  authored-file writes.
+- Found while testing: the control room's `runCommand` sent no actor, so
+  take selections and the voice switch were recorded as `unknown`; it now
+  defaults to `control-room` (human).
+
+Validation:
+
+- `tests/test_mcp.py` (5): the tool list and what is excluded; reads; a
+  decision recorded as claude-code and refusals as answers; the paid cap
+  refusing before any submit; an assembly job followed and adopted.
+- Real run: Claude Code 2.1.285, `claude -p --mcp-config ... --strict-mcp-config
+  --allowedTools "mcp__cine-toaster__*"` on the SINGULAR scratch copy (the
+  user's configuration untouched). Asked, in Portuguese, to read the film
+  and 3-01, summarise its findings, decide the cut into P2 as a match with a
+  reason, and assemble a version: all four done in 1 min 42 s. `state.json`
+  holds the cut with `decided_by: claude-code (agent)` and version v2 with
+  its summary.
+
+Remaining: option 2 (reviewed diffs for breakdowns and the screenplay) and
+option 3 (the assistant delegating to Claude Code) stay for later.

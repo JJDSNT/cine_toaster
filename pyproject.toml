@@ -34,6 +34,8 @@ gpu = ["moderngl>=5.10"]
 # person's own login -- so nothing here needs a key.
 agents = ["langgraph>=1.2", "langgraph-checkpoint-sqlite>=3.1", "ag-ui-langgraph>=0.0.45",
           "fastapi>=0.140", "uvicorn>=0.50", "anthropic>=1.0"]
+# Claude Code working on a film through Cine Toaster's commands (CT-0045): `toast mcp <project>`.
+mcp = ["mcp>=2.2"]
 
 [project.scripts]
 toast = "cine_toaster.cli:main"
