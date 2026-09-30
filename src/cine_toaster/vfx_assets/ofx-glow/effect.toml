@@ -1,0 +1,15 @@
+schema_version = 1
+id = "ofx-glow"
+name = "Glow (OpenFX)"
+category = "light"
+says = "Highlights glow over the picture: neon, screens, the hot core of a fire. Natron's Glow, run headless."
+energy = "medium"
+use_when = ["Holograms, screens, neon, magic"]
+avoid_when = ["When Natron is not installed (refused, not faked)"]
+
+[params]
+size = 20.0
+
+[render]
+engine = "ofx"
+plugin = "fr.inria.Glow"

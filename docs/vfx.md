@@ -96,3 +96,21 @@ into scene-linear EXR, then through OpenColorIO like any EXR element.
 OpenVDB's own samples (openvdb.org/download) work: `smoke.vdb` (2.5 MB)
 and `explosion.vdb` (72 MB, with fire). `toast vfx examples` downloads
 `smoke.vdb` once into `~/.local/share/cine-toaster/assets/openvdb`.
+
+## OpenFX plugins (through Natron)
+
+Items with `engine = "ofx"` run an OpenFX plugin in **Natron**, the open
+OpenFX host, headless (`NatronRenderer`): the shot's frames go out as PNG,
+through the plugin chain (all of a shot's OFX effects, in order), and back,
+the sound kept; then the other effects. Parameters named like the plugin's
+own are passed to it (a 2D one as a list: `size = [12.0, 12.0]`; `mix`
+blends the result with the input).
+
+Built in: `ofx-bloom` (CImg Bloom), `ofx-lens-distortion` (openfx-misc
+LensDistortion), `ofx-glow` (Natron's Glow). Natron 2.5 ships about 580
+plugins (openfx-misc, openfx-io, CImg, G'MIC, Arena, Shadertoy); a
+production adds one as an item with its `plugin` id.
+
+Natron is found as `NatronRenderer` on PATH, `CINE_TOASTER_NATRON`, or
+under `~/.local/opt/Natron*/`. It is GPL and runs as a separate program:
+nothing of it is linked or bundled (ADR 0011).

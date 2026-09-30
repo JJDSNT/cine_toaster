@@ -1,0 +1,16 @@
+schema_version = 1
+id = "ofx-lens-distortion"
+name = "Lens distortion (OpenFX)"
+category = "lens"
+says = "The frame bulges like a wide lens: the openfx-misc LensDistortion plugin, run in Natron."
+energy = "low"
+use_when = ["Matching a wide or fisheye look, a subjective point of view"]
+avoid_when = ["When Natron is not installed (refused, not faked)"]
+
+[params]
+k1 = 0.12
+k2 = 0.02
+
+[render]
+engine = "ofx"
+plugin = "net.sf.openfx.LensDistortion"

@@ -272,3 +272,28 @@ class OpenVdbTests(unittest.TestCase):
                     os.environ.pop("XDG_STATE_HOME", None)
                 else:
                     os.environ["XDG_STATE_HOME"] = previous
+
+
+@unittest.skipUnless(HAS_FFMPEG and __import__("cine_toaster.vfx").vfx.natron_binary(),
+                     "Natron (the OpenFX host) is not installed")
+class OpenFxTests(unittest.TestCase):
+    def test_openfx_plugins_run_in_natron_before_the_rest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plate = root / "plate.mp4"
+            ffmpeg("-f", "lavfi", "-i", "color=c=0x202830:s=320x180:d=0.5:r=24,drawgrid=w=40:h=40:t=1:c=0x506070",
+                   "-f", "lavfi", "-i", "sine=f=300:d=0.5", "-shortest", "-pix_fmt", "yuv420p", str(plate))
+            catalog = {item["id"]: item for item in list_effects()}
+            effects, problems = expand([{"id": "vignette"}, {"id": "ofx-lens-distortion", "k1": 0.3}], catalog, {})
+            self.assertEqual(problems, [])
+            out = render(effects, 0.5, root / "out.mp4", background=plate, width=320, height=180)
+            probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,width",
+                                    "-of", "csv=p=0", str(out)], capture_output=True, text=True).stdout
+            self.assertIn("video,320", probe)
+            self.assertIn("audio", probe)  # the sound came through Natron's detour
+            # The grid's straight lines are bent: the plate and the result differ along an edge.
+            grab = lambda path: subprocess.run(["ffmpeg", "-v", "error", "-ss", "0.2", "-i", str(path), "-frames:v", "1",
+                                                "-vf", "crop=320:10:0:5,format=gray", "-f", "rawvideo", "-"],
+                                               capture_output=True, check=True).stdout  # noqa: E731
+            difference = sum(abs(a - b) for a, b in zip(grab(plate), grab(out))) / 3200
+            self.assertGreater(difference, 2)

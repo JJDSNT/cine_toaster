@@ -46,7 +46,7 @@ user may have forgotten is left to the development agent's judgement.
 | 10 | Blender projects (`.blend`) | a production `.blend` with declared parameters, rendered headless | a `.blend` element project | done |
 | 11 | OpenVDB volumes | Blender imports `.vdb`, renders with alpha → element | openvdb.org `explosion.vdb` / `smoke.vdb` | done |
 | 12 | OpenUSD scenes | Blender imports USD; Cine Toaster exports its plan (room, cameras, marks, set pieces) as USD | usd-wg Teapot; the demo's set as USD | done |
-| 13 | OpenFX plugins | Natron (an OFX host) run headless (`NatronRenderer`) on a generated project | an openfx-misc effect on a take | todo |
+| 13 | OpenFX plugins | Natron (an OFX host) run headless (`NatronRenderer`) on a generated project | bloom, lens distortion, glow | done |
 | 14 | Alembic caches (added) | Blender imports `.abc` | a cache rendered as an element | later |
 | 15 | Gaussian splats | Spark (three.js, MIT) viewer + camera path rendered headless; Blender 5.3 native | a `.ply`/`.spz` scene as a location plate / moving camera | study + example |
 
@@ -198,3 +198,22 @@ Each step ships its example, a test, and the line in this table.
 - Tests: `tests/test_usd.py` (the stage's structure; the P3 camera centres
   Mara as the frame does; subjects move per shot; USD import when Blender
   and the sample are present).
+
+# Done: phase 5, OpenFX through Natron (2026-09-30)
+
+- Natron 2.5.0 installed headless under `~/.local/opt/Natron` (its Qt
+  installer driven by a control script; its post-install desktop-database
+  step needs stub `update-desktop-database` etc.). 580 plugins: openfx-misc,
+  openfx-io, CImg, G'MIC, Arena, Shadertoy.
+- `_natron/chain.py` (run by `NatronRenderer -w Out 1-N`): reader, the
+  plugins in order with parameters set by their own names, writer. Found:
+  headless, the reader does not detect the sequence's range (given
+  explicitly), the writer falls back to the project's HD format whatever
+  its `formatType` says (a project format of the picture's size is added:
+  `addFormat("Name WxH 1")`, chosen by name), and a 2D parameter is set with
+  `set(x, y)`, not `setValue`.
+- `vfx.py`: `engine = "ofx"` items; a shot's OFX effects run first as one
+  chain (frames out as PNG, back into a clip with the sound), then the
+  FFmpeg effects. Items: ofx-bloom (with `mix`), ofx-lens-distortion,
+  ofx-glow. `toast doctor` reports Natron.
+- Test: `OpenFxTests` (lens distortion bends the grid; the sound survives).

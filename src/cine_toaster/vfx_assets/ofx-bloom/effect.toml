@@ -1,0 +1,19 @@
+schema_version = 1
+id = "ofx-bloom"
+name = "Bloom (OpenFX)"
+category = "light"
+says = "Bright parts bleed soft light around them: a lamp in haze, a sunlit window. The CImg Bloom OpenFX plugin, run in Natron."
+energy = "low"
+use_when = ["Practical lights, sunlight, a dreamy softness"]
+avoid_when = ["When Natron is not installed (refused, not faked)"]
+
+# Parameters named like the plugin's own are passed to it.
+[params]
+size = [12.0, 12.0]  # a 2D parameter: x and y
+bloomRatio = 2.0
+bloomCount = 5
+mix = 0.55  # every Natron OFX plugin mixes its result with its input
+
+[render]
+engine = "ofx"
+plugin = "net.sf.cimg.CImgBloom"

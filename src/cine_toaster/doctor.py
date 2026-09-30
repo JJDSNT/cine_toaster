@@ -296,6 +296,21 @@ def _color() -> Capability:
     )
 
 
+def _natron() -> Capability:
+    from .vfx import natron_binary
+
+    path = natron_binary()
+    return Capability(
+        name="Natron (OpenFX)",
+        what_it_enables="OpenFX plugins as VFX (ofx-bloom, ofx-lens-distortion, ofx-glow; CT-0047)",
+        required=False,
+        status=OK if path else MISSING,
+        detail=path or "",
+        remedy="" if path else "https://github.com/NatronGitHub/Natron/releases (2.5), installed under ~/.local/opt/Natron, "
+                               "or set CINE_TOASTER_NATRON",
+    )
+
+
 def _usd() -> Capability:
     from .usd_export import available
 
@@ -355,6 +370,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _mcp,
     _color,
     _usd,
+    _natron,
     # Detected, not yet used. See `report`.
     _sox,
     _blender,

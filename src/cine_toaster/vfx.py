@@ -35,8 +35,10 @@ from .errors import ValidationError
 BUILTIN = Path(__file__).with_name("vfx_assets")
 CATEGORIES = ("texture", "lens", "light", "motion", "glitch", "particles", "elements")
 EFFECTS = ("grain", "vignette", "light-leak", "aberration", "glitch", "shake", "flash", "defocus", "old-film",
-           "element", "sparks-burst", "disintegrate", "look")
-ENGINES = ("ffmpeg", "blender")
+           "element", "sparks-burst", "disintegrate", "look", "ofx")
+ENGINES = ("ffmpeg", "blender", "ofx")
+#: OpenFX plugins run in Natron, an OFX host driven headless (vfx_assets/_natron/chain.py).
+NATRON_CHAIN_SCRIPT = BUILTIN / "_natron" / "chain.py"
 #: Effects Blender renders as an element on the fly (vfx_assets/_blender/element.py).
 BLENDER_EFFECTS = ("sparks-burst", "disintegrate")
 BLENDER_ELEMENT_SCRIPT = BUILTIN / "_blender" / "element.py"
@@ -79,6 +81,7 @@ def list_effects(project_root: Path | None = None) -> list[dict[str, Any]]:
                 "avoid_when": [str(item) for item in raw.get("avoid_when") or []],
                 "params": dict(raw.get("params") or {}), "effect": str(render.get("effect") or "grain"),
                 "engine": str(render.get("engine") or "ffmpeg"),
+                "plugin": str(render.get("plugin") or ""),
                 "element_category": str(render.get("element_category") or ""), "origin": origin,
                 "directory": str(manifest.parent),
             }
@@ -165,7 +168,9 @@ def expand(raw: Any, catalog: dict[str, dict[str, Any]], elements: dict[str, dic
             continue
         params = {**item["params"], **{key: value for key, value in entry.items() if key not in ("id", "reason")}}
         effect = {"id": item["id"], "effect": item["effect"], "params": params, "reason": str(entry.get("reason") or "")}
-        if item.get("engine") == "blender":
+        if item.get("engine") == "ofx":
+            effect.update(effect="ofx", plugin=item["plugin"])
+        elif item.get("engine") == "blender":
             # Rendered by Blender when the shot is drawn, then composited like an element with alpha.
             effect["effect"] = "element"
             effect["element"] = {"id": f"{item['id']} (Blender)", "blend": "alpha", "format": "generated",
@@ -291,6 +296,59 @@ def _chain(effect: dict[str, Any], label: str, out: str, duration: float, width:
     raise ValidationError(f"The effect {kind!r} is not one Cine Toaster draws", effects=list(EFFECTS))
 
 
+def natron_binary() -> str | None:
+    import glob
+
+    configured = os.environ.get("CINE_TOASTER_NATRON")
+    if configured and Path(configured).expanduser().is_file():
+        return str(Path(configured).expanduser())
+    found = shutil.which("NatronRenderer")
+    if found:
+        return found
+    candidates = sorted(glob.glob(str(Path.home() / ".local/opt/Natron*/bin/NatronRenderer")))
+    return candidates[-1] if candidates else None
+
+
+def _ofx(effects: list[dict[str, Any]], duration: float, work: Path, *, background: Path | None, start: float,
+         width: int, height: int, fps: int, run) -> Path:
+    """Run OpenFX plugins through Natron over the picture; returns the treated clip (sound kept)."""
+
+    import json
+
+    natron = natron_binary()
+    if not natron:
+        raise ValidationError("OpenFX effects run in Natron, which is not found (install it, or set CINE_TOASTER_NATRON)")
+    ffmpeg = shutil.which("ffmpeg")
+    frames = max(1, round(duration * fps))
+    if background is None:
+        background, start = render([], duration, work / "source.mp4", width=width, height=height, fps=fps, run=run), 0.0
+    (work / "in").mkdir()
+    (work / "out").mkdir()
+    size = f"{width}:{height}"
+    run([ffmpeg, "-v", "error", "-y", "-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", str(background),
+         "-vf", f"scale={size}:force_original_aspect_ratio=decrease,pad={size}:(ow-iw)/2:(oh-ih)/2,fps={fps}",
+         "-frames:v", str(frames), "-start_number", "1", str(work / "in" / "f_%04d.png")])
+    spec = work / "spec.json"
+    spec.write_text(json.dumps({"input": str(work / "in" / "f_####.png"), "output": str(work / "out" / "o_####.png"),
+                                "frames": frames, "width": width, "height": height,
+                                "effects": [{"plugin": effect["plugin"], "params": effect["params"]}
+                                            for effect in effects]}), encoding="utf-8")
+    environment = {**os.environ, "CINE_TOASTER_OFX_SPEC": str(spec)}
+    completed = subprocess.run([natron, "-w", "Out", f"1-{frames}", str(NATRON_CHAIN_SCRIPT)], cwd=work,
+                               env=environment, capture_output=True, text=True, timeout=3600)
+    rendered = sorted((work / "out").glob("o_*.png"))
+    if completed.returncode != 0 or not rendered:
+        raise ValidationError("Natron could not run the OpenFX chain",
+                              detail=(completed.stderr or completed.stdout)[-600:])
+    treated = work / "treated.mp4"
+    first = int(rendered[0].stem.split("_")[-1])
+    run([ffmpeg, "-v", "error", "-y", "-framerate", str(fps), "-start_number", str(first), "-i",
+         str(work / "out" / "o_%04d.png"), "-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", str(background),
+         "-map", "0:v", "-map", "1:a?", "-c:v", "libx264", "-crf", "16", "-pix_fmt", "yuv420p", "-c:a", "aac",
+         "-shortest", str(treated)])
+    return treated
+
+
 def _sequence_input(pattern: str, fps: int, loop: bool) -> list[str]:
     from .color import _frames
 
@@ -379,6 +437,15 @@ def render(effects: list[dict[str, Any]], duration: float, output: Path, *, back
     if not ffmpeg:
         raise ValidationError("FFmpeg is needed to draw effects")
     width, height = width // 2 * 2, height // 2 * 2
+    plugins = [effect for effect in effects if effect["effect"] == "ofx"]
+    if plugins:
+        # OpenFX plugins first, in order, in one Natron chain; then the rest here.
+        with tempfile.TemporaryDirectory(prefix="ofx-") as scratch:
+            treated = _ofx(plugins, duration, Path(scratch), background=background, start=start, width=width,
+                           height=height, fps=fps, run=run)
+            rest = [effect for effect in effects if effect["effect"] != "ofx"]
+            return render(rest, duration, output, background=treated, start=0.0, width=width, height=height,
+                          fps=fps, run=run)
     size = f"{width}:{height}"
     if background is not None:
         inputs = ["-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", str(background)]
