@@ -175,7 +175,12 @@ remains:
   `derive` (render + cast faces, `toast picture`) close step 9. Step 10 is done too:
   the built-in workflow stops at "approve the master picture" (SPEC-0009,
   CT-0042; `toast workflow`, the scene room's Workflow panel, a card on the
-  canvas); refusals must say what is wrong. Next: step 11, the LangGraph spike. The author
+  canvas); refusals must say what is wrong. Step 11 is done (ADR 0017,
+  CT-0043): production workflows stay built in; LangGraph runs the agents as an
+  optional extra; a LangGraph CoAgent with CopilotKit knew what the page showed,
+  shared state, and asked before starting a workflow; the model ran through the
+  Claude Code CLI with no API key. Next: step 12, the CopilotKit decision and
+  the real Agent Runtime extra. The author
   will re-check later whether Kael's converted voice still sounds ill.
 
 Earlier notes:

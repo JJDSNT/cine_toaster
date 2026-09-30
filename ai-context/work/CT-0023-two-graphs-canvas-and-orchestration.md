@@ -2,7 +2,7 @@
 id: CT-0023
 title: Two graphs — the production canvas and agent orchestration (LangGraph)
 type: work
-status: ready
+status: done
 owner: unassigned
 created_at: 2026-09-29
 updated_at: 2026-09-29
@@ -154,3 +154,9 @@ the orchestration model before there is a workflow to orchestrate.
   invariants, `architecture.md`, and `agent-architecture.md` (Orchestration and
   AG-UI sections). LangGraph capabilities are stated from its public
   positioning and not verified by a spike.
+
+# Outcome (2026-09-29)
+
+The LangGraph spike ran (CT-0043). ADR 0017 decided that production
+workflows stay on the built-in engine, and that LangGraph orchestrates
+agents, as an optional extra, served over AG-UI to CopilotKit.

@@ -42,6 +42,8 @@ execution history and links to those destinations.
 The order of work is the ordered plan in
 [`development/roadmap.md`](../development/roadmap.md).
 
+- `CT-0043` — plan step 11: LangGraph spike with CoAgents and a CLI model;
+  ADR 0017 (`done`)
 - `CT-0042` — plan step 10: the built-in workflow with a human gate
   (SPEC-0009); picture → approval → block → takes (`done`)
 - `CT-0041` — learning from gate decisions, up to reinforcement learning;

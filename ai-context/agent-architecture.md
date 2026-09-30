@@ -164,6 +164,19 @@ LangGraph, ADK, or another framework must not become part of the Project Core.
 Adoption requires a spike that proves value over the built-in workflow and
 documents persistence, recovery, cancellation, observability, and migration.
 
+That spike ran (CT-0043), and ADR 0017 records the outcome:
+
+- **Production workflows** (SPEC-0009) stay on the built-in engine.
+- **Agents** run on LangGraph, as an optional extra, served over AG-UI to
+  the interface (CopilotKit CoAgents).
+- The interface sends what the person is looking at as context with each
+  turn.
+- An agent acts only through commands, asks the person before
+  consequential actions, and never decides a human gate.
+- The model sits behind a model adapter. The first adapter is the Claude
+  Code CLI with the person's own login, and an API-key adapter serves any
+  other use.
+
 ## Runtime skill location
 
 A future location such as `packages/runtime-skills/` may contain filmmaking
