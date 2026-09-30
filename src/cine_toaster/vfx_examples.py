@@ -10,7 +10,10 @@ registered under `vfx_elements/<id>/element.toml`:
 - `example-prores-4444`: a ProRes 4444 video with alpha;
 - `example-video-matte`: a colour video and a separate black-and-white matte;
 - `example-green-screen`: the element over green, to be keyed;
-- `example-blender-project`: the `.blend` itself, rendered headless when used.
+- `example-blender-project`: the `.blend` itself, rendered headless when used;
+- `example-openvdb`: OpenVDB's own `smoke.vdb` sample (downloaded once from
+  openvdb.org into the shared asset folder), rendered by Blender as a
+  volume.
 
 Nothing here is a stock asset: the element is made on this machine, so the
 examples carry no licence but their own.
@@ -28,6 +31,22 @@ from .errors import ValidationError
 from .vfx import BLENDER_ELEMENT_SCRIPT
 
 WIDTH, HEIGHT, FRAMES, FPS = 640, 360, 36, 24
+OPENVDB_SAMPLES = "https://media.githubusercontent.com/media/AcademySoftwareFoundation/openvdb-website/master/download/models/"
+ASSETS = Path.home() / ".local" / "share" / "cine-toaster" / "assets"
+
+
+def openvdb_sample(name: str = "smoke.vdb") -> Path:
+    """One of OpenVDB's sample volumes, downloaded once and shared by every production."""
+
+    import urllib.request
+
+    path = ASSETS / "openvdb" / name
+    if not path.is_file():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".part")
+        urllib.request.urlretrieve(OPENVDB_SAMPLES + name, temporary)  # noqa: S310 - a fixed, public URL
+        temporary.replace(path)
+    return path
 
 
 def _write(folder: Path, fields: dict[str, Any]) -> None:
@@ -36,7 +55,7 @@ def _write(folder: Path, fields: dict[str, Any]) -> None:
     (folder / "element.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def build(root: Path, *, run=None) -> list[str]:
+def build(root: Path, *, run=None, with_downloads: bool = True) -> list[str]:
     """Make the example elements in `root/vfx_elements`; returns their ids."""
 
     from .titles import blender_binary
@@ -96,7 +115,16 @@ def build(root: Path, *, run=None) -> list[str]:
     _write(green, {"id": "example-green-screen", "label": "Sparks (green screen)", **common, "blend": "key",
                    "key_color": "0x00B140", "file": "sparks_green.mp4"})
 
+    made = ["example-png-sequence", "example-exr-sequence", "example-prores-4444", "example-video-matte",
+            "example-green-screen", "example-blender-project"]
+    if with_downloads:
+        vdb = library / "example-openvdb"
+        _write(vdb, {"id": "example-openvdb", "label": "Smoke (OpenVDB sample)", "category": "smoke", "blend": "alpha",
+                     "volume": str(openvdb_sample("smoke.vdb")), "loop": False,
+                     "source": OPENVDB_SAMPLES + "smoke.vdb", "license": "OpenVDB sample model (Academy Software Foundation)"})
+        (vdb / "element.toml").write_text((vdb / "element.toml").read_text() + "[params]\ndensity = 3.0\nspin = 40\n",
+                                          encoding="utf-8")
+        made.append("example-openvdb")
     shutil.rmtree(source / "render", ignore_errors=True)
     (source / "spec.json").unlink(missing_ok=True)
-    return ["example-png-sequence", "example-exr-sequence", "example-prores-4444", "example-video-matte",
-            "example-green-screen", "example-blender-project"]
+    return made

@@ -44,7 +44,7 @@ user may have forgotten is left to the development agent's judgement.
 | 8 | OpenColorIO | a config (ACES studio or Blender's), transforms baked to `.cube` for FFmpeg `lut3d`; `look` effects | EXR linear → sRGB; a look | done |
 | 9 | Blender scripts | engine `blender` effect items (like titles) | sparks-burst, disintegrate | done |
 | 10 | Blender projects (`.blend`) | a production `.blend` with declared parameters, rendered headless | a `.blend` element project | done |
-| 11 | OpenVDB volumes | Blender imports `.vdb`, renders with alpha → element | openvdb.org `explosion.vdb` / `smoke.vdb` | todo |
+| 11 | OpenVDB volumes | Blender imports `.vdb`, renders with alpha → element | openvdb.org `explosion.vdb` / `smoke.vdb` | done |
 | 12 | OpenUSD scenes | Blender imports USD; Cine Toaster exports its plan (room, cameras, marks, set pieces) as USD | usd-wg sample; the demo's set as USD | todo |
 | 13 | OpenFX plugins | Natron (an OFX host) run headless (`NatronRenderer`) on a generated project | an openfx-misc effect on a take | todo |
 | 14 | Alembic caches (added) | Blender imports `.abc` | a cache rendered as an element | later |
@@ -164,3 +164,19 @@ Each step ships its example, a test, and the line in this table.
   ACES 2.0 maps display white to about 0.71.
 - Tests: `ModalityTests` (PNG sequence, video + matte, EXR through OCIO,
   the baked look; the six examples when Blender is present).
+
+# Done: phase 3, OpenVDB (2026-09-30)
+
+- `_blender/volume.py`: import (`object.volume_import`; `.vdb` or a `%04d`
+  sequence), centre and scale, Principled Volume with `density` and, from a
+  `temperature` grid, blackbody emission through an attribute scaled to
+  kelvin (the sample stores about 0–2), a sun, a turntable spin, Cycles CPU
+  with a coarse volume step rate; EXR with alpha.
+- Element `volume = ...` (format `openvdb`), shading `[params]` in
+  `element.toml`, overridable per shot. Samples: smoke.vdb (density) and
+  explosion.vdb (density, temperature, velocity), both rendered and
+  composited (explosion 24 frames at 480×270 in about 80 s on 8 CPU
+  threads, then cached).
+- `toast vfx examples` also downloads OpenVDB's `smoke.vdb` once into a
+  shared asset folder and registers `example-openvdb`.
+- Test: `OpenVdbTests` (skipped without Blender or the sample).

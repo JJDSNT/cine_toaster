@@ -231,9 +231,44 @@ class ModalityTests(unittest.TestCase):
     def test_every_example_modality_is_built_and_composited(self) -> None:
         from cine_toaster.vfx_examples import build
 
-        made = build(self.root)
+        made = build(self.root, with_downloads=False)
         formats = {item["id"]: item["format"] for item in list_elements(self.root)}
         self.assertEqual({formats[element_id] for element_id in made},
                          {"image-sequence", "exr-sequence", "video", "blender-project"})
         for element_id in made:
             self.assertGreater(self.bright(element_id), 120, element_id)
+
+
+VDB = Path.home() / ".local" / "share" / "cine-toaster" / "assets" / "openvdb" / "smoke.vdb"
+
+
+@unittest.skipUnless(HAS_FFMPEG and VDB.is_file() and __import__("cine_toaster.titles").titles.blender_binary(),
+                     "needs Blender and OpenVDB's smoke.vdb (toast vfx examples downloads it)")
+class OpenVdbTests(unittest.TestCase):
+    def test_a_volume_is_rendered_by_blender_and_composited(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            previous = os.environ.get("XDG_STATE_HOME")
+            os.environ["XDG_STATE_HOME"] = str(root / "state")
+            try:
+                folder = root / "vfx_elements" / "smoke"
+                folder.mkdir(parents=True)
+                (folder / "element.toml").write_text(
+                    f'id = "smoke"\ncategory = "smoke"\nblend = "alpha"\nvolume = "{VDB}"\n[params]\ndensity = 3.0\n'
+                    f'samples = 4\n', encoding="utf-8")
+                [element_] = list_elements(root)
+                self.assertEqual((element_["format"], element_["exists"]), ("openvdb", True))
+                catalog = {item["id"]: item for item in list_effects(root)}
+                effects, problems = expand([{"id": "smoke-over", "element": "smoke"}], catalog, {"smoke": element_})
+                self.assertEqual(problems, [])
+                out = render(effects, 0.25, root / "smoke.mp4", width=160, height=90)
+                frame = subprocess.run(["ffmpeg", "-v", "error", "-i", str(out), "-frames:v", "1", "-vf",
+                                        "crop=30:50:65:20,format=gray", "-f", "rawvideo", "-"], capture_output=True,
+                                       check=True).stdout
+                # The smoke is there, lighter than the neutral picture's dark figure behind it.
+                self.assertGreater(max(frame) - min(frame), 20)
+            finally:
+                if previous is None:
+                    os.environ.pop("XDG_STATE_HOME", None)
+                else:
+                    os.environ["XDG_STATE_HOME"] = previous

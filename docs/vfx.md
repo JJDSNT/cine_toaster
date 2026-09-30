@@ -59,6 +59,7 @@ and the production's `vfx_elements/`.
 | PNG sequence with alpha | `file = "frames/f_%04d.png"`, `blend = "alpha"` |
 | OpenEXR sequence (scene-linear) | `file = "frames/f_%04d.exr"`, `colorspace = "Linear Rec.709 (sRGB)"`, `view = "..."` |
 | A Blender project | `project = "sparks.blend"`, `frames = 36` |
+| An OpenVDB volume (or `%04d` sequence) | `volume = "explosion.vdb"`, `[params] density, fire, temperature, spin` |
 
 EXR frames go through **OpenColorIO** to the picture's encoding before they
 are composited (premultiplied alpha handled, cached). The config is
@@ -84,3 +85,14 @@ shot is drawn, through the same EXR and OpenColorIO path, then composited.
 `aces-film-look` applies an OpenColorIO view (ACES 2.0's tone scale by
 default) baked to a 3D LUT that FFmpeg applies; `strength` mixes it with
 the original.
+
+## OpenVDB volumes
+
+A `.vdb` (a simulation's smoke, fire, clouds) is rendered by Blender as a
+volume: its `density` grid is the density, its `temperature` grid (when it
+has one) blackbody emission scaled to kelvin by `temperature`, lit by a sun
+and turned by `spin` degrees over the shot, with a transparent background
+into scene-linear EXR, then through OpenColorIO like any EXR element.
+OpenVDB's own samples (openvdb.org/download) work: `smoke.vdb` (2.5 MB)
+and `explosion.vdb` (72 MB, with fire). `toast vfx examples` downloads
+`smoke.vdb` once into `~/.local/share/cine-toaster/assets/openvdb`.
