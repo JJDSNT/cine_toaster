@@ -107,4 +107,13 @@ ADR 0012. ADR 0012 names locations as the next entity of the same shape.
   from the plate; a missing plate found by the check and refused by the
   plan). Not done: no demo plate ships (a drawn stand-in would be edited as
   if it were a photograph).
-- A Locations room in the control room.
+- ~~A Locations room in the control room~~ done 2026-09-30. `GET
+  /api/locations` (`web.locations_view`): each location with its plan
+  parsed into the Core's geometry (the same `_geometry_document` a scene
+  uses), its scenes, plates, and backlot status. The room draws the plan
+  with the scene room's `drawBlockout`, lists cameras, marks and pieces,
+  links the scenes, shows plates with the `derive` that uses them, and
+  flags a pinned set whose backlot moved on. Nav count; the assistant can
+  take the screen there (`locations`). Read-only: a location is edited in
+  its file. Validated: a test of the view on the demo; headless screenshot
+  with a test plate on a demo copy.

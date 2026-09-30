@@ -252,6 +252,14 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
 
     def _handle_api(self, parsed) -> None:
         query = parse_qs(parsed.query)
+        if parsed.path == "/api/locations":
+            # The production's sets (SPEC-0010): each with its plan drawn in the Core's terms,
+            # the scenes shot there, and where it stands against the backlot.
+            from .locations import status as backlot_status
+
+            self._send_json(locations_view(self.project_root, cached_production(self.project_root),
+                                           {item["id"]: item for item in backlot_status(self.project_root)}))
+            return
         if parsed.path == "/api/camera-moves":
             # The camera-move catalog (CT-0027): built in, external, the production's.
             from .camera_moves import list_moves
@@ -711,6 +719,22 @@ _JOB_MANAGER_LOCK = threading.Lock()
 PRODUCTION_TTL_SECONDS = 2.0
 _PRODUCTION_CACHE: dict[Path, tuple[float, dict]] = {}
 _PRODUCTION_LOCK = threading.Lock()
+
+
+def locations_view(root: Path, production: dict, backlot: dict) -> list[dict]:
+    from .errors import ValidationError as _Invalid
+    from .geometry import parse_geometry
+    from .project import _geometry_document
+
+    found = []
+    for location_id, location in sorted((production.get("locations") or {}).items()):
+        geography = {key: location[key] for key in ("room", "marks", "cameras", "set_pieces") if location.get(key)}
+        try:
+            plan = parse_geometry(_geometry_document(geography)).public_dict() if geography else None
+        except _Invalid as error:
+            plan = {"error": error.message}
+        found.append({**location, "plan": plan, "backlot": backlot.get(location_id)})
+    return found
 
 
 def cached_production(root: Path) -> dict:

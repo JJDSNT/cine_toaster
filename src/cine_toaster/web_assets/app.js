@@ -20,7 +20,7 @@ const state = {
 
 const ROOMS = new Set([
   "overview", "script", "storyboard", "dialogue",
-  "sequences", "scenes", "review", "cut", "cast",
+  "sequences", "scenes", "review", "cut", "cast", "locations",
   "transitions", "moves", "library", "knowledge",
 ]);
 
@@ -71,6 +71,7 @@ function draw(view) {
   else if (view === "cut") renderCut();
   else if (view === "transitions") renderTransitions();
   else if (view === "moves") renderMoves();
+  else if (view === "locations") renderLocations();
   else if (view === "cast") renderCast();
   else if (view === "library") renderLibrary(state.project.id);
   else if (view === "knowledge") renderKnowledge();
@@ -1293,6 +1294,96 @@ function transitionVisual(transition, large = false, lazy = false) {
 
 // The camera-move catalog (CT-0027): what each move says, when to use it, the
 // geometry it implies (checked against the plan), and the words a model gets.
+// The sets (SPEC-0010): each declared once, with its plan, its plates, and
+// the scenes shot there. A location is edited in its location.yaml; this
+// room shows what the runtime reads from it.
+async function renderLocations() {
+  const root = byId("workspace");
+  root.replaceChildren();
+  const heading = sectionHeading("LOCATIONS", "Locations",
+    "Each set declared once: its room, marks, cameras, set pieces and plates. Scenes set there take its plan and add who is in it.");
+  heading.classList.add("page-heading");
+  root.append(heading);
+  const locations = (await api("/api/locations", { optional: true })) || [];
+  if (!locations.length) {
+    root.append(el("p", "empty-state", "No location yet. Declare one in locations/<id>/location.yaml, or pin one from the backlot (toast backlot pin)."));
+    tellAssistant();
+    return;
+  }
+  for (const location of locations) {
+    const panel = el("section", "panel wide-panel location-panel");
+    panel.append(sectionHeading(location.id, location.label, location.description || ""));
+    const body = el("div", "location-body");
+    const plan = el("div", "location-plan");
+    if (location.plan?.room) {
+      const canvas = el("canvas", "blockout-canvas");
+      plan.append(canvas);
+      requestAnimationFrame(() => drawBlockout(canvas, { subjects: [], axis: null, ...location.plan }));
+    } else {
+      plan.append(el("p", "empty-state", location.plan?.error || "No room declared: nothing to draw."));
+    }
+    const facts = el("div", "location-facts");
+    const room = location.plan?.room;
+    if (room) facts.append(el("p", "", `Room ${room.width} × ${room.depth} m, ${room.height} m high.`));
+    const list = (title, items, describe) => {
+      if (!items?.length) return;
+      const block = el("div", "location-list");
+      block.append(el("strong", "", title));
+      const ul = el("ul");
+      for (const item of items) ul.append(el("li", "", describe(item)));
+      block.append(ul);
+      facts.append(block);
+    };
+    list("Cameras", location.plan?.cameras, (camera) =>
+      `${camera.id} · ${camera.lens_mm} mm · ${camera.height != null ? `${camera.height} m high` : "height not set"}${camera.label && camera.label !== camera.id ? ` · ${camera.label}` : ""}`);
+    list("Marks", location.plan?.marks, (mark) => `${mark.id}${mark.label && mark.label !== mark.id ? ` · ${mark.label}` : ""}`);
+    list("Set pieces", location.plan?.set_pieces, (piece) => `${piece.label} · ${piece.width} × ${piece.depth} × ${piece.height} m`);
+    const scenes = el("div", "location-list");
+    scenes.append(el("strong", "", "Scenes shot here"));
+    if (location.appearances?.length) {
+      const links = el("div", "location-scenes");
+      for (const sceneId of location.appearances) links.append(button(sceneId, () => renderScene(sceneId), "quiet-button"));
+      scenes.append(links);
+    } else {
+      scenes.append(el("small", "muted", "None yet: a scene names it with location: " + location.id));
+    }
+    facts.append(scenes);
+    if (location.pinned) {
+      const state_ = location.backlot || {};
+      const notes = [`Pinned from the backlot ${String(location.pinned.pinned_at || "").slice(0, 10)}`];
+      if (state_.edited_here) notes.push("edited here since");
+      if (state_.backlot_moved_on) notes.push("the backlot has a newer version (toast backlot pin --update)");
+      if (location.backlot && !state_.in_backlot) notes.push("no longer in the backlot");
+      facts.append(el("small", state_.backlot_moved_on ? "finding warning" : "muted", notes.join(" · ")));
+    }
+    body.append(plan, facts);
+    panel.append(body);
+    const plates = (location.references || []).filter((ref) => ref.kind === "plate");
+    if (plates.length) {
+      const strip = el("div", "location-plates");
+      for (const plate of plates) {
+        const figure = el("figure", "location-plate");
+        if (plate.exists) {
+          const image = el("img");
+          image.src = `/media/${plate.path}`;
+          image.alt = `Plate from ${plate.camera}`;
+          image.loading = "lazy";
+          figure.append(image);
+        } else {
+          figure.append(el("div", "empty-state", "missing"));
+        }
+        figure.append(el("figcaption", "", `Plate from ${plate.camera || "—"} · a picture can be made from it: derive: {from: location:${plate.camera}}`));
+        strip.append(figure);
+      }
+      panel.append(strip);
+    } else {
+      panel.append(el("small", "muted", "No plates yet: photograph or render the empty set from a camera and list it under references (kind: plate, camera: <id>)."));
+    }
+    root.append(panel);
+  }
+  tellAssistant();
+}
+
 async function renderMoves() {
   const root = byId("workspace");
   root.replaceChildren();
@@ -2288,6 +2379,8 @@ function updateChrome() {
   byId("transition-nav-count").textContent = state.transitions.length;
   const castCount = byId("cast-nav-count");
   if (castCount) castCount.textContent = String(Object.keys(state.production?.cast || {}).length);
+  const locationCount = byId("locations-nav-count");
+  if (locationCount) locationCount.textContent = String(Object.keys(state.production?.locations || {}).length);
   byId("cut-nav-count").textContent = (state.production?.renders || []).length;
   const writingCounts = state.writing?.counts;
   byId("storyboard-nav-count").textContent = writingCounts?.frames ?? 0;

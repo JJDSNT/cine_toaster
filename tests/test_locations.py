@@ -61,6 +61,20 @@ class LocationTests(unittest.TestCase):
         self.assertIn("set piece CONSOLE stands elsewhere here than in the location", notes)
         self.assertEqual(len(merged["set_pieces"]), 2)
 
+    def test_the_locations_room_reads_each_set_in_the_cores_terms(self) -> None:
+        from cine_toaster.project import load_production
+        from cine_toaster.web import locations_view
+
+        root = Path(__file__).parents[1] / "examples" / "demo-project"
+        [station] = locations_view(root, load_production(root), {})
+        self.assertEqual(station["id"], "LISTENING-STATION")
+        self.assertEqual(station["appearances"], ["SC-010", "SC-030"])
+        plan = station["plan"]
+        self.assertEqual(plan["room"], {"width": 6.0, "depth": 4.5, "height": 3.2})
+        self.assertEqual([camera["id"] for camera in plan["cameras"]], ["CAM-A", "CAM-B", "CAM-C"])
+        self.assertEqual({piece["id"] for piece in plan["set_pieces"]}, {"CONSOLE", "RACK"})
+        self.assertIsNone(station["backlot"])
+
     def test_an_unknown_location_is_an_error(self) -> None:
         self.scene.write_text(self.scene.read_text(encoding="utf-8").replace(
             "location: LISTENING-STATION", "location: LIGHTHOUSE"), encoding="utf-8")

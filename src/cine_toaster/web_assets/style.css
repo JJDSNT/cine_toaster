@@ -680,3 +680,14 @@ dialog::backdrop { background: #000b; }
 
 .voice-in-cut { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px;
   padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+
+.location-panel { margin-bottom: 18px; }
+.location-body { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 18px; align-items: start; }
+.location-plan .blockout-canvas { width: 100%; }
+.location-facts { display: grid; gap: 12px; font-size: 13px; }
+.location-list ul { margin: 4px 0 0; padding-left: 18px; }
+.location-scenes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.location-plates { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.location-plate { margin: 0; width: 240px; font-size: 11px; }
+.location-plate img { width: 100%; border-radius: 6px; display: block; }
+@media (max-width: 900px) { .location-body { grid-template-columns: 1fr; } }

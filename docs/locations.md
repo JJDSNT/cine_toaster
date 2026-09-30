@@ -51,8 +51,11 @@ geography:
 - **Checks:** a scene that moves one of the set's marks or cameras is told
   (`location_override`, advice), so a real change and a drift both show. A
   location the production does not have is an error (`location_unknown`).
-- **Where it shows:** the scene room says where the scene is set and which
-  other scenes are shot there. The assistant knows every location and its
+- **Where it shows:** the **Locations** room draws each set's plan (room,
+  marks, cameras with their field of view, set pieces), lists its cameras,
+  marks and pieces, shows its plates, links the scenes shot there, and says
+  where a pinned set stands against the backlot. The scene room says where
+  the scene is set and which other scenes are shot there. The assistant knows every location and its
   scenes.
 
 ## The backlot
