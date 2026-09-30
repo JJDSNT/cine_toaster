@@ -126,7 +126,11 @@ every scene command is.
 
 - Authoring templates in the project. Templates are built in until plan
   step 11 (LangGraph) decides the orchestrator.
-- Gates other than `approve_picture`. The phase gate "storyboard approved"
-  (`production-flow.md`) comes next, on the same record.
+- Gates other than `approve_picture` and `approve_storyboard`.
+  - The phase gate (added 2026-09-30) is decided by a person in one act,
+    `approve_storyboard` or `reopen_storyboard`, with the breakdown's
+    digest.
+  - The scene payload's `phase` says `fitting` or `production`, and
+    whether the breakdown changed since the approval.
 - Agents deciding gates. The record allows an agent actor, but granting that
   permission is SPEC-0001's concern.

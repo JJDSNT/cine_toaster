@@ -564,6 +564,21 @@ def command_gate(args: argparse.Namespace) -> int:
     return _drive(root, args.scene, act)
 
 
+def command_storyboard(args: argparse.Namespace) -> int:
+    """The phase gate: approve a scene's storyboard as what will be produced, or reopen it."""
+
+    from .commands import dispatch
+
+    root = Path(args.project).expanduser().resolve()
+    command = "approve_storyboard" if args.storyboard_command == "approve" else "reopen_storyboard"
+    result = dispatch(root, command, {"scene_id": args.scene, "rationale": args.why,
+                                      "actor": {"id": args.actor, "kind": "human"}})
+    phase = next(item for item in load_production(root)["scenes"] if item["id"] == args.scene)["phase"]
+    print(f"{result.type}: {args.scene} is now {'in production' if phase['phase'] == 'production' else 'fitting its storyboard'}"
+          f" (revision {result.revision})")
+    return 0
+
+
 def command_cut(args: argparse.Namespace) -> int:
     """Decide the cut into a shot, over what the breakdown says; or return to it (plan step 13)."""
 
@@ -1474,6 +1489,16 @@ def build_parser() -> argparse.ArgumentParser:
     costs_parser.add_argument("project", type=Path)
     costs_parser.add_argument("--json", action="store_true")
     costs_parser.set_defaults(function=command_costs)
+
+    board_parser = subparsers.add_parser("storyboard", help="Approve a scene's storyboard (the phase gate), or reopen it")
+    board_sub = board_parser.add_subparsers(dest="storyboard_command", required=True)
+    for name, text in (("approve", "What the storyboard defines will be produced"), ("reopen", "Back to fitting it")):
+        item = board_sub.add_parser(name, help=text)
+        item.add_argument("project", type=Path)
+        item.add_argument("scene")
+        item.add_argument("--why", help="kept with the decision")
+        item.add_argument("--actor", default=os.environ.get("USER", "director"))
+    board_parser.set_defaults(function=command_storyboard)
 
     cut_parser = subparsers.add_parser("cut", help="Decide the cut into a shot, over the breakdown (plan step 13)")
     cut_sub = cut_parser.add_subparsers(dest="cut_command", required=True)

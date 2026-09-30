@@ -355,6 +355,12 @@ def _camera_assignments(geography: dict[str, Any]) -> dict[str, str]:
     return assignments
 
 
+def _phase(root: Path, path: Path, state: SceneState) -> dict[str, Any]:
+    from .workflows import phase
+
+    return phase(root, {"file": path.relative_to(root).as_posix()}, state.gates)
+
+
 def _apply_cut_decisions(shots: list[dict[str, Any]], state: SceneState) -> None:
     """A cut decided in the runtime stands over the breakdown's (plan step 13).
 
@@ -525,6 +531,8 @@ def _load_scene(
         # SPEC-0009: workflow runs, newest first, and the gates they opened.
         "runs": sorted(state.workflows.values(), key=lambda run: run.get("created_at", ""), reverse=True),
         "gates": state.gates,
+        # production-flow.md: fitting the storyboard, or producing what it defines.
+        "phase": _phase(root, path, state),
         # SPEC-0003 / CT-0040: which variant of each cast member this scene
         # uses, how their voice sounds here, and any voice restated in full.
         "cast": _scene_field(document, "cast", scene_aliases) or {},

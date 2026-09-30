@@ -781,7 +781,8 @@ COMMANDS = {
 SCENE_LEVEL_COMMANDS = {"record_assembly", "review_assembly", "restore_assembly"}
 
 # SPEC-0009: workflow runs and the gates they open.
-WORKFLOW_COMMANDS = {"start_workflow", "decide_gate", "cancel_workflow", "resume_workflow"}
+WORKFLOW_COMMANDS = {"start_workflow", "decide_gate", "cancel_workflow", "resume_workflow",
+                     "approve_storyboard", "reopen_storyboard"}
 
 
 def _dispatch_workflow(root: Path, command_type: str, payload: dict[str, Any]) -> CommandResult:
@@ -811,6 +812,10 @@ def _dispatch_workflow(root: Path, command_type: str, payload: dict[str, Any]) -
                                      chosen=str(payload.get("chosen", "")).strip(),
                                      rationale=payload.get("rationale"), reasons=payload.get("reasons") or [],
                                      expected_revision=expected)
+    if command_type in ("approve_storyboard", "reopen_storyboard"):
+        return workflows.decide_storyboard(root, scene_id=scene_id, approved=command_type == "approve_storyboard",
+                                           actor=actor, rationale=payload.get("rationale"),
+                                           expected_revision=expected)
     workflow_id = str(payload.get("workflow_id", "")).strip()
     if command_type == "cancel_workflow":
         return workflows.cancel_workflow(root, scene_id=scene_id, workflow_id=workflow_id, actor=actor,

@@ -460,6 +460,34 @@ function renderScenes() {
   root.append(table);
 }
 
+// The phase gate (production-flow.md): fitting the storyboard, or producing
+// what it defines. Approving is the director's act; nothing is blocked by it.
+function phaseLine(scene) {
+  const phase = scene.phase || { phase: "fitting" };
+  const line = el("div", "phase-line");
+  const producing = phase.phase === "production";
+  line.append(el("span", `status status-${producing ? "approved" : "planned"}`,
+    producing ? "Production: storyboard approved" : "Fitting the storyboard"));
+  if (producing && phase.changed_since) {
+    line.append(el("span", "join-finding warning", "The breakdown changed since the approval"));
+  }
+  const decide = (command) => async () => {
+    const why = prompt(producing ? "Why reopen the storyboard?" : "Approve the storyboard as what will be produced. Why?") ;
+    if (why === null) return;
+    try {
+      await runCommand(command, { scene_id: scene.id, expected_revision: scene.revision, rationale: why,
+        actor: { id: "control-room", kind: "human" } });
+      await renderScene(scene.id);
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+  line.append(producing
+    ? button("Reopen the storyboard", decide("reopen_storyboard"), "quiet-button")
+    : button("Approve the storyboard", decide("approve_storyboard"), "quiet-button"));
+  return line;
+}
+
 async function renderScene(sceneId, { record = true } = {}) {
   const scene = await api(`/api/scene?id=${encodeURIComponent(sceneId)}`);
   state.currentView = "scene";
@@ -475,7 +503,7 @@ async function renderScene(sceneId, { record = true } = {}) {
   const copy = el("div");
   const meta = el("div", "scene-header-meta");
   meta.append(el("span", "scene-id", scene.id), statusPill(scene.status), el("span", "muted", scene.sequence));
-  copy.append(meta, el("h1", "", scene.title), el("p", "hero-logline", scene.summary));
+  copy.append(meta, el("h1", "", scene.title), el("p", "hero-logline", scene.summary), phaseLine(scene));
   const facts = el("div", "scene-facts");
   facts.append(metric(`R${String(scene.iteration).padStart(2, "0")}`, "Current iteration"), metric(`${scene.duration_seconds}s`, "Target duration"), metric(`${scene.progress}%`, "Workflow"));
   header.append(copy, facts);

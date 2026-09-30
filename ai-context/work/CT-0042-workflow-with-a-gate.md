@@ -99,8 +99,11 @@ video is made only from a picture a person approved.
 
 # Remaining
 
-- The phase gate "storyboard approved" (`production-flow.md`), on the same
-  record.
-- Feeding a refusal's reasons into the next attempt (CT-0041, option 1).
+- ~~The phase gate "storyboard approved"~~ done 2026-09-30:
+  `approve_storyboard` / `reopen_storyboard` (a person only), the scene
+  payload's `phase`, the scene room's phase line, `toast storyboard`, and
+  the assistant's digest.
+- ~~Feeding a refusal's reasons into the next attempt~~ done 2026-09-30
+  (CT-0041 option 1).
 - Templates for a single shot outside a block.
 - Plan step 11: the same workflow on LangGraph behind `orchestration/`.

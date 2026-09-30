@@ -35,7 +35,8 @@ def overview(production: dict[str, Any], budget: dict[str, Any] | None = None) -
         chosen = sum(1 for shot in shots if shot.get("selected_take"))
         waiting = [gate for gate in (scene.get("gates") or {}).values() if gate.get("state") == "waiting"]
         active = [run for run in scene.get("runs") or [] if run.get("state") in ("running", "waiting")]
-        parts = [f"{len(shots)} shots, {chosen} with a chosen take", f"status {scene.get('status') or '—'}"]
+        stage = "production" if (scene.get("phase") or {}).get("phase") == "production" else "fitting the storyboard"
+        parts = [f"{len(shots)} shots, {chosen} with a chosen take", f"status {scene.get('status') or '—'}", stage]
         if scene.get("findings"):
             parts.append(f"{len(scene['findings'])} finding(s)")
         if waiting:

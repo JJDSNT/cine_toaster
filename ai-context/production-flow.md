@@ -49,5 +49,12 @@ versions.
 
 Moving a scene from phase 1 to phase 2 is a decision: the storyboard is
 approved as what will be produced. It belongs in the production record, as a
-human gate (architecture invariant), not in chat. It is not modelled yet. It
-is the natural first step of the built-in workflow (plan step 10).
+human gate (architecture invariant), not in chat. It is modelled
+(2026-09-30, SPEC-0009): `approve_storyboard` / `reopen_storyboard`, from
+the scene room ("Approve the storyboard") or `toast storyboard approve`.
+
+- The gate records who approved, when and why, and the breakdown's digest
+  at that moment. A later change to the breakdown shows as "changed since
+  the approval".
+- Only a person decides it.
+- It blocks nothing. The scene shows its phase, and the assistant knows it.

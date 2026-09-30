@@ -91,3 +91,26 @@ class CutDecisionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StoryboardPhaseTests(unittest.TestCase):
+    setUp = CutDecisionTests.setUp
+    _restore = CutDecisionTests._restore
+
+    def phase(self) -> dict:
+        return load_scene(self.root, "SC-030")["phase"]
+
+    def test_approving_the_storyboard_moves_the_scene_to_production(self) -> None:
+        self.assertEqual(self.phase()["phase"], "fitting")
+        dispatch(self.root, "approve_storyboard", {"scene_id": "SC-030", "actor": HUMAN, "rationale": "the cut reads"})
+        phase = self.phase()
+        self.assertEqual((phase["phase"], phase["rationale"], phase["changed_since"]), ("production", "the cut reads", False))
+        # A later change to the breakdown shows, without undoing the approval.
+        self.scene_file.write_text(self.scene_file.read_text(encoding="utf-8") + "\n# a note\n", encoding="utf-8")
+        self.assertTrue(self.phase()["changed_since"])
+        dispatch(self.root, "reopen_storyboard", {"scene_id": "SC-030", "actor": HUMAN, "rationale": "P2 changes"})
+        self.assertEqual(self.phase()["phase"], "fitting")
+
+    def test_only_a_person_approves_the_storyboard(self) -> None:
+        with self.assertRaisesRegex(ValidationError, "by a person"):
+            dispatch(self.root, "approve_storyboard", {"scene_id": "SC-030", "actor": {"id": "assistant", "kind": "agent"}})

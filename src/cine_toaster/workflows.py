@@ -202,6 +202,60 @@ def decide_gate(root: Path, *, scene_id: str, gate_id: str, outcome: str, actor:
     return _result("gate.decided", production, scene_id, committed.revision, event, gate.get("subject", ""))
 
 
+def _breakdown_digest(root: Path, scene: dict[str, Any]) -> str:
+    import hashlib
+
+    path = root / scene["file"]
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:16] if path.is_file() else ""
+
+
+def decide_storyboard(root: Path, *, scene_id: str, approved: bool, actor: Actor, rationale: str | None = None,
+                      expected_revision: int | None = None) -> CommandResult:
+    """The phase gate (production-flow.md): the storyboard is approved as what will be produced, or reopened.
+
+    A person's act, recorded as a gate with the breakdown's digest at that
+    moment, so a later change to the breakdown shows. It blocks nothing.
+    """
+
+    if actor.kind != "human":
+        raise ValidationError("The storyboard is approved or reopened by a person")
+    production, scene = _scene(root, scene_id)
+    directory = scene_directory(root, scene_id)
+    _check_writable(directory, scene_id)
+    text = _clean_rationale(rationale)
+    command_id = _new_command_id()
+    with _LOCKS[str(directory)]:
+        state = load_scene_state(directory, scene_id)
+        _check_revision(expected_revision, state.revision)
+        stamp = now()
+        gate_id = "storyboard_" + uuid.uuid4().hex[:10]
+        gate = {"id": gate_id, "kind": "approve_storyboard", "subject": scene_id, "workflow": None,
+                "state": "approved" if approved else "reopened", "candidates": [], "chosen": "",
+                "breakdown_digest": _breakdown_digest(root, scene), "requested_at": stamp,
+                "requested_by": actor.public_dict(), "decided_at": stamp, "decided_by": actor.public_dict(),
+                "rationale": text, "reasons": []}
+        kind = "storyboard.approved" if approved else "storyboard.reopened"
+        record = {"kind": kind, "gate": gate_id, "actor": actor.public_dict(), "rationale": text,
+                  "decided_at": stamp, "command_id": command_id}
+        committed = state.with_decision(decision=record, gates={**state.gates, gate_id: gate})
+        write_scene_state(directory, committed)
+    event = append_event(root, Event.create(kind, production["id"], scene_id=scene_id, gate=gate_id,
+                                            actor=actor.public_dict(), rationale=text, command_id=command_id))
+    return _result(kind, production, scene_id, committed.revision, event)
+
+
+def phase(root: Path, scene: dict[str, Any], gates: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """Which phase the scene is in: fitting the storyboard, or producing what it defines."""
+
+    latest = max((gate for gate in gates.values() if gate.get("kind") == "approve_storyboard"),
+                 key=lambda gate: gate.get("decided_at", ""), default=None)
+    if not latest or latest.get("state") != "approved":
+        return {"phase": "fitting", "since": (latest or {}).get("decided_at", ""), "changed_since": False}
+    return {"phase": "production", "since": latest.get("decided_at", ""),
+            "approved_by": latest.get("decided_by"), "rationale": latest.get("rationale", ""),
+            "changed_since": latest.get("breakdown_digest") != _breakdown_digest(root, scene)}
+
+
 def cancel_workflow(root: Path, *, scene_id: str, workflow_id: str, actor: Actor,
                     rationale: str | None = None, expected_revision: int | None = None) -> CommandResult:
     production, _ = _scene(root, scene_id)
