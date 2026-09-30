@@ -4,6 +4,7 @@ import json
 import mimetypes
 import os
 import re
+import subprocess
 import threading
 import time
 from http import HTTPStatus
@@ -259,6 +260,31 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
 
             self._send_json(locations_view(self.project_root, cached_production(self.project_root),
                                            {item["id"]: item for item in backlot_status(self.project_root)}))
+            return
+        if parsed.path == "/api/titles":
+            # The title catalog (CT-0031), with whether each item's engine can run here.
+            from .titles import engine_missing, list_titles
+
+            self._send_json([{**{key: item[key] for key in ("id", "name", "category", "says", "energy", "use_when",
+                                                             "avoid_when", "params", "engine", "effect", "origin")},
+                              "unavailable": engine_missing(item["engine"])} for item in list_titles(self.project_root)])
+            return
+        if parsed.path == "/api/title-preview":
+            # One frame, drawn by the item's own engine; cached, since Blender takes seconds.
+            from .titles import cached_preview, list_titles
+
+            wanted = query.get("id", [""])[0]
+            item = next((entry for entry in list_titles(self.project_root) if entry["id"] == wanted), None)
+            if item is None:
+                self._send_json({"error": {"code": "not_found", "message": f"No title {wanted!r}"}}, HTTPStatus.NOT_FOUND)
+                return
+            try:
+                path = cached_preview(item, text=query.get("text", [""])[0][:80], root=self.project_root)
+            except (ValidationError, OSError, subprocess.CalledProcessError) as error:
+                self._send_json({"error": {"code": "unavailable", "message": getattr(error, "message", str(error))}},
+                                HTTPStatus.SERVICE_UNAVAILABLE)
+                return
+            self._send_file(path)
             return
         if parsed.path == "/api/camera-move-preview":
             # A move on the preview stage, as blocking frames (CT-0027): derived, never stored.

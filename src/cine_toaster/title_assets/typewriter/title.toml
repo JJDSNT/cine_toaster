@@ -1,0 +1,17 @@
+schema_version = 1
+id = "typewriter"
+name = "Typewriter"
+category = "reveal"
+says = "The words type themselves, letter by letter: a record being written, a message arriving."
+energy = "medium"
+use_when = ["Messages, logs, a machine speaking, a date being set down"]
+avoid_when = ["Long texts: the audience waits for every letter"]
+
+[params]
+size = 34
+fade_in = 0.0
+fade_out = 0.8
+
+[render]
+engine = "ffmpeg"
+effect = "typewriter"

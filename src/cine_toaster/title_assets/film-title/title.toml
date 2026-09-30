@@ -1,0 +1,19 @@
+schema_version = 1
+id = "film-title"
+name = "Film title"
+category = "cards"
+says = "The film's name, large and slow, arriving after the picture has settled."
+energy = "low"
+use_when = ["The title, once, where the story has earned it"]
+avoid_when = ["Anything but the title"]
+
+[params]
+size = 76
+spaced = true
+fade_in = 2.5
+fade_out = 2.0
+enter_at = 1.0
+
+[render]
+engine = "ffmpeg"
+effect = "fade"

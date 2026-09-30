@@ -192,6 +192,8 @@ def _load_shots(
                 "subjects_move": _entries(field(raw, "subjects_move")),
                 "subjects_at": _entries(field(raw, "subjects_at")),
                 "move": field(raw, "move") if isinstance(field(raw, "move"), dict) else None,
+                # A title from the catalog (CT-0031): on a card, or over the picture.
+                "title": field(raw, "title") if isinstance(field(raw, "title"), (str, dict)) else None,
                 "ends_on": vtext(raw, "ends_on"),
                 "motion": None,
                 "covers": field(raw, "covers"),
@@ -389,6 +391,30 @@ def _expand_camera_moves(shots: list[dict[str, Any]], scene_id: str, root: Path)
     return findings
 
 
+def _expand_titles(shots: list[dict[str, Any]], scene_id: str, root: Path) -> list[Finding]:
+    """`title: {id: card, text: ...}` takes its engine, effect and defaults from the title catalog (CT-0031)."""
+
+    if not any(shot.get("title") for shot in shots):
+        return []
+    from .titles import engine_missing, expand, list_titles
+
+    catalog = {item["id"]: item for item in list_titles(root)}
+    findings = []
+    for shot in shots:
+        if not shot.get("title"):
+            continue
+        shot["title"], problem = expand(shot["title"], catalog)
+        if problem:
+            findings.append(Finding(code="title_unknown", severity="error", scene_id=scene_id, shots=(shot["id"],),
+                                    message=f"{shot['id']} {problem}. It would be lost, not guessed."))
+        elif shot["title"] and engine_missing(shot["title"]["engine"]):
+            findings.append(Finding(code="title_engine_missing", severity="warning", scene_id=scene_id,
+                                    shots=(shot["id"],),
+                                    message=f"{shot['id']}'s title {shot['title']['id']!r} is drawn by "
+                                            f"{shot['title']['engine']}: {engine_missing(shot['title']['engine'])}."))
+    return findings
+
+
 def _apply_cut_decisions(shots: list[dict[str, Any]], state: SceneState) -> None:
     """A cut decided in the runtime stands over the breakdown's (plan step 13).
 
@@ -507,6 +533,7 @@ def _load_scene(
     except ValidationError as error:
         raise ProjectFormatError(f"{error.message} (in {path})") from error
     move_findings = _expand_camera_moves(shots, scene_id, root)
+    move_findings.extend(_expand_titles(shots, scene_id, root))
     motions = shot_motions(geometry, shots, scene_id=scene_id)
     positions_by_shot = {motion.shot_id: motion.start_positions for motion in motions}
     findings = [

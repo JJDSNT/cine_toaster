@@ -1,0 +1,18 @@
+schema_version = 1
+id = "card"
+name = "Card"
+category = "cards"
+says = "Words alone on the screen, tracked out, fading in and out: the film pausing to state something."
+energy = "low"
+use_when = ["A prologue's statements, a place and a date, a single word that matters"]
+avoid_when = ["When the picture already says it"]
+
+[params]
+size = 40
+spaced = true
+fade_in = 1.0
+fade_out = 1.0
+
+[render]
+engine = "ffmpeg"
+effect = "fade"

@@ -1,0 +1,18 @@
+schema_version = 1
+id = "flicker"
+name = "Flicker"
+category = "texture"
+says = "The words stutter like a failing signal: interference, a system under strain."
+energy = "high"
+use_when = ["A broken transmission, a warning, a machine losing hold"]
+avoid_when = ["Anything that must read cleanly"]
+
+[params]
+size = 42
+spaced = true
+fade_in = 0.4
+fade_out = 0.6
+
+[render]
+engine = "ffmpeg"
+effect = "flicker"

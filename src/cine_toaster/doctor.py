@@ -197,15 +197,18 @@ def _sox() -> Capability:
 
 
 def _blender() -> Capability:
-    path = _binary("blender")
+    from .titles import blender_binary
+
+    # Found on PATH, in CINE_TOASTER_BLENDER, or unpacked in ~/.local/opt or ~/ferramentas-ext.
+    path = blender_binary()
     return Capability(
         name="Blender",
-        what_it_enables="3D titles, set previsualisation, and compositing passes",
+        what_it_enables="3D titles from the title catalog (letters-turn-in, letters-rise; CT-0031)",
         required=False,
         status=OK if path else MISSING,
-        detail=path,
-        remedy="" if path else "https://www.blender.org/download/  (4.2 LTS or newer)",
-        wired=False,
+        detail=path or "",
+        remedy="" if path else "https://www.blender.org/download/ (4.2 LTS or newer), unpacked in ~/.local/opt, "
+                               "or set CINE_TOASTER_BLENDER",
     )
 
 

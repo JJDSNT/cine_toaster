@@ -21,7 +21,7 @@ const state = {
 const ROOMS = new Set([
   "overview", "script", "storyboard", "dialogue",
   "sequences", "scenes", "review", "cut", "cast", "locations",
-  "transitions", "moves", "library", "knowledge",
+  "transitions", "moves", "titles", "library", "knowledge",
 ]);
 
 /** Write where we are into the address bar.
@@ -72,6 +72,7 @@ function draw(view) {
   else if (view === "transitions") renderTransitions();
   else if (view === "moves") renderMoves();
   else if (view === "locations") renderLocations();
+  else if (view === "titles") renderTitles();
   else if (view === "cast") renderCast();
   else if (view === "library") renderLibrary(state.project.id);
   else if (view === "knowledge") renderKnowledge();
@@ -1418,6 +1419,63 @@ function movePreview(move) {
   return box;
 }
 
+// The title catalog (CT-0031): each item previewed by its own engine, with
+// the text the director types. A shot names one with title: {id: …, text: …}.
+async function renderTitles() {
+  const root = byId("workspace");
+  root.replaceChildren();
+  const heading = sectionHeading("TITLES", "Titles",
+    "Title effects chosen like transitions: a shot names one with title: {id: …, text: …}. The preview is drawn by the item's own engine.");
+  heading.classList.add("page-heading");
+  root.append(heading);
+  state.titles ??= (await api("/api/titles", { optional: true })) || [];
+  const tryText = el("input", "title-try");
+  tryText.placeholder = "Try your own text (Enter)";
+  tryText.maxLength = 80;
+  root.append(tryText);
+  const cards = [];
+  const categories = new Map();
+  for (const item of state.titles) {
+    if (!categories.has(item.category)) categories.set(item.category, []);
+    categories.get(item.category).push(item);
+  }
+  for (const [category, items] of categories) {
+    const section = el("section", "transition-section");
+    section.append(sectionHeading("TITLES", label(category), `${items.length} available`));
+    const grid = el("div", "transition-grid");
+    for (const item of items) {
+      const card = el("article", "transition-card move-card");
+      const picture = el("div", "move-preview title-preview");
+      const image = el("img");
+      image.alt = item.name;
+      image.loading = "lazy";
+      image.addEventListener("error", () => picture.replaceChildren(el("small", "move-note", "The preview could not be drawn.")));
+      const load = () => {
+        const text = tryText.value.trim();
+        image.src = `/api/title-preview?id=${encodeURIComponent(item.id)}${text ? `&text=${encodeURIComponent(text)}` : ""}`;
+      };
+      if (item.unavailable) picture.append(el("small", "move-note", item.unavailable));
+      else { picture.append(image); load(); }
+      cards.push(load);
+      const engine = item.engine === "blender" ? "Blender (3D)" : "FFmpeg";
+      card.append(
+        picture,
+        el("strong", "", item.name),
+        el("code", "move-id", `title: {id: ${item.id}, text: …}`),
+        el("p", "", item.says),
+        el("small", "muted", `${engine} · ${item.effect} · energy ${item.energy || "—"}${item.origin !== "built-in" ? ` · ${item.origin}` : ""}`),
+        guidanceList("Use when", item.use_when, "good"),
+        guidanceList("Avoid when", item.avoid_when, "warning"),
+      );
+      grid.append(card);
+    }
+    section.append(grid);
+    root.append(section);
+  }
+  tryText.addEventListener("keydown", (event) => { if (event.key === "Enter") cards.forEach((load) => load()); });
+  tellAssistant();
+}
+
 async function renderMoves() {
   const root = byId("workspace");
   root.replaceChildren();
@@ -2561,6 +2619,11 @@ async function start() {
   startEventStream();
   renderJobs().catch(() => {});
   startAssistant({ seen: assistantSeen, navigate: assistantNavigate }).catch(() => {});
+  api("/api/titles", { optional: true }).then((titles) => {
+    state.titles = titles || [];
+    const count = byId("titles-nav-count");
+    if (count) count.textContent = String(state.titles.length);
+  }).catch(() => {});
   api("/api/camera-moves", { optional: true }).then((moves) => {
     state.moves = moves || [];
     const count = byId("moves-nav-count");

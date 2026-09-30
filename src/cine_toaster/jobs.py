@@ -695,7 +695,7 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
     scene_id, version = context.params["scene"], context.params["version"]
     return {
         "files": [{"staged": "assembly.mp4", "destination": f"renders/assemblies/{scene_id}/{version}.mp4"}],
-        "summary": {"segments": [{**{key: value for key, value in asdict(segment).items() if key != "sound"},
+        "summary": {"segments": [{**{key: value for key, value in asdict(segment).items() if key not in ("sound", "source")},
                                   "gain_db": plan.gains.get(segment.shot, 0.0)} for segment in plan.segments],
                     "notes": plan.notes, "voices": voices,
                     "duration_seconds": plan.duration, "takes": plan.takes},

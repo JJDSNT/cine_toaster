@@ -1,0 +1,17 @@
+schema_version = 1
+id = "credits-roll"
+name = "Credits roll"
+category = "credits"
+says = "Lines rolling up from below: the end, the people who made it."
+energy = "low"
+use_when = ["End credits (separate lines with \\n)"]
+avoid_when = ["Inside the story"]
+
+[params]
+size = 28
+fade_in = 0.0
+fade_out = 0.0
+
+[render]
+engine = "ffmpeg"
+effect = "roll"

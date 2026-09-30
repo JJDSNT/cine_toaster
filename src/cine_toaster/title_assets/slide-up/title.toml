@@ -1,0 +1,18 @@
+schema_version = 1
+id = "slide-up"
+name = "Slide up"
+category = "motion"
+says = "The words rise a little as they appear: light, modern, moving on."
+energy = "medium"
+use_when = ["Chapter titles, section headings"]
+avoid_when = ["Grave or still moments"]
+
+[params]
+size = 44
+spaced = true
+fade_in = 0.8
+fade_out = 0.8
+
+[render]
+engine = "ffmpeg"
+effect = "slide"

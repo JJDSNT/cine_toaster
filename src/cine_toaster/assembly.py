@@ -70,6 +70,10 @@ class Segment:
     #: the take's sound with the voices converted, on the take's own timeline.
     revoice: bool = False
     sound: str = ""
+    #: A title from the catalog (CT-0031): drawn on its own card, or over the take.
+    title: dict[str, Any] | None = None
+    #: The file actually cut, when it is not the take itself (a rendered card or titled piece).
+    source: str = ""
 
 
 @dataclass(slots=True)
@@ -81,7 +85,8 @@ class Plan:
 
     @property
     def takes(self) -> dict[str, str]:
-        return {segment.shot: segment.take for segment in self.segments}
+        # A title card is drawn, not chosen: it has no take to remember.
+        return {segment.shot: segment.take for segment in self.segments if segment.method != "title"}
 
     @property
     def duration(self) -> float:
@@ -193,6 +198,14 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         chosen = next((take for take in takes if take.get("selected")), None)
         if chosen is None:
             chosen = next((take for take in takes if take["id"] == "CUT"), None)
+        title = shot.get("title") if isinstance(shot.get("title"), dict) and not shot["title"].get("unknown") else None
+        if chosen is None and title:
+            # A card: the title drawn over its background, as long as the shot plays.
+            length = float(shot.get("duration_seconds") or 0) or 3.0
+            cut = cuts.get(shot["id"]) or {}
+            plan.segments.append(Segment(shot["id"], "TITLE", "", 0.0, length, cut.get("type") or "hard", "title",
+                                         None, shot.get("level_db"), title=title))
+            continue
         if chosen is None:
             if shot.get("source") == "composed":
                 plan.notes.append(f"{shot['id']} is composed (a card); its card is not part of a take cut yet.")
@@ -221,7 +234,7 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         plan.segments.append(Segment(
             shot["id"], chosen["id"], chosen["media"], start, end, join, method,
             (spoken[0][0], spoken[-1][1]) if spoken else None, shot.get("level_db"),
-            revoice=bool(shot.get("voice_in_cut")),
+            revoice=bool(shot.get("voice_in_cut")), title=title,
         ))
     if not plan.segments:
         raise ValidationError(f"{scene['id']} has no shot with a take to assemble")
@@ -244,6 +257,34 @@ def loudness_gain(source: Path, segment: Segment) -> float:
     return round(max(-12.0, min(ceiling, target - float(measured[-1]))), 1)
 
 
+def _draw_title(root: Path, segment: Segment, output: Path, first: dict[str, Any], fps: float, run_process) -> None:
+    """Render a segment's title: a card on its own, or over the cut piece of its take, sound kept.
+
+    The segment is then cut from that file, which starts where the cut does.
+    """
+
+    from .titles import render as render_title
+
+    length = segment.end - segment.start
+    background = None
+    if segment.media:
+        # A take whose voice was converted is titled over the converted sound.
+        background = Path(segment.sound) if segment.sound else root / segment.media
+        if segment.sound:
+            muxed = output.with_suffix(".voice.mp4")
+            run_process(["ffmpeg", "-y", "-loglevel", "error", "-i", str(root / segment.media), "-i", str(segment.sound),
+                         "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-shortest", str(muxed)],
+                        message=f"{segment.shot}: the converted voice under the picture")
+            background = muxed
+    render_title(segment.title, length, output, width=first["width"] // 2 * 2, height=first["height"] // 2 * 2,
+                 background=background, start=segment.start, root=root, fps=round(fps) or FPS,
+                 run=lambda command: run_process(command, expected_seconds=length,
+                                                 message=f"{segment.shot}: title {segment.title['id']}"))
+    if segment.speech:
+        segment.speech = (segment.speech[0] - segment.start, segment.speech[1] - segment.start)
+    segment.source, segment.start, segment.end = str(output), 0.0, length
+
+
 def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
            span: tuple[float, float] = (0.0, 1.0)) -> None:
     """Cut each take, normalise it, and join the pieces without re-encoding twice.
@@ -260,7 +301,8 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
     if not ffmpeg:
         raise ValidationError("FFmpeg is needed to assemble a cut")
     work.mkdir(parents=True, exist_ok=True)
-    first = probe(root / plan.segments[0].media)
+    real = next((segment for segment in plan.segments if segment.media), None)
+    first = probe(root / real.media) if real else {"width": 1280, "height": 720, "fps": FPS, "audio": False}
     size = f"{first['width'] // 2 * 2}:{first['height'] // 2 * 2}"
     fps = first["fps"] or FPS
     pieces = []
@@ -268,8 +310,10 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
     plan.gains = segment_gain
     total = len(plan.segments)
     for index, segment in enumerate(plan.segments):
-        source = root / segment.media
-        sound = Path(segment.sound) if segment.sound else None
+        if segment.title and not segment.source:
+            _draw_title(root, segment, work / f"title-{index:03d}.mp4", first, fps, run_process)
+        source = Path(segment.source) if segment.source else root / segment.media
+        sound = Path(segment.sound) if segment.sound and not segment.source else None
         has_audio = bool(sound) or probe(source)["audio"]
         length = segment.end - segment.start
         gain = loudness_gain(sound or source, segment) if has_audio and segment.normalize else 0.0

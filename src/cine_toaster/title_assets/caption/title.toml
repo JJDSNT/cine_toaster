@@ -1,0 +1,19 @@
+schema_version = 1
+id = "caption"
+name = "Caption"
+category = "lower thirds"
+says = "Small and grey at the bottom of the frame: a time, a place, noted without interrupting."
+energy = "low"
+use_when = ["Timestamps, locations, a quiet fact over the picture"]
+avoid_when = ["Anything the audience must not miss"]
+
+[params]
+size = 20
+color = "#8C8F96"
+position = "bottom"
+fade_in = 1.0
+fade_out = 1.0
+
+[render]
+engine = "ffmpeg"
+effect = "fade"

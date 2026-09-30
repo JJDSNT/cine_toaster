@@ -49,14 +49,15 @@ class StudioToolchainTests(unittest.TestCase):
 
     def test_a_tool_nothing_calls_yet_is_marked_as_such(self) -> None:
         by_name = {item.name: item for item in doctor.examine()}
-        for name in ("SoX", "Blender", "Transcription"):
+        for name in ("SoX", "Transcription"):
             self.assertIn(name, by_name)
             self.assertFalse(by_name[name].wired, name)
             self.assertFalse(by_name[name].required, name)
 
     def test_what_is_in_use_is_marked_as_in_use(self) -> None:
         by_name = {item.name: item for item in doctor.examine()}
-        for name in ("FFmpeg", "Piper narration", "Media libraries", "ModernGL"):
+        # Blender draws the 3D titles (CT-0031).
+        for name in ("FFmpeg", "Piper narration", "Media libraries", "ModernGL", "Blender"):
             self.assertTrue(by_name[name].wired, name)
 
     def test_the_report_separates_the_two(self) -> None:
@@ -64,5 +65,5 @@ class StudioToolchainTests(unittest.TestCase):
         self.assertIn("Studio toolchain", text)
         self.assertIn("does not call these yet", text)
         studio = text.split("Studio toolchain")[1]
-        self.assertIn("Blender", studio)
+        self.assertIn("SoX", studio)
         self.assertNotIn("PyYAML", studio)

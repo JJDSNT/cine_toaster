@@ -1,0 +1,20 @@
+schema_version = 1
+id = "lower-third"
+name = "Lower third"
+category = "lower thirds"
+says = "A name and a role on a bar that slides in from the left: who this is."
+energy = "medium"
+use_when = ["Introducing a person, documentary style"]
+avoid_when = ["Fiction that should not feel like the news"]
+
+[params]
+size = 30
+subtitle = ""
+fade_in = 0.6
+fade_out = 0.6
+bar_color = "#101315"
+subtitle_color = "#9AA3A8"
+
+[render]
+engine = "ffmpeg"
+effect = "lower-third"

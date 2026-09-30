@@ -1,0 +1,19 @@
+schema_version = 1
+id = "letters-turn-in"
+name = "Letters turn in"
+category = "3d"
+says = "Every letter turns on its own axis, from edge-on to facing us, all together: the name assembling itself."
+energy = "medium"
+use_when = ["A film title that should feel built, not written"]
+avoid_when = ["Long texts", "When Blender is not installed (it is refused, not replaced)"]
+
+[params]
+size = 70
+spaced = true
+fade_in = 3.0
+fade_out = 1.0
+enter_at = 0.3
+
+[render]
+engine = "blender"
+effect = "letters-turn-in"

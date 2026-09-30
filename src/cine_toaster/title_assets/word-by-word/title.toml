@@ -1,0 +1,17 @@
+schema_version = 1
+id = "word-by-word"
+name = "Word by word"
+category = "reveal"
+says = "The sentence builds one word at a time: the audience reads it as it is said."
+energy = "medium"
+use_when = ["A phrase with a turn at its end", "Text timed to a voice"]
+avoid_when = ["A single word"]
+
+[params]
+size = 38
+spaced = false
+fade_out = 1.0
+
+[render]
+engine = "ffmpeg"
+effect = "words"

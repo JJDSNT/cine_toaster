@@ -1,0 +1,18 @@
+schema_version = 1
+id = "grow"
+name = "Grow"
+category = "motion"
+says = "The words slowly grow toward the audience: pressure, something approaching."
+energy = "high"
+use_when = ["A threat, a countdown, a word that fills the mind"]
+avoid_when = ["Calm information"]
+
+[params]
+size = 64
+spaced = true
+fade_in = 1.2
+fade_out = 0.6
+
+[render]
+engine = "ffmpeg"
+effect = "grow"

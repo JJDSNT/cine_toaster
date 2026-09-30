@@ -1,0 +1,18 @@
+schema_version = 1
+id = "letters-rise"
+name = "Letters rise"
+category = "3d"
+says = "The letters rise into place one after another: a word coming up out of the dark."
+energy = "medium"
+use_when = ["Titles and single words with weight"]
+avoid_when = ["Long texts"]
+
+[params]
+size = 64
+spaced = true
+fade_in = 2.0
+fade_out = 1.0
+
+[render]
+engine = "blender"
+effect = "letters-rise"

@@ -162,6 +162,15 @@ def build(root: Path, manager=None):
                  "implies": move["implies"]} for move in list_moves(runtime.root)]
 
     @server.tool(annotations=reading)
+    def list_titles() -> list[dict[str, Any]]:
+        """The title catalog: a shot names one with `title: {id: …, text: …}` in its breakdown."""
+        from .titles import engine_missing, list_titles as catalog
+
+        return [{"id": item["id"], "name": item["name"], "category": item["category"], "says": item["says"],
+                 "engine": item["engine"], "params": item["params"], "unavailable": engine_missing(item["engine"])}
+                for item in catalog(runtime.root)]
+
+    @server.tool(annotations=reading)
     def plan_generation(scene: str, target: str, seed: int = 1) -> dict[str, Any]:
         """What generating a block (its id) or a lone shot (P7) would send and cost. Nothing is sent or paid."""
 

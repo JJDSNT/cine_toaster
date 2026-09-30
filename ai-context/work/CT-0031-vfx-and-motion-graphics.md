@@ -2,7 +2,7 @@
 id: CT-0031
 title: VFX, motion graphics and titles through external tools (Natron, Friction, Blender)
 type: work
-status: ready
+status: doing
 owner: unassigned
 created_at: 2026-09-29
 updated_at: 2026-09-29
@@ -95,3 +95,36 @@ Pillow cards (`build.py`); a real title, a composite, or a graphic has no path.
 - Licences checked from the repositories on 2026-09-29: QuickTitling
   `1c699e6` (GPL block in `__init__.py`) and Friction `138c85c`
   (`LICENSE.md`, GPL-3.0).
+
+# Titles, done (2026-09-30)
+
+- First need, from SINGULAR: text cards (`tipo: cartela`, Oswald tracked
+  out, fading), captions at the bottom, words over images, and the film
+  title over Geneva at the end of 1-04 -- plus its own Blender title
+  (`ferramentas/blender/titulo_singular.py`: letters turning on their axis).
+- `titles.py`: a catalog (`title_assets/<id>/title.toml`, layered like
+  camera moves), `expand` for a shot's `title`, engines `ffmpeg` (drawtext:
+  fade, typewriter, words, slide, grow, roll, lower-third, flicker) and
+  `blender` (`title_assets/_blender/title.py`, our own script:
+  letters-turn-in, letters-rise; Workbench, transparent PNGs overlaid).
+  12 items. `render` draws over a clip or a colour, keeping the sound;
+  `preview`/`cached_preview` draw one frame with the item's own engine.
+- Project: shot `title` expanded at load; `title_unknown` (error),
+  `title_engine_missing` (warning). Assembly: a `title_card` with a title
+  is a drawn segment (not a take in the record); a titled take is drawn
+  over its cut piece, with its (converted) sound.
+- Room **Titles** (`/api/titles`, `/api/title-preview`, cached per manifest
+  and text), with a text field; the assistant can go there; MCP
+  `list_titles`; `toast doctor` finds Blender off PATH and reports it wired.
+- Blender: 4.5.14 LTS was already in `~/ferramentas-ext` (not on PATH, so
+  doctor missed it); 5.2.2 LTS installed in `~/.local/opt` with the user's
+  leave, checksum verified. Both work.
+- Validation: `tests/test_titles.py` (8: catalog, expansion, production
+  layer, every FFmpeg title draws, a Blender title draws, a missing engine
+  refused, a card and a caption in an assembled version with the card's
+  words lit, an unknown title reported). Headless: the Titles room, 12
+  previews with typed text, Blender ones included (about 11 s each, then
+  cached).
+- Found: drawbox's `h` is the box's height (the lower third's bar was at
+  the top); expressions with commas must be quoted in drawtext; two
+  concurrent requests for one preview raced on the cache file.
