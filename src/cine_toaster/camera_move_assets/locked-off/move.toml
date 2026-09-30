@@ -1,0 +1,25 @@
+schema_version = 1
+id = "locked-off"
+name = "Locked off"
+category = "static"
+says = "The frame holds still and lets the action come to it."
+energy = "low"
+use_when = [
+  "The performance carries the moment",
+  "A composition must be read",
+  "Dialogue that needs no help",
+]
+avoid_when = [
+  "Nothing moves in the frame either: it goes dead",
+]
+
+# What the move implies in the scene's plan (SPEC-0005): `toast check` compares
+# it with the move the shot's start and end poses derive.
+[implies]
+kind = "static"
+direction = ""
+rig = "tripod"
+
+# The words a video model is given for this move.
+[prompt]
+text = "static shot, locked off, no camera movement"

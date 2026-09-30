@@ -1,0 +1,23 @@
+schema_version = 1
+id = "zoom-out"
+name = "Zoom out"
+category = "zoom/lens"
+says = "The lens opens without the camera moving: context, distance."
+energy = "medium"
+use_when = [
+  "Revealing the setting around a detail",
+]
+avoid_when = [
+  "A pull out is meant: depth stays flat",
+]
+
+# What the move implies in the scene's plan (SPEC-0005): `toast check` compares
+# it with the move the shot's start and end poses derive.
+[implies]
+kind = "zoom"
+direction = "out"
+rig = "tripod"
+
+# The words a video model is given for this move.
+[prompt]
+text = "a slow zoom out revealing the surroundings, the camera does not move"

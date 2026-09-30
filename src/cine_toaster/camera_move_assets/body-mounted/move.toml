@@ -1,0 +1,23 @@
+schema_version = 1
+id = "body-mounted"
+name = "Body-mounted"
+category = "human"
+says = "The camera rides on the character: the world swings, the face stays put. Disorientation, intoxication."
+energy = "high"
+use_when = [
+  "Panic, drunkenness, a mind coming apart",
+]
+avoid_when = [
+  "Anything that should feel stable",
+]
+
+# What the move implies in the scene's plan (SPEC-0005); empty `kind` means the
+# plan cannot see it (a rig, a lens effect), so nothing is checked.
+[implies]
+kind = ""
+direction = ""
+rig = "body"
+
+# The words a video model is given for this move.
+[prompt]
+text = "the camera is fixed to the character's body, their face steady while the world swings around them"

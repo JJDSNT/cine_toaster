@@ -1,0 +1,24 @@
+schema_version = 1
+id = "truck-right"
+name = "Truck right"
+category = "dolly/track"
+says = "The camera slides sideways, parallel to the action."
+energy = "medium"
+use_when = [
+  "Walking with a character along a wall",
+  "Parallax that gives depth to a still scene",
+]
+avoid_when = [
+  "Crossing the axis without meaning to",
+]
+
+# What the move implies in the scene's plan (SPEC-0005): `toast check` compares
+# it with the move the shot's start and end poses derive.
+[implies]
+kind = "truck"
+direction = "right"
+rig = "slider"
+
+# The words a video model is given for this move.
+[prompt]
+text = "the camera trucks slowly to the right, parallel to the subject"

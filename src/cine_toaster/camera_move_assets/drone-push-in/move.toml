@@ -1,0 +1,23 @@
+schema_version = 1
+id = "drone-push-in"
+name = "Drone push in"
+category = "drone/crane"
+says = "A high approach from the air: arriving at a place."
+energy = "medium"
+use_when = [
+  "Establishing a place on arrival",
+]
+avoid_when = [
+  "Interiors, or anything that needs to feel intimate",
+]
+
+# What the move implies in the scene's plan (SPEC-0005); empty `kind` means the
+# plan cannot see it (a rig, a lens effect), so nothing is checked.
+[implies]
+kind = "dolly"
+direction = "in"
+rig = "drone"
+
+# The words a video model is given for this move.
+[prompt]
+text = "an aerial shot flying slowly toward the location"

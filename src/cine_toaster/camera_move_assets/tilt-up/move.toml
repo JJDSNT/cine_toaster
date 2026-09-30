@@ -1,0 +1,24 @@
+schema_version = 1
+id = "tilt-up"
+name = "Tilt up"
+category = "pan/tilt"
+says = "The camera tilts up: height, scale, arrival."
+energy = "medium"
+use_when = [
+  "Revealing height or a figure's full presence",
+  "Ending on the sky or a face",
+]
+avoid_when = [
+  "Used only to show off a set",
+]
+
+# What the move implies in the scene's plan (SPEC-0005): `toast check` compares
+# it with the move the shot's start and end poses derive.
+[implies]
+kind = "tilt"
+direction = "up"
+rig = "tripod"
+
+# The words a video model is given for this move.
+[prompt]
+text = "slow tilt up from a fixed position"

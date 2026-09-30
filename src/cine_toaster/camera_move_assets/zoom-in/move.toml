@@ -1,0 +1,24 @@
+schema_version = 1
+id = "zoom-in"
+name = "Zoom in"
+category = "zoom/lens"
+says = "The lens closes on the subject without the camera moving: observed, not approached."
+energy = "medium"
+use_when = [
+  "An observer's view",
+  "Isolating a detail from afar",
+]
+avoid_when = [
+  "Where a push in is meant: the space flattens",
+]
+
+# What the move implies in the scene's plan (SPEC-0005): `toast check` compares
+# it with the move the shot's start and end poses derive.
+[implies]
+kind = "zoom"
+direction = "in"
+rig = "tripod"
+
+# The words a video model is given for this move.
+[prompt]
+text = "a slow zoom in toward the subject, the camera does not move"

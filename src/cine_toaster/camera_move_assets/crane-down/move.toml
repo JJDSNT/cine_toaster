@@ -1,0 +1,23 @@
+schema_version = 1
+id = "crane-down"
+name = "Crane down"
+category = "drone/crane"
+says = "The camera descends into the scene: arrival, entering a world."
+energy = "medium"
+use_when = [
+  "Arriving at a place and finding the person in it",
+]
+avoid_when = [
+  "When the audience already knows where they are",
+]
+
+# What the move implies in the scene's plan (SPEC-0005): `toast check` compares
+# it with the move the shot's start and end poses derive.
+[implies]
+kind = "crane"
+direction = "down"
+rig = "crane"
+
+# The words a video model is given for this move.
+[prompt]
+text = "a slow crane down into the scene"

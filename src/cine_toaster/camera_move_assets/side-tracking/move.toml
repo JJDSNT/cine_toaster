@@ -1,0 +1,24 @@
+schema_version = 1
+id = "side-tracking"
+name = "Side tracking"
+category = "dolly/track"
+says = "The camera travels beside a moving subject, profile to profile."
+energy = "medium"
+use_when = [
+  "A journey seen from its side",
+  "Parallax against a passing background",
+]
+avoid_when = [
+  "Where the face matters: it stays in profile",
+]
+
+# What the move implies in the scene's plan (SPEC-0005); empty `kind` means the
+# plan cannot see it (a rig, a lens effect), so nothing is checked.
+[implies]
+kind = "track"
+direction = ""
+rig = "dolly"
+
+# The words a video model is given for this move.
+[prompt]
+text = "the camera tracks alongside the subject in profile as they move"

@@ -1,0 +1,24 @@
+schema_version = 1
+id = "push-past"
+name = "Push past"
+category = "dolly/track"
+says = "The camera moves past something close in the foreground, into the scene."
+energy = "medium"
+use_when = [
+  "Entering a scene through its world",
+  "Hiding a transition behind a foreground",
+]
+avoid_when = [
+  "When the foreground has no reason to be there",
+]
+
+# What the move implies in the scene's plan (SPEC-0005); empty `kind` means the
+# plan cannot see it (a rig, a lens effect), so nothing is checked.
+[implies]
+kind = "dolly"
+direction = "in"
+rig = "dolly"
+
+# The words a video model is given for this move.
+[prompt]
+text = "the camera pushes forward past an object close in the foreground, into the scene"

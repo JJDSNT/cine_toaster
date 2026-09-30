@@ -21,7 +21,7 @@ const state = {
 const ROOMS = new Set([
   "overview", "script", "storyboard", "dialogue",
   "sequences", "scenes", "review", "cut", "cast",
-  "transitions", "library", "knowledge",
+  "transitions", "moves", "library", "knowledge",
 ]);
 
 /** Write where we are into the address bar.
@@ -70,6 +70,7 @@ function draw(view) {
   else if (view === "review") renderReview();
   else if (view === "cut") renderCut();
   else if (view === "transitions") renderTransitions();
+  else if (view === "moves") renderMoves();
   else if (view === "cast") renderCast();
   else if (view === "library") renderLibrary(state.project.id);
   else if (view === "knowledge") renderKnowledge();
@@ -1282,6 +1283,48 @@ function transitionVisual(transition, large = false, lazy = false) {
   return frame;
 }
 
+// The camera-move catalog (CT-0027): what each move says, when to use it, the
+// geometry it implies (checked against the plan), and the words a model gets.
+async function renderMoves() {
+  const root = byId("workspace");
+  root.replaceChildren();
+  const heading = sectionHeading("CAMERA MOVES", "Camera moves",
+    "A shared vocabulary of moves. A shot names one with move: {id: …}; the plan checks it, and generation tells the model in its words.");
+  heading.classList.add("page-heading");
+  root.append(heading);
+  state.moves ??= (await api("/api/camera-moves", { optional: true })) || [];
+  const categories = new Map();
+  for (const move of state.moves) {
+    if (!categories.has(move.category)) categories.set(move.category, []);
+    categories.get(move.category).push(move);
+  }
+  for (const [category, moves] of categories) {
+    const section = el("section", "transition-section");
+    section.append(sectionHeading("MOVES", label(category), `${moves.length} available`));
+    const grid = el("div", "transition-grid");
+    for (const move of moves) {
+      const card = el("article", "transition-card move-card");
+      const implied = move.implies;
+      const geometry = implied.kind
+        ? [`${implied.kind} ${implied.direction}`.trim(), implied.rig, implied.speed, ...(implied.secondary || [])].filter(Boolean).join(" · ")
+        : `rig: ${implied.rig || "any"} (the plan cannot see it)`;
+      card.append(
+        el("strong", "", move.name),
+        el("code", "move-id", `move: {id: ${move.id}}`),
+        el("p", "", move.says),
+        el("small", "muted", `Plan: ${geometry} · energy ${move.energy || "—"}${move.origin !== "built-in" ? ` · ${move.origin}` : ""}`),
+        guidanceList("Use when", move.use_when, "good"),
+        guidanceList("Avoid when", move.avoid_when, "warning"),
+        el("small", "move-prompt", `Model: “${move.prompt}”`),
+      );
+      grid.append(card);
+    }
+    section.append(grid);
+    root.append(section);
+  }
+  tellAssistant();
+}
+
 function renderTransitions() {
   const root = byId("workspace");
   root.replaceChildren();
@@ -2382,6 +2425,11 @@ async function start() {
   startEventStream();
   renderJobs().catch(() => {});
   startAssistant({ seen: assistantSeen, navigate: assistantNavigate }).catch(() => {});
+  api("/api/camera-moves", { optional: true }).then((moves) => {
+    state.moves = moves || [];
+    const count = byId("moves-nav-count");
+    if (count) count.textContent = String(state.moves.length);
+  }).catch(() => {});
   document.addEventListener("jobs-changed", () => renderJobs(true).catch(() => {}));
   const parameters = new URLSearchParams(window.location.search);
   const requestedTransition = parameters.get("transition");

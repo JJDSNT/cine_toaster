@@ -1,0 +1,24 @@
+schema_version = 1
+id = "orbit-left"
+name = "Orbit left"
+category = "dolly/track"
+says = "The camera circles the subject: a turning point, a person seen whole."
+energy = "high"
+use_when = [
+  "A decision, a reunion, a moment that turns",
+  "Showing a subject from more than one side",
+]
+avoid_when = [
+  "Dialogue: the axis wanders and the audience loses the geography",
+]
+
+# What the move implies in the scene's plan (SPEC-0005): `toast check` compares
+# it with the move the shot's start and end poses derive.
+[implies]
+kind = "arc"
+direction = "left"
+rig = "dolly"
+
+# The words a video model is given for this move.
+[prompt]
+text = "the camera orbits slowly to the left around the subject, keeping the same distance"

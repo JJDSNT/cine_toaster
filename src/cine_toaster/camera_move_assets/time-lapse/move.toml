@@ -1,0 +1,23 @@
+schema_version = 1
+id = "time-lapse"
+name = "Time-lapse"
+category = "specials"
+says = "Hours pass in seconds from a fixed place."
+energy = "low"
+use_when = [
+  "A passage of time the audience should see",
+]
+avoid_when = [
+  "Inside a scene's continuous time",
+]
+
+# What the move implies in the scene's plan (SPEC-0005); empty `kind` means the
+# plan cannot see it (a rig, a lens effect), so nothing is checked.
+[implies]
+kind = "static"
+direction = ""
+rig = "tripod"
+
+# The words a video model is given for this move.
+[prompt]
+text = "time-lapse from a fixed position, light and clouds moving fast"

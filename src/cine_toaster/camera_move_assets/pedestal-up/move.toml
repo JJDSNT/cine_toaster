@@ -1,0 +1,24 @@
+schema_version = 1
+id = "pedestal-up"
+name = "Pedestal up"
+category = "physical"
+says = "The camera rises straight up, keeping its angle."
+energy = "low"
+use_when = [
+  "Finding an eyeline that changes as someone stands",
+  "Clearing a foreground",
+]
+avoid_when = [
+  "When a tilt would say it more simply",
+]
+
+# What the move implies in the scene's plan (SPEC-0005): `toast check` compares
+# it with the move the shot's start and end poses derive.
+[implies]
+kind = "pedestal"
+direction = "up"
+rig = "tripod"
+
+# The words a video model is given for this move.
+[prompt]
+text = "the camera rises slowly straight up, keeping its angle"

@@ -1,0 +1,25 @@
+schema_version = 1
+id = "crash-zoom-in"
+name = "Crash zoom in"
+category = "zoom/lens"
+says = "The lens slams onto a face or a detail: shock, comedy, emphasis."
+energy = "high"
+use_when = [
+  "A reaction the audience must not miss",
+  "Genre moments: comedy, horror, action",
+]
+avoid_when = [
+  "Drama that wants to stay invisible",
+]
+
+# What the move implies in the scene's plan (SPEC-0005); empty `kind` means the
+# plan cannot see it (a rig, a lens effect), so nothing is checked.
+[implies]
+kind = "zoom"
+direction = "in"
+rig = "tripod"
+speed = "snap"
+
+# The words a video model is given for this move.
+[prompt]
+text = "a sudden fast zoom in onto the subject, the camera does not move"

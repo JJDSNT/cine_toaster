@@ -576,6 +576,26 @@ def command_gate(args: argparse.Namespace) -> int:
     return _drive(root, args.scene, act)
 
 
+def command_moves(args: argparse.Namespace) -> int:
+    """The camera-move catalog (CT-0027)."""
+
+    from .camera_moves import list_moves
+
+    moves = list_moves(Path(args.project).expanduser().resolve() if args.project else None)
+    if args.json:
+        print(json.dumps(moves, indent=2, ensure_ascii=False))
+        return 0
+    category = ""
+    for move in moves:
+        if move["category"] != category:
+            category = move["category"]
+            print(f"\n{category}")
+        implied = move["implies"]
+        geometry = f"{implied['kind']} {implied['direction']}".strip() or "(not in the plan)"
+        print(f"  {move['id']:18} {move['name']:18} {geometry:14} {move['says']}")
+    return 0
+
+
 def command_storyboard(args: argparse.Namespace) -> int:
     """The phase gate: approve a scene's storyboard as what will be produced, or reopen it."""
 
@@ -1501,6 +1521,11 @@ def build_parser() -> argparse.ArgumentParser:
     costs_parser.add_argument("project", type=Path)
     costs_parser.add_argument("--json", action="store_true")
     costs_parser.set_defaults(function=command_costs)
+
+    moves_parser = subparsers.add_parser("moves", help="The camera-move catalog: guidance, implied geometry, model words")
+    moves_parser.add_argument("project", type=Path, nargs="?", help="include this production's own moves")
+    moves_parser.add_argument("--json", action="store_true")
+    moves_parser.set_defaults(function=command_moves)
 
     board_parser = subparsers.add_parser("storyboard", help="Approve a scene's storyboard (the phase gate), or reopen it")
     board_sub = board_parser.add_subparsers(dest="storyboard_command", required=True)

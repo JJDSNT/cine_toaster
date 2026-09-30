@@ -1,0 +1,24 @@
+schema_version = 1
+id = "walk-and-talk"
+name = "Walk and talk"
+category = "dolly/track"
+says = "The camera retreats ahead of people walking toward it: conversation in motion."
+energy = "medium"
+use_when = [
+  "Dialogue that needs momentum",
+  "Two characters on the way somewhere",
+]
+avoid_when = [
+  "Long static dialogue: the movement becomes a gimmick",
+]
+
+# What the move implies in the scene's plan (SPEC-0005); empty `kind` means the
+# plan cannot see it (a rig, a lens effect), so nothing is checked.
+[implies]
+kind = "track"
+direction = ""
+rig = "steadicam"
+
+# The words a video model is given for this move.
+[prompt]
+text = "the camera moves backward ahead of the people walking toward it, keeping them in frame"

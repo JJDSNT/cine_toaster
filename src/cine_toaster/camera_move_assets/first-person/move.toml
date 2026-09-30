@@ -1,0 +1,23 @@
+schema_version = 1
+id = "first-person"
+name = "First person"
+category = "specials"
+says = "The frame is the character's eyes."
+energy = "high"
+use_when = [
+  "A subjective moment, a threat seen as the character sees it",
+]
+avoid_when = [
+  "Long stretches: the audience loses the face",
+]
+
+# What the move implies in the scene's plan (SPEC-0005); empty `kind` means the
+# plan cannot see it (a rig, a lens effect), so nothing is checked.
+[implies]
+kind = ""
+direction = ""
+rig = "body"
+
+# The words a video model is given for this move.
+[prompt]
+text = "first-person point of view, as seen through the character's eyes"

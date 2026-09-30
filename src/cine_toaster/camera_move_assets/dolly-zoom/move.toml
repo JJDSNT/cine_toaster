@@ -1,0 +1,24 @@
+schema_version = 1
+id = "dolly-zoom"
+name = "Dolly zoom"
+category = "specials"
+says = "The camera pushes in as the lens widens: the world warps around a still face."
+energy = "high"
+use_when = [
+  "A shock, vertigo, a realisation that changes everything",
+]
+avoid_when = [
+  "More than once in a film",
+]
+
+# What the move implies in the scene's plan (SPEC-0005): `toast check` compares
+# it with the move the shot's start and end poses derive.
+[implies]
+kind = "dolly"
+direction = "in"
+rig = "dolly"
+secondary = ["zoom out"]
+
+# The words a video model is given for this move.
+[prompt]
+text = "the camera dollies in while the lens zooms out, the subject keeps the same size while the background stretches"

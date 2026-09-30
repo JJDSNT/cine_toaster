@@ -1,0 +1,24 @@
+schema_version = 1
+id = "push-in"
+name = "Push in"
+category = "dolly/track"
+says = "The camera moves closer: attention, realisation, pressure."
+energy = "medium"
+use_when = [
+  "A character realises something",
+  "The scene tightens around one person",
+]
+avoid_when = [
+  "Every shot: the audience stops feeling it",
+]
+
+# What the move implies in the scene's plan (SPEC-0005): `toast check` compares
+# it with the move the shot's start and end poses derive.
+[implies]
+kind = "dolly"
+direction = "in"
+rig = "dolly"
+
+# The words a video model is given for this move.
+[prompt]
+text = "slow dolly in toward the subject, the lens unchanged"

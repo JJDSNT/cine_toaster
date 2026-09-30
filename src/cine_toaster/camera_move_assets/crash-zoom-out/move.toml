@@ -1,0 +1,24 @@
+schema_version = 1
+id = "crash-zoom-out"
+name = "Crash zoom out"
+category = "zoom/lens"
+says = "The lens snaps wide: the situation is bigger than it looked."
+energy = "high"
+use_when = [
+  "A reveal played for surprise",
+]
+avoid_when = [
+  "When the reveal needs time to land",
+]
+
+# What the move implies in the scene's plan (SPEC-0005); empty `kind` means the
+# plan cannot see it (a rig, a lens effect), so nothing is checked.
+[implies]
+kind = "zoom"
+direction = "out"
+rig = "tripod"
+speed = "snap"
+
+# The words a video model is given for this move.
+[prompt]
+text = "a sudden fast zoom out revealing the surroundings, the camera does not move"

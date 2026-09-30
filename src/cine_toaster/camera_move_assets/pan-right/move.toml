@@ -1,0 +1,24 @@
+schema_version = 1
+id = "pan-right"
+name = "Pan right"
+category = "pan/tilt"
+says = "The camera turns to follow or discover, from a fixed place."
+energy = "medium"
+use_when = [
+  "Revealing what lies beside the subject",
+  "Following a movement across the frame",
+]
+avoid_when = [
+  "A pan with nothing to find at its end",
+]
+
+# What the move implies in the scene's plan (SPEC-0005): `toast check` compares
+# it with the move the shot's start and end poses derive.
+[implies]
+kind = "pan"
+direction = "right"
+rig = "tripod"
+
+# The words a video model is given for this move.
+[prompt]
+text = "slow pan to the right from a fixed position"

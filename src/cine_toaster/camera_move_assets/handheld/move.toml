@@ -1,0 +1,23 @@
+schema_version = 1
+id = "handheld"
+name = "Handheld"
+category = "human"
+says = "The frame breathes with the operator: presence, urgency, the documentary look."
+energy = "medium"
+use_when = [
+  "Tension, chaos, a witness in the room",
+]
+avoid_when = [
+  "Composed, formal scenes: the sway reads as a mistake",
+]
+
+# What the move implies in the scene's plan (SPEC-0005); empty `kind` means the
+# plan cannot see it (a rig, a lens effect), so nothing is checked.
+[implies]
+kind = ""
+direction = ""
+rig = "handheld"
+
+# The words a video model is given for this move.
+[prompt]
+text = "handheld camera with a slight natural sway"

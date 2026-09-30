@@ -252,6 +252,12 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
 
     def _handle_api(self, parsed) -> None:
         query = parse_qs(parsed.query)
+        if parsed.path == "/api/camera-moves":
+            # The camera-move catalog (CT-0027): built in, external, the production's.
+            from .camera_moves import list_moves
+
+            self._send_json(list_moves(self.project_root))
+            return
         if parsed.path == "/api/transitions":
             self._send_json(
                 [

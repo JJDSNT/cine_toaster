@@ -1,0 +1,25 @@
+schema_version = 1
+id = "whip-pan-right"
+name = "Whip pan right"
+category = "pan/tilt"
+says = "A pan so fast the image blurs: energy, a sudden turn of attention, a cut hidden in motion."
+energy = "high"
+use_when = [
+  "Jumping to what a character just heard",
+  "Joining two shots through the blur",
+]
+avoid_when = [
+  "A calm scene: it reads as panic",
+]
+
+# What the move implies in the scene's plan (SPEC-0005); empty `kind` means the
+# plan cannot see it (a rig, a lens effect), so nothing is checked.
+[implies]
+kind = "pan"
+direction = "right"
+rig = "tripod"
+speed = "snap"
+
+# The words a video model is given for this move.
+[prompt]
+text = "a very fast whip pan to the right, the image streaking with motion blur"

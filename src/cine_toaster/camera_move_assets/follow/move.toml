@@ -1,0 +1,24 @@
+schema_version = 1
+id = "follow"
+name = "Follow"
+category = "dolly/track"
+says = "The camera travels with a moving subject."
+energy = "medium"
+use_when = [
+  "A walk that matters",
+  "Keeping the audience with a character",
+]
+avoid_when = [
+  "A subject that does not move",
+]
+
+# What the move implies in the scene's plan (SPEC-0005): `toast check` compares
+# it with the move the shot's start and end poses derive.
+[implies]
+kind = "track"
+direction = ""
+rig = "steadicam"
+
+# The words a video model is given for this move.
+[prompt]
+text = "the camera follows the subject as they move, at a steady distance"

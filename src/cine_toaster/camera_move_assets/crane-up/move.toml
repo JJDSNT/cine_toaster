@@ -1,0 +1,24 @@
+schema_version = 1
+id = "crane-up"
+name = "Crane up"
+category = "drone/crane"
+says = "The camera rises and travels: the scene opens, the world is larger than the person."
+energy = "high"
+use_when = [
+  "Opening or closing a sequence",
+  "Leaving a character alone in a place",
+]
+avoid_when = [
+  "Inside a small room: the move has nowhere to go",
+]
+
+# What the move implies in the scene's plan (SPEC-0005): `toast check` compares
+# it with the move the shot's start and end poses derive.
+[implies]
+kind = "crane"
+direction = "up"
+rig = "crane"
+
+# The words a video model is given for this move.
+[prompt]
+text = "a slow crane up and away, the scene opening below"

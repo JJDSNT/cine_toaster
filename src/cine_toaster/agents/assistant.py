@@ -40,7 +40,7 @@ ROOMS = {
     "overview": "the production's front page", "script": "the screenplay room", "storyboard": "the storyboard",
     "dialogue": "the dialogue room", "sequences": "sequences and their versions", "scenes": "the list of scenes",
     "review": "what waits for review", "cut": "the cut room (joins between shots)", "cast": "the cast room",
-    "transitions": "the transition catalogue", "library": "the media library", "knowledge": "measured knowledge",
+    "transitions": "the transition catalogue", "moves": "the camera-move catalogue", "library": "the media library", "knowledge": "measured knowledge",
     "scene": "one scene's room: shots, workflow and gates, pictures, blocks, versions (needs scene)",
     "compare": "a shot's takes side by side, to choose (needs scene and shot)",
     "canvas": "the production canvas, focused on a scene (scene optional)",

@@ -1,0 +1,24 @@
+schema_version = 1
+id = "tilt-down"
+name = "Tilt down"
+category = "pan/tilt"
+says = "The camera tilts down: to the ground, to what was hidden, to defeat."
+energy = "low"
+use_when = [
+  "Finding an object on the ground",
+  "Letting a figure diminish",
+]
+avoid_when = [
+  "When the frame should stay with the eyes",
+]
+
+# What the move implies in the scene's plan (SPEC-0005): `toast check` compares
+# it with the move the shot's start and end poses derive.
+[implies]
+kind = "tilt"
+direction = "down"
+rig = "tripod"
+
+# The words a video model is given for this move.
+[prompt]
+text = "slow tilt down from a fixed position"

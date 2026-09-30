@@ -1,0 +1,23 @@
+schema_version = 1
+id = "pedestal-down"
+name = "Pedestal down"
+category = "physical"
+says = "The camera lowers straight down, keeping its angle."
+energy = "low"
+use_when = [
+  "Following a character who sits or kneels",
+]
+avoid_when = [
+  "When a tilt would say it more simply",
+]
+
+# What the move implies in the scene's plan (SPEC-0005); empty `kind` means the
+# plan cannot see it (a rig, a lens effect), so nothing is checked.
+[implies]
+kind = "pedestal"
+direction = "down"
+rig = "tripod"
+
+# The words a video model is given for this move.
+[prompt]
+text = "the camera lowers slowly straight down, keeping its angle"

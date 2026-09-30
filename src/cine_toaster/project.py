@@ -361,6 +361,25 @@ def _phase(root: Path, path: Path, state: SceneState) -> dict[str, Any]:
     return phase(root, {"file": path.relative_to(root).as_posix()}, state.gates)
 
 
+def _expand_camera_moves(shots: list[dict[str, Any]], scene_id: str, root: Path) -> list[Finding]:
+    """`move: {id: push-in}` takes its kind, direction and rig from the camera-move catalog (CT-0027)."""
+
+    if not any(isinstance(shot.get("move"), dict) and shot["move"].get("id") for shot in shots):
+        return []
+    from .camera_moves import expand, list_moves
+
+    catalog = {move["id"]: move for move in list_moves(root)}
+    findings = []
+    for shot in shots:
+        if not isinstance(shot.get("move"), dict):
+            continue
+        shot["move"], problem = expand(shot["move"], catalog)
+        if problem:
+            findings.append(Finding(code="move_unknown", severity="error", scene_id=scene_id, shots=(shot["id"],),
+                                    message=f"{shot['id']} {problem}. It would be lost, not guessed."))
+    return findings
+
+
 def _apply_cut_decisions(shots: list[dict[str, Any]], state: SceneState) -> None:
     """A cut decided in the runtime stands over the breakdown's (plan step 13).
 
@@ -435,6 +454,7 @@ def _load_scene(
         geometry = parse_geometry(_geometry_document(geography))
     except ValidationError as error:
         raise ProjectFormatError(f"{error.message} (in {path})") from error
+    move_findings = _expand_camera_moves(shots, scene_id, root)
     motions = shot_motions(geometry, shots, scene_id=scene_id)
     positions_by_shot = {motion.shot_id: motion.start_positions for motion in motions}
     findings = [
@@ -451,6 +471,7 @@ def _load_scene(
         for shot, motion in zip(shots, motions):
             shot["motion"] = motion.public_dict()
     findings.extend(finding.public_dict() for finding in _check_shot_fields(shots, scene_id))
+    findings.extend(finding.public_dict() for finding in move_findings)
     findings.extend(
         finding.public_dict() for finding in _check_transitions(shots, scene_id, root)
     )

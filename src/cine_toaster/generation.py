@@ -84,9 +84,13 @@ def _from_shot(scene: dict[str, Any], shot: dict[str, Any]) -> dict[str, Any] | 
 
 
 def _camera(scene: dict[str, Any], shot: dict[str, Any]) -> str:
+    """How the camera behaves, in words: the shot's own, else its catalog move's (CT-0027)."""
+
     ids = {camera["id"] for camera in (scene.get("geometry") or {}).get("cameras", [])}
     text = shot.get("camera_text") or ""
-    return text if text and text not in ids and text != shot.get("camera") else ""
+    if text and text not in ids and text != shot.get("camera"):
+        return text
+    return str((shot.get("move") or {}).get("prompt") or "")
 
 
 def _voice(production: dict[str, Any], scene: dict[str, Any], who: str) -> tuple[str, str]:

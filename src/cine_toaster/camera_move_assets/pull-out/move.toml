@@ -1,0 +1,24 @@
+schema_version = 1
+id = "pull-out"
+name = "Pull out"
+category = "dolly/track"
+says = "The camera moves away: isolation, context, an ending."
+energy = "medium"
+use_when = [
+  "Revealing where a character really is",
+  "Leaving a scene",
+]
+avoid_when = [
+  "When the new context adds nothing",
+]
+
+# What the move implies in the scene's plan (SPEC-0005): `toast check` compares
+# it with the move the shot's start and end poses derive.
+[implies]
+kind = "dolly"
+direction = "out"
+rig = "dolly"
+
+# The words a video model is given for this move.
+[prompt]
+text = "slow dolly out away from the subject, the lens unchanged"
