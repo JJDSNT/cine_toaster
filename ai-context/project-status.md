@@ -183,8 +183,10 @@ remains:
   CT-0044): `toast serve --assistant` puts a directing assistant beside the
   canvas (CopilotKit v2 → bundled Copilot Runtime sidecar → LangGraph agent over
   AG-UI → Claude Code CLI); it knows what is on screen, points at shots, and acts
-  only through commands after a yes, never on a gate. Next: step 13, the
-  editable canvas. The author
+  only through commands after a yes, never on a gate. Step 13 is done too
+  (CT-0046): the canvas edits cuts (a decision over the breakdown, never a
+  rewrite) and starts workflows, through the same commands. Next: step 14,
+  Tauri, and the pending hardening items. The author
   will re-check later whether Kael's converted voice still sounds ill.
 
 Earlier notes:

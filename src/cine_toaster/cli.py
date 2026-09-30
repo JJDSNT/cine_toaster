@@ -564,6 +564,31 @@ def command_gate(args: argparse.Namespace) -> int:
     return _drive(root, args.scene, act)
 
 
+def command_cut(args: argparse.Namespace) -> int:
+    """Decide the cut into a shot, over what the breakdown says; or return to it (plan step 13)."""
+
+    from .commands import dispatch
+
+    root = Path(args.project).expanduser().resolve()
+    payload = {"scene_id": args.scene, "shot_id": args.shot, "rationale": args.why,
+               "actor": {"id": args.actor, "kind": "human"}}
+    if args.cut_command == "clear":
+        result = dispatch(root, "clear_cut", payload)
+    else:
+        transition = {"id": args.transition, "duration_ms": args.ms, "reason": args.transition_why} if args.transition else None
+        payload["cut"] = {"type": args.type, "chain": "frame" if args.chain else "", "reason": args.reason,
+                          "transition": transition}
+        result = dispatch(root, "set_cut", payload)
+    cut = next(item for item in load_production(root)["scenes"] if item["id"] == args.scene)
+    record = next((item for item in cut["cuts"] if item["to"] == args.shot), {})
+    print(f"{result.type}: into {args.shot} is now {record.get('type', 'hard')}"
+          + (f" with {record['transition']['id']}" if record.get("transition") else "")
+          + f" (revision {result.revision})")
+    for finding in record.get("findings") or []:
+        print(f"  {finding['severity']}: {finding['message']}")
+    return 0
+
+
 def command_picture(args: argparse.Namespace) -> int:
     """A master picture made by editing its source with the cast, within the budget."""
 
@@ -1449,6 +1474,26 @@ def build_parser() -> argparse.ArgumentParser:
     costs_parser.add_argument("project", type=Path)
     costs_parser.add_argument("--json", action="store_true")
     costs_parser.set_defaults(function=command_costs)
+
+    cut_parser = subparsers.add_parser("cut", help="Decide the cut into a shot, over the breakdown (plan step 13)")
+    cut_sub = cut_parser.add_subparsers(dest="cut_command", required=True)
+    for name, text in (("set", "Decide the cut into a shot"), ("clear", "Return to what the breakdown says")):
+        item = cut_sub.add_parser(name, help=text)
+        item.add_argument("project", type=Path)
+        item.add_argument("scene")
+        item.add_argument("shot", help="the incoming shot: the cut is the join into it")
+        item.add_argument("--why", help="why the decision was made (kept in the history)")
+        item.add_argument("--actor", default=os.environ.get("USER", "director"))
+        if name == "set":
+            from .cuts import CUT_TYPES
+
+            item.add_argument("--type", default="hard", choices=CUT_TYPES)
+            item.add_argument("--chain", action="store_true", help="the shot opens on the previous shot's last frame")
+            item.add_argument("--reason", default="", help="what the cut does")
+            item.add_argument("--transition", help="a catalog transition id, e.g. cross-dissolve")
+            item.add_argument("--ms", type=int, help="the transition's duration in milliseconds")
+            item.add_argument("--transition-why", default="", help="why this transition")
+    cut_parser.set_defaults(function=command_cut)
 
     workflow_parser = subparsers.add_parser(
         "workflow", help="The built-in workflow: picture, a person's approval, video, takes (SPEC-0009)")

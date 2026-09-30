@@ -6,6 +6,7 @@ import {
 import { layout } from "./layout.ts";
 import { nodeTypes } from "./nodes.tsx";
 import { CUT_NAMES, edgeTypes } from "./edges.tsx";
+import { CutEditor, startWorkflow } from "./CutEditor.tsx";
 import type { GraphEdge, GraphNode, ProductionGraph } from "./types.ts";
 
 // The assistant is its own chunk, fetched only when the runtime has it on (ADR 0018).
@@ -67,24 +68,43 @@ function toFlow(graph: ProductionGraph, showTakes: boolean, focus: Focus): { nod
   return { nodes, edges };
 }
 
-function Details({ selection }: { selection: Selection }) {
+/** A block with no run in progress can be started from the canvas, as from the scene room. */
+function StartBlock({ graph, scene, block, onChanged }: { graph: ProductionGraph | null; scene: string; block: string; onChanged: () => void }) {
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const active = graph?.nodes.some((node) => node.type === "run" && node.scene === scene && node.data.block === block
+    && ["running", "waiting"].includes(node.data.state));
+  if (active) return <p className="hint">Block {block} has a workflow in progress: its card is beside the scene.</p>;
+  const sceneNode = graph?.nodes.find((node) => node.type === "scene" && node.scene === scene);
+  const revision = sceneNode?.type === "scene" ? sceneNode.data.revision : undefined;
+  return (
+    <div className="actions">
+      <button type="button" disabled={busy} onClick={async () => {
+        setBusy(true);
+        setError("");
+        try { await startWorkflow(scene, block, revision ?? 0); onChanged(); }
+        catch (reason) { setError((reason as Error).message); }
+        finally { setBusy(false); }
+      }}>Start the workflow for block {block}</button>
+      {error && <p className="finding error">{error}</p>}
+    </div>
+  );
+}
+
+function Details({ selection, graph, onChanged }: { selection: Selection; graph: ProductionGraph | null; onChanged: () => void }) {
   if (!selection) {
-    return <p className="hint">Select a card or a cut to see its record. The canvas only reads the production: change it in the control room, and this view follows.</p>;
+    return <p className="hint">Select a card or a cut to see its record. Select a cut to change it; every change is a command, recorded like any other decision.</p>;
   }
   if (selection.kind === "edge") {
     const edge = selection.edge;
     if (edge.type !== "cut") return null;
     const [, scene, pair] = edge.id.match(/^cut:([^/]+)\/(.+)$/) ?? [];
+    const shot = edge.target.replace(/^shot:[^/]+\//, "");
     return (
       <div>
         <span className="eyebrow">Cut · {scene}</span>
         <h2>{pair?.replace("-", " → ")}</h2>
-        <dl>
-          <dt>Type</dt><dd>{CUT_NAMES[edge.data.cut] || edge.data.cut}</dd>
-          {edge.data.chain && (<><dt>Chain</dt><dd>opens on the previous last frame</dd></>)}
-          {edge.data.transition && (<><dt>Transition</dt><dd>{edge.data.transition}</dd></>)}
-          {edge.data.reason && (<><dt>Why</dt><dd>{edge.data.reason}</dd></>)}
-        </dl>
+        <CutEditor key={`${edge.id}@${edge.data.revision}`} scene={scene} shot={shot} data={edge.data} onSaved={onChanged} />
         {edge.data.findings.map((code) => <p key={code} className={`finding ${edge.data.severity}`}>{code}</p>)}
         <a href={`/?view=cut`}>Open the Cut room</a>
       </div>
@@ -127,7 +147,9 @@ function Details({ selection }: { selection: Selection }) {
           <dt>Speakers</dt><dd>{d.speakers.join(", ") || "—"}</dd>
           <dt>Picture</dt><dd>{d.picture.level}</dd>
           <dt>Selected take</dt><dd>{d.selected_take || "—"}</dd>
+          {d.block && (<><dt>Block</dt><dd>{d.block}</dd></>)}
         </dl>
+        {d.block && <StartBlock graph={graph} scene={d.scene} block={d.block} onChanged={onChanged} />}
         <a href={`/?scene=${encodeURIComponent(d.scene)}&shot=${encodeURIComponent(d.shot)}`}>Compare takes</a>
       </div>
     );
@@ -151,6 +173,18 @@ export function App() {
   const [selection, setSelection] = useState<Selection>(null);
   const [focus, setFocus] = useState<Focus | null>(null);
   const [assistantOn, setAssistantOn] = useState(false);
+  // After a reload, the selection shows the new record, not the one it was made from.
+  useEffect(() => {
+    setSelection((current) => {
+      if (!current || !graph) return current;
+      if (current.kind === "node") {
+        const node = graph.nodes.find((item) => item.id === current.node.id);
+        return node ? { kind: "node", node } : null;
+      }
+      const edge = graph.edges.find((item) => item.id === current.edge.id);
+      return edge ? { kind: "edge", edge } : null;
+    });
+  }, [graph]);
   const [talking, setTalking] = useState(false);
   const [highlight, setHighlight] = useState("");
 
@@ -246,7 +280,7 @@ export function App() {
       <header>
         <a className="back" href="/">← Control room</a>
         <div>
-          <span className="eyebrow">Production canvas · read only</span>
+          <span className="eyebrow">Production canvas · cuts and workflows editable</span>
           <h1>{graph?.production.title ?? "…"}</h1>
         </div>
         {graph && (
@@ -297,7 +331,7 @@ export function App() {
           </ReactFlow>
         </div>
         <aside className="details">
-          <Details selection={selection} />
+          <Details selection={selection} graph={graph} onChanged={load} />
           {assistantOn && talking && (
             <div className="assistant dark" data-testid="assistant">
               <Suspense fallback={<p className="hint">Opening the assistant…</p>}>

@@ -42,6 +42,7 @@ execution history and links to those destinations.
 The order of work is the ordered plan in
 [`development/roadmap.md`](../development/roadmap.md).
 
+- `CT-0046` — plan step 13: the editable canvas (`done`)
 - `CT-0045` — Claude Code acting through Cine Toaster (MCP first); noted for
   later at the user's request (`proposed`)
 - `CT-0044` — plan step 12: the directing assistant; ADR 0018 (`done`)

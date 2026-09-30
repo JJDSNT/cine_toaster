@@ -125,3 +125,10 @@ first thing that would read it.
 - Bridge generation between two shots (CineGen's "fill gap") as a cut option.
   Deferred until generation exists.
 - Cuts between scenes, at the sequence level.
+
+# Amendment: cuts decided in the runtime (2026-09-30, CT-0046)
+
+A cut may also be **decided** through `set_cut` (canvas, CLI, assistant with
+a yes). The decision is kept in the scene's `state.json` and stands over the
+breakdown's `cut`/`transition` without rewriting it (ADR 0006); `clear_cut`
+returns to the breakdown. The record and every check read the decided cut.

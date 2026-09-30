@@ -85,6 +85,8 @@ def production_graph(production: dict[str, Any], root: Path | None = None) -> di
             "data": {
                 "scene": scene["id"], "title": scene["title"], "order": scene_index,
                 "sequence": scene.get("sequence") or "", "status": scene.get("status") or "",
+                # The revision a canvas edit is made against: a stale edit is refused.
+                "revision": scene.get("revision", 0),
                 "findings": len(scene.get("findings") or []),
                 "severity": _severity(scene.get("findings") or []),
             },
@@ -116,6 +118,7 @@ def production_graph(production: dict[str, Any], root: Path | None = None) -> di
                     "move": motion.get("kind") or "",
                     "walks": bool(motion.get("moved_subjects")),
                     "picture": _picture(scene, shot, root),
+                    "block": shot.get("block") or "",
                     "findings": len(found), "severity": _severity(found),
                 },
             })
@@ -173,6 +176,12 @@ def production_graph(production: dict[str, Any], root: Path | None = None) -> di
                     "reason": cut.get("reason") or "", "transition": transition.get("id") or "",
                     "findings": [finding["code"] for finding in cut.get("findings") or []],
                     "severity": _severity(cut.get("findings") or []),
+                    # Plan step 13: a cut decided here, over what the breakdown says.
+                    "decided": bool(after.get("cut_decision")),
+                    "authored": (after.get("authored_cut") or {}).get("type", "hard") if after.get("cut_decision") else "",
+                    "transition_ms": transition.get("duration_ms") or 0,
+                    "transition_reason": transition.get("reason") or "",
+                    "revision": scene.get("revision", 0),
                 },
             })
         # Between scenes the join belongs to the sequence and is not checked yet.

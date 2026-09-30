@@ -353,6 +353,23 @@ def _camera_assignments(geography: dict[str, Any]) -> dict[str, str]:
     return assignments
 
 
+def _apply_cut_decisions(shots: list[dict[str, Any]], state: SceneState) -> None:
+    """A cut decided in the runtime stands over the breakdown's (plan step 13).
+
+    The breakdown is not rewritten (ADR 0006): what it says stays visible as
+    `authored_cut`/`authored_transition`, and clearing the decision returns to it.
+    """
+
+    for shot in shots:
+        decision = state.cuts.get(shot["id"])
+        shot["cut_decision"] = decision
+        if not decision:
+            continue
+        shot["authored_cut"], shot["authored_transition"] = shot.get("cut"), shot.get("transition")
+        shot["cut"] = {key: decision[key] for key in ("type", "chain", "reason") if decision.get(key)}
+        shot["transition"] = decision.get("transition") or None
+
+
 def _apply_state(shots: list[dict[str, Any]], state: SceneState) -> None:
     """Overlay committed decisions on what the breakdown and the disk describe."""
 
@@ -404,6 +421,7 @@ def _load_scene(
     approved = state.approved_pictures()
     for shot in shots:
         shot["approved_picture"] = approved.get(shot["id"], "")
+    _apply_cut_decisions(shots, state)
 
     try:
         geometry = parse_geometry(_geometry_document(geography))

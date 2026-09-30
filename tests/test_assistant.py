@@ -92,7 +92,7 @@ class AssistantTests(unittest.TestCase):
         graph = build(model, runtime, MemorySaver())
         state, config = self.run_turn(graph, "Inicie o bloco A")
         interrupts = state["__interrupt__"]
-        self.assertIn("Iniciar o workflow do bloco A da cena SC-030?", interrupts[0].value["message"])
+        self.assertIn("Iniciar o workflow do bloco A na cena SC-030?", interrupts[0].value["message"])
         self.assertEqual(runtime.commands, [])  # nothing before the yes
         # What the records say right after: this run stopped at its first step.
         runtime.scene_record["runs"] = [{"id": "wf_1", "subject": {"block": "A"}, "state": "failed", "steps": [
@@ -102,6 +102,20 @@ class AssistantTests(unittest.TestCase):
         self.assertEqual(runtime.commands, [("start_workflow", {"scene_id": "SC-030", "block": "A"})])
         self.assertIn("revisão 7", state["messages"][-1].content)
         self.assertIn("parou: Picture 3 falhou — needs RUNPOD_API_KEY", state["messages"][-1].content)
+
+    def test_it_can_propose_a_cut_and_it_is_applied_only_on_a_yes(self) -> None:
+        model = FakeModel({"reply": "Um corte em movimento cabe aqui.", "action": "set_cut", "scene": "SC-030",
+                           "shot": "P2", "cut_type": "action", "reason": "cortar no passo",
+                           "transition": ""})
+        runtime = FakeRuntime()
+        graph = build(model, runtime, MemorySaver())
+        state, config = self.run_turn(graph, "Que corte você faria para o P2?")
+        self.assertIn("Mudar o corte para P2 para action (cortar no passo) na cena SC-030?",
+                      state["__interrupt__"][0].value["message"])
+        self.assertEqual(runtime.commands, [])
+        graph.invoke(Command(resume={"approved": True}), config)
+        self.assertEqual(runtime.commands, [("set_cut", {"scene_id": "SC-030", "shot_id": "P2", "cut": {
+            "type": "action", "reason": "cortar no passo", "transition": None}})])
 
     def test_a_no_changes_nothing(self) -> None:
         model = FakeModel({"reply": "Posso iniciar.", "action": "start_workflow", "block": "A"})

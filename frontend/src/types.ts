@@ -13,6 +13,7 @@ export interface SceneData {
   scene: string;
   title: string;
   order: number;
+  revision: number;
   sequence: string;
   status: string;
   findings: number;
@@ -34,6 +35,8 @@ export interface ShotData {
   move: string;
   walks: boolean;
   picture: Picture;
+  /** The generation block the shot belongs to, if any. */
+  block: string;
   findings: number;
   severity: Severity;
 }
@@ -77,8 +80,16 @@ export interface CutData {
   chain: string;
   reason: string;
   transition: string;
+  transition_ms: number;
+  transition_reason: string;
   findings: string[];
   severity: Severity;
+  /** Decided in the runtime over the breakdown (plan step 13). */
+  decided: boolean;
+  /** What the breakdown says, when a decision stands over it. */
+  authored: string;
+  /** The scene's revision this edge was drawn from. */
+  revision: number;
 }
 
 export type GraphEdge =

@@ -101,3 +101,15 @@ main { display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
 .assistant-page { margin: 0; background: #0a0c0d; height: 100vh; }
 .assistant-drawer { height: 100vh; display: flex; flex-direction: column; }
 .assistant-drawer > * { flex: 1; min-height: 0; }
+
+/* Editing cuts (plan step 13) */
+.cut-editor { display: grid; gap: 8px; margin: 10px 0; font-size: 12px; }
+.cut-editor label { display: grid; gap: 3px; color: var(--muted, #8c9597); }
+.cut-editor label.inline { display: flex; align-items: center; gap: 6px; }
+.cut-editor input, .cut-editor select { background: #181c1e; color: inherit; border: 1px solid #2b3134; border-radius: 6px; padding: 5px 7px; font: inherit; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.actions button, .cut-editor button { background: #181c1e; color: inherit; border: 1px solid #3a4245; border-radius: 6px; padding: 5px 10px; cursor: pointer; font: inherit; }
+.actions button[type="submit"], .cut-editor button[type="submit"] { border-color: #ef6a3a; color: #ef6a3a; }
+.cut-line.decided path, path.cut-line.decided { stroke-dasharray: none; stroke-width: 2.5; }
+/* A cut's label reads above the cards it sits between. */
+.react-flow__edgelabel-renderer { z-index: 1001; }

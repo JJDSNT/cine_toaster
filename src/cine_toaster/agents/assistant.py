@@ -54,6 +54,8 @@ MAX_READS = 4
 ACTIONS = {
     "start_workflow": "start the workflow of a generation block (needs `block`)",
     "resume_workflow": "move a stopped workflow run on (needs `workflow`)",
+    "set_cut": "decide the cut into a shot (needs `scene`, `shot` = the incoming shot, `cut_type`; optional "
+               "`reason`, `transition` = a catalog id)",
 }
 
 SYSTEM = (
@@ -84,6 +86,9 @@ SCHEMA = {
         "text": {"type": "string"},
         "block": {"type": "string"},
         "workflow": {"type": "string"},
+        "cut_type": {"type": "string", "enum": ["", "hard", "match", "action", "j", "l", "smash", "jump", "continuation"]},
+        "reason": {"type": "string"},
+        "transition": {"type": "string"},
         "navigate": {"type": "object", "properties": {
             "room": {"type": "string", "enum": ["", *ROOMS]}, "scene": {"type": "string"}, "shot": {"type": "string"}}},
     },
@@ -194,6 +199,9 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None):
         if action in ACTIONS:
             proposal = {"action": action, "scene": answer.get("scene") or scene_id, "block": answer.get("block", ""),
                         "workflow": answer.get("workflow", "")}
+            if action == "set_cut":
+                proposal.update(shot=answer.get("shot", ""), cut_type=answer.get("cut_type") or "hard",
+                                reason=answer.get("reason", ""), transition=answer.get("transition", ""))
         update: dict[str, Any] = {"messages": [AIMessage(content=answer.get("reply", ""))],
                                   "highlight": answer.get("highlight", ""), "proposal": proposal, "notes": notes,
                                   "turn": turn}
@@ -215,23 +223,36 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None):
         """Put the proposal to the person; act only on their yes, only through a command."""
 
         proposal = state["proposal"]
-        target = (f"o workflow do bloco {proposal['block']}" if proposal["action"] == "start_workflow"
-                  else f"a execução {proposal['workflow']}")
-        verb = "Iniciar" if proposal["action"] == "start_workflow" else "Retomar"
-        answer = interrupt({"message": f"{verb} {target} da cena {proposal['scene']}?", "proposal": proposal})
+        if proposal["action"] == "set_cut":
+            verb = "Mudar"
+            target = (f"o corte para {proposal['shot']} para {proposal['cut_type']}"
+                      + (f" com a transição {proposal['transition']}" if proposal.get("transition") else "")
+                      + (f" ({proposal['reason']})" if proposal.get("reason") else ""))
+        else:
+            verb = "Iniciar" if proposal["action"] == "start_workflow" else "Retomar"
+            target = (f"o workflow do bloco {proposal['block']}" if proposal["action"] == "start_workflow"
+                      else f"a execução {proposal['workflow']}")
+        answer = interrupt({"message": f"{verb} {target} na cena {proposal['scene']}?", "proposal": proposal})
         if not (isinstance(answer, dict) and answer.get("approved")):
             return {"messages": [AIMessage(content="Certo, não fiz nada.")], "proposal": {}}
         payload = {"scene_id": proposal["scene"]}
-        payload.update({"block": proposal["block"]} if proposal["action"] == "start_workflow"
-                       else {"workflow_id": proposal["workflow"]})
+        if proposal["action"] == "set_cut":
+            payload.update(shot_id=proposal["shot"], cut={
+                "type": proposal["cut_type"], "reason": proposal.get("reason", ""),
+                "transition": {"id": proposal["transition"]} if proposal.get("transition") else None})
+        elif proposal["action"] == "start_workflow":
+            payload["block"] = proposal["block"]
+        else:
+            payload["workflow_id"] = proposal["workflow"]
         try:
             result = runtime.command(proposal["action"], payload)
         except Exception as error:
             return {"messages": [AIMessage(content=f"O runtime recusou: {getattr(error, 'message', error)}")],
                     "proposal": {}}
         # Say what actually happened, read back from the records, not what was hoped for.
+        status = run_status(runtime, proposal) if proposal["action"] != "set_cut" else ""
         return {"messages": [AIMessage(content=f"Feito: {verb.lower()} {target} (revisão {result.get('revision')}). "
-                                               + run_status(runtime, proposal))],
+                                               + status)],
                 "proposal": {}}
 
     graph = StateGraph(Assistant)

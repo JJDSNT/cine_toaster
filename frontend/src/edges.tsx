@@ -21,13 +21,13 @@ export function CutLine(props: EdgeProps<CutEdge>) {
   const severity = data?.severity || "";
   return (
     <>
-      <BaseEdge path={path} className={`cut-line ${severity} ${data?.chain ? "chained" : ""} ${selected ? "selected" : ""}`} />
+      <BaseEdge path={path} className={`cut-line ${severity} ${data?.chain ? "chained" : ""} ${data?.decided ? "decided" : ""} ${selected ? "selected" : ""}`} />
       <EdgeLabelRenderer>
         <div
           className={`cut-label ${severity} ${selected ? "selected" : ""}`}
           style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
         >
-          <strong>{CUT_NAMES[data?.cut || "hard"] || data?.cut}</strong>
+          <strong>{CUT_NAMES[data?.cut || "hard"] || data?.cut}{data?.decided ? " ✎" : ""}</strong>
           {data?.transition && <small>{data.transition}</small>}
           {data?.findings.length ? <em>{data.findings.length}</em> : null}
         </div>

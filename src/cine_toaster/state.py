@@ -11,7 +11,7 @@ from .errors import PersistenceError, ValidationError
 
 
 STATE_FILENAME = "state.json"
-STATE_SCHEMA_VERSION = 3
+STATE_SCHEMA_VERSION = 4
 MAX_DECISION_HISTORY = 200
 MAX_ASSEMBLIES = 200
 
@@ -136,6 +136,9 @@ class SceneState:
     #: Human gates and the workflow runs that opened them (SPEC-0009), by id.
     gates: dict[str, dict[str, Any]] = field(default_factory=dict)
     workflows: dict[str, dict[str, Any]] = field(default_factory=dict)
+    #: Cuts decided here (plan step 13), by incoming shot: they stand over the
+    #: breakdown's `cut`/`transition` without rewriting it (ADR 0006).
+    cuts: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def approved_pictures(self) -> dict[str, str]:
         """The picture each shot's latest approved gate chose (SPEC-0009)."""
@@ -168,6 +171,7 @@ class SceneState:
             "assemblies": [assembly.public_dict() for assembly in self.assemblies],
             "gates": self.gates,
             "workflows": self.workflows,
+            "cuts": self.cuts,
         }
 
     def with_decision(
@@ -178,6 +182,7 @@ class SceneState:
         assemblies: list[Assembly] | None = None,
         gates: dict[str, dict[str, Any]] | None = None,
         workflows: dict[str, dict[str, Any]] | None = None,
+        cuts: dict[str, dict[str, Any]] | None = None,
     ) -> SceneState:
         history = [*self.decisions, decision][-MAX_DECISION_HISTORY:]
         return replace(
@@ -189,6 +194,7 @@ class SceneState:
             assemblies=self.assemblies if assemblies is None else assemblies[-MAX_ASSEMBLIES:],
             gates=self.gates if gates is None else gates,
             workflows=self.workflows if workflows is None else workflows,
+            cuts=self.cuts if cuts is None else cuts,
         )
 
 
@@ -268,6 +274,7 @@ def load_scene_state(scene_directory: Path, scene_id: str) -> SceneState:
     decisions = document.get("decisions")
     gates = document.get("gates")
     workflows = document.get("workflows")
+    cuts = document.get("cuts")
     return SceneState(
         scene_id=str(document.get("scene_id", scene_id)),
         revision=int(document.get("revision", 0)),
@@ -277,6 +284,7 @@ def load_scene_state(scene_directory: Path, scene_id: str) -> SceneState:
         assemblies=assemblies,
         gates=dict(gates) if isinstance(gates, dict) else {},
         workflows=dict(workflows) if isinstance(workflows, dict) else {},
+        cuts=dict(cuts) if isinstance(cuts, dict) else {},
     )
 
 

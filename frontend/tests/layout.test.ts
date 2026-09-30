@@ -5,13 +5,13 @@ import type { GraphNode } from "../src/types.ts";
 
 const scene = (id: string, order: number): GraphNode => ({
   id: `scene:${id}`, type: "scene", scene: id,
-  data: { scene: id, title: id, order, sequence: "", status: "", findings: 0, severity: "" },
+  data: { scene: id, title: id, order, revision: 0, sequence: "", status: "", findings: 0, severity: "" },
 });
 const shot = (sceneId: string, id: string, order: number): GraphNode => ({
   id: `shot:${sceneId}/${id}`, type: "shot", scene: sceneId,
   data: {
     scene: sceneId, shot: id, order, label: "", camera: "", duration_seconds: 1, status: "", source: "",
-    selected_take: "", takes: 0, speakers: [], move: "", walks: false, picture: { level: "none" },
+    selected_take: "", takes: 0, speakers: [], move: "", walks: false, picture: { level: "none" }, block: "",
     findings: 0, severity: "",
   },
 });
