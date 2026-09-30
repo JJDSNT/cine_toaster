@@ -67,9 +67,13 @@ The facts, from CT-0033, CT-0043 and this step (CT-0044):
   - Node 20+;
   - the built bundle (`make ui`);
   - a model adapter: the Claude CLI, logged in.
-- The vanilla control room does not have the assistant yet. It is in
-  `/app/`. Bringing it into the control room's rooms is a later step, with
-  the same context contract.
+- The vanilla control room hosts the same React assistant in a drawer
+  (`/app/assistant.html` in a same-origin iframe, spoken to with
+  `postMessage`), so the control room itself stays free of React.
+  - One conversation per browser tab (`threadId` in `sessionStorage`),
+    across rooms and pages.
+  - Navigation requests already followed are remembered, so a page opened
+    by one does not follow it again.
 - An upgrade of CopilotKit has to keep `@ag-ui/client` pinned to the version
   CopilotKit itself uses. 1.0.1 against CopilotKit's 0.0.59 did not
   type-check.

@@ -49,6 +49,17 @@ class FakeRuntime:
     def scene(self, scene_id):
         return self.scene_record
 
+    def production(self):
+        production = load_production(DEMO)
+        production["scenes"] = [self.scene_record if item["id"] == "SC-030" else item for item in production["scenes"]]
+        return production
+
+    def budget(self):
+        return {"limit_usd": 2.0, "spent_usd": 0.58, "recent": []}
+
+    def screenplay(self):
+        return {"files": [{"path": "script.fountain", "text": "INT. LISTENING STATION - NIGHT\n\nMARA\nThat's it."}]}
+
     def command(self, command, payload):
         self.commands.append((command, payload))
         return {"revision": 7}
@@ -113,6 +124,45 @@ class AssistantTests(unittest.TestCase):
         model = FakeModel(ModelUnavailable("claude is not on PATH"))
         state, _ = self.run_turn(build(model, FakeRuntime(), MemorySaver()), "Olá")
         self.assertIn("claude is not on PATH", state["messages"][-1].content)
+
+    def test_it_sees_the_whole_film_and_looks_things_up_before_answering(self) -> None:
+        model = FakeModel(
+            {"reply": "", "action": "read", "query": "screenplay", "text": "that's it"},
+            {"reply": "", "action": "read", "query": "shot", "scene": "SC-030", "shot": "P3"},
+            {"reply": "A fala está no P3.", "highlight": "P3", "action": "none"},
+        )
+        runtime = FakeRuntime()
+        state, _ = self.run_turn(build(model, runtime, MemorySaver()), "Onde está a fala 'That's it'?")
+        self.assertEqual(state["messages"][-1].content, "A fala está no P3.")
+        self.assertEqual(len([m for m in state["messages"] if m.type == "ai"]), 1)  # reads leave no chatter
+        # Every turn carries the whole film; each read's result reaches the next look.
+        self.assertIn("SC-010", model.prompts[0])
+        self.assertIn("US$ 0.58 spent of US$ 2.00", model.prompts[0])
+        self.assertIn("script.fountain:4: That's it.", model.prompts[1])
+        self.assertIn("SC-030 P3: Locked on Mara", model.prompts[2])
+        self.assertIn("2 read(s) left", model.prompts[2])
+
+    def test_it_can_take_the_screen_somewhere_without_asking(self) -> None:
+        model = FakeModel({"reply": "Abri a comparação do P3.", "action": "none",
+                           "navigate": {"room": "compare", "scene": "SC-030", "shot": "P3"}},
+                          {"reply": "Não existe.", "action": "none", "navigate": {"room": "elsewhere"}})
+        runtime = FakeRuntime()
+        graph = build(model, runtime, MemorySaver())
+        state, _ = self.run_turn(graph, "Mostre os takes do P3")
+        self.assertEqual({k: state["navigate"][k] for k in ("room", "scene", "shot")},
+                         {"room": "compare", "scene": "SC-030", "shot": "P3"})
+        self.assertNotIn("__interrupt__", state)  # moving the screen needs no yes
+        self.assertEqual(runtime.commands, [])
+        first = state["navigate"]["id"]
+        state, _ = self.run_turn(graph, "Leve-me a outro lugar")
+        self.assertEqual(state["navigate"]["id"], first)  # an unknown room moves nothing
+
+    def test_reads_are_bounded(self) -> None:
+        reads = [{"reply": "", "action": "read", "query": "budget"}] * 4
+        model = FakeModel(*reads, {"reply": "Chega de ler.", "action": "read", "query": "budget"})
+        state, _ = self.run_turn(build(model, FakeRuntime(), MemorySaver()), "Quanto gastei?")
+        self.assertEqual(state["messages"][-1].content, "Chega de ler.")
+        self.assertIn("0 read(s) left", model.prompts[-1])
 
     def test_page_context_reads_dicts_and_objects(self) -> None:
         class Context:

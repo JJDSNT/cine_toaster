@@ -13,7 +13,7 @@ export default defineConfig({
   build: {
     outDir: "../src/cine_toaster/web_assets/app",
     emptyOutDir: true,
-    rollupOptions: { input: { canvas: "index.html", script: "script.html" } },
+    rollupOptions: { input: { canvas: "index.html", script: "script.html", assistant: "assistant.html" } },
   },
   server: { proxy: { "/api": runtime, "/media": runtime } },
 });

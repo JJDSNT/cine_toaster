@@ -98,3 +98,6 @@ main { display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
 .assistant-confirm { border: 1px solid #e7b75c; border-radius: 8px; padding: 10px; display: grid; gap: 8px; }
 .assistant-confirm button { margin-right: 6px; }
 .react-flow__node.assistant-highlight .card { outline: 3px solid #ef6a3a; outline-offset: 3px; }
+.assistant-page { margin: 0; background: #0a0c0d; height: 100vh; }
+.assistant-drawer { height: 100vh; display: flex; flex-direction: column; }
+.assistant-drawer > * { flex: 1; min-height: 0; }

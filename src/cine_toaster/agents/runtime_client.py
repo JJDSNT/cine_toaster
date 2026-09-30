@@ -31,6 +31,15 @@ class RuntimeClient:
         except urllib.error.URLError as error:
             raise CineToasterError(f"The runtime at {self.url} is not reachable: {error.reason}") from error
 
+    def production(self) -> dict[str, Any]:
+        return self._call("/api/production")
+
+    def screenplay(self) -> dict[str, Any]:
+        return self._call("/api/screenplay")
+
+    def budget(self) -> dict[str, Any]:
+        return self._call("/api/budget")
+
     def scene(self, scene_id: str) -> dict[str, Any]:
         return self._call("/api/scene?id=" + urllib.parse.quote(scene_id))
 

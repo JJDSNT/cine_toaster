@@ -368,6 +368,15 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
                              "limit_usd": float(ledger.get("limit_usd") or 0)})
             return
 
+        if parsed.path == "/api/budget":
+            # What paid generation may spend and has spent (CT-0037); read-only here.
+            from . import spend
+
+            ledger = spend.load()
+            self._send_json({"limit_usd": float(ledger.get("limit_usd") or 0), "spent_usd": spend.spent(ledger),
+                             "recent": ledger.get("entries", [])[-5:]})
+            return
+
         if parsed.path == "/api/screenplay":
             from .screenplay_edit import screenplay_files
 

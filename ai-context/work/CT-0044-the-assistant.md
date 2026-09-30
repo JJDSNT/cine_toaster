@@ -90,10 +90,57 @@ only through commands after a yes. Decision: ADR 0018.
 - Supervisor: the runtime was killed with `-9`; the proxy answered 503,
   then 200 two seconds later with a new process.
 
-# Remaining
+# Done later the same day: every room, the whole film, and the screen
 
-- The assistant in the vanilla control room's rooms (scene room, gates,
-  comparison), with the same context contract.
+These came from the user's questions: "put it in the other rooms"; "does it
+see the whole project or only the screen?"; "can it command the screen?".
+Before this, it saw only the screen and the scene in view, and it could only
+point.
+
+- **The whole film in every turn** (`reads.overview`): scenes with
+  shots, chosen takes, findings, waiting gates and active runs; sequences;
+  cast; budget (new `GET /api/budget`).
+- **Reads it asks for by itself** (`reads.py`): `scene`, `shot`, `cast`,
+  `screenplay` (text search), `budget`.
+  - `action: read` loops back into the graph without chat messages, at most
+    4 per turn; after that it must answer.
+  - The results are cut at 3,500 characters.
+- **Screen navigation** (`navigate` in shared state, with a fresh id per
+  request). Rooms: the sidebar's rooms, `scene`, `compare`, `canvas`,
+  `editor`. No confirmation, because it changes only the view.
+  - The canvas follows `canvas` itself; other rooms leave for the control
+    room's URL (`navigation.ts`, outside the CopilotKit chunk).
+- **The control room drawer** (`assistant-drawer.js`):
+  - an "Assistant" button in the header, beside "Find anything";
+  - an iframe of `/app/assistant.html` (a new Vite entry,
+    `assistant-main.tsx`);
+  - `postMessage` both ways: context out after every room render, and
+    highlight and navigate back;
+  - scene room shot rows carry `data-shot-id` for the highlight.
+  - `assistantSeen()` describes each room, including an open gate and its
+    candidates, runs in progress, and the takes being compared.
+- **One conversation per tab** (`threadId` in `sessionStorage`), across
+  rooms and page loads. Followed navigations are remembered in the session.
+
+**Validation.**
+
+- `tests/test_assistant.py` has 11 tests. New ones cover:
+  - the whole film in the prompt;
+  - two reads then an answer, with no chatter;
+  - reads bounded at 4;
+  - navigation without confirmation, and unknown rooms ignored.
+- Real model, control room, demo copy:
+  - "in which scenes is something waiting for me?" answered for the whole
+    film (SC-010 and SC-030) in 9 s;
+  - "take me to P3's comparison of takes" landed on
+    `/?scene=SC-030&shot=P3` with the comparison open, in 6 s;
+  - "point at P2" put the outline on the scene room's P2 row, in 5 s;
+  - the conversation was remembered across a page load.
+  - Zero external requests.
+- A bug found and fixed on the way: the first navigation request was
+  skipped by an "old request" guard. It is now remembered per tab instead.
+
+# Remaining
 - An API-key model adapter, for use beyond one person's machine.
 - More actions as commands, each with a confirm, for example proposing a
   take (never selecting it) or drafting a screenplay change as a diff for

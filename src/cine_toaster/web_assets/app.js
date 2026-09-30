@@ -1,5 +1,6 @@
 import { drawBlockout } from "./blockout.js";
 import { renderCompare } from "./compare.js";
+import { startAssistant, tellAssistant } from "./assistant-drawer.js";
 import { sentDetails, sentView } from "./sent.js";
 import { renderVersions } from "./versions.js";
 import { api, button, byId, el, label, metric, runCommand, sectionHeading, statusPill, toast } from "./ui.js";
@@ -73,6 +74,8 @@ function draw(view) {
   else if (view === "library") renderLibrary(state.project.id);
   else if (view === "knowledge") renderKnowledge();
   byId("workspace").focus();
+  state.scene = null;
+  tellAssistant();
 }
 
 function setView(view, { record = true } = {}) {
@@ -515,6 +518,8 @@ async function renderScene(sceneId, { record = true } = {}) {
   if (blockout) root.append(blockout);
   root.append(renderBrief(scene));
   root.append(renderIterations(scene));
+  state.scene = scene;
+  tellAssistant();
 }
 
 const BRIEF_SOURCES = {
@@ -927,6 +932,7 @@ function renderShots(scene) {
     const row = shot.take_count
       ? button("", () => openCompare(scene.id, shot.id), "shot-row shot-row-open")
       : el("div", "shot-row");
+    row.dataset.shotId = shot.id;
     const copy = el("span", "shot-copy");
     copy.append(el("b", "", shot.id), el("strong", "", shot.label));
     row.append(
@@ -959,6 +965,49 @@ async function openCompare(sceneId, shotId, { record = true } = {}) {
       await openCompare(sceneId, shotId);
     },
   });
+  state.scene = scene;
+  tellAssistant();
+}
+
+// What the assistant is told the director sees (ADR 0018): the room, the scene,
+// the shot, and what in the room waits for a decision.
+function assistantSeen() {
+  const scene = state.scene && state.scene.id === state.sceneId ? state.scene : null;
+  const room = state.currentView === "compare" ? "comparison of a shot's takes"
+    : state.currentView === "scene" ? "scene room" : `${state.currentView} room`;
+  const details = [];
+  if (scene && state.currentView === "scene") {
+    for (const gate of Object.values(scene.gates || {})) {
+      if (gate.state === "waiting") {
+        details.push(`The gate ${gate.id} is open on screen: approve the picture of ${gate.subject} among ${gate.candidates.length} candidate(s)`);
+      }
+    }
+    for (const run of scene.runs || []) {
+      if (!["done", "failed", "cancelled"].includes(run.state)) details.push(`Workflow ${run.id} for block ${run.subject.block}: ${run.state}`);
+    }
+  }
+  if (scene && state.currentView === "compare") {
+    const shot = scene.shots.find((item) => item.id === state.shotId);
+    if (shot) details.push(`Comparing ${shot.id}'s takes: ${shot.takes.map((take) => `${take.id}${take.selected ? " (chosen)" : ""}`).join(", ")}`);
+  }
+  return {
+    room,
+    scene: scene ? scene.id : "",
+    focus: scene ? `${scene.id} ${scene.title}` : room,
+    selected: state.currentView === "compare" && state.shotId ? `shot ${state.shotId}` : "",
+    details: details.join("\n"),
+  };
+}
+
+// Where the assistant asks to take the screen; it only moves the view.
+function assistantNavigate(where) {
+  if (!where) return;
+  if (where.room === "canvas") window.location.href = "/app/";
+  else if (where.room === "editor") window.location.href = "/app/script.html";
+  else if (where.room === "scene" && where.scene) renderScene(where.scene);
+  else if (where.room === "compare" && where.scene && where.shot) {
+    openCompare(where.scene, /^P/i.test(where.shot) ? where.shot : `P${where.shot}`);
+  } else if (ROOMS.has(where.room)) setView(where.room);
 }
 
 function renderDecisions(scene) {
@@ -2290,6 +2339,7 @@ async function start() {
   updateChrome();
   startEventStream();
   renderJobs().catch(() => {});
+  startAssistant({ seen: assistantSeen, navigate: assistantNavigate }).catch(() => {});
   document.addEventListener("jobs-changed", () => renderJobs(true).catch(() => {}));
   const parameters = new URLSearchParams(window.location.search);
   const requestedTransition = parameters.get("transition");

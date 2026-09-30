@@ -10,6 +10,7 @@ import type { GraphEdge, GraphNode, ProductionGraph } from "./types.ts";
 
 // The assistant is its own chunk, fetched only when the runtime has it on (ADR 0018).
 const Assistant = lazy(() => import("./Assistant.tsx"));
+import { addressOf, type Navigation } from "./navigation.ts";
 
 type Selection = { kind: "node"; node: GraphNode } | { kind: "edge"; edge: GraphEdge } | null;
 
@@ -201,6 +202,14 @@ export function App() {
     const focusText = !focus || focus.kind === "all" ? "the whole film" : `${focus.kind} ${focus.id}`;
     return { room: "production canvas", scene, focus: focusText, selected };
   }, [selection, focus, graph]);
+  // The assistant may move the screen: here on the canvas, or out to a room.
+  const navigate = useCallback((where: Navigation) => {
+    if (where.room === "canvas") {
+      if (where.scene) setFocus({ kind: "scene", id: where.scene });
+      return;
+    }
+    window.location.href = addressOf(where);
+  }, []);
   const shown = useMemo(() => {
     if (!highlight) return flow.nodes;
     const target = `shot:${seen.scene}/${highlight}`;
@@ -292,7 +301,7 @@ export function App() {
           {assistantOn && talking && (
             <div className="assistant dark" data-testid="assistant">
               <Suspense fallback={<p className="hint">Opening the assistant…</p>}>
-                <Assistant seen={seen} onHighlight={setHighlight} />
+                <Assistant seen={seen} onHighlight={setHighlight} onNavigate={navigate} />
               </Suspense>
             </div>
           )}
