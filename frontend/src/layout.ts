@@ -12,6 +12,7 @@ export const SIZES = {
   header: { width: 190, height: 150 },
   shot: { width: 230, height: 214 },
   take: { width: 198, height: 46 },
+  run: { width: 190, height: 190 },
   gap: 56,
   takeGap: 26,
   takeStep: 54,
@@ -41,6 +42,12 @@ export function layout(nodes: GraphNode[], options: Partial<LayoutOptions> = {})
   let y = 0;
   for (const scene of scenes) {
     positions.set(scene.id, { x: 0, y });
+    // Workflow runs stack under the scene's header card, beside the shots they make.
+    const runs = nodes.filter((node) => node.type === "run" && node.scene === scene.scene);
+    runs.forEach((run, index) => {
+      positions.set(run.id, { x: 0, y: y + SIZES.header.height + SIZES.takeGap + index * (SIZES.run.height + SIZES.takeGap) });
+    });
+    const headerDepth = SIZES.header.height + runs.length * (SIZES.run.height + SIZES.takeGap);
     const shots = nodes
       .filter((node) => node.type === "shot" && node.scene === scene.scene)
       .sort((a, b) => (a.type === "shot" && b.type === "shot" ? a.data.order - b.data.order : 0));
@@ -67,7 +74,7 @@ export function layout(nodes: GraphNode[], options: Partial<LayoutOptions> = {})
       const takesDepth = deepest ? SIZES.takeGap + (deepest - 1) * SIZES.takeStep + SIZES.take.height : 0;
       lineTop += SIZES.shot.height + takesDepth + SIZES.gap;
     }
-    y = Math.max(y + SIZES.header.height, lineTop - SIZES.gap) + SIZES.rowGap;
+    y = Math.max(y + headerDepth, lineTop - SIZES.gap) + SIZES.rowGap;
   }
   return positions;
 }

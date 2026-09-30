@@ -1,6 +1,7 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import type { SceneData, ShotData, TakeData } from "./types.ts";
+import type { RunData, SceneData, ShotData, TakeData } from "./types.ts";
 
+export type RunNode = Node<RunData & Record<string, unknown>, "run">;
 export type SceneNode = Node<SceneData & Record<string, unknown>, "scene">;
 export type ShotNode = Node<ShotData & Record<string, unknown>, "shot">;
 export type TakeNode = Node<TakeData & Record<string, unknown>, "take">;
@@ -65,4 +66,27 @@ export function TakeCard({ data, selected }: NodeProps<TakeNode>) {
   );
 }
 
-export const nodeTypes = { scene: SceneCard, shot: ShotCard, take: TakeCard };
+const MARKS: Record<string, string> = {
+  done: "✓", skipped: "–", running: "…", waiting: "?", failed: "✕", pending: "·",
+};
+
+// A workflow run beside its block: its steps, and the gate it waits at. The
+// decision is made in the scene room, where the candidates are shown.
+export function RunCard({ data, selected }: NodeProps<RunNode>) {
+  return (
+    <div className={`card run-card run-${data.state} ${selected ? "selected" : ""}`}>
+      <span className="eyebrow">Workflow · block {data.block}</span>
+      <ol>
+        {data.steps.map((step, index) => (
+          <li key={index} className={`step step-${step.state}`}>
+            <span className="mark">{MARKS[step.state] ?? "·"}</span> {step.label}
+          </li>
+        ))}
+      </ol>
+      {data.waiting && <span className="flag warning">Waiting for you: {data.waiting}</span>}
+      <Handle type="source" position={Position.Right} />
+    </div>
+  );
+}
+
+export const nodeTypes = { scene: SceneCard, shot: ShotCard, take: TakeCard, run: RunCard };

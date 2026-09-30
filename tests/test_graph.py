@@ -122,3 +122,24 @@ class ServingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WorkflowRunNodeTests(unittest.TestCase):
+    def test_the_latest_run_of_a_block_is_a_card_linked_to_its_first_shot(self) -> None:
+        from cine_toaster.graph import production_graph
+        from cine_toaster.project import load_production
+
+        production = load_production(Path(__file__).parents[1] / "examples" / "demo-project")
+        scene = next(item for item in production["scenes"] if item["id"] == "SC-030")
+        scene["blocks"] = [{"id": "A", "shots": ["P2", "P3"]}]
+        step = {"label": "Approve picture 3", "state": "waiting", "kind": "gate"}
+        scene["runs"] = [  # newest first, as the scene payload has them
+            {"id": "wf_new", "subject": {"block": "A"}, "state": "waiting", "steps": [step]},
+            {"id": "wf_old", "subject": {"block": "A"}, "state": "cancelled", "steps": []},
+        ]
+        graph = production_graph(production)
+        runs = [node for node in graph["nodes"] if node["type"] == "run"]
+        self.assertEqual([node["data"]["run"] for node in runs], ["wf_new"])
+        self.assertEqual(runs[0]["data"]["waiting"], "Approve picture 3")
+        edge = next(edge for edge in graph["edges"] if edge["type"] == "run")
+        self.assertEqual(edge["target"], "shot:SC-030/P2")

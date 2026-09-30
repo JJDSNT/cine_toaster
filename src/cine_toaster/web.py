@@ -194,6 +194,10 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             command_type = str(payload.get("command", "")).strip()
             if not command_type:
                 raise ValidationError("A command name is required")
+            from .commands import WORKFLOW_COMMANDS
+
+            if command_type in WORKFLOW_COMMANDS:
+                self.job_manager  # a workflow's jobs run in this runtime  # noqa: B018
             result = dispatch(self.project_root, command_type, payload)
             forget_production(self.project_root)
         except CineToasterError as error:
@@ -378,7 +382,7 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             from .graph import production_graph
 
             try:
-                self._send_json(production_graph(cached_production(self.project_root)))
+                self._send_json(production_graph(cached_production(self.project_root), self.project_root))
             except (FileNotFoundError, ProjectFormatError) as error:
                 self._send_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
             return
@@ -578,7 +582,10 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         server = self.server
         with _JOB_MANAGER_LOCK:
             if getattr(server, "job_manager", None) is None:
+                from .workflows import attach
+
                 server.job_manager = JobManager()  # type: ignore[attr-defined]
+                attach(server.job_manager)
         return server.job_manager  # type: ignore[attr-defined]
 
     def _scene(self, scene_id: str) -> dict | None:
@@ -702,7 +709,11 @@ def serve_project(
     # starting it reconciles work an earlier runtime left unfinished.
     from .jobs import JobManager
 
+    from .workflows import attach
+
     server.job_manager = JobManager()  # type: ignore[attr-defined]
+    # Workflows move when their jobs finish, inside the runtime that runs them (SPEC-0009).
+    attach(server.job_manager)
     for job in server.job_manager.reconciled:
         print(f"Job {job['id']} ({job['kind']}) was interrupted: {job['message']}")
     print(f"Cine Toaster browsing {server.project_root}")

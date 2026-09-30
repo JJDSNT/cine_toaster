@@ -286,6 +286,9 @@ class JobManager:
         self._futures: dict[str, Any] = {}
         self._cancel_flags: dict[str, threading.Event] = {}
         self._last_progress_event: dict[str, float] = {}
+        #: Called with (manager, job) when a job finishes: how a workflow moves
+        #: on without anyone polling (SPEC-0009).
+        self.listeners: list[Callable[["JobManager", dict[str, Any]], None]] = []
         self._stop = threading.Event()
         self._heartbeat = threading.Thread(target=self._beat, daemon=True)
         self._heartbeat.start()
@@ -391,6 +394,7 @@ class JobManager:
         if job["cancel_requested"] or self._local_cancel(job_id):
             self.store.update(job_id, state="cancelled", finished_at=_now(), message="Cancelled before it started.")
             self._event(self.store.get(job_id), "job.cancelled")
+            self._finished(job_id)
             return
         self.store.update(job_id, state="running", started_at=_now(), heartbeat_at=time.time())
         self._event(job, "job.started")
@@ -408,6 +412,15 @@ class JobManager:
             self.store.update(job_id, state="succeeded", finished_at=_now(), progress=1.0,
                               message="Ready to adopt.", result=result)
             self._event(self.store.get(job_id), "job.succeeded")
+        self._finished(job_id)
+
+    def _finished(self, job_id: str) -> None:
+        job = self.store.get(job_id)
+        for listener in list(self.listeners):
+            try:
+                listener(self, job)
+            except Exception as error:  # a listener's failure must not become the job's
+                self._event(job, "job.listener_failed", error=str(error))
 
     def get(self, job_id: str) -> dict[str, Any]:
         job = self.store.get(job_id)

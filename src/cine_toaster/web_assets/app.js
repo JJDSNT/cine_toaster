@@ -2,7 +2,7 @@ import { drawBlockout } from "./blockout.js";
 import { renderCompare } from "./compare.js";
 import { sentDetails, sentView } from "./sent.js";
 import { renderVersions } from "./versions.js";
-import { api, button, byId, el, label, metric, sectionHeading, statusPill, toast } from "./ui.js";
+import { api, button, byId, el, label, metric, runCommand, sectionHeading, statusPill, toast } from "./ui.js";
 
 const state = {
   project: null,
@@ -503,6 +503,8 @@ async function renderScene(sceneId, { record = true } = {}) {
   columns.append(renderShots(scene), renderDecisions(scene));
   root.append(columns);
 
+  const runs = renderWorkflows(scene);
+  if (runs) root.append(runs);
   // Master pictures come before the blocks that animate them.
   if (scene.shots.some((shot) => shot.derive)) root.append(renderPictures(scene));
   const blocks = renderBlocks(scene);
@@ -1610,6 +1612,136 @@ async function renderDialogue() {
 // Generation blocks (CT-0037): shots made together in one generation, and the
 // clip that came back. Slicing finds where the model really cut and turns each
 // stretch into a take of its shot, kept beside the others.
+// The built-in workflow (SPEC-0009): picture, a person's approval, video,
+// takes. It moves by itself between gates; at a gate it waits here, and the
+// decision is a production record like choosing a take.
+const STEP_STATES = { done: "approved", skipped: "approved", running: "in_progress", waiting: "needs_review",
+  failed: "blocked", pending: "planned" };
+
+function renderWorkflows(scene) {
+  const blocks = (scene.blocks || []).filter((block) => block.contiguous);
+  if (!blocks.length && !(scene.runs || []).length) return null;
+  const panel = el("section", "panel wide-panel");
+  panel.append(sectionHeading(
+    "WORKFLOW",
+    "From picture to takes",
+    "Each run makes the master pictures a block needs, stops for a person to approve them, then generates the block and slices it into takes. Paid steps run within the budget.",
+  ));
+  const act = async (command, payload) => {
+    try {
+      await runCommand(command, { scene_id: scene.id, expected_revision: scene.revision,
+        actor: { id: "control-room", kind: "human" }, ...payload });
+      await renderScene(scene.id);
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+  const active = new Set((scene.runs || []).filter((run) => !["done", "failed", "cancelled"].includes(run.state))
+    .map((run) => run.subject.block));
+  const starts = el("div", "take-actions");
+  for (const block of blocks) {
+    if (active.has(block.id)) continue;
+    starts.append(button(`Start for block ${block.id} (${block.shots.join(", ")})`,
+      () => act("start_workflow", { block: block.id }), "quiet-button"));
+  }
+  if (starts.childElementCount) panel.append(starts);
+  for (const run of scene.runs || []) panel.append(workflowRun(scene, run, act));
+  return panel;
+}
+
+function workflowRun(scene, run, act) {
+  const box = el("article", "workflow-run");
+  const head = el("div", "block-head");
+  head.append(el("strong", "", `Block ${run.subject.block}`),
+    el("span", `status status-${STEP_STATES[run.state] || "planned"}`, label(run.state)),
+    el("span", "muted", `${run.id} · ${run.created_at.slice(0, 16).replace("T", " ")}`));
+  box.append(head);
+  const rail = el("div", "workflow-rail");
+  run.steps.forEach((step, index) => {
+    const item = el("article", `workflow-step workflow-${STEP_STATES[step.state] || step.state}`);
+    item.append(el("span", "workflow-number", String(index + 1).padStart(2, "0")), el("strong", "", step.label),
+      el("small", "", step.state));
+    const detail = step.note || (step.outputs || []).map((value) => value.split("/").pop()).join(", ");
+    if (detail) item.append(el("small", "muted", detail));
+    rail.append(item);
+  });
+  box.append(rail);
+  const waiting = run.steps.find((step) => step.state === "waiting" && step.gate);
+  if (waiting && scene.gates[waiting.gate]) box.append(gateCard(scene, scene.gates[waiting.gate], act));
+  if (!["done", "failed", "cancelled"].includes(run.state)) {
+    const actions = el("div", "take-actions");
+    actions.append(button("Cancel run", () => {
+      if (confirm("Cancel this run? Its running job is stopped; what it made is kept.")) {
+        act("cancel_workflow", { workflow_id: run.id });
+      }
+    }, "quiet-button"));
+    box.append(actions);
+  }
+  return box;
+}
+
+// A waiting gate: every candidate side by side, each with what it was made from.
+function gateCard(scene, gate, act) {
+  const card = el("div", "gate-card");
+  const shot = scene.shots.find((item) => item.id === gate.subject);
+  card.append(el("h4", "", `Approve the picture for ${shot ? shot.number : gate.subject}`),
+    el("p", "muted", "The approved version becomes the picture the block is animated from. Look at where people are against the render: the edge score cannot tell."));
+  const why = el("textarea", "gate-why");
+  why.placeholder = "Why — optional to approve; required to ask for another or to reject: say what is wrong";
+  // What is wrong, from a fixed list, so refusals can be counted later.
+  const REASONS = { subject_moved: "Subject moved", identity: "Wrong face", geometry: "Geometry",
+    light: "Light", detail_lost: "Detail lost", anatomy: "Anatomy", other: "Other" };
+  const reasons = el("div", "gate-reasons");
+  for (const [value, text] of Object.entries(REASONS)) {
+    const item = el("label", "gate-reason");
+    const box = el("input");
+    box.type = "checkbox";
+    box.value = value;
+    item.append(box, document.createTextNode(` ${text}`));
+    reasons.append(item);
+  }
+  const chosenReasons = () => [...reasons.querySelectorAll("input:checked")].map((box) => box.value);
+  const grid = el("div", "gate-candidates");
+  card.append(grid);
+  api(`/api/pictures?scene=${encodeURIComponent(scene.id)}`).then((pictures) => {
+    const records = Object.fromEntries(pictures.flatMap((picture) => picture.versions.map((v) => [v.path, v.record])));
+    const source = (pictures.find((picture) => picture.shot === gate.subject) || {}).source;
+    if (source) {
+      const figure = el("figure", "sent-picture");
+      const image = el("img");
+      image.src = `/media/${source}`;
+      figure.append(image, el("figcaption", "", "Source (the render)"));
+      grid.append(figure);
+    }
+    for (const path of gate.candidates) {
+      const figure = el("figure", "sent-picture");
+      const image = el("img");
+      image.src = `/media/${path}`;
+      const details = sentDetails(records[path]);
+      figure.append(image, el("figcaption", "", path.split("/").pop()));
+      if (details) figure.append(details);
+      figure.append(button("Approve this", () => act("decide_gate",
+        { gate_id: gate.id, outcome: "approved", chosen: path, rationale: why.value }), "primary-button"));
+      grid.append(figure);
+    }
+  }).catch((error) => grid.append(el("p", "join-finding warning", error.message)));
+  const refuse = (outcome) => {
+    if (!why.value.trim() && !chosenReasons().length) {
+      why.focus();
+      alert("Say what is wrong: tick a reason or write one. It is what the next version has to fix.");
+      return;
+    }
+    act("decide_gate", { gate_id: gate.id, outcome, rationale: why.value, reasons: chosenReasons() });
+  };
+  const actions = el("div", "take-actions");
+  actions.append(
+    button("Ask for another version", () => refuse("changes_requested"), "quiet-button"),
+    button("Reject (end the run)", () => refuse("rejected"), "quiet-button"),
+  );
+  card.append(el("strong", "", "What is wrong?"), reasons, why, actions);
+  return card;
+}
+
 // Master pictures made by editing a source -- a render of the 3D set -- with
 // the cast's faces. Every edit is a version beside the picture; each shows
 // what it was made from, and a new one is sent from the view of what it

@@ -172,8 +172,10 @@ remains:
   starts one after showing the estimate. The voice spike is done too:
   `toast revoice` converts a take's speech to the cast member's recording, the
   room kept, as a new take (CT-0040). Master pictures by
-  `derive` (render + cast faces, `toast picture`) close step 9. Next: step 10,
-  the built-in workflow whose gate is approving the master picture. The author
+  `derive` (render + cast faces, `toast picture`) close step 9. Step 10 is done too:
+  the built-in workflow stops at "approve the master picture" (SPEC-0009,
+  CT-0042; `toast workflow`, the scene room's Workflow panel, a card on the
+  canvas); refusals must say what is wrong. Next: step 11, the LangGraph spike. The author
   will re-check later whether Kael's converted voice still sounds ill.
 
 Earlier notes:

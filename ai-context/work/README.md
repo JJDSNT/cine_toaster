@@ -42,13 +42,17 @@ execution history and links to those destinations.
 The order of work is the ordered plan in
 [`development/roadmap.md`](../development/roadmap.md).
 
-- `CT-0040` — voice direction: cast sheets with voice, variants and names are
-  done; TTS and voice conversion await a spike (`doing`)
+- `CT-0042` — plan step 10: the built-in workflow with a human gate
+  (SPEC-0009); picture → approval → block → takes (`done`)
+- `CT-0041` — learning from gate decisions, up to reinforcement learning;
+  noted for later at the user's request (`proposed`)
+- `CT-0040` — voice direction: cast sheets, voice conversion (`toast
+  revoice`) done; the author re-checks the ill/healthy voice later (`doing`)
 - `CT-0039` — lessons between Cine Toaster and SINGULAR, with the working
   order: speech trims and loudness, job lineage, LTX rules, SINGULAR geometry,
   sequences, generation (`doing`)
-- `CT-0037` — the generation unit: blocks, as SINGULAR's pipeline already
-  does; a proposal for plan step 9 (`ready`)
+- `CT-0037` — the generation unit: blocks, budgeted generation, master
+  pictures by `derive`; plan step 9 done (`doing`)
 - `CT-0035` — validation on SINGULAR: seven problems the demos missed,
   including the screenplay path, legacy fields, jump false positives,
   continuation, and canvas scale and speed (`ready`)

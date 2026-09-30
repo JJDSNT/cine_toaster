@@ -55,3 +55,19 @@ test("a long scene wraps onto further lines instead of one endless row", () => {
   assert.ok(at.get("shot:A/P9")!.y > at.get("shot:A/P5")!.y);
   assert.ok(at.get("scene:B")!.y > at.get("shot:A/P9")!.y + SIZES.shot.height);
 });
+
+const run = (sceneId: string, id: string): GraphNode => ({
+  id: `run:${sceneId}/${id}`, type: "run", scene: sceneId,
+  data: { scene: sceneId, run: id, block: "1", state: "waiting", steps: [], waiting: "Approve picture mA" },
+});
+
+test("a workflow run sits under its scene's header, and pushes the next scene down", () => {
+  const without = layout([scene("A", 0), shot("A", "P1", 0), scene("B", 1)]);
+  const nodes = [scene("A", 0), shot("A", "P1", 0), run("A", "wf1"), run("A", "wf2"), scene("B", 1)];
+  const at = layout(nodes);
+  assert.equal(at.get("run:A/wf1")!.x, 0);
+  assert.ok(at.get("run:A/wf1")!.y > at.get("scene:A")!.y + SIZES.header.height - 1);
+  assert.ok(at.get("run:A/wf2")!.y > at.get("run:A/wf1")!.y + SIZES.run.height - 1);
+  assert.ok(at.get("scene:B")!.y > without.get("scene:B")!.y);
+  assert.ok(at.get("scene:B")!.y > at.get("run:A/wf2")!.y + SIZES.run.height);
+});

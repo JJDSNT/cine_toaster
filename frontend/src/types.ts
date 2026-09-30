@@ -49,10 +49,28 @@ export interface TakeData {
   poster: string;
 }
 
+export interface RunStep {
+  label: string;
+  state: "pending" | "running" | "waiting" | "done" | "skipped" | "failed";
+  kind: string;
+}
+
+/** The latest workflow run of a block (SPEC-0009). */
+export interface RunData {
+  scene: string;
+  run: string;
+  block: string;
+  state: "running" | "waiting" | "done" | "failed" | "cancelled";
+  steps: RunStep[];
+  /** The step waiting for a person, if any. */
+  waiting: string;
+}
+
 export type GraphNode =
   | { id: string; type: "scene"; scene: string; data: SceneData }
   | { id: string; type: "shot"; scene: string; data: ShotData }
-  | { id: string; type: "take"; scene: string; data: TakeData };
+  | { id: string; type: "take"; scene: string; data: TakeData }
+  | { id: string; type: "run"; scene: string; data: RunData };
 
 export interface CutData {
   cut: string;
@@ -66,7 +84,8 @@ export interface CutData {
 export type GraphEdge =
   | { id: string; type: "cut"; source: string; target: string; data: CutData }
   | { id: string; type: "take"; source: string; target: string; data: { selected: boolean } }
-  | { id: string; type: "scene-order"; source: string; target: string; data: Record<string, never> };
+  | { id: string; type: "scene-order"; source: string; target: string; data: Record<string, never> }
+  | { id: string; type: "run"; source: string; target: string; data: { state: string } };
 
 export interface Sequence {
   id: string;

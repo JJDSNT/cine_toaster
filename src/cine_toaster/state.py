@@ -11,7 +11,7 @@ from .errors import PersistenceError, ValidationError
 
 
 STATE_FILENAME = "state.json"
-STATE_SCHEMA_VERSION = 2
+STATE_SCHEMA_VERSION = 3
 MAX_DECISION_HISTORY = 200
 MAX_ASSEMBLIES = 200
 
@@ -133,6 +133,20 @@ class SceneState:
     selections: dict[str, Selection] = field(default_factory=dict)
     decisions: list[dict[str, Any]] = field(default_factory=list)
     assemblies: list[Assembly] = field(default_factory=list)
+    #: Human gates and the workflow runs that opened them (SPEC-0009), by id.
+    gates: dict[str, dict[str, Any]] = field(default_factory=dict)
+    workflows: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    def approved_pictures(self) -> dict[str, str]:
+        """The picture each shot's latest approved gate chose (SPEC-0009)."""
+
+        chosen: dict[str, tuple[str, str]] = {}
+        for gate in self.gates.values():
+            if gate.get("kind") == "approve_picture" and gate.get("state") == "approved" and gate.get("chosen"):
+                subject, when = str(gate.get("subject", "")), str(gate.get("decided_at", ""))
+                if subject not in chosen or when > chosen[subject][0]:
+                    chosen[subject] = (when, str(gate["chosen"]))
+        return {subject: path for subject, (_, path) in chosen.items()}
 
     def approved_assembly(self) -> Assembly | None:
         return next(
@@ -152,6 +166,8 @@ class SceneState:
             },
             "decisions": self.decisions,
             "assemblies": [assembly.public_dict() for assembly in self.assemblies],
+            "gates": self.gates,
+            "workflows": self.workflows,
         }
 
     def with_decision(
@@ -160,6 +176,8 @@ class SceneState:
         decision: dict[str, Any],
         selections: dict[str, Selection] | None = None,
         assemblies: list[Assembly] | None = None,
+        gates: dict[str, dict[str, Any]] | None = None,
+        workflows: dict[str, dict[str, Any]] | None = None,
     ) -> SceneState:
         history = [*self.decisions, decision][-MAX_DECISION_HISTORY:]
         return replace(
@@ -169,7 +187,20 @@ class SceneState:
             selections=self.selections if selections is None else selections,
             decisions=history,
             assemblies=self.assemblies if assemblies is None else assemblies[-MAX_ASSEMBLIES:],
+            gates=self.gates if gates is None else gates,
+            workflows=self.workflows if workflows is None else workflows,
         )
+
+
+def with_progress(state: SceneState, *, gates: dict[str, dict[str, Any]],
+                  workflows: dict[str, dict[str, Any]]) -> SceneState:
+    """A workflow moving on by itself: a new revision, no entry in the decision history.
+
+    Only what a person or agent decides is a decision (SPEC-0009); a step
+    finishing is not.
+    """
+
+    return replace(state, revision=state.revision + 1, updated_at=now(), gates=gates, workflows=workflows)
 
 
 def state_path(scene_directory: Path) -> Path:
@@ -235,6 +266,8 @@ def load_scene_state(scene_directory: Path, scene_id: str) -> SceneState:
         )
 
     decisions = document.get("decisions")
+    gates = document.get("gates")
+    workflows = document.get("workflows")
     return SceneState(
         scene_id=str(document.get("scene_id", scene_id)),
         revision=int(document.get("revision", 0)),
@@ -242,6 +275,8 @@ def load_scene_state(scene_directory: Path, scene_id: str) -> SceneState:
         selections=selections,
         decisions=list(decisions) if isinstance(decisions, list) else [],
         assemblies=assemblies,
+        gates=dict(gates) if isinstance(gates, dict) else {},
+        workflows=dict(workflows) if isinstance(workflows, dict) else {},
     )
 
 

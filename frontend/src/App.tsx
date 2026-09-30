@@ -53,6 +53,10 @@ function toFlow(graph: ProductionGraph, showTakes: boolean, focus: Focus): { nod
         return { id: edge.id, source: edge.source, sourceHandle: "takes", target: edge.target,
                  className: edge.data.selected ? "take-line chosen" : "take-line" };
       }
+      if (edge.type === "run") {
+        return { id: edge.id, source: edge.source, target: edge.target, type: "smoothstep",
+                 className: `run-line run-${edge.data.state}`, animated: edge.data.state === "running", selectable: false };
+      }
       return { id: edge.id, source: edge.source, target: edge.target, type: "smoothstep", className: "scene-line",
                label: "next scene", selectable: false };
     });
@@ -90,6 +94,18 @@ function Details({ selection }: { selection: Selection }) {
         <h2>{node.data.title}</h2>
         <dl><dt>Sequence</dt><dd>{node.data.sequence || "—"}</dd><dt>Status</dt><dd>{node.data.status}</dd><dt>Findings</dt><dd>{node.data.findings}</dd></dl>
         <a href={`/?scene=${encodeURIComponent(node.data.scene)}`}>Open the scene</a>
+      </div>
+    );
+  }
+  if (node.type === "run") {
+    const d = node.data;
+    return (
+      <div>
+        <span className="eyebrow">Workflow · {d.scene} block {d.block}</span>
+        <h2>{d.state}</h2>
+        <ol className="run-steps">{d.steps.map((step, index) => <li key={index}>{step.label}: {step.state}</li>)}</ol>
+        {d.waiting && <p className="finding warning">Waiting for you: {d.waiting}</p>}
+        <a href={`/?scene=${encodeURIComponent(d.scene)}`}>{d.waiting ? "Decide in the scene room" : "Open the scene"}</a>
       </div>
     );
   }

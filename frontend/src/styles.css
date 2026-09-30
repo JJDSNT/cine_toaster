@@ -75,3 +75,17 @@ main { display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
 
 /* Read only: nothing can be connected, so the connection points stay hidden. */
 .react-flow__handle { opacity: 0; pointer-events: none; }
+
+/* Workflow runs (SPEC-0009) */
+.run-card { width: 190px; min-height: 120px; gap: 6px; border-color: #3a4245; }
+.run-card ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 11px; }
+.run-card .step { color: #8c9597; }
+.run-card .step .mark { display: inline-block; width: 12px; }
+.run-card .step-done, .run-card .step-skipped { color: #66c99a; }
+.run-card .step-running { color: #70aee8; }
+.run-card .step-waiting { color: #e7b75c; font-weight: 700; }
+.run-card .step-failed { color: #ed6e68; }
+.run-waiting { border-color: #e7b75c; }
+.run-failed, .run-cancelled { opacity: .7; }
+.run-line path { stroke: #e7b75c; stroke-dasharray: 4 4; }
+.run-steps { padding-left: 18px; font-size: 12px; }

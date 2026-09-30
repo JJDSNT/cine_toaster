@@ -654,3 +654,13 @@ dialog::backdrop { background: #000b; }
 .sent-copy { justify-self: start; }
 .sent-view audio { width: 100%; }
 .picture-version { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; background: #000; }
+
+/* --- Workflow runs and gates (SPEC-0009) ----------------------------------- */
+.workflow-run { display: grid; gap: 10px; padding: 12px; margin-top: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.gate-card { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--yellow); border-radius: 10px; background: var(--surface); }
+.gate-card h4 { margin: 0; }
+.gate-candidates { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.gate-candidates .sent-picture { align-content: start; }
+.gate-why { width: 100%; min-height: 48px; box-sizing: border-box; background: var(--surface-3); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; font: inherit; }
+.gate-reasons { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; }
+.gate-reason { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }

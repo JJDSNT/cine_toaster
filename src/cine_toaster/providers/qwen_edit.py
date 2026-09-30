@@ -42,7 +42,8 @@ def size_like(path: Path, widest: int = 1408) -> tuple[int, int]:
 
     from PIL import Image
 
-    width, height = Image.open(path).size
+    with Image.open(path) as image:
+        width, height = image.size
     target = min(widest, max(1024, round(width * 2 / 32) * 32))
     return target, max(32, round(target * height / width / 32) * 32)
 

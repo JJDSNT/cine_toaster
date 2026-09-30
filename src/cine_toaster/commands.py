@@ -682,6 +682,48 @@ COMMANDS = {
 # Commands act on a shot; these act on a whole scene version instead.
 SCENE_LEVEL_COMMANDS = {"record_assembly", "review_assembly", "restore_assembly"}
 
+# SPEC-0009: workflow runs and the gates they open.
+WORKFLOW_COMMANDS = {"start_workflow", "decide_gate", "cancel_workflow", "resume_workflow"}
+
+
+def _dispatch_workflow(root: Path, command_type: str, payload: dict[str, Any]) -> CommandResult:
+    from . import workflows
+
+    actor_payload = payload.get("actor") or {}
+    if isinstance(actor_payload, str):
+        actor = Actor(id=actor_payload)
+    else:
+        actor = Actor(id=str(actor_payload.get("id", "")).strip() or "unknown",
+                      kind=str(actor_payload.get("kind", "human")))
+    scene_id = str(payload.get("scene_id", "")).strip()
+    if not scene_id:
+        raise ValidationError("scene_id is required")
+    expected = payload.get("expected_revision")
+    try:
+        expected = int(expected) if expected is not None else None
+    except (TypeError, ValueError) as error:
+        raise ValidationError("expected_revision must be an integer") from error
+    if command_type == "start_workflow":
+        return workflows.start_workflow(root, scene_id=scene_id, block_id=str(payload.get("block", "")).strip(),
+                                        actor=actor, template=str(payload.get("template") or "block"),
+                                        expected_revision=expected)
+    if command_type == "decide_gate":
+        return workflows.decide_gate(root, scene_id=scene_id, gate_id=str(payload.get("gate_id", "")).strip(),
+                                     outcome=str(payload.get("outcome", "")).strip(), actor=actor,
+                                     chosen=str(payload.get("chosen", "")).strip(),
+                                     rationale=payload.get("rationale"), reasons=payload.get("reasons") or [],
+                                     expected_revision=expected)
+    workflow_id = str(payload.get("workflow_id", "")).strip()
+    if command_type == "cancel_workflow":
+        return workflows.cancel_workflow(root, scene_id=scene_id, workflow_id=workflow_id, actor=actor,
+                                         rationale=payload.get("rationale"), expected_revision=expected)
+    run = workflows.advance(root, scene_id, workflow_id)
+    production = load_production(root)
+    return CommandResult(command_id=_new_command_id(), type="workflow.resumed", project_id=production["id"],
+                         scene_id=scene_id, shot_id="", take_id=None, previous_take_id=None,
+                         revision=load_scene_state(scene_directory(root, scene_id), scene_id).revision,
+                         event={"workflow": run["id"], "state": run["state"]})
+
 
 def dispatch(root: Path, command_type: str, payload: dict[str, Any]) -> CommandResult:
     """Run one command by name, as an HTTP handler or agent tool would.
@@ -691,10 +733,12 @@ def dispatch(root: Path, command_type: str, payload: dict[str, Any]) -> CommandR
     """
 
     handler = COMMANDS.get(command_type)
+    if handler is None and command_type in WORKFLOW_COMMANDS:
+        return _dispatch_workflow(root, command_type, payload)
     if handler is None:
         raise ValidationError(
             f"Unknown command {command_type!r}",
-            available=sorted(COMMANDS),
+            available=sorted({*COMMANDS, *WORKFLOW_COMMANDS}),
         )
 
     actor_payload = payload.get("actor") or {}

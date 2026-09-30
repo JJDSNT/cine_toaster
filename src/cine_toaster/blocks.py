@@ -106,6 +106,18 @@ def _picture_stems(value: str) -> list[str]:
     return list(dict.fromkeys(stems))
 
 
+def _approved(root: Path, scene: dict[str, Any], shot: dict[str, Any]) -> Path | None:
+    candidates = [shot]
+    for item in shot.get("from") or []:
+        ref = str(item.get("ref") or "") if isinstance(item, dict) else ""
+        candidates += [other for other in scene.get("shots", []) if shot_key(other.get("number")) == shot_key(ref)]
+    for candidate in candidates:
+        path = candidate.get("approved_picture")
+        if path and (root / path).is_file():
+            return root / path
+    return None
+
+
 def reference_picture(work: Path, root: Path, scene: dict[str, Any], shot: dict[str, Any]) -> Path | None:
     """The picture a shot's slice should look like.
 
@@ -114,6 +126,11 @@ def reference_picture(work: Path, root: Path, scene: dict[str, Any], shot: dict[
     shot or master it is made from (its `from` lineage, e.g. `pmA.png`).
     """
 
+    # A picture a person approved (SPEC-0009) is the shot's picture, and the
+    # picture of every shot made from it.
+    approved = _approved(root, scene, shot)
+    if approved is not None:
+        return approved
     if shot.get("still"):
         path = root / shot["still"]
         if path.is_file():

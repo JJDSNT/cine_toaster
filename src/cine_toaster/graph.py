@@ -12,6 +12,7 @@ the canvas, the CLI and, later, agents.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from .project import load_production
@@ -20,9 +21,20 @@ from .project import load_production
 PICTURE_LEVELS = ("still", "take", "blocking", "none")
 
 
-def _picture(scene: dict[str, Any], shot: dict[str, Any]) -> dict[str, Any]:
+def _picture(scene: dict[str, Any], shot: dict[str, Any], root: Path | None = None) -> dict[str, Any]:
     """The best picture a shot has, and which storyboard level it is (CT-0025)."""
 
+    # A master picture a person approved (SPEC-0009), else the master's own.
+    if shot.get("approved_picture"):
+        return {"level": "still", "image": f"/media/{shot['approved_picture']}"}
+    if root is not None and shot.get("derive"):
+        from .pictures import picture_stem, picture_versions, relative
+        from .takes import work_directory_for
+
+        work = work_directory_for(root / scene["file"])
+        versions = picture_versions(work, picture_stem(work, str(shot.get("number"))))
+        if versions:
+            return {"level": "still", "image": f"/media/{relative(root, versions[0])}"}
     if shot.get("still"):
         return {"level": "still", "image": f"/media/{shot['still']}"}
     takes = shot.get("takes") or []
@@ -34,6 +46,14 @@ def _picture(scene: dict[str, Any], shot: dict[str, Any]) -> dict[str, Any]:
     if ((shot.get("motion") or {}).get("start") or {}).get("camera"):
         return {"level": "blocking",
                 "image": f"/api/blocking-frame?scene={scene['id']}&shot={shot['id']}&at=start"}
+    if root is not None:
+        # A render of the 3D set that only points to its file is a blocking frame too.
+        from .pictures import _file, relative
+
+        for item in shot.get("from") or []:
+            path = _file(root / scene["file"], str(item.get("ref") or ""))
+            if path is not None and path.is_relative_to(root.resolve()):
+                return {"level": "blocking", "image": f"/media/{relative(root, path)}"}
     return {"level": "none"}
 
 
@@ -45,8 +65,11 @@ def _severity(findings: list[dict[str, Any]]) -> str:
     return ""
 
 
-def production_graph(production: dict[str, Any]) -> dict[str, Any]:
-    """Nodes and edges for a loaded production (`load_production`'s dict)."""
+def production_graph(production: dict[str, Any], root: Path | None = None) -> dict[str, Any]:
+    """Nodes and edges for a loaded production (`load_production`'s dict).
+
+    With the project `root`, master pictures are looked up on disk too.
+    """
 
     nodes: list[dict[str, Any]] = []
     edges: list[dict[str, Any]] = []
@@ -92,7 +115,7 @@ def production_graph(production: dict[str, Any]) -> dict[str, Any]:
                     "speakers": sorted({line["who"] for line in script.get("dialogue") or []}),
                     "move": motion.get("kind") or "",
                     "walks": bool(motion.get("moved_subjects")),
-                    "picture": _picture(scene, shot),
+                    "picture": _picture(scene, shot, root),
                     "findings": len(found), "severity": _severity(found),
                 },
             })
@@ -112,6 +135,28 @@ def production_graph(production: dict[str, Any]) -> dict[str, Any]:
                 })
                 edges.append({"id": f"of:{take_id}", "type": "take", "source": node_id, "target": take_id,
                               "data": {"selected": bool(take.get("selected"))}})
+
+        # The latest workflow run of each block (SPEC-0009), linked to its first shot.
+        latest: dict[str, dict[str, Any]] = {}
+        for run in scene.get("runs") or []:  # newest first
+            latest.setdefault(str(run.get("subject", {}).get("block", "")), run)
+        blocks = {block["id"]: block for block in scene.get("blocks") or []}
+        for block_id, run in latest.items():
+            run_node = f"run:{scene['id']}/{run['id']}"
+            waiting = next((step for step in run["steps"] if step["state"] == "waiting"), None)
+            nodes.append({
+                "id": run_node, "type": "run", "scene": scene["id"],
+                "data": {
+                    "scene": scene["id"], "run": run["id"], "block": block_id, "state": run["state"],
+                    "steps": [{"label": step["label"], "state": step["state"], "kind": step["kind"]}
+                              for step in run["steps"]],
+                    "waiting": waiting["label"] if waiting else "",
+                },
+            })
+            shots = (blocks.get(block_id) or {}).get("shots") or []
+            if shots:
+                edges.append({"id": f"runs:{run_node}", "type": "run", "source": run_node,
+                              "target": f"shot:{scene['id']}/{shots[0]}", "data": {"state": run["state"]}})
 
         # Within a scene every join is a cut record (SPEC-0007).
         by_pair = {(cut["from"], cut["to"]): cut for cut in scene.get("cuts") or []}
@@ -157,4 +202,4 @@ def production_graph(production: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_graph(root) -> dict[str, Any]:
-    return production_graph(load_production(root))
+    return production_graph(load_production(root), Path(root))

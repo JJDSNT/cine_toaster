@@ -465,6 +465,105 @@ def command_generate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _show_run(run: dict) -> None:
+    marks = {"done": "✓", "skipped": "–", "running": "…", "waiting": "?", "failed": "✗", "pending": " "}
+    print(f"{run['id']}  block {run['subject']['block']} of {run['subject']['scene']}: {run['state']}")
+    for step in run["steps"]:
+        detail = step.get("note") or ", ".join(step.get("outputs") or [])
+        print(f"  [{marks.get(step['state'], ' ')}] {step['label']:28} {step['state']:8} {detail}")
+
+
+def _drive(root: Path, scene_id: str, act) -> int:
+    """Run a workflow command in this process and stay while its jobs run.
+
+    The workflow moves inside the runtime that owns its jobs; here that is
+    this command, until the run waits for a person, ends, or Ctrl+C.
+    """
+
+    import time
+
+    from .commands import dispatch
+    from .jobs import JobManager
+    from .project import scene_directory
+    from .state import load_scene_state
+    from .workflows import attach
+
+    manager = JobManager()
+    attach(manager)
+    try:
+        run_id = act(dispatch)
+        while True:
+            run = load_scene_state(scene_directory(root, scene_id), scene_id).workflows[run_id]
+            if run["state"] != "running":
+                break
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        print("Stopped here; the run continues from where it is: toast workflow resume", file=sys.stderr)
+        return 130
+    finally:
+        manager.shutdown()
+    _show_run(run)
+    gate = next((step.get("gate") for step in run["steps"] if step["state"] == "waiting"), None)
+    if gate:
+        state = load_scene_state(scene_directory(root, scene_id), scene_id)
+        print(f"\nWaiting for a person: gate {gate}. Candidates:")
+        for path in state.gates[gate]["candidates"]:
+            print(f"  {path}")
+        print(f"Decide: toast gate decide {root} {scene_id} {gate} --approve <path> | --changes | --reject")
+    return 0 if run["state"] in ("waiting", "done") else 1
+
+
+def command_workflow(args: argparse.Namespace) -> int:
+    """The built-in workflow: picture, a person's approval, video, takes (SPEC-0009)."""
+
+    from .project import scene_directory
+    from .state import load_scene_state
+
+    root = Path(args.project).expanduser().resolve()
+    actor = {"id": args.actor, "kind": "human"}
+    if args.workflow_command == "list":
+        scenes = [args.scene] if args.scene else [scene["id"] for scene in load_production(root)["scenes"]]
+        for scene_id in scenes:
+            for run in load_scene_state(scene_directory(root, scene_id), scene_id).workflows.values():
+                _show_run(run)
+        return 0
+    if args.workflow_command == "start":
+        def act(dispatch):
+            before = set(load_scene_state(scene_directory(root, args.scene), args.scene).workflows)
+            dispatch(root, "start_workflow", {"scene_id": args.scene, "block": args.block, "actor": actor})
+            after = load_scene_state(scene_directory(root, args.scene), args.scene).workflows
+            return next(run_id for run_id in after if run_id not in before)
+        return _drive(root, args.scene, act)
+    command = "resume_workflow" if args.workflow_command == "resume" else "cancel_workflow"
+
+    def act(dispatch):
+        dispatch(root, command, {"scene_id": args.scene, "workflow_id": args.workflow, "actor": actor})
+        return args.workflow
+    return _drive(root, args.scene, act)
+
+
+def command_gate(args: argparse.Namespace) -> int:
+    """Decide a human gate: approve one candidate, ask for another, or reject (SPEC-0009)."""
+
+    from .project import scene_directory
+    from .state import load_scene_state
+
+    root = Path(args.project).expanduser().resolve()
+    state = load_scene_state(scene_directory(root, args.scene), args.scene)
+    gate = state.gates.get(args.gate)
+    if gate is None:
+        raise SystemExit(f"No gate {args.gate} in {args.scene}")
+    outcome = "approved" if args.approve else "changes_requested" if args.changes else "rejected"
+
+    def act(dispatch):
+        dispatch(root, "decide_gate", {"scene_id": args.scene, "gate_id": args.gate, "outcome": outcome,
+                                        "chosen": args.approve or "", "rationale": args.why,
+                                        "reasons": args.reason or [],
+                                        "actor": {"id": args.actor, "kind": "human"}})
+        return gate["workflow"]
+    return _drive(root, args.scene, act)
+
+
 def command_picture(args: argparse.Namespace) -> int:
     """A master picture made by editing its source with the cast, within the budget."""
 
@@ -1348,6 +1447,43 @@ def build_parser() -> argparse.ArgumentParser:
     costs_parser.add_argument("project", type=Path)
     costs_parser.add_argument("--json", action="store_true")
     costs_parser.set_defaults(function=command_costs)
+
+    workflow_parser = subparsers.add_parser(
+        "workflow", help="The built-in workflow: picture, a person's approval, video, takes (SPEC-0009)")
+    workflow_sub = workflow_parser.add_subparsers(dest="workflow_command", required=True)
+    workflow_start = workflow_sub.add_parser("start", help="Start the workflow for a generation block")
+    workflow_start.add_argument("project", type=Path)
+    workflow_start.add_argument("scene")
+    workflow_start.add_argument("block")
+    workflow_list = workflow_sub.add_parser("list", help="Every run, with its steps")
+    workflow_list.add_argument("project", type=Path)
+    workflow_list.add_argument("scene", nargs="?")
+    for name, text in (("resume", "Move a run on, e.g. after the runtime restarted"), ("cancel", "Stop a run")):
+        item = workflow_sub.add_parser(name, help=text)
+        item.add_argument("project", type=Path)
+        item.add_argument("scene")
+        item.add_argument("workflow")
+    for item in workflow_sub.choices.values():
+        item.add_argument("--actor", default=os.environ.get("USER", "director"), help="who is acting (recorded)")
+    workflow_parser.set_defaults(function=command_workflow)
+
+    gate_parser = subparsers.add_parser("gate", help="Decide a human gate (SPEC-0009)")
+    gate_sub = gate_parser.add_subparsers(dest="gate_command", required=True)
+    gate_decide = gate_sub.add_parser("decide", help="Approve a candidate, ask for another, or reject")
+    gate_decide.add_argument("project", type=Path)
+    gate_decide.add_argument("scene")
+    gate_decide.add_argument("gate")
+    choice = gate_decide.add_mutually_exclusive_group(required=True)
+    choice.add_argument("--approve", metavar="PATH", help="the candidate approved")
+    choice.add_argument("--changes", action="store_true", help="ask for another version")
+    choice.add_argument("--reject", action="store_true", help="end the run")
+    gate_decide.add_argument("--why", help="the reason, kept with the decision (required to ask again or reject)")
+    from .workflows import REJECTION_REASONS
+
+    gate_decide.add_argument("--reason", action="append", choices=REJECTION_REASONS,
+                             help="what is wrong (repeatable); counts across scenes and models")
+    gate_decide.add_argument("--actor", default=os.environ.get("USER", "director"))
+    gate_parser.set_defaults(function=command_gate)
 
     picture_parser = subparsers.add_parser(
         "picture", help="Make a master picture by editing its source (a render) with the cast, as a new version")

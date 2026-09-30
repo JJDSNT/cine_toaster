@@ -401,6 +401,9 @@ def _load_scene(
     directory = path.parent
     state = load_scene_state(directory, scene_id)
     _apply_state(shots, state)
+    approved = state.approved_pictures()
+    for shot in shots:
+        shot["approved_picture"] = approved.get(shot["id"], "")
 
     try:
         geometry = parse_geometry(_geometry_document(geography))
@@ -499,6 +502,9 @@ def _load_scene(
         "script": script_link,
         "cuts": cuts,
         "blocks": [block.public_dict() for block in blocks],
+        # SPEC-0009: workflow runs, newest first, and the gates they opened.
+        "runs": sorted(state.workflows.values(), key=lambda run: run.get("created_at", ""), reverse=True),
+        "gates": state.gates,
         # SPEC-0003 / CT-0040: which variant of each cast member this scene
         # uses, how their voice sounds here, and any voice restated in full.
         "cast": _scene_field(document, "cast", scene_aliases) or {},
