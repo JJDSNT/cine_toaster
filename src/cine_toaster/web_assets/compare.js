@@ -72,6 +72,34 @@ function provenanceLine(take) {
   return el("small", "take-provenance", text);
 }
 
+// One speaker in the take: its speech can be converted to the cast member's
+// recorded voice, as a new take beside this one (CT-0040, `toast revoice`).
+function revoiceButton(scene, shot, take) {
+  const speakers = new Set((shot.lines || []).filter((line) => line.in_take !== false).map((line) => line.who));
+  if (speakers.size !== 1 || !/\.(mp4|mov|webm)$/i.test(take.media || "")) return null;
+  const [who] = speakers;
+  const action = button(`Revoice as ${who}`, async () => {
+    action.disabled = true;
+    try {
+      const response = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "convert_voice", params: { scene: scene.id, shot: shot.id, take: take.id } }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error?.message || `Request failed (${response.status})`);
+      toast(`Converting ${who}'s voice: the new take appears here when it is adopted.`);
+      document.dispatchEvent(new CustomEvent("jobs-changed"));
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      action.disabled = false;
+    }
+  }, "quiet-button");
+  action.title = `Convert this take's speech to ${who}'s recorded voice; the room's sound is kept. A new take, nothing replaced.`;
+  return action;
+}
+
 function takeCard(scene, shot, take, { onCompare, onSelect }) {
   const card = el("article", "take-card");
   if (take.selected) card.classList.add("take-selected");
@@ -96,6 +124,8 @@ function takeCard(scene, shot, take, { onCompare, onSelect }) {
 
   const actions = el("div", "take-actions");
   actions.append(button("Compare", () => onCompare(take.id)));
+  const revoice = revoiceButton(scene, shot, take);
+  if (revoice) actions.append(revoice);
   if (take.selectable && !take.selected) {
     actions.append(button("Select", () => onSelect(take.id), "primary-button"));
   }

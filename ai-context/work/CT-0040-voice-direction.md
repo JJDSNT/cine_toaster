@@ -183,7 +183,10 @@ Remaining:
   or has become healthy. Until then, conversion is not applied where the
   state of the voice matters. Noted in `singular/docs/SINGULAR-CINE-TOASTER.md`;
 - converting per speaker in two-speaker takes, which needs diarization;
-- a control-room action;
+- ~~a control-room action~~ done 2026-09-30: "Revoice as <speaker>" on a
+  take card in the comparison room, when the shot has one speaker in the
+  take. It starts `convert_voice`, and the new take appears once adopted.
+  Checked headless with a fake voice interpreter.
 - applying conversion inside `assemble` rather than as a take.
 
 # Order

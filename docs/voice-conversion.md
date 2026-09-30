@@ -11,6 +11,9 @@ toast revoice <project> 3-01 P13 --dry-run           # whose voice, which record
 toast revoice <project> 3-01 P13 [--take BLOCK-2]    # -> _takes/c13-voice.mp4, take VOICE
 ```
 
+In the comparison room, a take of a shot with one speaker offers **Revoice
+as <speaker>**, which starts the same job.
+
 ## What it needs
 
 - The shot declares **one** speaker in the take (`lines`, not `mix: true`).
