@@ -123,11 +123,18 @@ class WorkflowTests(unittest.TestCase):
 
         # Asking for another makes a second version and asks again, with both.
         dispatch(self.root, "decide_gate", {"scene_id": "SC-030", "gate_id": gate["id"], "outcome": "changes_requested",
-                                            "actor": human, "rationale": "Her head moved off the render's mark."})
+                                            "actor": human, "rationale": "Her head moved off the render's mark.",
+                                            "reasons": ["subject_moved"]})
         state, run = self.wait_for(lambda state, run: run["state"] == "waiting"
                                    and any(g["state"] == "waiting" for g in state.gates.values()))
         second = self.waiting_gate(state)
         self.assertEqual(len(second["candidates"]), 2)
+        # What was wrong went into the second edit's instructions, and is kept with it.
+        import json as json_module
+        made = json_module.loads((self.root / "scenes/030-echo-chamber/work/p03-2.png.provenance.json").read_text())
+        self.assertIn("Correction from the director: Her head moved off the render's mark.", made["prompt"])
+        self.assertIn("Keep every person exactly where image 1 has them", made["prompt"])
+        self.assertEqual(made["feedback"]["text"], "Her head moved off the render's mark.")
         self.assertEqual(self.fake.sent, ["editor", "editor"])
 
         # A stale decision is refused.

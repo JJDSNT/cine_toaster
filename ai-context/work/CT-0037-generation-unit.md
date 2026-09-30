@@ -246,7 +246,9 @@ Tests: `tests/test_pictures.py` (3 tests).
 
 Remaining:
 
-- SINGULAR's `guia_no_corte` and `forca_corte` per-shot options;
+- ~~SINGULAR's `guia_no_corte` and `forca_corte`~~ done 2026-09-30 as the
+  core fields `guide_at_cut` and `guide_strength`; a production maps its
+  own names to them;
 - ~~resuming a remote job after the process dies~~ done 2026-09-30.
   - The remote job is remembered per request (`jobs._remote_record`: a hash
     of the plan), so a retry polls it instead of resubmitting.

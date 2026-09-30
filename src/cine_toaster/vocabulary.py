@@ -174,6 +174,9 @@ CORE_SHOT_FIELDS: frozenset[str] = frozenset(
         "trim",
         # A picture made by editing another (a render, a plate) with cast references.
         "derive",
+        # A block's guide at this shot's cut: whether there is one, and how strong.
+        "guide_at_cut",
+        "guide_strength",
     }
 )
 

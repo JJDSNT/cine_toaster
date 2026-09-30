@@ -133,8 +133,30 @@ def face_reference(root: Path, production: dict[str, Any], scene: dict[str, Any]
     return {"member": member["id"], "variant": chosen, "path": root / master["path"]}
 
 
+#: What a refused picture's reasons ask of the next edit (SPEC-0009, CT-0041 option 1).
+CORRECTIONS = {
+    "subject_moved": "Keep every person exactly where image 1 has them: the same place and the same size in the frame.",
+    "identity": "The face must be unmistakably the person in the identity image.",
+    "geometry": "Do not change the room: walls, furniture and objects keep their outlines and places.",
+    "light": "Keep the light of image 1: its direction, its warmth and its darkness.",
+    "detail_lost": "Keep every small detail of image 1: props, tubes, cables, hands.",
+    "anatomy": "Anatomy must be right: hands, fingers, eyes and limbs.",
+}
+
+
+def corrections(feedback: dict[str, Any] | None) -> str:
+    """The director's refusal, as instructions for the next edit."""
+
+    if not feedback:
+        return ""
+    lines = [CORRECTIONS[reason] for reason in feedback.get("reasons") or [] if reason in CORRECTIONS]
+    if feedback.get("text"):
+        lines.append(f"Correction from the director: {feedback['text']}")
+    return " ".join(lines)
+
+
 def plan_picture(root: Path, production: dict[str, Any], scene_id: str, shot_id: str, seed: int = 1,
-                 rate: float = HOURLY_RATE_USD) -> PicturePlan:
+                 rate: float = HOURLY_RATE_USD, feedback: dict[str, Any] | None = None) -> PicturePlan:
     scene = next((item for item in production["scenes"] if item["id"] == scene_id), None)
     if scene is None:
         raise ValidationError(f"No scene {scene_id!r}")
@@ -151,13 +173,16 @@ def plan_picture(root: Path, production: dict[str, Any], scene_id: str, shot_id:
         raise ValidationError(f"{shot_id} is derived from {derive['from']!r}, which has no picture yet")
     references = [face_reference(root, production, scene, name) for name in derive.get("with") or []]
     notes = []
+    if feedback:
+        notes.append("This edit carries the director's corrections from the refused version.")
     if shot.get("picture"):
         notes.append("The picture description is what the video model is told this image shows; "
                      "check the result against it.")
     return PicturePlan(
         scene=scene_id, shot=shot_id, stem=picture_stem(work_directory_for(root / scene["file"]), str(shot["number"])),
         source=source,
-        references=references, request=derive["request"], prompt=edit_prompt(derive["request"], bool(references)),
+        references=references, request=derive["request"],
+        prompt=edit_prompt(" ".join(filter(None, [derive["request"], corrections(feedback)])), bool(references)),
         seed=seed, size=size_like(source), estimate_usd=estimate(rate), notes=notes,
     )
 

@@ -339,7 +339,8 @@ def _picture_step(root, production, scene, state, run, step, directory) -> bool:
             _notify(root, production["id"], scene["id"], run, step)
             return True
     return _job_step("derive_picture",
-                     lambda scene, run, step: {"scene": scene["id"], "shot": step["shot"], "seed": step.get("seed", 1)},
+                     lambda scene, run, step: {"scene": scene["id"], "shot": step["shot"], "seed": step.get("seed", 1),
+                                               **({"feedback": step["feedback"]} if step.get("feedback") else {})},
                      lambda summary: [summary["picture"]])(root, production, scene, state, run, step, directory)
 
 
@@ -376,7 +377,10 @@ def _gate_step(root, production, scene, state, run, step, directory) -> bool:
     elif gate["state"] == "changes_requested":
         # Another version of the picture, then the question again with every version.
         picture = next(item for item in run["steps"] if item["id"] == f"picture-{step['shot']}")
-        picture.update(state="pending", again=True, seed=int(picture.get("seed", 1)) + 1, job=None, note="")
+        # What was wrong travels with the request for the next version.
+        feedback = {"reasons": list(gate.get("reasons") or []), "text": gate.get("rationale", "")}
+        picture.update(state="pending", again=True, seed=int(picture.get("seed", 1)) + 1, job=None, note="",
+                       feedback=feedback)
         step.update(state="pending", again=True, gate=None)
         run["state"] = "running"
     else:

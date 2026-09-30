@@ -117,6 +117,17 @@ class GenerateBlockTests(unittest.TestCase):
         self.assertEqual([section["shot"] for section in plan.sections], ["P2", "P3", ""])
         self.assertEqual(" ".join(section["text"] for section in plan.sections), plan.prompt)
 
+    def test_a_shot_can_ask_for_no_guide_or_a_softer_one(self) -> None:
+        scene = self.root / "scenes" / "030-echo-chamber" / "scene.yaml"
+        scene.write_text(scene.read_text(encoding="utf-8").replace(
+            "    block: A\n    lines:", "    block: A\n    guide_strength: 0.4\n    lines:", 1), encoding="utf-8")
+        self.assertEqual([(ref.role, ref.strength) for ref in self.plan().guides], [("first", 0.7), ("P3", 0.4)])
+        scene.write_text(scene.read_text(encoding="utf-8").replace(
+            "guide_strength: 0.4", "guide_at_cut: false"), encoding="utf-8")
+        plan = self.plan()
+        self.assertEqual([ref.role for ref in plan.guides], ["first"])
+        self.assertIn("P3 asks for no guide at its cut", plan.notes[-1])
+
     def test_nothing_is_generated_without_a_budget(self) -> None:
         jobs.GENERATION_TRANSPORT = FakeRunpod(self.video)
         with self.assertRaises(spend.BudgetExceeded):

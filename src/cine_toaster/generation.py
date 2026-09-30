@@ -37,6 +37,7 @@ class Reference:
     path: Path
     frame: int
     digest: str
+    strength: float = GUIDE_STRENGTH
 
 
 @dataclass(slots=True)
@@ -59,7 +60,7 @@ class BlockPlan:
             "scene": self.scene, "block": self.block, "shots": self.shots, "seconds": self.seconds,
             "image": self.image.relative_to(root).as_posix(),
             "guides": [{"role": ref.role, "path": ref.path.relative_to(root).as_posix(), "frame": ref.frame,
-                        "digest": ref.digest} for ref in self.guides],
+                        "digest": ref.digest, "strength": ref.strength} for ref in self.guides],
             "prompt": self.prompt, "prompt_sections": self.sections, "seed": self.seed,
             "estimate_usd": self.estimate_usd, "notes": self.notes,
         }
@@ -157,9 +158,18 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
     # Frame 0 is guided with the first picture too: alone, the first image gives
     # way in a long block (claim frame-zero-guide); each later shot's picture
     # guides its cut (claim keyframe-guides).
-    guides = [Reference("first", references[0], 0, _digest(references[0]))]
-    guides += [Reference(shot_id, ref, frame, _digest(ref))
-               for shot_id, ref, frame in zip(block.shots[1:], references[1:], frames[1:])]
+    # A shot may ask for its guide's strength, or for no guide at its cut
+    # (SINGULAR's `forca_corte` and `guia_no_corte`).
+    def strength(shot_id: str) -> float:
+        value = shots[shot_id].get("guide_strength")
+        return float(value) if value not in (None, "") else GUIDE_STRENGTH
+
+    guides = [Reference("first", references[0], 0, _digest(references[0]), strength(block.shots[0]))]
+    for shot_id, ref, frame in zip(block.shots[1:], references[1:], frames[1:]):
+        if shots[shot_id].get("guide_at_cut") is False:
+            notes.append(f"{shot_id} asks for no guide at its cut; the model finds that shot by the prompt alone.")
+            continue
+        guides.append(Reference(shot_id, ref, frame, _digest(ref), strength(shot_id)))
     return BlockPlan(
         scene=scene_id, block=block.id, shots=block.shots, seconds=int(seconds), image=references[0],
         guides=guides, prompt=block_prompt(prompts), seed=seed, estimate_usd=estimate(seconds, rate), notes=notes,

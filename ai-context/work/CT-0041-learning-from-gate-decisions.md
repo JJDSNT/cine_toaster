@@ -39,7 +39,11 @@ directing, with no labelling effort.
 
 # Options, cheapest first
 
-1. **Feed the refusal into the next attempt.** A `changes_requested`
+1. **Feed the refusal into the next attempt.** (Done 2026-09-30: each reason
+   becomes an English instruction (`pictures.CORRECTIONS`), and the
+   director's text is added as "Correction from the director: …"; both are
+   kept in the new version's provenance. Not yet measured: whether a
+   correction written in Portuguese helps or confuses the editor.) A `changes_requested`
    decision's reasons and text amend the next request, for example "keep her
    head where image 1 has it". No learning, and immediate. Open question:
    the note is in the director's language, while the model prompts are in

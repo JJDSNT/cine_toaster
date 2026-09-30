@@ -200,6 +200,8 @@ def _load_shots(
                 "block": _text(field(raw, "block")),
                 "trim": field(raw, "trim") if isinstance(field(raw, "trim"), dict) else None,
                 "derive": _derive(field(raw, "derive")),
+                "guide_at_cut": field(raw, "guide_at_cut") if isinstance(field(raw, "guide_at_cut"), bool) else None,
+                "guide_strength": field(raw, "guide_strength"),
                 "script": None,
                 "authored_status": "",
                 "authored_selected_take": "",

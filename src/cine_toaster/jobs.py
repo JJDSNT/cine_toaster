@@ -970,7 +970,7 @@ def _run_generate(context: JobContext) -> dict[str, Any]:
 
     context.progress(0.02, "Sending the block")
     provider = LtxProvider(endpoint, transport=transport)
-    guides = tuple(Guide(ref.path, ref.frame) for ref in plan.guides)
+    guides = tuple(Guide(ref.path, ref.frame, ref.strength) for ref in plan.guides)
     record_path = output.with_name(name + JOB_SUFFIX)
     pending = _remote_record("generate_block", plan.public_dict(root))
     try:
@@ -1078,8 +1078,10 @@ def _picture_plan(root: Path, params: dict[str, Any]):
     endpoint = os.environ.get("RUNPOD_QWEN_ENDPOINT_ID", "")
     # The production's declared price for this endpoint, else the editor's own (not LTX's).
     rate = float(_declared_rates(root).get(endpoint, HOURLY_RATE_USD))
+    feedback = params.get("feedback") if isinstance(params.get("feedback"), dict) else None
     plan = plan_picture(root, load_production(root), str(params.get("scene", "")).strip(),
-                        str(params.get("shot", "")).strip(), seed=int(params.get("seed") or 1), rate=rate)
+                        str(params.get("shot", "")).strip(), seed=int(params.get("seed") or 1), rate=rate,
+                        feedback=feedback)
     return plan, endpoint, rate
 
 
@@ -1097,7 +1099,11 @@ def _validate_picture(root: Path, params: dict[str, Any]) -> dict[str, Any]:
         raise ValidationError("A picture edit needs RUNPOD_API_KEY and RUNPOD_QWEN_ENDPOINT_ID in the environment "
                               "(toast picture --env-file <file> reads them without printing them)")
     spend.check(plan.estimate_usd, f"Picture {plan.shot} of {plan.scene}")
-    return {"scene": plan.scene, "shot": plan.shot, "seed": plan.seed}
+    checked = {"scene": plan.scene, "shot": plan.shot, "seed": plan.seed}
+    if isinstance(params.get("feedback"), dict):
+        checked["feedback"] = {"reasons": [str(item) for item in params["feedback"].get("reasons") or []],
+                               "text": str(params["feedback"].get("text") or "")}
+    return checked
 
 
 def _run_picture(context: JobContext) -> dict[str, Any]:
@@ -1138,6 +1144,7 @@ def _run_picture(context: JobContext) -> dict[str, Any]:
     _settle_remote(pending, record_path)
     score = edge_score(output, plan.source)
     provenance = {"kind": "picture-derivation", **plan.public_dict(root), "settings": settings,
+                  "feedback": context.params.get("feedback"),
                   "edge_score": score, "cost_usd": round(cost, 4), "job_id": context.job_id}
     (context.staging / f"{name}.provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
     destination = (work / name).relative_to(root).as_posix()
