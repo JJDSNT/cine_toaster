@@ -660,6 +660,25 @@ def command_cut(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_usd(args: argparse.Namespace) -> int:
+    """A scene's plan as an OpenUSD stage, for Blender, Unreal and Unity (CT-0047)."""
+
+    from .project import load_scene
+    from .usd_export import export
+
+    root = Path(args.project).expanduser().resolve()
+    scene = load_scene(root, args.scene)
+    if scene is None:
+        print(f"No scene {args.scene!r}", file=sys.stderr)
+        return 1
+    output = Path(args.output) if args.output else root / "exports" / "usd" / f"{args.scene}.usda"
+    summary = export(scene, output)
+    print(f"Wrote {summary['output']}: {len(summary['shots'])} shot cameras over {summary['frames']} frames at 24 fps")
+    for item in summary["shots"]:
+        print(f"  /Scene/Cameras/{item['shot']}  frames {item['first_frame']}-{item['first_frame'] + item['frames']}")
+    return 0
+
+
 def command_vfx(args: argparse.Namespace) -> int:
     """The VFX catalog and the production's elements; build the example elements (CT-0047)."""
 
@@ -1674,6 +1693,14 @@ def build_parser() -> argparse.ArgumentParser:
             item.add_argument("--ms", type=int, help="the transition's duration in milliseconds")
             item.add_argument("--transition-why", default="", help="why this transition")
     cut_parser.set_defaults(function=command_cut)
+
+    usd_parser = subparsers.add_parser("usd", help="Export a scene's plan as an OpenUSD stage (CT-0047)")
+    usd_sub = usd_parser.add_subparsers(dest="usd_command", required=True)
+    usd_export_parser = usd_sub.add_parser("export", help="Room, set pieces, subjects and one camera per shot")
+    usd_export_parser.add_argument("project", type=Path)
+    usd_export_parser.add_argument("scene")
+    usd_export_parser.add_argument("--output", help="the .usda/.usd/.usdc file (default exports/usd/<scene>.usda)")
+    usd_parser.set_defaults(function=command_usd)
 
     vfx_parser = subparsers.add_parser("vfx", help="The VFX catalog and the production's stock elements (CT-0047)")
     vfx_sub = vfx_parser.add_subparsers(dest="vfx_command", required=True)

@@ -98,12 +98,13 @@ def list_elements(project_root: Path | None = None) -> list[dict[str, Any]]:
             file = str((folder / str(raw.get("file") or "")).resolve()) if raw.get("file") else ""
             project = str((folder / str(raw["project"])).resolve()) if raw.get("project") else ""
             volume = str((folder / str(raw["volume"])).resolve()) if raw.get("volume") else ""
+            usd = str((folder / str(raw["usd"])).resolve()) if raw.get("usd") else ""
             matte = str((folder / str(raw["matte"])).resolve()) if raw.get("matte") else ""
             element = {
                 "id": str(raw.get("id") or folder.name), "label": str(raw.get("label") or folder.name),
                 "category": str(raw.get("category") or "other"), "blend": str(raw.get("blend") or "screen"),
                 "key_color": str(raw.get("key_color") or "0x00FF00"), "file": file, "matte": matte,
-                "project": project, "volume": volume, "frames": int(raw.get("frames") or 0),
+                "project": project, "volume": volume, "usd": usd, "frames": int(raw.get("frames") or 0),
                 # How the renderer shades it (a volume's density, fire, spin...), overridable per shot.
                 "params": dict(raw.get("params") or {}),
                 # Scene-linear EXR by default; display-encoded otherwise. `view` picks the OCIO view.
@@ -124,6 +125,8 @@ def _format(element: dict[str, Any]) -> str:
         return "blender-project"
     if element.get("volume"):
         return "openvdb"
+    if element.get("usd"):
+        return "openusd"
     name = element["file"].lower()
     if name.endswith(".exr"):
         return "exr-sequence" if "%" in name else "exr"
@@ -141,6 +144,8 @@ def _exists(element: dict[str, Any]) -> bool:
         return Path(element["project"]).is_file()
     if element.get("volume"):
         return bool(_frames(element["volume"])) if "%" in element["volume"] else Path(element["volume"]).is_file()
+    if element.get("usd"):
+        return Path(element["usd"]).is_file()
     if not element["file"]:
         return False
     present = bool(_frames(element["file"])) if "%" in element["file"] else Path(element["file"]).is_file()
@@ -310,7 +315,7 @@ def _element_input(element: dict[str, Any], file: str, duration: float, width: i
     cache = state_root() / "vfx-elements"
     loop = bool(element.get("loop"))
     kind = element.get("format")
-    if not matte and kind in ("generated", "blender-project", "openvdb"):
+    if not matte and kind in ("generated", "blender-project", "openvdb", "openusd"):
         frames = element.get("frames") or max(2, round(duration * fps))
         rendered = _blender_element(element, params, frames, width, height, fps, cache, run)
         file, kind = rendered, "exr-sequence"
@@ -342,11 +347,13 @@ def _blender_element(element: dict[str, Any], params: dict[str, Any], frames: in
             "width": width, "height": height, "fps": fps, "frames": frames, "formats": ["exr"]}
     if element.get("volume"):
         spec["volume"] = element["volume"]
+    if element.get("usd"):
+        spec["usd"] = element["usd"]
     hashed = hashlib.sha256(json.dumps(spec, sort_keys=True, default=str).encode())
-    script = (BLENDER_ELEMENT_SCRIPT if element.get("generated") else
-              BUILTIN / "_blender" / ("volume.py" if element.get("volume") else "project.py"))
+    script = (BLENDER_ELEMENT_SCRIPT if element.get("generated") else BUILTIN / "_blender" / (
+        "volume.py" if element.get("volume") else "usd.py" if element.get("usd") else "project.py"))
     hashed.update(script.read_bytes())
-    for source in filter(None, (element.get("project"), element.get("volume"))):
+    for source in filter(None, (element.get("project"), element.get("volume"), element.get("usd"))):
         stat = Path(source.replace("%04d", "0001")).stat()  # large files: their size and time, not their bytes
         hashed.update(f"{source}{stat.st_size}{stat.st_mtime_ns}".encode())
     folder = cache / "blender" / hashed.hexdigest()[:16]

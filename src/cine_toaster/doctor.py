@@ -296,6 +296,20 @@ def _color() -> Capability:
     )
 
 
+def _usd() -> Capability:
+    from .usd_export import available
+
+    reason = available()
+    return Capability(
+        name="OpenUSD",
+        what_it_enables="a scene's plan as a USD stage for Blender, Unreal and Unity (`toast usd export`, CT-0047)",
+        required=False,
+        status=OK if not reason else MISSING,
+        detail=reason,
+        remedy="" if not reason else "make install-usd",
+    )
+
+
 def _mcp() -> Capability:
     ok = _module("mcp")
     return Capability(
@@ -340,6 +354,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _assistant,
     _mcp,
     _color,
+    _usd,
     # Detected, not yet used. See `report`.
     _sox,
     _blender,

@@ -45,7 +45,7 @@ user may have forgotten is left to the development agent's judgement.
 | 9 | Blender scripts | engine `blender` effect items (like titles) | sparks-burst, disintegrate | done |
 | 10 | Blender projects (`.blend`) | a production `.blend` with declared parameters, rendered headless | a `.blend` element project | done |
 | 11 | OpenVDB volumes | Blender imports `.vdb`, renders with alpha → element | openvdb.org `explosion.vdb` / `smoke.vdb` | done |
-| 12 | OpenUSD scenes | Blender imports USD; Cine Toaster exports its plan (room, cameras, marks, set pieces) as USD | usd-wg sample; the demo's set as USD | todo |
+| 12 | OpenUSD scenes | Blender imports USD; Cine Toaster exports its plan (room, cameras, marks, set pieces) as USD | usd-wg Teapot; the demo's set as USD | done |
 | 13 | OpenFX plugins | Natron (an OFX host) run headless (`NatronRenderer`) on a generated project | an openfx-misc effect on a take | todo |
 | 14 | Alembic caches (added) | Blender imports `.abc` | a cache rendered as an element | later |
 | 15 | Gaussian splats | Spark (three.js, MIT) viewer + camera path rendered headless; Blender 5.3 native | a `.ply`/`.spz` scene as a location plate / moving camera | study + example |
@@ -180,3 +180,21 @@ Each step ships its example, a test, and the line in this table.
 - `toast vfx examples` also downloads OpenVDB's `smoke.vdb` once into a
   shared asset folder and registers `example-openvdb`.
 - Test: `OpenVdbTests` (skipped without Blender or the sample).
+
+# Done: phase 4, OpenUSD (2026-09-30)
+
+- `usd_export.py` + `toast usd export`: room, set pieces, subjects (moving),
+  one camera per shot with lens and move sampled from `blocking.state_at`
+  every 4 frames; Z up, metres, 24 fps, ids in `customData`. `usd-core` 26.8.
+- Checked in Blender (USD import, one render per shot camera) against the
+  blocking frames: same framing at P2 start/end and P3 start.
+- Found on the way: USD cameras measure lens and aperture in tenths of a
+  stage unit (with metres, 50 mm is 0.5; Blender read 5000 mm); Blender's
+  importer merges an Xform with a single child and drops its animation, so
+  each subject is its own animated shape.
+- Element `usd = ...` (format `openusd`) rendered by `_blender/usd.py` with
+  the stage's materials, through a named camera or a turntable; the USD-WG
+  Teapot (Apache-2.0) rendered and composited in 7 s.
+- Tests: `tests/test_usd.py` (the stage's structure; the P3 camera centres
+  Mara as the frame does; subjects move per shot; USD import when Blender
+  and the sample are present).

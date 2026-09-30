@@ -38,6 +38,8 @@ agents = ["langgraph>=1.2", "langgraph-checkpoint-sqlite>=3.1", "ag-ui-langgraph
 mcp = ["mcp>=2.2"]
 # VFX colour management (CT-0047): OpenColorIO and OpenEXR, both BSD-3.
 vfx = ["opencolorio>=2.3", "OpenEXR>=3.2", "numpy>=1.26", "pillow>=10"]
+# The plan as an OpenUSD stage (CT-0047): Pixar's USD (modified Apache 2.0).
+usd = ["usd-core>=25.5"]
 
 [project.scripts]
 toast = "cine_toaster.cli:main"
