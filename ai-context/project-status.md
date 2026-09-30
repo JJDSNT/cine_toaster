@@ -83,7 +83,6 @@ Cine Toaster cannot yet:
 - execute or recover background jobs;
 - persist the multi-project registry or expose project switching in the UI;
 - run project-scoped agents;
-- ship as a Tauri desktop application.
 
 ## Active work
 
@@ -146,7 +145,7 @@ Follow the **ordered plan** in `development/roadmap.md` (2026-09-29):
 11. LangGraph spike;
 12. CopilotKit/CoAgents spike;
 13. editable canvas;
-14. Tauri.
+14. ~~Tauri~~ (cancelled, ADR 0019).
 
 Steps 1–4 are **done**: screenplay coverage (SPEC-0006), the cut record
 (SPEC-0007), the blocking frame (`CT-0025`), and the brief builder with a
@@ -185,8 +184,9 @@ remains:
   AG-UI → Claude Code CLI); it knows what is on screen, points at shots, and acts
   only through commands after a yes, never on a gate. Step 13 is done too
   (CT-0046): the canvas edits cuts (a decision over the breakdown, never a
-  rewrite) and starts workflows, through the same commands. Next: step 14,
-  Tauri, and the pending hardening items. The author
+  rewrite) and starts workflows, through the same commands. Step 14 (Tauri) was
+  cancelled by the user (ADR 0019): the plan ends at 13. Next: the pending
+  hardening items. The author
   will re-check later whether Kael's converted voice still sounds ill.
 
 Earlier notes:

@@ -202,7 +202,7 @@ adapter categories, allowing models, providers, GPU infrastructure, and
 external filmmaking tools to evolve independently from the Core.
 
 The current headless runtime and CLI are implemented in Python. React/Vite and
-Tauri are strong incremental UI and desktop-shell candidates; they are not a
+Tauri were strong incremental UI and desktop-shell candidates (Tauri was since cancelled, ADR 0019); they are not a
 reason to duplicate or rewrite Project Core behavior. See
 [`ai-context/architecture.md`](ai-context/architecture.md) and the accepted
 decisions in [`docs/architecture/`](docs/architecture/).

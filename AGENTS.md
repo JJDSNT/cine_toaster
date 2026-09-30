@@ -49,7 +49,7 @@ runtime filmmaking skill or production context.
 - The next write milestone is selecting a take as an atomic canonical decision.
 - New interface work uses React, TypeScript and Vite, with React Flow for the
   canvas and CodeMirror for the screenplay (ADR 0015, 0016). Node is a build tool only. The existing control room is
-  not rewritten, and Tauri remains a shell candidate. None of this is
+  not rewritten, and there is no desktop shell (ADR 0019). None of this is
   permission to rewrite the Project Core.
 - Production workflows run on the built-in engine (SPEC-0009). LangGraph runs
   agents only, and CopilotKit carries the assistant through an optional,

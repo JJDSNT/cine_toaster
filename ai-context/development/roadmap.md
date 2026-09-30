@@ -49,7 +49,7 @@ exit. "Decision" marks a step that ends in an ADR.
 
 Pre-check for steps 7 and 12 (`CT-0033`, 2026-09-29): CopilotKit 1.75 (v2 API) works with React 19, Vite and React Flow 12 against a Python AG-UI agent. The direct browser-to-Python path is an enterprise-tier feature. The open path adds the self-hosted Node Copilot Runtime, whose telemetry is on by default.
 | 13 | ✅ **Canvas becomes editable.** (done 2026-09-30, CT-0046: cuts decided over the breakdown, workflows started, positions computed) Edit cuts, references, and workflow steps through commands. Agent-proposed graphs are accepted or rejected as decisions. Decide where card positions live (`CT-0024` finding 5): auto-layout or disposable operational layout. | Both | 7, 12 | Every canvas edit is a command, with conflict tests across the GUI, CLI, and agent. |
-| 14 | **Tauri shell** (Phase 3 remainder). | Stack | 7 | The Phase 3 exit. |
+| 14 | ~~**Tauri shell**~~ — cancelled 2026-09-30 by the user (ADR 0019): Cine Toaster runs in the browser, served by its local runtime. | Stack | — | — |
 Inserted between steps 2 and 3 at the user's request (2026-09-29, done): gl-transitions as the catalog's shader bank, and builds that run a transition's own shader (`CT-0026`).
 
 Why this order: screenplay coverage comes first because it depends on nothing
@@ -116,7 +116,7 @@ manifest identity after movement, and duplicate-ID conflict detection.
 
 - Spike React/TypeScript/Vite against the versioned Application API.
 - Migrate one production room at a time with behavior parity.
-- Spike Tauri supervision of the headless runtime and constrained native
+- (Cancelled, ADR 0019.) Spike Tauri supervision of the headless runtime and constrained native
   capabilities.
 - Keep browser-mode development and tests available.
 

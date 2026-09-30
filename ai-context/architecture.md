@@ -183,7 +183,7 @@ Strong candidates, introduced incrementally:
 
 - Python for the existing headless runtime and Core;
 - React, TypeScript, and Vite for the next visual interface;
-- Tauri 2 as the desktop shell;
+- ~~Tauri 2 as the desktop shell~~ (cancelled, ADR 0019: no desktop shell; the runtime serves the browser);
 - FFmpeg as the first media adapter;
 - ComfyUI as the first generation adapter.
 

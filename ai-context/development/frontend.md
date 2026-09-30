@@ -35,7 +35,7 @@ migrated room.
 ## Target direction
 
 React, TypeScript, and Vite are the preferred candidates for the next sustained
-visual interface. Tauri 2 is the preferred desktop-shell candidate. The
+visual interface. There is no desktop shell (ADR 0019, 2026-09-30); what follows about Tauri is kept as history. The
 renderer consumes a versioned Application API and remains a projection over
 authoritative project state.
 

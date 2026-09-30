@@ -2,6 +2,8 @@
 
 Status: accepted
 
+> Its Tauri desktop shell was cancelled by [ADR 0019](0019-no-desktop-shell.md) (2026-09-30).
+
 ## Context
 
 Cine Toaster is expected to support browser and desktop interfaces, CLI and API
