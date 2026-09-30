@@ -519,8 +519,26 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             return
         self.do_GET()
 
+    def _proxy_assistant(self, parsed) -> bool:
+        """`/api/copilotkit` goes to the Copilot Runtime when the assistant is on (ADR 0018)."""
+
+        from .assistant_host import PROXY_PREFIX, proxy
+
+        if not parsed.path.startswith(PROXY_PREFIX):
+            return False
+        host = getattr(self.server, "assistant", None)
+        if host is None:
+            self._send_json({"error": {"code": "assistant_off",
+                                       "message": "The assistant is off; start the runtime with --assistant."}},
+                            HTTPStatus.SERVICE_UNAVAILABLE)
+            return True
+        proxy(self, host.copilot_port)
+        return True
+
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        if self._proxy_assistant(parsed):
+            return
         if parsed.path == "/api/commands":
             self._handle_command()
             return
@@ -642,6 +660,8 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        if self._proxy_assistant(parsed):
+            return
         if parsed.path == "/":
             self._send_static("index.html")
         elif parsed.path in ("/canvas", "/canvas/") or parsed.path.startswith("/canvas/"):
@@ -700,6 +720,7 @@ def serve_project(
     *,
     host: str = "127.0.0.1",
     port: int = 8787,
+    assistant: bool = False,
 ) -> None:
     project_index = ProjectIndex(root)
     server = ThreadingHTTPServer((host, port), ProjectBrowserHandler)
@@ -716,6 +737,18 @@ def serve_project(
     attach(server.job_manager)
     for job in server.job_manager.reconciled:
         print(f"Job {job['id']} ({job['kind']}) was interrupted: {job['message']}")
+    server.assistant = None  # type: ignore[attr-defined]
+    if assistant:
+        # ADR 0018: the assistant and its Copilot Runtime, beside the control room.
+        from .assistant_host import AssistantHost, unavailable_reason
+
+        reason = unavailable_reason()
+        if reason:
+            print(f"Assistant not started: {reason}")
+        else:
+            server.assistant = AssistantHost(f"http://127.0.0.1:{port}", port + 1, port + 2)  # type: ignore[attr-defined]
+            server.assistant.start()  # type: ignore[attr-defined]
+            print(f"Assistant on (agent :{port + 1}, Copilot Runtime :{port + 2}); open /app/ to talk to it.")
     print(f"Cine Toaster browsing {server.project_root}")
     print(f"Open http://{host}:{port}")
     print("Press Ctrl+C to stop.")
@@ -726,3 +759,5 @@ def serve_project(
     finally:
         server.server_close()
         server.job_manager.shutdown(wait=False)
+        if server.assistant is not None:  # type: ignore[attr-defined]
+            server.assistant.stop()  # type: ignore[attr-defined]

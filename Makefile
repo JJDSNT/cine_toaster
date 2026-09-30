@@ -12,7 +12,7 @@ RUN = $(VENV)/bin/python
 TOAST = $(VENV)/bin/toast
 
 .DEFAULT_GOAL := setup
-.PHONY: ui ui-test setup environment submodules install install-media install-audio install-gpu install-voice test check demo doctor serve clean help voice build
+.PHONY: ui ui-test setup environment submodules install install-media install-audio install-gpu install-voice install-agents test check demo doctor serve clean help voice build
 
 help:
 	@echo "make setup     install and report what works"
@@ -69,6 +69,12 @@ install-audio: install
 install-gpu: install
 	@echo "==> Installing the gpu extra (transitions run their own shaders)"
 	@$(RUN) -m pip install --quiet -e '.[gpu]'
+
+# The directing assistant (ADR 0017, 0018): LangGraph over AG-UI. The model is
+# the Claude Code CLI with your own login, so no key is needed.
+install-agents: install
+	@echo "==> Installing the agents extra (the assistant)"
+	@$(RUN) -m pip install --quiet -e '.[agents]'
 
 # Voice conversion (CT-0040) runs in its own environment: its engines pin
 # their own numpy and torch. CPU is enough; nothing here needs a GPU.

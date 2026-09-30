@@ -161,7 +161,7 @@ def command_stats(args: argparse.Namespace) -> int:
 
 def command_serve(args: argparse.Namespace) -> int:
     _ensure_index(args.project, refresh=not args.no_refresh)
-    serve_project(args.project, host=args.host, port=args.port)
+    serve_project(args.project, host=args.host, port=args.port, assistant=args.assistant)
     return 0
 
 
@@ -1294,6 +1294,8 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument("--host", default="127.0.0.1")
     serve_parser.add_argument("--port", type=int, default=8787)
     serve_parser.add_argument("--no-refresh", action="store_true")
+    serve_parser.add_argument("--assistant", action="store_true",
+                              help="also run the directing assistant (the agents extra, Node, the Claude CLI; ADR 0018)")
     serve_parser.set_defaults(function=command_serve)
 
     demo_parser = subparsers.add_parser(

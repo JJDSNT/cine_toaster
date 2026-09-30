@@ -51,8 +51,10 @@ runtime filmmaking skill or production context.
   canvas and CodeMirror for the screenplay (ADR 0015, 0016). Node is a build tool only. The existing control room is
   not rewritten, and Tauri remains a shell candidate. None of this is
   permission to rewrite the Project Core.
-- CopilotKit, AG-UI, editors, playback engines, and orchestrators require focused
-  spikes before adoption.
+- Production workflows run on the built-in engine (SPEC-0009). LangGraph runs
+  agents only, and CopilotKit carries the assistant through an optional,
+  supervised Node sidecar (ADR 0017, 0018). Editors, playback engines, and
+  other frameworks still require focused spikes before adoption.
 - Use `Agent Runtime` in technical documentation. `AI Crew` is optional product
   language and is not an architectural component.
 

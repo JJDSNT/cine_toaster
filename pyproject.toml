@@ -29,6 +29,11 @@ audio = ["piper-tts>=1.8"]
 # Running a transition's own shader instead of an FFmpeg stand-in. Needs a GL
 # context, which is why it is not part of the ordinary install.
 gpu = ["moderngl>=5.10"]
+# The assistant (ADR 0017): a LangGraph agent served over AG-UI. The model is
+# reached through an adapter -- by default the Claude Code CLI, with the
+# person's own login -- so nothing here needs a key.
+agents = ["langgraph>=1.2", "langgraph-checkpoint-sqlite>=3.1", "ag-ui-langgraph>=0.0.45",
+          "fastapi>=0.140", "uvicorn>=0.50"]
 
 [project.scripts]
 toast = "cine_toaster.cli:main"
@@ -36,7 +41,7 @@ toast = "cine_toaster.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/cine_toaster"]
 # The built React app is ignored by git but belongs in the wheel (`make ui` first).
-artifacts = ["src/cine_toaster/web_assets/app/**"]
+artifacts = ["src/cine_toaster/web_assets/app/**", "src/cine_toaster/web_assets/copilot/**"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "examples/demo-project" = "cine_toaster/demo_projects/the-last-signal"

@@ -179,8 +179,12 @@ remains:
   CT-0043): production workflows stay built in; LangGraph runs the agents as an
   optional extra; a LangGraph CoAgent with CopilotKit knew what the page showed,
   shared state, and asked before starting a workflow; the model ran through the
-  Claude Code CLI with no API key. Next: step 12, the CopilotKit decision and
-  the real Agent Runtime extra. The author
+  Claude Code CLI with no API key. Step 12 is done too (ADR 0018,
+  CT-0044): `toast serve --assistant` puts a directing assistant beside the
+  canvas (CopilotKit v2 → bundled Copilot Runtime sidecar → LangGraph agent over
+  AG-UI → Claude Code CLI); it knows what is on screen, points at shots, and acts
+  only through commands after a yes, never on a gate. Next: step 13, the
+  editable canvas. The author
   will re-check later whether Kael's converted voice still sounds ill.
 
 Earlier notes:

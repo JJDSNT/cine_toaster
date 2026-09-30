@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background, Controls, ReactFlow, ReactFlowProvider,
   type Edge, type Node, type NodeMouseHandler, type EdgeMouseHandler,
@@ -7,6 +7,9 @@ import { layout } from "./layout.ts";
 import { nodeTypes } from "./nodes.tsx";
 import { CUT_NAMES, edgeTypes } from "./edges.tsx";
 import type { GraphEdge, GraphNode, ProductionGraph } from "./types.ts";
+
+// The assistant is its own chunk, fetched only when the runtime has it on (ADR 0018).
+const Assistant = lazy(() => import("./Assistant.tsx"));
 
 type Selection = { kind: "node"; node: GraphNode } | { kind: "edge"; edge: GraphEdge } | null;
 
@@ -146,6 +149,13 @@ export function App() {
   const [showTakes, setShowTakes] = useState(true);
   const [selection, setSelection] = useState<Selection>(null);
   const [focus, setFocus] = useState<Focus | null>(null);
+  const [assistantOn, setAssistantOn] = useState(false);
+  const [talking, setTalking] = useState(false);
+  const [highlight, setHighlight] = useState("");
+
+  useEffect(() => {
+    fetch("/api/copilotkit/info").then((response) => setAssistantOn(response.ok)).catch(() => setAssistantOn(false));
+  }, []);
 
   const load = useCallback(() => {
     fetch("/api/graph")
@@ -176,6 +186,26 @@ export function App() {
     () => (graph && focus ? toFlow(graph, showTakes, focus) : { nodes: [], edges: [] }),
     [graph, showTakes, focus],
   );
+  // What the person is looking at, for the assistant: the room, the scene, the selection.
+  const seen = useMemo(() => {
+    const selectedScene = selection?.kind === "node" ? selection.node.scene : "";
+    const scene = focus?.kind === "scene" ? focus.id : selectedScene || graph?.production.active_scene || "";
+    let selected = "";
+    if (selection?.kind === "node") {
+      const d = selection.node.data as unknown as Record<string, unknown>;
+      selected = `${selection.node.type} ${[d.shot, d.take, d.run, d.title].filter(Boolean).join(" ")} in ${selection.node.scene}`;
+      if (selection.node.type === "shot") selected += `: ${String(d.label ?? "")}`;
+    } else if (selection?.kind === "edge") {
+      selected = `cut ${selection.edge.id.replace(/^cut:/, "")}`;
+    }
+    const focusText = !focus || focus.kind === "all" ? "the whole film" : `${focus.kind} ${focus.id}`;
+    return { room: "production canvas", scene, focus: focusText, selected };
+  }, [selection, focus, graph]);
+  const shown = useMemo(() => {
+    if (!highlight) return flow.nodes;
+    const target = `shot:${seen.scene}/${highlight}`;
+    return flow.nodes.map((node) => (node.id === target ? { ...node, className: "assistant-highlight" } : node));
+  }, [flow.nodes, highlight, seen.scene]);
   // Open on the first scene in view, readable, rather than shrinking a whole
   // sequence until nothing on it can be read.
   const firstScene = useMemo(() => {
@@ -226,12 +256,17 @@ export function App() {
           </select>
         )}
         <label className="toggle"><input type="checkbox" checked={showTakes} onChange={(e) => setShowTakes(e.target.checked)} /> Takes</label>
+        {assistantOn && (
+          <button type="button" className={`toggle assistant-toggle ${talking ? "on" : ""}`} onClick={() => setTalking((value) => !value)}>
+            Assistant
+          </button>
+        )}
       </header>
       {error && <p className="error">Could not read the production: {error}</p>}
       <main>
         <div className="canvas" data-testid="canvas">
           <ReactFlow
-            nodes={flow.nodes}
+            nodes={shown}
             edges={flow.edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
@@ -252,7 +287,16 @@ export function App() {
             <Controls showInteractive={false} />
           </ReactFlow>
         </div>
-        <aside className="details"><Details selection={selection} /></aside>
+        <aside className="details">
+          <Details selection={selection} />
+          {assistantOn && talking && (
+            <div className="assistant dark" data-testid="assistant">
+              <Suspense fallback={<p className="hint">Opening the assistant…</p>}>
+                <Assistant seen={seen} onHighlight={setHighlight} />
+              </Suspense>
+            </div>
+          )}
+        </aside>
       </main>
     </div>
   );

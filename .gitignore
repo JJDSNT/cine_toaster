@@ -19,3 +19,4 @@ build/
 # into the package and the wheel includes as an artifact.
 /frontend/node_modules/
 /src/cine_toaster/web_assets/app/
+/src/cine_toaster/web_assets/copilot/

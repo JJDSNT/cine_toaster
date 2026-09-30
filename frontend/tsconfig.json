@@ -12,5 +12,5 @@
     "skipLibCheck": true,
     "types": ["vite/client", "node"]
   },
-  "include": ["src", "tests", "vite.config.ts"]
+  "include": ["src", "tests", "vite.config.ts", "vite.runtime.config.ts", "copilot-runtime.ts"]
 }

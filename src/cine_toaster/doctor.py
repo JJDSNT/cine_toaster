@@ -265,6 +265,20 @@ def _voice() -> Capability:
     )
 
 
+def _assistant() -> Capability:
+    from .assistant_host import unavailable_reason
+
+    reason = unavailable_reason()
+    return Capability(
+        name="Assistant",
+        what_it_enables="the directing assistant beside the canvas: `toast serve --assistant` (ADR 0017, 0018)",
+        required=False,
+        status=OK if not reason else MISSING,
+        detail=reason,
+        remedy="" if not reason else "make install-agents; Node 20+; make ui; Claude Code logged in (claude)",
+    )
+
+
 def _whisper() -> Capability:
     path = _binary("whisper-cli") or _binary("whisper-cpp") or _binary("main")
     ok = bool(path) or _module("faster_whisper")
@@ -293,6 +307,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _ffmpeg,
     _ffprobe,
     _voice,
+    _assistant,
     # Detected, not yet used. See `report`.
     _sox,
     _blender,

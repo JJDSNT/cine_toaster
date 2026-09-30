@@ -89,3 +89,12 @@ main { display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
 .run-failed, .run-cancelled { opacity: .7; }
 .run-line path { stroke: #e7b75c; stroke-dasharray: 4 4; }
 .run-steps { padding-left: 18px; font-size: 12px; }
+
+/* The assistant (ADR 0018) */
+.assistant-toggle { cursor: pointer; background: transparent; color: inherit; border: 1px solid #3a4245; border-radius: 6px; padding: 4px 10px; }
+.assistant-toggle.on { border-color: #ef6a3a; color: #ef6a3a; }
+.assistant { margin-top: 14px; height: 60vh; min-height: 360px; display: flex; flex-direction: column; border-top: 1px solid #2b3134; padding-top: 10px; }
+.assistant > * { flex: 1; min-height: 0; }
+.assistant-confirm { border: 1px solid #e7b75c; border-radius: 8px; padding: 10px; display: grid; gap: 8px; }
+.assistant-confirm button { margin-right: 6px; }
+.react-flow__node.assistant-highlight .card { outline: 3px solid #ef6a3a; outline-offset: 3px; }

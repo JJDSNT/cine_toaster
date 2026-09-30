@@ -6,15 +6,18 @@
   "description": "The production canvas: a read-only React Flow view of a production's records (ADR 0015).",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && vite build -c vite.runtime.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --test --experimental-strip-types tests/*.test.ts"
   },
   "dependencies": {
+    "@ag-ui/client": "0.0.59",
     "@codemirror/commands": "6.11.1",
     "@codemirror/language": "6.12.4",
     "@codemirror/state": "6.7.6",
     "@codemirror/view": "6.43.13",
+    "@copilotkit/react-core": "1.75.1",
+    "@copilotkit/runtime": "1.75.1",
     "@lezer/highlight": "1.2.5",
     "@xyflow/react": "12.12.0",
     "codemirror": "6.0.2",
