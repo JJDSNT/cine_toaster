@@ -64,18 +64,41 @@ class VoicePlan:
     shot: str
     take: str
     media: Path
-    speaker: str
-    member: str
-    reference: Path
+    #: Each speaker in the take: {who, member, reference}.
+    speakers: list[dict[str, Any]]
+    #: The lines spoken in the take, in order: {who, text}. With several
+    #: speakers they say who speaks when (voice_align).
+    lines: list[dict[str, str]]
+    #: Word timings recorded beside the take, when the production has them.
+    words: Path | None = None
+
+    @property
+    def speaker(self) -> str:
+        return ", ".join(item["who"] for item in self.speakers)
+
+    @property
+    def member(self) -> str:
+        return ", ".join(item["member"] for item in self.speakers)
+
+    def spec(self) -> dict[str, Any]:
+        """What the worker is given."""
+
+        return {"speakers": [{"who": item["who"], "reference": str(item["reference"])} for item in self.speakers],
+                "lines": self.lines, "words": str(self.words) if self.words else None}
 
     def public_dict(self, root: Path) -> dict[str, Any]:
+        first = self.speakers[0]
         return {"scene": self.scene, "shot": self.shot, "take": self.take,
                 "media": self.media.relative_to(root).as_posix(), "speaker": self.speaker, "member": self.member,
-                "reference": self.reference.relative_to(root).as_posix(), "reference_digest": _digest(self.reference)}
+                "reference": first["reference"].relative_to(root).as_posix(),
+                "reference_digest": _digest(first["reference"]),
+                "speakers": [{"who": item["who"], "member": item["member"],
+                              "reference": item["reference"].relative_to(root).as_posix(),
+                              "reference_digest": _digest(item["reference"])} for item in self.speakers]}
 
 
 def plan_conversion(root: Path, production: dict[str, Any], scene_id: str, shot_id: str, take_id: str = "") -> VoicePlan:
-    """Which take, whose voice, and the recording it is converted to."""
+    """Which take, whose voices, and the recording each is converted to."""
 
     scene = next((item for item in production["scenes"] if item["id"] == scene_id), None)
     if scene is None:
@@ -88,23 +111,28 @@ def plan_conversion(root: Path, production: dict[str, Any], scene_id: str, shot_
             else next((item for item in takes if item.get("selected")), None) or next(iter(takes), None))
     if take is None:
         raise ValidationError(f"{shot_id} has no video take {take_id!r}" if take_id else f"{shot_id} has no video take")
-    speakers = sorted({line.get("who", "") for line in shot.get("lines") or [] if line.get("in_take", True)})
-    if not speakers:
+    lines = [{"who": line.get("who", ""), "text": line.get("en") or line.get("text") or ""}
+             for line in shot.get("lines") or [] if line.get("in_take", True)]
+    order = list(dict.fromkeys(line["who"] for line in lines))
+    if not order:
         raise ValidationError(f"{shot_id} declares no line spoken in the take; there is no voice to convert")
-    if len(speakers) > 1:
-        raise ValidationError(f"{shot_id} has {len(speakers)} speakers ({', '.join(speakers)}); "
-                              f"converting one voice would change the others too")
     cast = production.get("cast") or {}
-    member = next((m for m in cast.values()
-                   if cast_key(speakers[0]) in {cast_key(n) for n in [m["id"], m["label"], *m.get("names", [])]}), None)
-    if member is None:
-        raise ValidationError(f"{speakers[0]} has no cast sheet (cast/<id>/character.yaml) to take a voice from")
-    recordings = ((member.get("voice") or {}).get("references") or [])
-    reference = next((root / item for item in recordings if (root / item).is_file()), None)
-    if reference is None:
-        raise ValidationError(f"{member['label']}'s cast sheet has no voice recording "
-                              f"(voice: references: [...]); a few clean seconds of the voice are needed")
-    return VoicePlan(scene_id, shot_id, take["id"], root / take["media"], speakers[0], member["id"], reference)
+    speakers = []
+    for who in order:
+        member = next((m for m in cast.values()
+                       if cast_key(who) in {cast_key(n) for n in [m["id"], m["label"], *m.get("names", [])]}), None)
+        if member is None:
+            raise ValidationError(f"{who} has no cast sheet (cast/<id>/character.yaml) to take a voice from")
+        recordings = ((member.get("voice") or {}).get("references") or [])
+        reference = next((root / item for item in recordings if (root / item).is_file()), None)
+        if reference is None:
+            raise ValidationError(f"{member['label']}'s cast sheet has no voice recording "
+                                  f"(voice: references: [...]); a few clean seconds of the voice are needed")
+        speakers.append({"who": who, "member": member["id"], "reference": reference})
+    media = root / take["media"]
+    pattern = str(production.get("words_sidecar") or "{stem}.words.json")
+    sidecar = media.parent / pattern.format(stem=media.stem, name=media.name)
+    return VoicePlan(scene_id, shot_id, take["id"], media, speakers, lines, sidecar if sidecar.is_file() else None)
 
 
 def mux_command(take: Path, audio: Path, output: Path) -> list[str]:

@@ -170,7 +170,8 @@ remains:
   (`toast budget`, `toast generate`, versions `b<id>-<n>`; CT-0037). The control room
   starts one after showing the estimate. The voice spike is done too:
   `toast revoice` converts a take's speech to the cast member's recording, the
-  room kept, as a new take (CT-0040). Master pictures by
+  room kept, as a new take, with each speaker of a multi-speaker take in their
+  own voice (lines aligned to word timings, no diarization; CT-0040). Master pictures by
   `derive` (render + cast faces, `toast picture`) close step 9. Step 10 is done too:
   the built-in workflow stops at "approve the master picture" (SPEC-0009,
   CT-0042; `toast workflow`, the scene room's Workflow panel, a card on the

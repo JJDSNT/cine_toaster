@@ -7,5 +7,7 @@ chatterbox-tts==0.1.7
 demucs==4.1.0
 resemblyzer==0.1.4
 soundfile>=0.12
+# Word timings for takes with several speakers, when the production has none (MIT).
+faster-whisper>=1.0
 # webrtcvad (via resemblyzer) still imports pkg_resources.
 setuptools<80

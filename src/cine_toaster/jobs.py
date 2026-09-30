@@ -1069,7 +1069,9 @@ def _run_voice(context: JobContext) -> dict[str, Any]:
     work = context.staging / "voice-work"
     audio, report = context.staging / "voice.wav", context.staging / "voice-report.json"
     context.progress(0.02, f"Separating and converting {plan.speaker}'s voice")
-    context.run_process([str(python), str(WORKER), str(plan.media), str(plan.reference), str(audio), str(work), str(report)],
+    spec = context.staging / "voice-spec.json"
+    spec.write_text(json.dumps(plan.spec(), indent=2), encoding="utf-8")
+    context.run_process([str(python), str(WORKER), str(plan.media), str(spec), str(audio), str(work), str(report)],
                         message=f"Converting {plan.speaker}'s voice", span=(0.02, 0.9))
     # A converted take sits with the takes, even when its source is the cut's own or a rejected one.
     work_dir = plan.media.parent
@@ -1092,7 +1094,9 @@ def _run_voice(context: JobContext) -> dict[str, Any]:
     return {"files": [{"staged": name, "destination": destination},
                       {"staged": f"{name}.provenance.json", "destination": destination + ".provenance.json"}],
             "summary": {"scene": plan.scene, "shot": plan.shot, "from_take": plan.take, "file": name,
-                        "media": destination, "similarity": measured.get("similarity")}}
+                        "media": destination, "similarity": measured.get("similarity"),
+                        "similarity_by_speaker": measured.get("similarity_by_speaker"),
+                        "unplaced": measured.get("unplaced") or []}}
 
 
 register(JobKind("convert_voice", _validate_voice, _run_voice))

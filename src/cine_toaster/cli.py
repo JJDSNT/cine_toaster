@@ -717,7 +717,12 @@ def command_revoice(args: argparse.Namespace) -> int:
 
     root = Path(args.project).expanduser().resolve()
     plan = plan_conversion(root, load_production(root), args.scene, args.shot, args.take or "")
-    print(f"{plan.scene} {plan.shot} take {plan.take}: {plan.speaker}'s voice -> {plan.reference.relative_to(root)}")
+    for item in plan.speakers:
+        print(f"{plan.scene} {plan.shot} take {plan.take}: {item['who']}'s voice -> {item['reference'].relative_to(root)}")
+    if len(plan.speakers) > 1:
+        print(f"  who speaks when: the {len(plan.lines)} declared lines aligned to "
+              + (f"the words in {plan.words.name} (or heard from the take, if it leaves a line out)"
+                 if plan.words else "words heard from the take"))
     if args.dry_run:
         print("Nothing was converted (--dry-run).")
         return 0
@@ -739,6 +744,11 @@ def command_revoice(args: argparse.Namespace) -> int:
     similarity = summary.get("similarity") or {}
     print(f"Made {summary['media']}"
           + (f"; likeness to the reference {similarity['before']} -> {similarity['after']}" if similarity else ""))
+    for who, measured in (summary.get("similarity_by_speaker") or {}).items():
+        if measured and len(plan.speakers) > 1:
+            print(f"  {who}: likeness {measured['before']} -> {measured['after']}")
+    for who in summary.get("unplaced") or []:
+        print(f"  {who} was not heard in this take; whatever they say in it was converted to another speaker's voice", file=sys.stderr)
     return 0
 
 

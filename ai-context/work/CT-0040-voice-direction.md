@@ -182,7 +182,21 @@ Remaining:
   They will judge whether Kael's converted voice in 3-01 still sounds ill
   or has become healthy. Until then, conversion is not applied where the
   state of the voice matters. Noted in `singular/docs/SINGULAR-CINE-TOASTER.md`;
-- converting per speaker in two-speaker takes, which needs diarization;
+- ~~converting per speaker in two-speaker takes~~ done 2026-09-30 without
+  diarization: `voice_align.py` aligns the declared lines to word timings
+  (the production sidecar only when it contains every line, else
+  faster-whisper on the separated voice); the worker converts each
+  speaker's stretch to their own recording. Provenance gains `segments`,
+  `words_source`, `similarity_by_speaker` and `unplaced`; the CLI and the
+  comparison room offer it for any number of speakers.
+  Validated: on SINGULAR's only two-speaker shot (3-01 P2) the take holds
+  no "Claire?!" at all (the voice track is silent until 6.5 s), and the
+  sidecar lacks it too; the run reported KAEL `unplaced` rather than
+  inventing a likeness. On a test take joined from 3-01 c15 (Kael) and c02
+  (Lira), the cut fell at 3.12 s against the real joint at 3.04 s; likeness
+  Kael 0.527 → 0.498, Lira 0.817 → 0.765. Comparison video sent to the
+  author. `tests/test_voice.py`: 8 tests (alignment, three speakers,
+  two-speaker job, an incomplete sidecar not trusted).
 - ~~a control-room action~~ done 2026-09-30: "Revoice as <speaker>" on a
   take card in the comparison room, when the shot has one speaker in the
   take. It starts `convert_voice`, and the new take appears once adopted.

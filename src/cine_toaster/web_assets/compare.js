@@ -72,13 +72,13 @@ function provenanceLine(take) {
   return el("small", "take-provenance", text);
 }
 
-// One speaker in the take: its speech can be converted to the cast member's
-// recorded voice, as a new take beside this one (CT-0040, `toast revoice`).
+// Each speaker in the take is converted to their cast member's recorded voice,
+// as a new take beside this one (CT-0040, `toast revoice`).
 function revoiceButton(scene, shot, take) {
-  const speakers = new Set((shot.lines || []).filter((line) => line.in_take !== false).map((line) => line.who));
-  if (speakers.size !== 1 || !/\.(mp4|mov|webm)$/i.test(take.media || "")) return null;
-  const [who] = speakers;
-  const action = button(`Revoice as ${who}`, async () => {
+  const speakers = [...new Set((shot.lines || []).filter((line) => line.in_take !== false).map((line) => line.who))];
+  if (!speakers.length || !/\.(mp4|mov|webm)$/i.test(take.media || "")) return null;
+  const who = speakers.join(" and ");
+  const action = button(speakers.length === 1 ? `Revoice as ${who}` : `Revoice ${who}`, async () => {
     action.disabled = true;
     try {
       const response = await fetch("/api/jobs", {
@@ -88,7 +88,7 @@ function revoiceButton(scene, shot, take) {
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error?.message || `Request failed (${response.status})`);
-      toast(`Converting ${who}'s voice: the new take appears here when it is adopted.`);
+      toast(`Converting ${speakers.length === 1 ? `${who}'s voice` : `the voices of ${who}`}: the new take appears here when it is adopted.`);
       document.dispatchEvent(new CustomEvent("jobs-changed"));
     } catch (error) {
       alert(error.message);
@@ -96,7 +96,9 @@ function revoiceButton(scene, shot, take) {
       action.disabled = false;
     }
   }, "quiet-button");
-  action.title = `Convert this take's speech to ${who}'s recorded voice; the room's sound is kept. A new take, nothing replaced.`;
+  action.title = speakers.length === 1
+    ? `Convert this take's speech to ${who}'s recorded voice; the room's sound is kept. A new take, nothing replaced.`
+    : `Each line goes to its speaker's recorded voice, found by aligning the declared lines to the spoken words; the room's sound is kept. A new take, nothing replaced.`;
   return action;
 }
 
