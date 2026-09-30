@@ -95,6 +95,16 @@ ADR 0012. ADR 0012 names locations as the next entity of the same shape.
 
 # Remaining
 
-- Set pieces drawn in the blocking frame and previs (CT-0025 item 5).
-- Plates as generation sources.
+- ~~Set pieces drawn in the blocking frame~~ done 2026-09-30 (CT-0025).
+- ~~Plates as generation sources~~ done 2026-09-30. `locations.plate(root,
+  location, camera)` reads the location's `references` (kind `plate`,
+  `camera`); `pictures.source_picture` resolves `location:<camera>` and bare
+  `location` (the shot's camera), so `plan_picture`, the Pictures panel,
+  workflows and `set_reference` all accept it. `toast check` reports
+  `plate_missing` (warning) before any paid edit. The graph carries each
+  scene's `location` and existing `plates`; the canvas reference editor
+  offers them. Tests: 2 in `test_pictures` (both spellings, the size taken
+  from the plate; a missing plate found by the check and refused by the
+  plan). Not done: no demo plate ships (a drawn stand-in would be edited as
+  if it were a photograph).
 - A Locations room in the control room.

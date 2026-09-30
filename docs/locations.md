@@ -32,6 +32,22 @@ geography:
   piece or move one by id; a moved piece is reported like a moved mark.
 - **Cameras:** a scene camera entry with only an id takes the location's
   camera. An entry with a position replaces it for that scene.
+- **Plates as the start of a picture:** a plate is the empty set,
+  photographed or rendered from where one of the set's cameras stands. A
+  shot's master picture can be made from it: `derive: {from: location:CAM-A,
+  with: [MARA], request: ...}`, or `from: location` for the plate of the
+  shot's own camera. The edit then puts the cast into the real room, with
+  its geometry kept. A plate that does not exist is reported by the checks
+  (`plate_missing`, warning) before any edit is paid for. On the canvas,
+  **Change what it is made from** lists the scene's plates beside its shots.
+- **Plates as the start of a picture:** a plate is the empty set,
+  photographed or rendered from where one of the set's cameras stands. A
+  shot's master picture can be made from it: `derive: {from: location:CAM-A,
+  with: [MARA], request: ...}`, or `from: location` for the plate of the
+  shot's own camera. The edit then puts the cast into the real room, with
+  its geometry kept. A plate that does not exist is reported by the checks
+  (`plate_missing`, warning) before any edit is paid for. On the canvas,
+  **Change what it is made from** lists the scene's plates beside its shots.
 - **Checks:** a scene that moves one of the set's marks or cameras is told
   (`location_override`, advice), so a real change and a drift both show. A
   location the production does not have is an error (`location_unknown`).

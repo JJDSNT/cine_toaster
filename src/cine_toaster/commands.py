@@ -486,8 +486,8 @@ def _made_from(root: Path, scene: dict[str, Any], shot: dict[str, Any], ref: str
         if match["id"] == shot["id"]:
             raise ValidationError(f"{shot['id']} cannot be made from itself")
         return str(match.get("number") or match["id"])
-    if source_picture(root, scene, ref) is None:
-        raise ValidationError(f"{ref!r} is neither a shot of {scene['id']} nor a picture file",
+    if source_picture(root, scene, ref, shot) is None:
+        raise ValidationError(f"{ref!r} is neither a shot of {scene['id']}, a picture file, nor a plate of its location",
                               scene_id=scene["id"], shot_id=shot["id"])
     return ref
 

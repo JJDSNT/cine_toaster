@@ -165,7 +165,7 @@ function Details({ selection, graph, onChanged }: { selection: Selection; graph:
         <details className="reference-details">
           <summary>Change what it is made from</summary>
           <ReferenceEditor key={`${node.id}@${revision}`} shot={d} shots={sceneShots} cast={graph?.production.cast ?? []}
-                           revision={revision} onSaved={onChanged} />
+                           plates={sceneNode?.type === "scene" ? sceneNode.data.plates : []} revision={revision} onSaved={onChanged} />
         </details>
         {d.block && <StartBlock graph={graph} scene={d.scene} block={d.block} onChanged={onChanged} />}
         {!d.block && d.source === "generated" && <StartBlock graph={graph} scene={d.scene} shot={d.shot} onChanged={onChanged} />}

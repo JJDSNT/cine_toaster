@@ -93,9 +93,29 @@ def _file(scene_file: Path, value: str) -> Path | None:
     return candidate if value and candidate.suffix.lower() in IMAGE_SUFFIXES and candidate.is_file() else None
 
 
-def source_picture(root: Path, scene: dict[str, Any], name: str) -> Path | None:
-    """The picture a derivation edits: a file, or the picture of the shot or master it names."""
+#: A derivation from the scene's location: `location:CAM-A`, or `location` for the shot's own camera.
+LOCATION_PREFIX = "location"
 
+
+def location_camera(name: str, shot: dict[str, Any] | None = None) -> str | None:
+    """The camera whose plate `name` asks for, or None when it names no plate."""
+
+    text = str(name or "").strip()
+    if text.lower() == LOCATION_PREFIX:
+        return str((shot or {}).get("camera") or "")
+    if text.lower().startswith(LOCATION_PREFIX + ":"):
+        return text.split(":", 1)[1].strip()
+    return None
+
+
+def source_picture(root: Path, scene: dict[str, Any], name: str, shot: dict[str, Any] | None = None) -> Path | None:
+    """The picture a derivation edits: a file, the picture of the shot or master it names, or a location's plate."""
+
+    camera = location_camera(name, shot)
+    if camera is not None:
+        from .locations import plate
+
+        return plate(root, scene["location"], camera) if scene.get("location") and camera else None
     scene_file = root / scene["file"]
     direct = _file(scene_file, name)
     if direct:
@@ -168,8 +188,13 @@ def plan_picture(root: Path, production: dict[str, Any], scene_id: str, shot_id:
         raise ValidationError(f"{shot_id} does not say what picture it is made from (derive: {{from, with, request}})")
     if not derive.get("request"):
         raise ValidationError(f"{shot_id} does not say what the picture should become (derive: request)")
-    source = source_picture(root, scene, derive["from"])
+    source = source_picture(root, scene, derive["from"], shot)
     if source is None:
+        camera = location_camera(derive["from"], shot)
+        if camera is not None:
+            raise ValidationError(
+                f"{shot_id} is made from the plate of {camera or 'its camera'} in {scene.get('location') or 'no location'}, "
+                f"which has none (location.yaml references: {{path, kind: plate, camera: {camera or '<id>'}}})")
         raise ValidationError(f"{shot_id} is derived from {derive['from']!r}, which has no picture yet")
     references = [face_reference(root, production, scene, name) for name in derive.get("with") or []]
     notes = []
@@ -199,7 +224,7 @@ def scene_pictures(root: Path, scene: dict[str, Any]) -> list[dict[str, Any]]:
         if not derive:
             continue
         stem = picture_stem(work, str(shot["number"]))
-        source = source_picture(root, scene, derive.get("from", ""))
+        source = source_picture(root, scene, derive.get("from", ""), shot)
         found.append({
             "shot": shot["id"], "number": shot["number"], "label": shot.get("label", ""), "derive": derive,
             "source": relative(root, source) if source else "",

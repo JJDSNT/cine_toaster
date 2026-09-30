@@ -123,6 +123,23 @@ def resolve(geography: dict[str, Any], location: dict[str, Any]) -> tuple[dict[s
     return merged, notes
 
 
+def plate(root: Path, location_id: str, camera_id: str) -> Path | None:
+    """The location's plate for a camera: the empty set, seen from where that camera stands."""
+
+    location = load_locations(root).get(_key(location_id))
+    if location is None:
+        return None
+    folder = root / location["directory"]
+    raw = _read(folder / FILE)
+    for item in raw.get("references") or []:
+        if (isinstance(item, dict) and item.get("path") and str(item.get("kind") or "plate") == "plate"
+                and _key(item.get("camera")) == _key(camera_id)):
+            path = (folder / str(item["path"])).resolve()
+            if path.is_file():
+                return path
+    return None
+
+
 # --- the backlot ------------------------------------------------------------------
 
 

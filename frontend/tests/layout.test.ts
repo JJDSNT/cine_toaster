@@ -5,7 +5,7 @@ import type { GraphNode } from "../src/types.ts";
 
 const scene = (id: string, order: number): GraphNode => ({
   id: `scene:${id}`, type: "scene", scene: id,
-  data: { scene: id, title: id, order, revision: 0, sequence: "", status: "", findings: 0, severity: "" },
+  data: { scene: id, title: id, order, revision: 0, location: "", plates: [], sequence: "", status: "", findings: 0, severity: "" },
 });
 const shot = (sceneId: string, id: string, order: number): GraphNode => ({
   id: `shot:${sceneId}/${id}`, type: "shot", scene: sceneId,

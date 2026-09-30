@@ -77,8 +77,13 @@ def production_graph(production: dict[str, Any], root: Path | None = None) -> di
     previous_last: str | None = None
     previous_scene: str | None = None
 
+    locations = production.get("locations") or {}
     for scene_index, scene in enumerate(production["scenes"]):
         scene_node = f"scene:{scene['id']}"
+        # The empty set, by camera: what a shot's picture may be made from (SPEC-0010).
+        plates = [{"camera": ref["camera"], "path": ref["path"]}
+                  for ref in (locations.get(scene.get("location") or "") or {}).get("references") or []
+                  if ref.get("kind") == "plate" and ref.get("camera") and ref.get("exists")]
         nodes.append({
             "id": scene_node,
             "type": "scene",
@@ -88,6 +93,8 @@ def production_graph(production: dict[str, Any], root: Path | None = None) -> di
                 "sequence": scene.get("sequence") or "", "status": scene.get("status") or "",
                 # The revision a canvas edit is made against: a stale edit is refused.
                 "revision": scene.get("revision", 0),
+                "location": scene.get("location") or "",
+                "plates": plates,
                 "findings": len(scene.get("findings") or []),
                 "severity": _severity(scene.get("findings") or []),
             },

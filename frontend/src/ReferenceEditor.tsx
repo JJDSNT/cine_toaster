@@ -11,17 +11,19 @@ interface Props {
   /** The other shots of the scene, as possible sources. */
   shots: ShotData[];
   cast: { id: string; label: string }[];
+  /** The scene's location plates: the empty set, by camera. */
+  plates: { camera: string; path: string }[];
   revision: number;
   onSaved: () => void;
 }
 
-export function ReferenceEditor({ shot, shots, cast, revision, onSaved }: Props) {
+export function ReferenceEditor({ shot, shots, cast, plates, revision, onSaved }: Props) {
   const [from, setFrom] = useState(shot.from[0] ?? "");
   const [faces, setFaces] = useState<string[]>(shot.with);
   const [why, setWhy] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const known = shots.some((item) => item.number === from) || !from;
+  const known = shots.some((item) => item.number === from) || plates.some((item) => `location:${item.camera}` === from) || !from;
 
   const run = async (name: string, payload: Record<string, unknown>) => {
     setBusy(true);
@@ -48,6 +50,11 @@ export function ReferenceEditor({ shot, shots, cast, revision, onSaved }: Props)
           {shots.filter((item) => item.shot !== shot.shot).map((item) => (
             <option key={item.shot} value={item.number}>{item.shot} · {item.label.slice(0, 40)}</option>
           ))}
+          {plates.length > 0 && (
+            <optgroup label="The empty set (location plates)">
+              {plates.map((item) => <option key={item.camera} value={`location:${item.camera}`}>Plate from {item.camera}</option>)}
+            </optgroup>
+          )}
           {!known && <option value="__other">{from}</option>}
         </select>
       </label>

@@ -79,7 +79,10 @@ productions. It is found at the paths in `CINE_TOASTER_BACKLOT`.
 
 # Out of scope here
 
-- Set pieces (furniture, doors) drawn in the blocking frame and previs.
-  This is CT-0025's recorded limit, which the location will carry.
-- Plates as generation sources (`derive: {from: location:CAM-A}`).
+- ~~Set pieces drawn in the blocking frame~~ done 2026-09-30 (CT-0025):
+  `set_pieces` in a location or a scene, merged by id.
+- ~~Plates as generation sources~~ done 2026-09-30: `derive: {from:
+  location:CAM-A}` or `from: location` (the shot's own camera) makes the
+  master picture from the location's plate for that camera; `plate_missing`
+  (warning) when there is none.
 - A shared backlot shipped with the application.

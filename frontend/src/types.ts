@@ -14,6 +14,9 @@ export interface SceneData {
   title: string;
   order: number;
   revision: number;
+  /** The location the scene is set in, and its plates by camera (SPEC-0010). */
+  location: string;
+  plates: { camera: string; path: string }[];
   sequence: string;
   status: string;
   findings: number;

@@ -500,6 +500,7 @@ def _load_scene(
         shot["approved_picture"] = approved.get(shot["id"], "")
     _apply_cut_decisions(shots, state)
     _apply_reference_decisions(shots, state)
+    location_findings.extend(_check_plates(root, location_id, shots, scene_id))
 
     try:
         geometry = parse_geometry(_geometry_document(geography))
@@ -693,6 +694,31 @@ def _check_shot_fields(shots: list[dict[str, Any]], scene_id: str) -> list[Findi
                 shots=tuple(shot_ids),
             )
         )
+    return findings
+
+
+def _check_plates(root: Path, location_id: str, shots: list[dict[str, Any]], scene_id: str) -> list[Finding]:
+    """A picture made from a location's plate needs that plate: said before anyone pays for the edit."""
+
+    from .locations import plate
+    from .pictures import location_camera
+
+    findings = []
+    for shot in shots:
+        camera = location_camera((shot.get("derive") or {}).get("from", ""), shot)
+        if camera is None:
+            continue
+        if not location_id:
+            message = f"{shot['id']} is made from its location's plate, but the scene is set in no location."
+        elif not camera:
+            message = f"{shot['id']} is made from the plate of its camera, but it has no camera."
+        elif plate(root, location_id, camera) is None:
+            message = (f"{shot['id']} is made from the plate of {camera} in {location_id}, which has none "
+                       f"(references: {{path, kind: plate, camera: {camera}}} in its location.yaml).")
+        else:
+            continue
+        findings.append(Finding(code="plate_missing", severity="warning", scene_id=scene_id, shots=(shot["id"],),
+                                message=message))
     return findings
 
 

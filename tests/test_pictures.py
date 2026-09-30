@@ -89,6 +89,42 @@ class PictureTests(unittest.TestCase):
         self.assertIn("for identity only", plan.prompt)
         self.assertEqual(plan.stem, "p03")
 
+    def use_the_plate(self, source: str) -> None:
+        scene_file = self.scene_dir / "scene.yaml"
+        scene_file.write_text(scene_file.read_text(encoding="utf-8").replace("from: blockout/cam-a.png", f"from: {source}"),
+                              encoding="utf-8")
+
+    def test_a_picture_can_be_made_from_the_locations_plate(self) -> None:
+        from cine_toaster.project import load_scene
+
+        # The empty set, photographed from where CAM-A stands (SPEC-0010).
+        location = self.root / "locations" / "listening-station"
+        (location / "plates").mkdir()
+        png(location / "plates" / "cam-a.png", (640, 352), "navy")
+        yaml_file = location / "location.yaml"
+        yaml_file.write_text(yaml_file.read_text(encoding="utf-8")
+                             + "references:\n  - {path: plates/cam-a.png, kind: plate, camera: CAM-A}\n", encoding="utf-8")
+        for source in ("location:CAM-A", "location"):  # named, or the shot's own camera (P3 is CAM-A's)
+            self.use_the_plate(source)
+            plan = plan_picture(self.root, load_production(self.root), "SC-030", "P3")
+            self.assertEqual(plan.source, (location / "plates" / "cam-a.png").resolve())
+            self.assertEqual(plan.size, (1280, 704))
+            self.assertFalse([f for f in load_scene(self.root, "SC-030")["findings"] if f["code"] == "plate_missing"])
+            self.scene_dir.joinpath("scene.yaml").write_text(
+                self.scene_dir.joinpath("scene.yaml").read_text(encoding="utf-8").replace(f"from: {source}",
+                                                                                           "from: blockout/cam-a.png"),
+                encoding="utf-8")
+
+    def test_a_missing_plate_is_said_before_anything_is_paid(self) -> None:
+        from cine_toaster.project import load_scene
+
+        self.use_the_plate("location:CAM-B")
+        findings = [f for f in load_scene(self.root, "SC-030")["findings"] if f["code"] == "plate_missing"]
+        self.assertEqual(len(findings), 1)
+        self.assertIn("P3 is made from the plate of CAM-B in LISTENING-STATION, which has none", findings[0]["message"])
+        with self.assertRaisesRegex(ValidationError, "made from the plate of CAM-B in LISTENING-STATION"):
+            plan_picture(self.root, load_production(self.root), "SC-030", "P3")
+
     def test_a_shot_that_is_not_derived_is_told_so(self) -> None:
         with self.assertRaisesRegex(ValidationError, "does not say what picture it is made from"):
             plan_picture(self.root, load_production(self.root), "SC-030", "P1")
