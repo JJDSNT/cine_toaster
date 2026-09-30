@@ -504,7 +504,15 @@ async function renderScene(sceneId, { record = true } = {}) {
   const copy = el("div");
   const meta = el("div", "scene-header-meta");
   meta.append(el("span", "scene-id", scene.id), statusPill(scene.status), el("span", "muted", scene.sequence));
-  copy.append(meta, el("h1", "", scene.title), el("p", "hero-logline", scene.summary), phaseLine(scene));
+  const place = scene.location && state.production?.locations?.[scene.location];
+  copy.append(meta, el("h1", "", scene.title), el("p", "hero-logline", scene.summary));
+  if (scene.location) {
+    // SPEC-0010: the set this scene is shot in, declared once and shared.
+    const others = (place?.appearances || []).filter((id) => id !== scene.id);
+    copy.append(el("p", "muted location-line", `Set in ${place ? place.label : scene.location}`
+      + (others.length ? ` · also ${others.join(", ")}` : "")));
+  }
+  copy.append(phaseLine(scene));
   const facts = el("div", "scene-facts");
   facts.append(metric(`R${String(scene.iteration).padStart(2, "0")}`, "Current iteration"), metric(`${scene.duration_seconds}s`, "Target duration"), metric(`${scene.progress}%`, "Workflow"));
   header.append(copy, facts);

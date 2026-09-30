@@ -115,7 +115,8 @@ def scene_digest(scene: dict[str, Any]) -> str:
              + (", but the breakdown changed since" if phase.get("changed_since") else "") + ")"
              if phase.get("phase") == "production" else "fitting the storyboard (not yet approved)")
     lines = [f"Scene {scene['id']}: {scene.get('title', '')} — {len(scene['shots'])} shots, "
-             f"{sum(1 for shot in scene['shots'] if shot.get('selected_take'))} with a chosen take; {stage}."]
+             f"{sum(1 for shot in scene['shots'] if shot.get('selected_take'))} with a chosen take; {stage}"
+             + (f"; set in the location {scene['location']}" if scene.get("location") else "") + "."]
     for block in scene.get("blocks") or []:
         lines.append(f"Block {block['id']}: shots {', '.join(block['shots'])}; "
                      f"{len(block.get('versions') or [])} generated version(s).")

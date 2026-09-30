@@ -81,11 +81,12 @@ class CliTakeTests(unittest.TestCase):
         self.assertIn("No continuity problems", out)
 
     def test_check_fails_when_a_camera_crosses_the_line(self) -> None:
-        scene_file = self.root / "scenes" / "030-echo-chamber" / "scene.yaml"
-        scene_file.write_text(
-            scene_file.read_text().replace(
-                "      x: 2.9\n      y: 0.5",
-                "      x: 2.9\n      y: 4.0",
+        # The two-shot camera lives in the location now (SPEC-0010): move it on the set.
+        location_file = self.root / "locations" / "listening-station" / "location.yaml"
+        location_file.write_text(
+            location_file.read_text().replace(
+                "    x: 2.9\n    y: 0.5",
+                "    x: 2.9\n    y: 4.0",
             ),
             encoding="utf-8",
         )

@@ -1,0 +1,33 @@
+# The listening station, declared once (SPEC-0010). SC-010 and SC-030 are shot
+# here; each scene adds only who is in the room and which shots each camera covers.
+id: LISTENING-STATION
+label: The listening station
+description: A cramped radio room. The console on one side, the speaker stack opposite, the room only ever seen from the console side.
+room: [6.0, 4.5, 3.2]
+marks:
+  - id: HALFWAY
+    x: 2.6
+    y: 2.3
+    label: Two steps short of the stack
+cameras:
+  - id: CAM-A
+    x: 3.4
+    y: 0.9
+    height: 1.05
+    target: [4.1, 2.2]
+    lens_mm: 50
+    label: Console side, on Mara
+  - id: CAM-B
+    x: 2.2
+    y: 1.0
+    height: 1.05
+    target: [1.2, 2.4]
+    lens_mm: 35
+    label: Console side, on the stack
+  - id: CAM-C
+    x: 2.9
+    y: 0.5
+    height: 1.35
+    target: [2.6, 2.3]
+    lens_mm: 28
+    label: Two-shot

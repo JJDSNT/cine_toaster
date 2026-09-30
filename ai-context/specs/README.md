@@ -45,6 +45,7 @@ work is tracked separately under `ai-context/work/`.
 | `SPEC-0007` | the cut: how one shot becomes the next, within a scene | implemented | complete |
 | `SPEC-0008` | jobs: background work that outlives the interface that started it | implemented | complete |
 | `SPEC-0009` | workflows and human gates: the built-in state machine that stops for a person | accepted | partial |
+| `SPEC-0010` | locations and the backlot: a set declared once, pinned from a shared library | accepted | partial |
 
 ## Rule
 

@@ -132,7 +132,7 @@ class SelectTakeTests(CommandTestCase):
         select_take(self.root, scene_id=SCENE, shot_id=SHOT, take_id="HARD-CUT-IN", actor=DIRECTOR)
         self.assertEqual(authored.read_text(), before)
         # Comments and prose survive because nothing rewrites this file.
-        self.assertIn("# The plan of the scene", before)
+        self.assertIn("# The scene is set in the listening station", before)
         self.assertIn("direction: |", before)
 
     def test_unrelated_scene_state_is_preserved(self) -> None:

@@ -361,6 +361,15 @@ def _phase(root: Path, path: Path, state: SceneState) -> dict[str, Any]:
     return phase(root, {"file": path.relative_to(root).as_posix()}, state.gates)
 
 
+def _production_locations(root: Path, scenes: list[dict[str, Any]]) -> dict[str, Any]:
+    from .locations import load_locations
+
+    found = load_locations(root)
+    for location_id, location in found.items():
+        location["appearances"] = [scene["id"] for scene in scenes if scene.get("location") == location_id]
+    return found
+
+
 def _expand_camera_moves(shots: list[dict[str, Any]], scene_id: str, root: Path) -> list[Finding]:
     """`move: {id: push-in}` takes its kind, direction and rig from the camera-move catalog (CT-0027)."""
 
@@ -436,6 +445,22 @@ def _load_scene(
         raise ProjectFormatError(f"Missing 'scene' in {path}")
 
     geography = field(document, "geography") or {}
+    # SPEC-0010: a scene in a location takes the set's plan and adds its own.
+    location_id = _text(_scene_field(document, "location", scene_aliases)).strip().upper()
+    location_findings: list[Finding] = []
+    if location_id:
+        from .locations import load_locations, resolve
+
+        location = load_locations(root).get(location_id)
+        if location is None:
+            location_findings.append(Finding(code="location_unknown", severity="error", scene_id=scene_id,
+                message=f"The scene is set in {location_id}, which is not among the production's locations "
+                        f"(locations/<id>/location.yaml)."))
+        else:
+            geography, differences = resolve(geography if isinstance(geography, dict) else {}, location)
+            for difference in differences:
+                location_findings.append(Finding(code="location_override", severity="advice", scene_id=scene_id,
+                    message=f"In {location_id}, {difference}. Intended for this scene, or drift from the set?"))
     shots = _load_shots(document, path, root, declared_fields, aliases)
     assignments = _camera_assignments(geography)
     for shot in shots:
@@ -472,6 +497,7 @@ def _load_scene(
             shot["motion"] = motion.public_dict()
     findings.extend(finding.public_dict() for finding in _check_shot_fields(shots, scene_id))
     findings.extend(finding.public_dict() for finding in move_findings)
+    findings.extend(finding.public_dict() for finding in location_findings)
     findings.extend(
         finding.public_dict() for finding in _check_transitions(shots, scene_id, root)
     )
@@ -557,6 +583,7 @@ def _load_scene(
         # SPEC-0003 / CT-0040: which variant of each cast member this scene
         # uses, how their voice sounds here, and any voice restated in full.
         "cast": _scene_field(document, "cast", scene_aliases) or {},
+        "location": location_id,
         "voice_state": _scene_field(document, "voice_state", scene_aliases) or {},
         "voices": _scene_field(document, "voices", scene_aliases) or {},
         # How a generation model should refer to each speaker ("The man beside the bed").
@@ -886,7 +913,7 @@ def discover_stills(root: Path, scene_id: str) -> dict[str, str]:
 
 
 #: Scene fields a production may name in its own words (`scene_fields`).
-SCENE_ALIAS_TARGETS = ("cast", "voice_state", "voices", "refer_as")
+SCENE_ALIAS_TARGETS = ("cast", "voice_state", "voices", "refer_as", "location")
 
 
 def _scene_field_aliases(manifest: dict[str, Any]) -> dict[str, str]:
@@ -1195,6 +1222,8 @@ def load_production(root: Path) -> dict[str, Any]:
         "script_problem": script_problem,
         "cast": {key: {**member.public_dict(), "appearances": seen.get(key, [])}
                  for seen in [cast_appearances(scenes, cast)] for key, member in cast.items()},
+        # SPEC-0010: each set declared once, with the scenes shot in it.
+        "locations": _production_locations(root, scenes),
         # ADR 0016: a generated screenplay is read only in the editor.
         "script_generated_by": _text(manifest.get("screenplay_generated_by")),
         # Where a take's word timings are, beside it: `{stem}` is the take's

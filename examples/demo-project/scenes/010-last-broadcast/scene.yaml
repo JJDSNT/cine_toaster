@@ -9,6 +9,9 @@ summary: Waiting on the master images.
 script:
   heading: INT. LISTENING STATION - NIGHT
 
+# The same room as SC-030, declared once (locations/listening-station).
+location: LISTENING-STATION
+
 shots:
   - n: 1
     kind: black

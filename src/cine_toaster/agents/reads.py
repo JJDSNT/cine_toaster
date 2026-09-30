@@ -49,6 +49,10 @@ def overview(production: dict[str, Any], budget: dict[str, Any] | None = None) -
     unplaced = [scene["id"] for scene in production["scenes"] if scene["id"] not in placed]
     if production.get("sequences") and unplaced:
         lines.append(f"Scenes in no sequence: {', '.join(unplaced)}")
+    places = production.get("locations") or {}
+    if places:
+        lines.append("Locations: " + "; ".join(f"{place.get('label') or key} ({', '.join(place.get('appearances') or []) or 'no scene yet'})"
+                                                for key, place in places.items()))
     cast = production.get("cast") or {}
     if cast:
         lines.append("Cast: " + ", ".join(member.get("label") or key for key, member in cast.items()))

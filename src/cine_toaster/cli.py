@@ -576,6 +576,30 @@ def command_gate(args: argparse.Namespace) -> int:
     return _drive(root, args.scene, act)
 
 
+def command_backlot(args: argparse.Namespace) -> int:
+    """Locations shared across productions: list, pin a copy, see what moved (SPEC-0010)."""
+
+    from .locations import backlot, pin, status
+
+    if args.backlot_command == "list":
+        offered = backlot()
+        if not offered:
+            print("The backlot is empty (set CINE_TOASTER_BACKLOT to one or more folders of locations).")
+        for location in offered.values():
+            print(f"{location['id']:22} {location['label']:30} {location['source']}")
+        return 0
+    root = Path(args.project).expanduser().resolve()
+    if args.backlot_command == "pin":
+        record = pin(root, args.location, update=args.update)
+        print(f"Pinned {record['id']} into {record['directory']} (digest {record['digest']})")
+        return 0
+    for item in status(root):
+        state = ("the backlot moved on (pin --update to take it)" if item["backlot_moved_on"]
+                 else "up to date" if item["in_backlot"] else "no longer in the backlot")
+        print(f"{item['id']:22} {state}{'; edited in this production' if item['edited_here'] else ''}")
+    return 0
+
+
 def command_moves(args: argparse.Namespace) -> int:
     """The camera-move catalog (CT-0027)."""
 
@@ -1521,6 +1545,17 @@ def build_parser() -> argparse.ArgumentParser:
     costs_parser.add_argument("project", type=Path)
     costs_parser.add_argument("--json", action="store_true")
     costs_parser.set_defaults(function=command_costs)
+
+    backlot_parser = subparsers.add_parser("backlot", help="Locations shared across productions (SPEC-0010)")
+    backlot_sub = backlot_parser.add_subparsers(dest="backlot_command", required=True)
+    backlot_sub.add_parser("list", help="What the backlot offers (CINE_TOASTER_BACKLOT)")
+    backlot_pin = backlot_sub.add_parser("pin", help="Copy a location into the production")
+    backlot_pin.add_argument("project", type=Path)
+    backlot_pin.add_argument("location")
+    backlot_pin.add_argument("--update", action="store_true", help="replace the pinned copy with the backlot's")
+    backlot_status = backlot_sub.add_parser("status", help="Pinned locations: moved on in the backlot, edited here")
+    backlot_status.add_argument("project", type=Path)
+    backlot_parser.set_defaults(function=command_backlot)
 
     moves_parser = subparsers.add_parser("moves", help="The camera-move catalog: guidance, implied geometry, model words")
     moves_parser.add_argument("project", type=Path, nargs="?", help="include this production's own moves")

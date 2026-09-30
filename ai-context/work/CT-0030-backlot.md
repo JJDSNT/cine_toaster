@@ -2,10 +2,10 @@
 id: CT-0030
 title: Backlot — sets and locations as reusable entities
 type: work
-status: ready
+status: doing
 owner: unassigned
 created_at: 2026-09-29
-updated_at: 2026-09-29
+updated_at: 2026-09-30
 tags:
   - locations
   - geometry
@@ -54,6 +54,47 @@ ADR 0012. ADR 0012 names locations as the next entity of the same shape.
 
 - Pin, never live-link.
 
+# Done (2026-09-30)
+
+- **SPEC-0010** (accepted, partial).
+- **`locations.py`**:
+  - `load_locations` reads `locations/<id>/location.yaml`: room, marks,
+    cameras, references (with existence) and look;
+  - `resolve` merges a scene's geography into its location's. Room and
+    marks come from the location; cameras merge by id (an id alone adds the
+    scene's `shots`, a position replaces). It reports moved marks and
+    cameras;
+  - backlot helpers: `backlot()` reads `CINE_TOASTER_BACKLOT`; `pin`
+    copies a location with `pinned.json` (source, digest, date) and refuses
+    to overwrite without `update`; `status` says whether the backlot moved
+    on or the copy was edited here.
+- **Scenes and the production.** A scene's `location` (production aliases
+  allowed) resolves its geometry before parsing. Findings:
+  `location_unknown` (error) and `location_override` (advice). The
+  production payload gains `locations`, with the scenes shot in each.
+- **Demo.** `locations/listening-station` holds SC-030's room, mark and
+  three cameras. SC-030 keeps only its subjects, axis and camera coverage,
+  and SC-010 is set in the same room.
+  - The geometry, movement, blocking, cut, project, graph and brief tests
+    (120) pass unchanged, so the resolved geometry is the same.
+  - `toast check` is clean, with 2 scenes that have geometry.
+- **Surfaces.**
+  - `toast backlot list|pin|status`;
+  - the scene room's "Set in …" line;
+  - the assistant's digest and overview.
+- Docs are in `docs/locations.md`.
+
 # Validation
 
-- Not started.
+- `tests/test_locations.py` (4 tests):
+  - shared plan and appearances;
+  - override advice;
+  - an unknown location;
+  - pin, status, the backlot moving on without changing the film, refusal
+    to overwrite, and an explicit update.
+
+# Remaining
+
+- Set pieces drawn in the blocking frame and previs (CT-0025 item 5).
+- Plates as generation sources.
+- A Locations room in the control room.
