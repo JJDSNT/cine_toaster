@@ -397,6 +397,7 @@ def _apply_cut_decisions(shots: list[dict[str, Any]], state: SceneState) -> None
     """
 
     for shot in shots:
+        shot["voice_in_cut"] = state.voices.get(shot["id"])
         decision = state.cuts.get(shot["id"])
         shot["cut_decision"] = decision
         if not decision:

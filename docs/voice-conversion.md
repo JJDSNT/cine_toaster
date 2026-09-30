@@ -11,6 +11,34 @@ toast revoice <project> 3-01 P13 --dry-run           # whose voice, which record
 toast revoice <project> 3-01 P13 [--take BLOCK-2]    # -> _takes/c13-voice.mp4, take VOICE
 ```
 
+## In the cut, without a new take
+
+Converting to a new take is for listening and comparing. For the film, the
+conversion is a **decision on the shot**: the cut hears its speech in the
+cast's own voices, whichever take is chosen.
+
+```bash
+toast revoice <project> 3-01 P13 --in-cut --why "Kael drifts here"
+toast assemble <project> 3-01          # P13's voice is converted on the chosen take
+toast revoice <project> 3-01 P13 --take-sound   # back to the take's own sound
+```
+
+The decision lives in the scene's `state.json` (`voices`, command
+`set_voice`), with its history; the breakdown is not rewritten. Setting it
+checks that every speaker has a sheet and a recording. The assembly job
+converts each marked shot's chosen take and keeps the result in the
+operational state (`voice/<key>.wav`), keyed by the take, the recordings,
+the lines and the worker: assembling again converts nothing, and changing
+any of them converts again. Deleting the cache costs time, not the film.
+The version's summary names the shots heard in the cast's voices; the job's
+result keeps the likeness per speaker. A shot that can no longer be
+converted keeps its take's sound, and the version says why.
+
+In the comparison room, the shot shows **In the cut** with a switch
+between the cast's voices and the take's own sound.
+
+## As a take
+
 In the comparison room, a take offers **Revoice as <speaker>** (or
 **Revoice <A> and <B>** with several speakers), which starts the same job.
 

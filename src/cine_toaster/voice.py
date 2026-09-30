@@ -97,20 +97,10 @@ class VoicePlan:
                               "reference_digest": _digest(item["reference"])} for item in self.speakers]}
 
 
-def plan_conversion(root: Path, production: dict[str, Any], scene_id: str, shot_id: str, take_id: str = "") -> VoicePlan:
-    """Which take, whose voices, and the recording each is converted to."""
+def speakers_of(root: Path, production: dict[str, Any], shot: dict[str, Any]) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+    """The lines spoken in the shot's take, and each speaker with the recording to convert to."""
 
-    scene = next((item for item in production["scenes"] if item["id"] == scene_id), None)
-    if scene is None:
-        raise ValidationError(f"No scene {scene_id!r}")
-    shot = next((item for item in scene["shots"] if item["id"] == shot_id), None)
-    if shot is None:
-        raise ValidationError(f"{scene_id} has no shot {shot_id!r}")
-    takes = [take for take in shot.get("takes") or [] if str(take.get("media", "")).endswith((".mp4", ".mov", ".webm"))]
-    take = (next((item for item in takes if item["id"] == take_id), None) if take_id
-            else next((item for item in takes if item.get("selected")), None) or next(iter(takes), None))
-    if take is None:
-        raise ValidationError(f"{shot_id} has no video take {take_id!r}" if take_id else f"{shot_id} has no video take")
+    shot_id = shot["id"]
     lines = [{"who": line.get("who", ""), "text": line.get("en") or line.get("text") or ""}
              for line in shot.get("lines") or [] if line.get("in_take", True)]
     order = list(dict.fromkeys(line["who"] for line in lines))
@@ -129,6 +119,24 @@ def plan_conversion(root: Path, production: dict[str, Any], scene_id: str, shot_
             raise ValidationError(f"{member['label']}'s cast sheet has no voice recording "
                                   f"(voice: references: [...]); a few clean seconds of the voice are needed")
         speakers.append({"who": who, "member": member["id"], "reference": reference})
+    return lines, speakers
+
+
+def plan_conversion(root: Path, production: dict[str, Any], scene_id: str, shot_id: str, take_id: str = "") -> VoicePlan:
+    """Which take, whose voices, and the recording each is converted to."""
+
+    scene = next((item for item in production["scenes"] if item["id"] == scene_id), None)
+    if scene is None:
+        raise ValidationError(f"No scene {scene_id!r}")
+    shot = next((item for item in scene["shots"] if item["id"] == shot_id), None)
+    if shot is None:
+        raise ValidationError(f"{scene_id} has no shot {shot_id!r}")
+    takes = [take for take in shot.get("takes") or [] if str(take.get("media", "")).endswith((".mp4", ".mov", ".webm"))]
+    take = (next((item for item in takes if item["id"] == take_id), None) if take_id
+            else next((item for item in takes if item.get("selected")), None) or next(iter(takes), None))
+    if take is None:
+        raise ValidationError(f"{shot_id} has no video take {take_id!r}" if take_id else f"{shot_id} has no video take")
+    lines, speakers = speakers_of(root, production, shot)
     media = root / take["media"]
     pattern = str(production.get("words_sidecar") or "{stem}.words.json")
     sidecar = media.parent / pattern.format(stem=media.stem, name=media.name)

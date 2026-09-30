@@ -19,6 +19,10 @@ Each take's sound is set to a loudness: speech to −20 LUFS, measured on the
 speech only; other sound to the shot's `level_db` (−34 by default), with only
 a small boost, so a silent room's hiss is not raised.
 
+A shot decided to be heard in the cast's own voices (`set_voice`, CT-0040)
+takes its sound from the chosen take with each speaker's voice converted;
+the job does the conversion and keeps it in a disposable cache.
+
 Shots are joined with straight cuts. Transitions and split edits (J/L) are
 listed as not rendered yet, not approximated. Picture is normalised to the
 first take's size and frame rate, sound to 48 kHz stereo.
@@ -62,6 +66,10 @@ class Segment:
     level: float | None = None
     #: Scene versions in a sequence were levelled when they were assembled.
     normalize: bool = True
+    #: The speech is heard in the cast's own voices (CT-0040): `sound` is then
+    #: the take's sound with the voices converted, on the take's own timeline.
+    revoice: bool = False
+    sound: str = ""
 
 
 @dataclass(slots=True)
@@ -213,6 +221,7 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         plan.segments.append(Segment(
             shot["id"], chosen["id"], chosen["media"], start, end, join, method,
             (spoken[0][0], spoken[-1][1]) if spoken else None, shot.get("level_db"),
+            revoice=bool(shot.get("voice_in_cut")),
         ))
     if not plan.segments:
         raise ValidationError(f"{scene['id']} has no shot with a take to assemble")
@@ -235,12 +244,17 @@ def loudness_gain(source: Path, segment: Segment) -> float:
     return round(max(-12.0, min(ceiling, target - float(measured[-1]))), 1)
 
 
-def render(root: Path, plan: Plan, output: Path, work: Path, run_process) -> None:
+def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
+           span: tuple[float, float] = (0.0, 1.0)) -> None:
     """Cut each take, normalise it, and join the pieces without re-encoding twice.
 
     ``run_process(command, expected_seconds=..., message=..., span=...)`` is
-    the job's process runner, so progress and cancellation work per piece.
+    the job's process runner, so progress and cancellation work per piece;
+    ``span`` is the part of the job's progress the render takes.
     """
+
+    def within(a: float, b: float) -> tuple[float, float]:
+        return span[0] + (span[1] - span[0]) * a, span[0] + (span[1] - span[0]) * b
 
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
@@ -255,26 +269,29 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process) -> Non
     total = len(plan.segments)
     for index, segment in enumerate(plan.segments):
         source = root / segment.media
-        has_audio = probe(source)["audio"]
+        sound = Path(segment.sound) if segment.sound else None
+        has_audio = bool(sound) or probe(source)["audio"]
         length = segment.end - segment.start
-        gain = loudness_gain(source, segment) if has_audio and segment.normalize else 0.0
+        gain = loudness_gain(sound or source, segment) if has_audio and segment.normalize else 0.0
         segment_gain[segment.shot] = gain
         piece = work / f"piece-{index:03d}.mp4"
         command = [ffmpeg, "-y", "-loglevel", "error", "-ss", f"{segment.start:.3f}", "-t", f"{length:.3f}", "-i", str(source)]
-        if not has_audio:
+        if sound:
+            command += ["-ss", f"{segment.start:.3f}", "-t", f"{length:.3f}", "-i", str(sound)]
+        elif not has_audio:
             command += ["-f", "lavfi", "-t", f"{length:.3f}", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"]
         command += [
             "-vf", f"scale={size}:force_original_aspect_ratio=decrease,pad={size}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps},format=yuv420p",
-            "-map", "0:v:0", "-map", "0:a:0" if has_audio else "1:a:0",
+            "-map", "0:v:0", "-map", "0:a:0" if has_audio and not sound else "1:a:0",
             "-af", f"volume={gain}dB,aresample=async=1",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
             "-c:a", "aac", "-ar", "48000", "-ac", "2", "-shortest", str(piece),
         ]
         run_process(command, expected_seconds=length, message=f"Cutting {segment.shot}",
-                    span=(0.9 * index / total, 0.9 * (index + 1) / total))
+                    span=within(0.9 * index / total, 0.9 * (index + 1) / total))
         pieces.append(piece)
     listing = work / "pieces.txt"
     listing.write_text("".join(f"file '{piece.name}'\n" for piece in pieces), encoding="utf-8")
     run_process([ffmpeg, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing),
                  "-c", "copy", "-movflags", "+faststart", str(output)],
-                message="Joining the shots", span=(0.9, 1.0))
+                message="Joining the shots", span=within(0.9, 1.0))

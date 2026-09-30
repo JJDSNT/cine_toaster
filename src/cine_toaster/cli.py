@@ -716,6 +716,15 @@ def command_revoice(args: argparse.Namespace) -> int:
     from .voice import plan_conversion
 
     root = Path(args.project).expanduser().resolve()
+    if args.in_cut or args.take_sound:
+        from .commands import dispatch
+
+        result = dispatch(root, "set_voice", {"scene_id": args.scene, "shot_id": args.shot, "converted": bool(args.in_cut),
+                                              "rationale": args.why, "actor": {"id": args.actor, "kind": "human"}})
+        print(f"{result.type}: {args.shot} is heard "
+              + ("in the cast's own voices in every version assembled from now on"
+                 if args.in_cut else "with its take's own sound") + f" (revision {result.revision})")
+        return 0
     plan = plan_conversion(root, load_production(root), args.scene, args.shot, args.take or "")
     for item in plan.speakers:
         print(f"{plan.scene} {plan.shot} take {plan.take}: {item['who']}'s voice -> {item['reference'].relative_to(root)}")
@@ -1657,6 +1666,13 @@ def build_parser() -> argparse.ArgumentParser:
     voice_convert.add_argument("shot")
     voice_convert.add_argument("--take", help="which take (default: the selected one, else the first)")
     voice_convert.add_argument("--dry-run", action="store_true", help="say whose voice and which recording; convert nothing")
+    in_cut = voice_convert.add_mutually_exclusive_group()
+    in_cut.add_argument("--in-cut", action="store_true",
+                        help="no new take: decide that the cut hears this shot in the cast's own voices, "
+                             "converted when the scene is assembled, whichever take is chosen")
+    in_cut.add_argument("--take-sound", action="store_true", help="undo --in-cut: the cut hears the take's own sound")
+    voice_convert.add_argument("--why", help="the reason, kept with the decision")
+    voice_convert.add_argument("--actor", default=os.environ.get("USER") or "director")
     voice_convert.set_defaults(function=command_revoice)
 
     budget_parser = subparsers.add_parser("budget", help="What paid generation may spend, and has spent")

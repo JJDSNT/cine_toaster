@@ -11,7 +11,7 @@ from .errors import PersistenceError, ValidationError
 
 
 STATE_FILENAME = "state.json"
-STATE_SCHEMA_VERSION = 4
+STATE_SCHEMA_VERSION = 5
 MAX_DECISION_HISTORY = 200
 MAX_ASSEMBLIES = 200
 
@@ -139,6 +139,9 @@ class SceneState:
     #: Cuts decided here (plan step 13), by incoming shot: they stand over the
     #: breakdown's `cut`/`transition` without rewriting it (ADR 0006).
     cuts: dict[str, dict[str, Any]] = field(default_factory=dict)
+    #: Shots whose speech the cut hears in the cast's own recorded voices
+    #: (CT-0040), by shot: converted when the scene is assembled, whatever take is chosen.
+    voices: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def approved_pictures(self) -> dict[str, str]:
         """The picture each shot's latest approved gate chose (SPEC-0009)."""
@@ -172,6 +175,7 @@ class SceneState:
             "gates": self.gates,
             "workflows": self.workflows,
             "cuts": self.cuts,
+            "voices": self.voices,
         }
 
     def with_decision(
@@ -183,6 +187,7 @@ class SceneState:
         gates: dict[str, dict[str, Any]] | None = None,
         workflows: dict[str, dict[str, Any]] | None = None,
         cuts: dict[str, dict[str, Any]] | None = None,
+        voices: dict[str, dict[str, Any]] | None = None,
     ) -> SceneState:
         history = [*self.decisions, decision][-MAX_DECISION_HISTORY:]
         return replace(
@@ -195,6 +200,7 @@ class SceneState:
             gates=self.gates if gates is None else gates,
             workflows=self.workflows if workflows is None else workflows,
             cuts=self.cuts if cuts is None else cuts,
+            voices=self.voices if voices is None else voices,
         )
 
 
@@ -275,6 +281,7 @@ def load_scene_state(scene_directory: Path, scene_id: str) -> SceneState:
     gates = document.get("gates")
     workflows = document.get("workflows")
     cuts = document.get("cuts")
+    voices = document.get("voices")
     return SceneState(
         scene_id=str(document.get("scene_id", scene_id)),
         revision=int(document.get("revision", 0)),
@@ -285,6 +292,7 @@ def load_scene_state(scene_directory: Path, scene_id: str) -> SceneState:
         gates=dict(gates) if isinstance(gates, dict) else {},
         workflows=dict(workflows) if isinstance(workflows, dict) else {},
         cuts=dict(cuts) if isinstance(cuts, dict) else {},
+        voices=dict(voices) if isinstance(voices, dict) else {},
     )
 
 

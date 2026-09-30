@@ -201,7 +201,17 @@ Remaining:
   take card in the comparison room, when the shot has one speaker in the
   take. It starts `convert_voice`, and the new take appears once adopted.
   Checked headless with a fake voice interpreter.
-- applying conversion inside `assemble` rather than as a take.
+- ~~applying conversion inside `assemble` rather than as a take~~ done
+  2026-09-30. A decision on the shot, `voices` in `state.json` (schema 5),
+  command `set_voice` (`toast revoice --in-cut|--take-sound`, a switch in the
+  comparison room). The assemble job converts each marked shot's chosen take
+  and caches the audio in the operational state, keyed by the take, the
+  recordings, the lines and the worker. Decision: a decision, not a take,
+  so choosing another take keeps the voice, and the alternatives are not
+  cluttered by converted copies. Validated: `tests/test_voice.py` (9 tests,
+  the cache hit included); on the SINGULAR scratch copy, 3-01 P13 marked and
+  3-01 assembled as v1 (85.5 s, 85 s of CPU), P13 likeness 0.475 → 0.741, no
+  new take. Comparison sent to the author.
 
 # Order
 

@@ -234,7 +234,7 @@ class StateFileTests(CommandTestCase):
         document = json.loads(
             (self.root / "scenes" / "030-echo-chamber" / "state.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(document["schema_version"], 4)
+        self.assertEqual(document["schema_version"], 5)
         self.assertEqual(document["revision"], 1)
         self.assertEqual(document["selections"][SHOT]["take_id"], "CUT")
 

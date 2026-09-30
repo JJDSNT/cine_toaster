@@ -388,6 +388,57 @@ def clear_cut(
                          event=event.public_dict())
 
 
+def set_voice(
+    root: Path,
+    *,
+    scene_id: str,
+    shot_id: str,
+    actor: Actor,
+    converted: bool = True,
+    expected_revision: int | None = None,
+    rationale: str | None = None,
+) -> CommandResult:
+    """Decide whether the cut hears this shot's speech in the cast's own voices (CT-0040).
+
+    The conversion happens when the scene is assembled, on whichever take is
+    chosen, so changing the take does not undo it. `converted=False` returns
+    the shot to the take's own sound; the decision stays in the history.
+    """
+
+    from .voice import speakers_of
+
+    root = root.expanduser().resolve()
+    production, _scene, shot = _locate(root, scene_id, shot_id)
+    if converted:
+        speakers_of(root, production, shot)  # every speaker needs a sheet and a recording, said now
+    rationale_text = _clean_rationale(rationale)
+    directory = scene_directory(root, scene_id)
+    _check_writable(directory, scene_id)
+    state = load_scene_state(directory, scene_id)
+    _check_revision(expected_revision, state.revision)
+    if not converted and shot_id not in state.voices:
+        raise ValidationError(f"{shot_id} already keeps its take's own sound", scene_id=scene_id, shot_id=shot_id)
+
+    command_id = _new_command_id()
+    stamp = now()
+    kind = "voice.converted" if converted else "voice.original"
+    voices = dict(state.voices)
+    if converted:
+        voices[shot_id] = {"converted": True, "decided_at": stamp, "decided_by": actor.public_dict()}
+    else:
+        voices.pop(shot_id)
+    record = {"kind": kind, "shot_id": shot_id, "previous": state.voices.get(shot_id), "actor": actor.public_dict(),
+              "rationale": rationale_text, "decided_at": stamp, "command_id": command_id}
+    committed = state.with_decision(decision=record, voices=voices)
+    write_scene_state(directory, committed)
+    event = append_event(root, Event.create(kind, production["id"], scene_id=scene_id, shot_id=shot_id,
+                                            revision=committed.revision, actor=actor.public_dict(),
+                                            rationale=rationale_text, command_id=command_id))
+    return CommandResult(command_id=command_id, type=kind, project_id=production["id"], scene_id=scene_id,
+                         shot_id=shot_id, take_id=None, previous_take_id=None, revision=committed.revision,
+                         event=event.public_dict())
+
+
 def record_assembly(
     root: Path,
     *,
@@ -775,6 +826,7 @@ COMMANDS = {
     "restore_assembly": restore_assembly,
     "set_cut": set_cut,
     "clear_cut": clear_cut,
+    "set_voice": set_voice,
 }
 
 # Commands act on a shot; these act on a whole scene version instead.
@@ -896,6 +948,8 @@ def dispatch(root: Path, command_type: str, payload: dict[str, Any]) -> CommandR
         arguments["take_id"] = str(payload.get("take_id", "")).strip()
     elif command_type == "set_cut":
         arguments["cut"] = payload.get("cut") if isinstance(payload.get("cut"), dict) else {}
+    elif command_type == "set_voice":
+        arguments["converted"] = payload.get("converted", True) not in (False, "false", "0", 0)
 
     return handler(root, **arguments)
 
@@ -911,4 +965,5 @@ __all__ = [
     "review_assembly",
     "select_take",
     "set_cut",
+    "set_voice",
 ]

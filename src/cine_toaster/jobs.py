@@ -13,6 +13,7 @@ stop.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -618,6 +619,64 @@ def _validate_assemble(root: Path, params: dict[str, Any]) -> dict[str, Any]:
     return {"scene": scene_id, "version": version, "summary": str(params.get("summary") or "")}
 
 
+def _voices_for_cut(context: JobContext, production: dict[str, Any], scene_id: str, plan) -> dict[str, Any]:
+    """Convert the voices of the shots the cut hears in the cast's own voices (CT-0040).
+
+    Each conversion is kept in the operational state, keyed by the take, the
+    recordings, the lines and the worker, so assembling again costs nothing
+    and changing any of them converts again. A cache: deleting it loses time,
+    not the film. A shot that cannot be converted any more keeps its take's
+    sound, and the version says so.
+    """
+
+    from .voice import WORKER, plan_conversion, voice_python
+
+    root = context.project_root
+    wanted = [segment for segment in plan.segments if segment.revoice]
+    measured: dict[str, Any] = {}
+    python = voice_python() if wanted else None
+    for index, segment in enumerate(wanted):
+        if python is None:
+            plan.notes.append(f"{segment.shot} keeps its take's own voice: the voice environment is not installed "
+                              "(make install-voice).")
+            continue
+        try:
+            voice = plan_conversion(root, production, scene_id, segment.shot, segment.take)
+        except ValidationError as error:
+            plan.notes.append(f"{segment.shot} keeps its take's own voice: {error}")
+            continue
+        spec = voice.spec()
+        hashed = hashlib.sha256()
+        for path in (voice.media, *(item["reference"] for item in voice.speakers), WORKER,
+                     *([voice.words] if voice.words else [])):
+            hashed.update(hashlib.sha256(Path(path).read_bytes()).digest())
+        hashed.update(json.dumps(spec["lines"], sort_keys=True).encode())
+        cache = state_root() / "voice"
+        cache.mkdir(parents=True, exist_ok=True)
+        key = hashed.hexdigest()[:24]
+        audio, report = cache / f"{key}.wav", cache / f"{key}.json"
+        span = (0.02 + 0.58 * index / len(wanted), 0.02 + 0.58 * (index + 1) / len(wanted))
+        if not (audio.is_file() and report.is_file()):
+            staged = context.staging / f"voice-{segment.shot}"
+            staged.mkdir(parents=True, exist_ok=True)
+            (staged / "spec.json").write_text(json.dumps(spec, indent=2), encoding="utf-8")
+            context.run_process([str(python), str(WORKER), str(voice.media), str(staged / "spec.json"),
+                                 str(staged / "voice.wav"), str(staged / "work"), str(staged / "report.json")],
+                                message=f"{segment.shot}: {voice.speaker} in their own voice", span=span)
+            shutil.move(staged / "voice.wav", audio)
+            shutil.move(staged / "report.json", report)
+            shutil.rmtree(staged, ignore_errors=True)
+        result = json.loads(report.read_text(encoding="utf-8"))
+        segment.sound = str(audio)
+        measured[segment.shot] = {"take": segment.take, "speakers": voice.public_dict(root)["speakers"],
+                                  "similarity_by_speaker": result.get("similarity_by_speaker")
+                                  or ({voice.speaker: result["similarity"]} if result.get("similarity") else {}),
+                                  "unplaced": result.get("unplaced") or [], "cache": key}
+        for who in result.get("unplaced") or []:
+            plan.notes.append(f"{segment.shot}: {who} was not heard in take {segment.take}.")
+    return measured
+
+
 def _run_assemble(context: JobContext) -> dict[str, Any]:
     from .assembly import plan_scene, render
     from .project import load_scene
@@ -628,14 +687,17 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
     scene = next(item for item in production["scenes"] if item["id"] == context.params["scene"])
     plan = plan_scene(context.project_root, scene, production.get("words_sidecar") or "{stem}.words.json")
     context.progress(0.01, f"{len(plan.segments)} shots")
+    voices = _voices_for_cut(context, production, scene["id"], plan)
     output = context.staging / "assembly.mp4"
-    render(context.project_root, plan, output, context.staging / "work", context.run_process)
+    render(context.project_root, plan, output, context.staging / "work", context.run_process,
+           span=(0.6, 1.0) if voices else (0.0, 1.0))
     shutil.rmtree(context.staging / "work", ignore_errors=True)
     scene_id, version = context.params["scene"], context.params["version"]
     return {
         "files": [{"staged": "assembly.mp4", "destination": f"renders/assemblies/{scene_id}/{version}.mp4"}],
-        "summary": {"segments": [{**asdict(segment), "gain_db": plan.gains.get(segment.shot, 0.0)} for segment in plan.segments],
-                    "notes": plan.notes,
+        "summary": {"segments": [{**{key: value for key, value in asdict(segment).items() if key != "sound"},
+                                  "gain_db": plan.gains.get(segment.shot, 0.0)} for segment in plan.segments],
+                    "notes": plan.notes, "voices": voices,
                     "duration_seconds": plan.duration, "takes": plan.takes},
     }
 
@@ -649,6 +711,8 @@ def _adopted_assemble(job: dict[str, Any], placed: list[str]) -> None:
     summary = job["result"]["summary"]
     media = Path(placed[0]).resolve().relative_to(root.resolve()).as_posix()
     notes = " ".join(summary["notes"])
+    if summary.get("voices"):
+        notes = f"Heard in the cast's own voices: {', '.join(summary['voices'])}. " + notes
     record_assembly(
         root,
         scene_id=job["params"]["scene"],

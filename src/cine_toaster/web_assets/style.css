@@ -677,3 +677,6 @@ dialog::backdrop { background: #000b; }
 .move-card { display: grid; gap: 8px; align-content: start; padding: 14px; }
 .move-id { font-size: 11px; color: var(--accent); }
 .move-prompt { color: var(--muted); font-style: italic; }
+
+.voice-in-cut { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }

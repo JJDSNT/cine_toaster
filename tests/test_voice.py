@@ -21,6 +21,7 @@ HAS_FFMPEG = shutil.which("ffmpeg") is not None
 
 #: Stands in for the voice environment: called as `python worker take ref out work report`.
 FAKE_WORKER = """#!/bin/sh
+echo "$2" >> "$XDG_STATE_HOME/voice-calls"
 ffmpeg -v error -y -f lavfi -i "sine=frequency=220:duration=2" -ar 44100 -ac 2 "$4"
 printf '{"engine": "chatterbox-vc", "similarity": {"before": 0.5, "after": 0.8}}' > "$6"
 """
@@ -123,6 +124,43 @@ class RevoiceTests(unittest.TestCase):
         source = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,width",
                                  "-of", "json", str(self.root / "scenes/030-echo-chamber/work/c03.mp4")], capture_output=True, text=True)
         self.assertEqual(json.loads(probe.stdout), json.loads(source.stdout))
+
+    def test_the_cut_can_hear_a_shot_in_the_cast_voice_without_a_new_take(self) -> None:
+        from cine_toaster.commands import dispatch
+
+        director = {"id": "director", "kind": "human"}
+        with self.assertRaisesRegex(ValidationError, "no line spoken in the take"):
+            dispatch(self.root, "set_voice", {"scene_id": "SC-030", "shot_id": "P1", "actor": director})
+        dispatch(self.root, "set_voice", {"scene_id": "SC-030", "shot_id": "P3", "actor": director,
+                                          "rationale": "Mara drifts in this take"})
+        shot = next(item for item in load_scene(self.root, "SC-030")["shots"] if item["id"] == "P3")
+        self.assertTrue(shot["voice_in_cut"]["converted"])
+
+        def assemble(version: str) -> dict:
+            job = self.manager.wait(self.manager.submit("assemble", self.root, {"scene": "SC-030", "version": version})["id"],
+                                    timeout=120)
+            self.assertEqual(job["state"], "succeeded", job["error"])
+            return job
+
+        job = assemble("v1")
+        summary = job["result"]["summary"]
+        self.assertEqual(list(summary["voices"]), ["P3"])
+        self.assertEqual(summary["voices"]["P3"]["take"], shot["selected_take"] or "CUT")
+        self.assertTrue(next(item for item in summary["segments"] if item["shot"] == "P3")["revoice"])
+        self.manager.adopt(job["id"])
+        scene = load_scene(self.root, "SC-030")
+        self.assertIn("Heard in the cast's own voices: P3", scene["assemblies"][-1]["summary"])
+        # No new take: the voice belongs to the cut, not to the shot's alternatives.
+        self.assertFalse(any(take["id"] == "VOICE" for take in next(
+            item for item in scene["shots"] if item["id"] == "P3")["takes"]))
+        calls = Path(os.environ["XDG_STATE_HOME"]) / "voice-calls"
+        self.assertEqual(len(calls.read_text().splitlines()), 1)
+        assemble("v2")  # the same take, recordings and lines: converted once, kept in the cache
+        self.assertEqual(len(calls.read_text().splitlines()), 1)
+
+        dispatch(self.root, "set_voice", {"scene_id": "SC-030", "shot_id": "P3", "actor": director, "converted": False})
+        self.assertIsNone(next(item for item in load_scene(self.root, "SC-030")["shots"] if item["id"] == "P3")["voice_in_cut"])
+        self.assertEqual(assemble("v3")["result"]["summary"]["voices"], {})
 
 
 if __name__ == "__main__":

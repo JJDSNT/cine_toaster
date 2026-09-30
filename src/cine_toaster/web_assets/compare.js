@@ -102,6 +102,37 @@ function revoiceButton(scene, shot, take) {
   return action;
 }
 
+// Whether the cut hears this shot's speech in the cast's own voices (CT-0040):
+// a decision on the shot, not a take, so it survives choosing another take.
+// The conversion happens when the scene is assembled.
+function voiceInCut(scene, shot, onChanged) {
+  const speakers = [...new Set((shot.lines || []).filter((line) => line.in_take !== false).map((line) => line.who))];
+  if (!speakers.length) return null;
+  const converted = Boolean(shot.voice_in_cut);
+  const row = el("div", "voice-in-cut");
+  row.append(el("span", "", converted
+    ? `In the cut: ${speakers.join(" and ")} in their own recorded voice${speakers.length > 1 ? "s" : ""}, converted when the scene is assembled.`
+    : "In the cut: the take's own sound."));
+  const toggle = button(converted ? "Use the take's sound" : "Use the cast's voices in the cut", async () => {
+    toggle.disabled = true;
+    try {
+      await runCommand("set_voice", {
+        scene_id: scene.id, shot_id: shot.id, converted: !converted, expected_revision: scene.revision,
+      });
+      toast(converted ? `${shot.id} keeps its take's sound in the cut.` : `${shot.id} will be heard in the cast's voices in the next version.`, "good");
+      await onChanged();
+    } catch (error) {
+      toast(error.message, error.code === "revision_conflict" ? "warn" : "bad");
+      if (error.code === "revision_conflict") await onChanged();
+    } finally {
+      toggle.disabled = false;
+    }
+  }, "quiet-button");
+  toggle.title = "A decision on the shot: whichever take is chosen, its speech is converted to the cast's recorded voices when the scene is assembled. No new take.";
+  row.append(toggle);
+  return row;
+}
+
 function takeCard(scene, shot, take, { onCompare, onSelect }) {
   const card = el("article", "take-card");
   if (take.selected) card.classList.add("take-selected");
@@ -239,9 +270,10 @@ function decisionHistory(scene, shot) {
   const list = el("div", "decision-list");
   for (const entry of entries) {
     const card = el("article", "decision-card");
-    const headline = entry.take_id
+    const voices = { "voice.converted": "the cast's voices in the cut", "voice.original": "the take's own sound in the cut" };
+    const headline = voices[entry.kind] || (entry.take_id
       ? `${entry.previous_take_id ? `${entry.previous_take_id} → ` : ""}${entry.take_id}`
-      : `cleared ${entry.previous_take_id || ""}`;
+      : `cleared ${entry.previous_take_id || ""}`);
     card.append(
       statusPill(entry.kind === "take.selected" ? "selected" : "waiting"),
       el("strong", "", headline),
@@ -305,6 +337,8 @@ export function renderCompare(root, scene, shot, { onBack, onChanged }) {
     const controls = syncedControls(comparison);
     if (controls) comparison.append(controls);
     comparison.append(decisionForm(scene, shot, commit));
+    const voice = voiceInCut(scene, shot, onChanged);
+    if (voice) comparison.append(voice);
     root.append(comparison);
 
     const gallery = el("section", "panel wide-panel");
