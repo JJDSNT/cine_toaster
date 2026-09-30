@@ -156,6 +156,9 @@ decision, and continue from the committed result without bypassing permissions.
 
 ## Later evaluation
 
+- Claude Code doing the work through Cine Toaster, as in SINGULAR (`CT-0045`):
+  first an MCP server over the commands and queries; then more assistant
+  actions, each confirmed; then delegating long tasks to a headless session;
 - learning from gate decisions to reduce refused pictures and takes, up to
   reinforcement learning (`CT-0041`): refusals already record what was
   wrong; start by counting and by feeding refusals into the next attempt;

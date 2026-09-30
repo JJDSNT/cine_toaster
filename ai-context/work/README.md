@@ -42,6 +42,8 @@ execution history and links to those destinations.
 The order of work is the ordered plan in
 [`development/roadmap.md`](../development/roadmap.md).
 
+- `CT-0045` — Claude Code acting through Cine Toaster (MCP first); noted for
+  later at the user's request (`proposed`)
 - `CT-0044` — plan step 12: the directing assistant; ADR 0018 (`done`)
 - `CT-0043` — plan step 11: LangGraph spike with CoAgents and a CLI model;
   ADR 0017 (`done`)
