@@ -222,3 +222,59 @@ class AgUiTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(HAS_AGENTS, "the agents extra is not installed")
+class ClaudeApiAdapterTests(unittest.TestCase):
+    """The API adapter's request and answers, against a stand-in for the SDK client."""
+
+    def client(self, **response):
+        from types import SimpleNamespace
+
+        sent = {}
+
+        class Messages:
+            def create(self, **kwargs):
+                sent.update(kwargs)
+                return SimpleNamespace(**{"stop_reason": "end_turn", "model": kwargs["model"],
+                                          "usage": SimpleNamespace(output_tokens=12),
+                                          "content": [SimpleNamespace(type="text", text='{"reply": "ok", "action": "none"}')],
+                                          **response})
+
+        return SimpleNamespace(beta=SimpleNamespace(messages=Messages())), sent
+
+    def test_a_turn_asks_for_structured_output_with_the_fallback_on(self) -> None:
+        from cine_toaster.agents.assistant import SCHEMA
+        from cine_toaster.agents.models import ClaudeApi
+
+        client, sent = self.client()
+        answer = ClaudeApi(client=client).ask("system", "prompt", SCHEMA)
+        self.assertEqual(answer, {"reply": "ok", "action": "none"})
+        self.assertEqual(sent["model"], "claude-opus-5-5")
+        self.assertEqual(sent["output_config"]["effort"], "low")
+        schema = sent["output_config"]["format"]["schema"]
+        self.assertFalse(schema["additionalProperties"])
+        self.assertFalse(schema["properties"]["navigate"]["additionalProperties"])  # nested objects closed too
+        self.assertEqual((sent["fallbacks"], sent["betas"]), ("default", ["server-side-fallback-2026-07-01"]))
+
+    def test_a_refusal_is_said_not_raised_past_the_adapter(self) -> None:
+        from types import SimpleNamespace
+
+        from cine_toaster.agents.models import ClaudeApi, ModelUnavailable
+
+        client, _ = self.client(stop_reason="refusal", content=[SimpleNamespace(type="text", text="")])
+        with self.assertRaisesRegex(ModelUnavailable, "declined"):
+            ClaudeApi(client=client).ask("system", "prompt", {"type": "object", "properties": {}})
+
+    def test_the_adapter_is_chosen_by_the_environment(self) -> None:
+        import os
+
+        from cine_toaster.agents.models import ClaudeApi, ClaudeCli, model_from_env
+
+        previous = os.environ.get("CINE_TOASTER_MODEL")
+        self.addCleanup(lambda: os.environ.pop("CINE_TOASTER_MODEL", None) if previous is None
+                        else os.environ.__setitem__("CINE_TOASTER_MODEL", previous))
+        os.environ["CINE_TOASTER_MODEL"] = "claude-api"
+        self.assertIsInstance(model_from_env(), ClaudeApi)
+        os.environ["CINE_TOASTER_MODEL"] = "claude-cli"
+        self.assertIsInstance(model_from_env(), ClaudeCli)

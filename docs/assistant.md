@@ -69,7 +69,16 @@ The page talks only to the runtime, which forwards `/api/copilotkit`.
 Telemetry and CopilotKit's development inspector are off, so nothing leaves
 the machine except the model's own calls.
 
-The model is reached through the Claude Code CLI (`claude -p`), with your
-login: no API key. A turn takes several seconds. Conversations are kept in
+The model is reached through an adapter, chosen with `CINE_TOASTER_MODEL`:
+
+- `claude-cli` (the default): the Claude Code CLI (`claude -p`) with your
+  login, so no API key.
+- `claude-api`: the Claude API through the official SDK, for use beyond one
+  person's machine. Credentials come from `ANTHROPIC_API_KEY` or an
+  `ant auth login` profile.
+  - The model is `claude-opus-5-5` at low effort (`CINE_TOASTER_MODEL_ID`
+    and `CINE_TOASTER_MODEL_EFFORT` override them).
+  - The API's own fallback serves a turn the model declines, and a turn
+    declined by every model is said in the chat. A turn takes several seconds. Conversations are kept in
 memory, and a restart forgets them, never the film. See ADR 0017 and ADR
 0018.

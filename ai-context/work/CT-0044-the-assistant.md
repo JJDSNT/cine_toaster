@@ -141,7 +141,15 @@ point.
   skipped by an "old request" guard. It is now remembered per tab instead.
 
 # Remaining
-- An API-key model adapter, for use beyond one person's machine.
+- ~~An API-key model adapter~~ done 2026-09-30: `ClaudeApi`, the official
+  `anthropic` SDK (now in the `agents` extra).
+  - Defaults: `claude-opus-5-5` at low effort, structured output through
+    `output_config.format` with every object closed, and the server-side
+    fallback (`fallbacks: "default"`) on.
+  - A refusal or API error becomes a message in the chat.
+  - Chosen with `CINE_TOASTER_MODEL=claude-api`.
+  - Tested against a stand-in for the SDK client (3 tests). **Not yet run
+    against the real API**: no key is configured on this machine.
 - More actions as commands, each with a confirm, for example proposing a
   take (never selecting it) or drafting a screenplay change as a diff for
   the editor (ADR 0016).
