@@ -58,7 +58,7 @@ test("a long scene wraps onto further lines instead of one endless row", () => {
 
 const run = (sceneId: string, id: string): GraphNode => ({
   id: `run:${sceneId}/${id}`, type: "run", scene: sceneId,
-  data: { scene: sceneId, run: id, block: "1", state: "waiting", steps: [], waiting: "Approve picture mA" },
+  data: { scene: sceneId, run: id, block: "1", shot: "", state: "waiting", steps: [], waiting: "Approve picture mA" },
 });
 
 test("a workflow run sits under its scene's header, and pushes the next scene down", () => {

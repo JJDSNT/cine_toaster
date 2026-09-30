@@ -805,7 +805,7 @@ def _dispatch_workflow(root: Path, command_type: str, payload: dict[str, Any]) -
     if command_type == "start_workflow":
         return workflows.start_workflow(root, scene_id=scene_id, block_id=str(payload.get("block", "")).strip(),
                                         actor=actor, template=str(payload.get("template") or "block"),
-                                        expected_revision=expected)
+                                        expected_revision=expected, shot_id=str(payload.get("shot", "") or "").strip())
     if command_type == "decide_gate":
         return workflows.decide_gate(root, scene_id=scene_id, gate_id=str(payload.get("gate_id", "")).strip(),
                                      outcome=str(payload.get("outcome", "")).strip(), actor=actor,

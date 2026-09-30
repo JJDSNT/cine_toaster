@@ -22,7 +22,7 @@ from .events import Event, append_event
 from .project import load_production, scene_directory
 from .state import Actor, load_scene_state, now, with_progress, write_scene_state
 
-TEMPLATES = ("block",)
+TEMPLATES = ("block", "shot")
 GATE_OUTCOMES = ("approved", "changes_requested", "rejected")
 #: What can be wrong with a master picture: a closed list, so refusals can be
 #: counted and compared across scenes, models and prompts later. Free text
@@ -125,33 +125,58 @@ def _result(kind: str, production: dict[str, Any], scene_id: str, revision: int,
                          previous_take_id=None, revision=revision, event=event.public_dict())
 
 
+def _shot_steps(scene: dict[str, Any], shot_id: str) -> list[dict[str, Any]]:
+    """One shot outside any block: its master pictures, their approval, then its generation as a take."""
+
+    shot = next((item for item in scene["shots"] if item["id"] == shot_id), None)
+    if shot is None:
+        raise ValidationError(f"{scene['id']} has no shot {shot_id!r}")
+    if shot.get("block"):
+        raise ValidationError(f"{shot_id} is part of block {shot['block']}: start the block's workflow")
+    steps: list[dict[str, Any]] = []
+    for master in _masters(scene, [shot_id]):
+        steps.append({"id": f"picture-{master['id']}", "kind": "picture", "shot": master["id"],
+                      "label": f"Picture {master['number']}", "state": "pending", "seed": 1})
+        steps.append({"id": f"approve-{master['id']}", "kind": "gate", "shot": master["id"],
+                      "label": f"Approve picture {master['number']}", "state": "pending"})
+    steps.append({"id": "generate", "kind": "generate", "label": f"Generate {shot_id} as a take", "state": "pending"})
+    return steps
+
+
 def start_workflow(root: Path, *, scene_id: str, block_id: str, actor: Actor, template: str = "block",
-                   expected_revision: int | None = None) -> CommandResult:
+                   expected_revision: int | None = None, shot_id: str = "") -> CommandResult:
+    if shot_id:
+        template = "shot"
     if template not in TEMPLATES:
         raise ValidationError(f"Unknown workflow template {template!r}", available=list(TEMPLATES))
     production, scene = _scene(root, scene_id)
-    steps = _block_steps(scene, block_id)
+    steps = _shot_steps(scene, shot_id) if template == "shot" else _block_steps(scene, block_id)
     directory = scene_directory(root, scene_id)
     _check_writable(directory, scene_id)
     command_id = _new_command_id()
     with _LOCKS[str(directory)]:
         state = load_scene_state(directory, scene_id)
         _check_revision(expected_revision, state.revision)
+        subject = {"scene": scene_id, "block": "" if template == "shot" else block_id, "shot": shot_id}
         active = [run for run in state.workflows.values() if run.get("state") not in FINISHED_RUN
-                  and run.get("subject", {}).get("block") == block_id]
+                  and run.get("subject", {}).get("block", "") == subject["block"]
+                  and run.get("subject", {}).get("shot", "") == subject["shot"]]
         if active:
-            raise ValidationError(f"Block {block_id} already has a workflow in progress ({active[0]['id']})")
+            what = f"Shot {shot_id}" if template == "shot" else f"Block {block_id}"
+            raise ValidationError(f"{what} already has a workflow in progress ({active[0]['id']})")
         run_id = "wf_" + uuid.uuid4().hex[:12]
         stamp = now()
-        run = {"id": run_id, "template": template, "subject": {"scene": scene_id, "block": block_id},
+        run = {"id": run_id, "template": template, "subject": subject,
                "state": "running", "steps": steps, "created_at": stamp, "updated_at": stamp,
                "started_by": actor.public_dict()}
-        record = {"kind": "workflow.started", "workflow": run_id, "block": block_id, "actor": actor.public_dict(),
+        record = {"kind": "workflow.started", "workflow": run_id, "block": subject["block"], "shot": shot_id,
+                  "actor": actor.public_dict(),
                   "decided_at": stamp, "command_id": command_id, "rationale": ""}
         committed = state.with_decision(decision=record, workflows={**state.workflows, run_id: run})
         write_scene_state(directory, committed)
     event = append_event(root, Event.create("workflow.started", production["id"], scene_id=scene_id,
-                                            workflow=run_id, block=block_id, command_id=command_id))
+                                            workflow=run_id, block=subject["block"], shot=shot_id,
+                                            command_id=command_id))
     advance(root, scene_id, run_id)
     return _result("workflow.started", production, scene_id, committed.revision, event)
 
@@ -454,7 +479,9 @@ _STEPS = {
     "picture": _picture_step,
     "gate": _gate_step,
     "generate": _job_step("generate_block",
-                          lambda scene, run, step: {"scene": scene["id"], "block": run["subject"]["block"]},
+                          lambda scene, run, step: ({"scene": scene["id"], "shot": run["subject"]["shot"]}
+                                                    if run["subject"].get("shot")
+                                                    else {"scene": scene["id"], "block": run["subject"]["block"]}),
                           lambda summary: [summary["clip"]]),
     "slice": _job_step("slice_block",
                        lambda scene, run, step: {"scene": scene["id"], "block": run["subject"]["block"],

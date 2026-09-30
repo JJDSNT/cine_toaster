@@ -429,8 +429,16 @@ def command_generate(args: argparse.Namespace) -> int:
     root = Path(args.project).expanduser().resolve()
     if args.env_file:
         load_credentials(Path(args.env_file).expanduser())  # never printed
-    plan = plan_block(root, load_production(root), args.scene, args.block, seed=args.seed,
-                      rate=hourly_rate(root, os.environ.get("RUNPOD_LTX_ENDPOINT_ID", "")))
+    from .generation import plan_shot
+
+    production = load_production(root)
+    rate = hourly_rate(root, os.environ.get("RUNPOD_LTX_ENDPOINT_ID", ""))
+    # A block's id, or a shot outside any block (its result is a take of that shot).
+    scene = next((item for item in production["scenes"] if item["id"] == args.scene), {"blocks": [], "shots": []})
+    is_block = any(block["id"] == args.block for block in scene.get("blocks") or [])
+    single = not is_block and any(shot["id"] == args.block for shot in scene["shots"])
+    plan = (plan_shot(root, production, args.scene, args.block, seed=args.seed, rate=rate) if single
+            else plan_block(root, production, args.scene, args.block, seed=args.seed, rate=rate))
     if args.json and args.dry_run:
         print(json.dumps(plan.public_dict(root), indent=2, ensure_ascii=False))
         return 0
@@ -447,7 +455,8 @@ def command_generate(args: argparse.Namespace) -> int:
         return 0
     manager = JobManager()
     try:
-        job = manager.submit("generate_block", root, {"scene": plan.scene, "block": plan.block, "seed": plan.seed})
+        target = {"shot": plan.block} if single else {"block": plan.block}
+        job = manager.submit("generate_block", root, {"scene": plan.scene, **target, "seed": plan.seed})
         try:
             job = manager.wait(job["id"])
         except KeyboardInterrupt:
@@ -530,7 +539,10 @@ def command_workflow(args: argparse.Namespace) -> int:
     if args.workflow_command == "start":
         def act(dispatch):
             before = set(load_scene_state(scene_directory(root, args.scene), args.scene).workflows)
-            dispatch(root, "start_workflow", {"scene_id": args.scene, "block": args.block, "actor": actor})
+            scene = next(item for item in load_production(root)["scenes"] if item["id"] == args.scene)
+            blocks = {block["id"] for block in scene.get("blocks") or []}
+            target = {"block": args.block} if args.block in blocks else {"shot": args.block}
+            dispatch(root, "start_workflow", {"scene_id": args.scene, **target, "actor": actor})
             after = load_scene_state(scene_directory(root, args.scene), args.scene).workflows
             return next(run_id for run_id in after if run_id not in before)
         return _drive(root, args.scene, act)
@@ -1526,7 +1538,7 @@ def build_parser() -> argparse.ArgumentParser:
     workflow_start = workflow_sub.add_parser("start", help="Start the workflow for a generation block")
     workflow_start.add_argument("project", type=Path)
     workflow_start.add_argument("scene")
-    workflow_start.add_argument("block")
+    workflow_start.add_argument("block", help="a generation block's id, or a shot outside any block (e.g. P7)")
     workflow_list = workflow_sub.add_parser("list", help="Every run, with its steps")
     workflow_list.add_argument("project", type=Path)
     workflow_list.add_argument("scene", nargs="?")

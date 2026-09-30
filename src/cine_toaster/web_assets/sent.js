@@ -200,7 +200,7 @@ export function sentView(record, { plan = false } = {}) {
   if (record.kind === "picture-derivation" || (plan && record.source && record.references)) {
     return derivation(record, { plan });
   }
-  if (plan || record.kind === "block-generation") return generation(record, { plan });
+  if (plan || record.kind === "block-generation" || record.kind === "shot-generation") return generation(record, { plan });
   if (record.kind === "block-slice") return slice(record);
   if (record.kind === "voice-conversion") return revoice(record);
   if (record.job && Object.keys(record).length === 1) return outside(record.job);
@@ -209,7 +209,7 @@ export function sentView(record, { plan = false } = {}) {
 
 function viewable(record) {
   if (!record || !Object.keys(record).length) return false;
-  if (["block-generation", "block-slice", "voice-conversion", "picture-derivation"].includes(record.kind)) return true;
+  if (["block-generation", "shot-generation", "block-slice", "voice-conversion", "picture-derivation"].includes(record.kind)) return true;
   return Boolean(record.job) && Object.keys(record).length === 1;
 }
 

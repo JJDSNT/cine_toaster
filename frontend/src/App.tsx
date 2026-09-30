@@ -69,12 +69,13 @@ function toFlow(graph: ProductionGraph, showTakes: boolean, focus: Focus): { nod
 }
 
 /** A block with no run in progress can be started from the canvas, as from the scene room. */
-function StartBlock({ graph, scene, block, onChanged }: { graph: ProductionGraph | null; scene: string; block: string; onChanged: () => void }) {
+function StartBlock({ graph, scene, block, shot, onChanged }: { graph: ProductionGraph | null; scene: string; block?: string; shot?: string; onChanged: () => void }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const active = graph?.nodes.some((node) => node.type === "run" && node.scene === scene && node.data.block === block
-    && ["running", "waiting"].includes(node.data.state));
-  if (active) return <p className="hint">Block {block} has a workflow in progress: its card is beside the scene.</p>;
+  const what = shot ? `shot ${shot}` : `block ${block}`;
+  const active = graph?.nodes.some((node) => node.type === "run" && node.scene === scene
+    && (shot ? node.data.shot === shot : node.data.block === block) && ["running", "waiting"].includes(node.data.state));
+  if (active) return <p className="hint">The {what} has a workflow in progress: its card is beside the scene.</p>;
   const sceneNode = graph?.nodes.find((node) => node.type === "scene" && node.scene === scene);
   const revision = sceneNode?.type === "scene" ? sceneNode.data.revision : undefined;
   return (
@@ -82,10 +83,10 @@ function StartBlock({ graph, scene, block, onChanged }: { graph: ProductionGraph
       <button type="button" disabled={busy} onClick={async () => {
         setBusy(true);
         setError("");
-        try { await startWorkflow(scene, block, revision ?? 0); onChanged(); }
+        try { await startWorkflow(scene, shot ? { shot } : { block }, revision ?? 0); onChanged(); }
         catch (reason) { setError((reason as Error).message); }
         finally { setBusy(false); }
-      }}>Start the workflow for block {block}</button>
+      }}>Start the workflow for the {what}</button>
       {error && <p className="finding error">{error}</p>}
     </div>
   );
@@ -150,6 +151,7 @@ function Details({ selection, graph, onChanged }: { selection: Selection; graph:
           {d.block && (<><dt>Block</dt><dd>{d.block}</dd></>)}
         </dl>
         {d.block && <StartBlock graph={graph} scene={d.scene} block={d.block} onChanged={onChanged} />}
+        {!d.block && d.source === "generated" && <StartBlock graph={graph} scene={d.scene} shot={d.shot} onChanged={onChanged} />}
         <a href={`/?scene=${encodeURIComponent(d.scene)}&shot=${encodeURIComponent(d.shot)}`}>Compare takes</a>
       </div>
     );

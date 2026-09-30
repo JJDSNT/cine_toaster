@@ -52,7 +52,8 @@ MAX_READS = 4
 
 #: What the assistant may propose. Each is a runtime command; none decides a gate.
 ACTIONS = {
-    "start_workflow": "start the workflow of a generation block (needs `block`)",
+    "start_workflow": "start a workflow: of a generation block (needs `block`), or of one shot outside any "
+                      "block (needs `shot`; its result is a take)",
     "resume_workflow": "move a stopped workflow run on (needs `workflow`)",
     "set_cut": "decide the cut into a shot (needs `scene`, `shot` = the incoming shot, `cut_type`; optional "
                "`reason`, `transition` = a catalog id)",
@@ -202,7 +203,7 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None):
         proposal = {}
         if action in ACTIONS:
             proposal = {"action": action, "scene": answer.get("scene") or scene_id, "block": answer.get("block", ""),
-                        "workflow": answer.get("workflow", "")}
+                        "workflow": answer.get("workflow", ""), "shot": answer.get("shot", "")}
             if action == "set_cut":
                 proposal.update(shot=answer.get("shot", ""), cut_type=answer.get("cut_type") or "hard",
                                 reason=answer.get("reason", ""), transition=answer.get("transition", ""))
@@ -234,8 +235,12 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None):
                       + (f" ({proposal['reason']})" if proposal.get("reason") else ""))
         else:
             verb = "Iniciar" if proposal["action"] == "start_workflow" else "Retomar"
-            target = (f"o workflow do bloco {proposal['block']}" if proposal["action"] == "start_workflow"
-                      else f"a execução {proposal['workflow']}")
+            if proposal["action"] != "start_workflow":
+                target = f"a execução {proposal['workflow']}"
+            elif proposal.get("block"):
+                target = f"o workflow do bloco {proposal['block']}"
+            else:
+                target = f"o workflow do plano {proposal['shot']}"
         answer = interrupt({"message": f"{verb} {target} na cena {proposal['scene']}?", "proposal": proposal})
         if not (isinstance(answer, dict) and answer.get("approved")):
             return {"messages": [AIMessage(content="Certo, não fiz nada.")], "proposal": {}}
@@ -245,7 +250,7 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None):
                 "type": proposal["cut_type"], "reason": proposal.get("reason", ""),
                 "transition": {"id": proposal["transition"]} if proposal.get("transition") else None})
         elif proposal["action"] == "start_workflow":
-            payload["block"] = proposal["block"]
+            payload.update({"block": proposal["block"]} if proposal.get("block") else {"shot": proposal["shot"]})
         else:
             payload["workflow_id"] = proposal["workflow"]
         try:

@@ -12,6 +12,7 @@ import unittest
 from pathlib import Path
 
 from cine_toaster import jobs, spend
+from cine_toaster.errors import ValidationError
 from cine_toaster.generation import estimate, plan_block
 from cine_toaster.jobs import JobManager, JobStore
 from cine_toaster.project import load_production, load_scene
@@ -127,6 +128,24 @@ class GenerateBlockTests(unittest.TestCase):
         plan = self.plan()
         self.assertEqual([ref.role for ref in plan.guides], ["first"])
         self.assertIn("P3 asks for no guide at its cut", plan.notes[-1])
+
+    def test_a_shot_outside_any_block_becomes_a_take_of_its_own(self) -> None:
+        from cine_toaster.generation import plan_shot
+
+        with self.assertRaisesRegex(ValidationError, "part of block A"):
+            plan_shot(self.root, load_production(self.root), "SC-030", "P2")
+        (self.work / "p01.png").write_bytes((self.work / "p02.png").read_bytes())
+        plan = plan_shot(self.root, load_production(self.root), "SC-030", "P1")
+        self.assertEqual((plan.shots, plan.seconds, len(plan.guides)), (["P1"], 6, 1))
+        jobs.GENERATION_TRANSPORT = FakeRunpod(self.video)
+        spend.set_limit(2)
+        job = self.manager.wait(self.manager.submit("generate_block", self.root, {"scene": "SC-030", "shot": "P1"})["id"], timeout=60)
+        self.assertEqual(job["state"], "succeeded", job["error"])
+        self.manager.adopt(job["id"])
+        shot = next(item for item in load_scene(self.root, "SC-030")["shots"] if item["id"] == "P1")
+        take = next(item for item in shot["takes"] if item["id"] == "GEN")
+        self.assertEqual(take["provenance"]["kind"], "shot-generation")
+        self.assertTrue(take["media"].endswith("work/_takes/c01-gen.mp4"))
 
     def test_nothing_is_generated_without_a_budget(self) -> None:
         jobs.GENERATION_TRANSPORT = FakeRunpod(self.video)

@@ -32,6 +32,12 @@ made from, and what a new edit would be given.
 
 # Generating a block
 
+(A shot outside any block is generated the same way, on its own:
+`toast generate <project> SC-030 P7` plans it as a one-shot generation, and
+its result is a **take** of the shot (`GEN`, `GEN-2`…), with no slicing. A
+length that is not a whole number of seconds is rounded up, and the cut
+trims the rest.)
+
 A **block** is a run of consecutive shots made in one generation
 (`block: <id>` on each shot). Cine Toaster builds everything the generation
 is given from the production's records, shows it, and sends it only when

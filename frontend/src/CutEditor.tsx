@@ -90,6 +90,7 @@ export function CutEditor({ scene, shot, data, onSaved }: { scene: string; shot:
   );
 }
 
-export async function startWorkflow(scene: string, block: string, revision: number): Promise<void> {
-  await command("start_workflow", { scene_id: scene, block, expected_revision: revision });
+/** Start a block's workflow, or a single shot's ({shot: …}). */
+export async function startWorkflow(scene: string, target: { block?: string; shot?: string }, revision: number): Promise<void> {
+  await command("start_workflow", { scene_id: scene, ...target, expected_revision: revision });
 }

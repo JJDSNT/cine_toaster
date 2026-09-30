@@ -63,6 +63,8 @@ export interface RunData {
   scene: string;
   run: string;
   block: string;
+  /** A single shot's run, when it is not a block's. */
+  shot: string;
   state: "running" | "waiting" | "done" | "failed" | "cancelled";
   steps: RunStep[];
   /** The step waiting for a person, if any. */

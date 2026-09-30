@@ -164,6 +164,25 @@ class WorkflowTests(unittest.TestCase):
         kinds = [item["kind"] for item in state.decisions]
         self.assertEqual(kinds, ["workflow.started", "gate.decided", "gate.decided"])
 
+    def test_a_shot_outside_any_block_has_its_own_workflow_ending_in_a_take(self) -> None:
+        scene = self.root / "scenes" / "030-echo-chamber" / "scene.yaml"
+        scene.write_text(scene.read_text(encoding="utf-8").replace("  - n: 3\n    block: A\n", "  - n: 3\n", 1),
+                         encoding="utf-8")
+        Image.new("RGB", (1280, 704), "green").save(self.root / "scenes/030-echo-chamber/work/p03.png")
+        human = {"id": "director", "kind": "human"}
+        with self.assertRaisesRegex(ValidationError, "part of block A"):
+            dispatch(self.root, "start_workflow", {"scene_id": "SC-030", "shot": "P2", "actor": human})
+        dispatch(self.root, "start_workflow", {"scene_id": "SC-030", "shot": "P3", "actor": human})
+        state, run = self.wait_for(lambda state, run: run["state"] == "waiting")
+        self.assertEqual([step["id"] for step in run["steps"]], ["picture-P3", "approve-P3", "generate"])
+        gate = self.waiting_gate(state)
+        dispatch(self.root, "decide_gate", {"scene_id": "SC-030", "gate_id": gate["id"], "outcome": "approved",
+                                            "chosen": gate["candidates"][0], "actor": human})
+        _, run = self.wait_for(lambda state, run: run["state"] in ("done", "failed", "cancelled"))
+        self.assertEqual(run["state"], "done", run)
+        shot = next(item for item in load_scene(self.root, "SC-030")["shots"] if item["id"] == "P3")
+        self.assertIn("GEN", [take["id"] for take in shot["takes"]])
+
     def test_a_rejected_picture_ends_the_run_and_nothing_is_animated(self) -> None:
         human = {"id": "director", "kind": "human"}
         dispatch(self.root, "start_workflow", {"scene_id": "SC-030", "block": "A", "actor": human})

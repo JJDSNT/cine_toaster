@@ -6,7 +6,12 @@ a picture nobody approved.
 
 ```text
 picture (each master the block uses) → approve it → generate the block → slice into takes
+picture (each master the shot uses)  → approve it → generate the shot as a take
 ```
+
+The second form is for a generated shot outside any block. The scene room
+offers it as **Start for this shot**, `toast workflow start <project> <scene>
+P7` does the same, and so does the canvas.
 
 ## In the control room
 

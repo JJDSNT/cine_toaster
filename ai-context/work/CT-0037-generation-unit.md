@@ -244,6 +244,24 @@ step 10's gate.
 
 Tests: `tests/test_pictures.py` (3 tests).
 
+**A shot outside any block** (2026-09-30):
+
+- `plan_shot` plans it as a one-shot generation, rounding the length up to
+  whole seconds with a note.
+- `generate_block` with `shot` makes a take of it
+  (`_takes/c<nn>-gen[-k].mp4`, provenance `shot-generation`); its remote
+  record is keyed separately.
+- A block's shots are refused ("generate the block").
+- The workflow template `shot`: its masters, their approval, then the
+  generation as a take.
+- Available from the CLI (`toast generate`, `toast workflow start` with a
+  shot id), the scene room ("Start for this shot"), the canvas and the
+  assistant.
+- Tests:
+  - `test_a_shot_outside_any_block_becomes_a_take_of_its_own`;
+  - `test_a_shot_outside_any_block_has_its_own_workflow_ending_in_a_take`.
+- Checked headless from the scene room.
+
 Remaining:
 
 - ~~SINGULAR's `guia_no_corte` and `forca_corte`~~ done 2026-09-30 as the

@@ -75,7 +75,7 @@ const MARKS: Record<string, string> = {
 export function RunCard({ data, selected }: NodeProps<RunNode>) {
   return (
     <div className={`card run-card run-${data.state} ${selected ? "selected" : ""}`}>
-      <span className="eyebrow">Workflow · block {data.block}</span>
+      <span className="eyebrow">Workflow · {data.shot ? `shot ${data.shot}` : `block ${data.block}`}</span>
       <ol>
         {data.steps.map((step, index) => (
           <li key={index} className={`step step-${step.state}`}>

@@ -852,14 +852,25 @@ GENERATION_TRANSPORT = None
 
 
 def _generation_plan(root: Path, params: dict[str, Any]):
-    from .generation import hourly_rate, plan_block
+    """A block's plan, or -- with `shot` -- one shot outside any block."""
+
+    from .generation import hourly_rate, plan_block, plan_shot
     from .project import load_production
 
     endpoint = os.environ.get("RUNPOD_LTX_ENDPOINT_ID", "")
     production = load_production(root)
-    plan = plan_block(root, production, str(params.get("scene", "")).strip(), str(params.get("block", "")).strip(),
-                      seed=int(params.get("seed") or 1), rate=hourly_rate(root, endpoint))
+    scene = str(params.get("scene", "")).strip()
+    seed, rate = int(params.get("seed") or 1), hourly_rate(root, endpoint)
+    if str(params.get("shot") or "").strip():
+        plan = plan_shot(root, production, scene, str(params["shot"]).strip(), seed=seed, rate=rate)
+    else:
+        plan = plan_block(root, production, scene, str(params.get("block", "")).strip(), seed=seed, rate=rate)
     return plan, endpoint
+
+
+def _single(context_or_params) -> bool:
+    params = getattr(context_or_params, "params", context_or_params)
+    return bool(str(params.get("shot") or "").strip())
 
 
 def _validate_generate(root: Path, params: dict[str, Any]) -> dict[str, Any]:
@@ -869,6 +880,9 @@ def _validate_generate(root: Path, params: dict[str, Any]) -> dict[str, Any]:
     if GENERATION_TRANSPORT is None and not (endpoint and os.environ.get("RUNPOD_API_KEY")):
         raise ValidationError("Generation needs RUNPOD_API_KEY and RUNPOD_LTX_ENDPOINT_ID in the environment "
                               "(toast generate --env-file <file> reads them without printing them)")
+    if _single(params):
+        spend.check(plan.estimate_usd, f"Shot {plan.block} of {plan.scene}")
+        return {"scene": plan.scene, "shot": plan.block, "seed": plan.seed}
     spend.check(plan.estimate_usd, f"Block {plan.block} of {plan.scene}")
     return {"scene": plan.scene, "block": plan.block, "seed": plan.seed}
 
@@ -959,12 +973,28 @@ def _run_generate(context: JobContext) -> dict[str, Any]:
 
     root = context.project_root
     plan, endpoint = _generation_plan(root, context.params)
-    what = f"Block {plan.block} of {plan.scene}"
+    single = _single(context)
+    what = f"{'Shot' if single else 'Block'} {plan.block} of {plan.scene}"
     spend.check(plan.estimate_usd, what)  # again: another job may have spent since this one was queued
-    scene_file = next(item["file"] for item in load_production(root)["scenes"] if item["id"] == plan.scene)
-    work = work_directory_for(root / scene_file)
-    numbers = [int(path.stem.rpartition("-")[2]) for path in block_versions(work, plan.block) if "-" in path.stem]
-    name = f"b{plan.block}-{max(numbers, default=0) + 1}.mp4"
+    scene = next(item for item in load_production(root)["scenes"] if item["id"] == plan.scene)
+    work = work_directory_for(root / scene["file"])
+    if single:
+        # One shot: the result is a take of it, beside the others (GEN, GEN-2…).
+        from .takes import TAKES_DIRECTORIES, shot_key
+
+        number = shot_key(next(shot["number"] for shot in scene["shots"] if shot["id"] == plan.block))
+        digits = "".join(ch for ch in number if ch.isdigit())
+        stem = f"c{int(digits):02d}{number[len(digits):]}" if digits else f"c{number}"
+        home = work / TAKES_DIRECTORIES[0]
+        slug, attempt = "gen", 1
+        while (home / f"{stem}-{slug}.mp4").exists():
+            attempt += 1
+            slug = f"gen-{attempt}"
+        name = f"{stem}-{slug}.mp4"
+    else:
+        home = work
+        numbers = [int(path.stem.rpartition("-")[2]) for path in block_versions(work, plan.block) if "-" in path.stem]
+        name = f"b{plan.block}-{max(numbers, default=0) + 1}.mp4"
     output = context.staging / name
     transport = _paid_transport(context, endpoint, "Generating")
 
@@ -972,7 +1002,7 @@ def _run_generate(context: JobContext) -> dict[str, Any]:
     provider = LtxProvider(endpoint, transport=transport)
     guides = tuple(Guide(ref.path, ref.frame, ref.strength) for ref in plan.guides)
     record_path = output.with_name(name + JOB_SUFFIX)
-    pending = _remote_record("generate_block", plan.public_dict(root))
+    pending = _remote_record("generate_shot" if single else "generate_block", plan.public_dict(root))
     try:
         result = provider.generate(image=plan.image, output=output, seconds=plan.seconds, prompt=plan.prompt,
                                    seed=plan.seed, guides=guides, label=what, state_file=pending)
@@ -985,17 +1015,19 @@ def _run_generate(context: JobContext) -> dict[str, Any]:
     cost = _record_spend(context, pending, hourly_rate(root, endpoint), what, plan.estimate_usd)
     _settle_remote(pending, record_path)
     provenance = {
-        "kind": "block-generation", "scene": plan.scene, "block": plan.block, "shots": plan.shots,
+        "kind": "shot-generation" if single else "block-generation", "scene": plan.scene, "block": plan.block,
+        "shots": plan.shots,
         "provider": result.provider, "model": result.model, "seed": plan.seed, "seconds": plan.seconds,
         **plan.public_dict(root), "settings": result.provenance,
         "cost_usd": round(cost, 4), "job_id": context.job_id,
     }
     (context.staging / f"{name}.provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
-    destination = (work / name).relative_to(root).as_posix()
+    destination = (home / name).relative_to(root).as_posix()
     files = [{"staged": name, "destination": destination},
              {"staged": record_path.name, "destination": destination + JOB_SUFFIX},
              {"staged": f"{name}.provenance.json", "destination": destination + ".provenance.json"}]
     return {"files": files, "summary": {"scene": plan.scene, "block": plan.block, "clip": destination,
+                                        "shot": plan.block if single else "", "take": name.rsplit(".", 1)[0].split("-", 1)[1].upper() if single else "",
                                         "cost_usd": round(cost, 4), "estimate_usd": plan.estimate_usd}}
 
 

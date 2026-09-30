@@ -1697,7 +1697,8 @@ const STEP_STATES = { done: "approved", skipped: "approved", running: "in_progre
 
 function renderWorkflows(scene) {
   const blocks = (scene.blocks || []).filter((block) => block.contiguous);
-  if (!blocks.length && !(scene.runs || []).length) return null;
+  const generated = scene.shots.some((shot) => shot.source === "generated" && !shot.block);
+  if (!blocks.length && !generated && !(scene.runs || []).length) return null;
   const panel = el("section", "panel wide-panel");
   panel.append(sectionHeading(
     "WORKFLOW",
@@ -1714,12 +1715,25 @@ function renderWorkflows(scene) {
     }
   };
   const active = new Set((scene.runs || []).filter((run) => !["done", "failed", "cancelled"].includes(run.state))
-    .map((run) => run.subject.block));
+    .map((run) => run.subject.block).filter(Boolean));
   const starts = el("div", "take-actions");
   for (const block of blocks) {
     if (active.has(block.id)) continue;
     starts.append(button(`Start for block ${block.id} (${block.shots.join(", ")})`,
       () => act("start_workflow", { block: block.id }), "quiet-button"));
+  }
+  // A generated shot outside any block has a workflow of its own, ending in a take.
+  const busyShots = new Set((scene.runs || []).filter((run) => !["done", "failed", "cancelled"].includes(run.state))
+    .map((run) => run.subject.shot).filter(Boolean));
+  const loose = scene.shots.filter((shot) => shot.source === "generated" && !shot.block && !busyShots.has(shot.id));
+  if (loose.length) {
+    const picker = el("select", "take-picker");
+    for (const shot of loose) {
+      const option = el("option", "", `${shot.id} · ${shot.label}`);
+      option.value = shot.id;
+      picker.append(option);
+    }
+    starts.append(picker, button("Start for this shot", () => act("start_workflow", { shot: picker.value }), "quiet-button"));
   }
   if (starts.childElementCount) panel.append(starts);
   for (const run of scene.runs || []) panel.append(workflowRun(scene, run, act));
@@ -1729,7 +1743,7 @@ function renderWorkflows(scene) {
 function workflowRun(scene, run, act) {
   const box = el("article", "workflow-run");
   const head = el("div", "block-head");
-  head.append(el("strong", "", `Block ${run.subject.block}`),
+  head.append(el("strong", "", run.subject.shot ? `Shot ${run.subject.shot}` : `Block ${run.subject.block}`),
     el("span", `status status-${STEP_STATES[run.state] || "planned"}`, label(run.state)),
     el("span", "muted", `${run.id} · ${run.created_at.slice(0, 16).replace("T", " ")}`));
   box.append(head);

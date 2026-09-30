@@ -142,21 +142,25 @@ def production_graph(production: dict[str, Any], root: Path | None = None) -> di
         # The latest workflow run of each block (SPEC-0009), linked to its first shot.
         latest: dict[str, dict[str, Any]] = {}
         for run in scene.get("runs") or []:  # newest first
-            latest.setdefault(str(run.get("subject", {}).get("block", "")), run)
+            subject = run.get("subject", {})
+            key = f"shot:{subject['shot']}" if subject.get("shot") else f"block:{subject.get('block', '')}"
+            latest.setdefault(key, run)
         blocks = {block["id"]: block for block in scene.get("blocks") or []}
-        for block_id, run in latest.items():
+        for run in latest.values():
+            block_id = str(run.get("subject", {}).get("block", ""))
+            single = str(run.get("subject", {}).get("shot", ""))
             run_node = f"run:{scene['id']}/{run['id']}"
             waiting = next((step for step in run["steps"] if step["state"] == "waiting"), None)
             nodes.append({
                 "id": run_node, "type": "run", "scene": scene["id"],
                 "data": {
-                    "scene": scene["id"], "run": run["id"], "block": block_id, "state": run["state"],
+                    "scene": scene["id"], "run": run["id"], "block": block_id, "shot": single, "state": run["state"],
                     "steps": [{"label": step["label"], "state": step["state"], "kind": step["kind"]}
                               for step in run["steps"]],
                     "waiting": waiting["label"] if waiting else "",
                 },
             })
-            shots = (blocks.get(block_id) or {}).get("shots") or []
+            shots = [single] if single else (blocks.get(block_id) or {}).get("shots") or []
             if shots:
                 edges.append({"id": f"runs:{run_node}", "type": "run", "source": run_node,
                               "target": f"shot:{scene['id']}/{shots[0]}", "data": {"state": run["state"]}})

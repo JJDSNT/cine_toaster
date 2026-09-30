@@ -113,25 +113,53 @@ def hourly_rate(root: Path, endpoint: str) -> float:
     return float(rates.get(endpoint, HOURLY_RATE_USD))
 
 
+def plan_shot(root: Path, production: dict[str, Any], scene_id: str, shot_id: str, seed: int = 1,
+              rate: float = HOURLY_RATE_USD) -> BlockPlan:
+    """One shot outside any block, planned as a generation of its own; its result is a take."""
+
+    return plan_block(root, production, scene_id, "", seed=seed, rate=rate, shot_id=shot_id)
+
+
 def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: str, seed: int = 1,
-               rate: float = HOURLY_RATE_USD) -> BlockPlan:
-    """Everything one generation of the block will be given, and what it should cost."""
+               rate: float = HOURLY_RATE_USD, shot_id: str = "") -> BlockPlan:
+    """Everything one generation of the block (or of one shot) will be given, and what it should cost."""
+
+    import math
+
+    from .blocks import Block
 
     scene = next((item for item in production["scenes"] if item["id"] == scene_id), None)
     if scene is None:
         raise ValidationError(f"No scene {scene_id!r}")
     work = work_directory_for(root / scene["file"])
-    block = next((item for item in scene_blocks(scene, work, root) if item.id == str(block_id)), None)
-    if block is None:
-        raise ValidationError(f"{scene_id} has no block {block_id!r}")
-    if not block.contiguous:
-        raise ValidationError(f"Block {block_id} is not a run of consecutive shots")
+    early_notes: list[str] = []
+    if shot_id:
+        shot = next((item for item in scene["shots"] if item["id"] == shot_id), None)
+        if shot is None:
+            raise ValidationError(f"{scene_id} has no shot {shot_id!r}")
+        if shot.get("block"):
+            raise ValidationError(f"{shot_id} is part of block {shot['block']}: generate the block, so its shots "
+                                  "keep one light and one room")
+        wanted = float(shot.get("generated_seconds") or shot.get("duration_seconds") or 0)
+        if wanted <= 0:
+            raise ValidationError(f"{shot_id} has no duration to generate")
+        whole = max(1, math.ceil(wanted))
+        if whole != wanted:
+            early_notes.append(f"{shot_id} runs {wanted:g} s; LTX 2.5 generates whole seconds, so {whole} s "
+                               "are asked for and the cut trims the rest.")
+        block = Block(shot_id, [shot_id], [float(whole)])
+    else:
+        block = next((item for item in scene_blocks(scene, work, root) if item.id == str(block_id)), None)
+        if block is None:
+            raise ValidationError(f"{scene_id} has no block {block_id!r}")
+        if not block.contiguous:
+            raise ValidationError(f"Block {block_id} is not a run of consecutive shots")
     seconds = sum(block.durations)
     if seconds != int(seconds) or not 1 <= seconds <= MAX_SECONDS:
         raise ValidationError(f"Block {block_id} runs {seconds:g} s; LTX 2.5 takes 1 to {MAX_SECONDS} whole seconds "
                               f"(claim duration-limits)")
     shots = {shot["id"]: shot for shot in scene["shots"]}
-    notes: list[str] = []
+    notes: list[str] = list(early_notes)
     prompts, references = [], []
     for shot_id in block.shots:
         shot = shots[shot_id]
