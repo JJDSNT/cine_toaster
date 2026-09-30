@@ -1,0 +1,16 @@
+schema_version = 1
+id = "glitch"
+name = "Glitch"
+category = "glitch"
+says = "The picture breaks up in bursts: a signal failing, a machine losing hold."
+energy = "high"
+use_when = ["A system under strain, a corrupted transmission"]
+avoid_when = ["More than a few seconds"]
+
+[params]
+strength = 0.6
+rate = 0.15
+
+[render]
+engine = "ffmpeg"
+effect = "glitch"

@@ -1,0 +1,22 @@
+schema_version = 1
+id = "smoke-over"
+name = "Smoke"
+category = "elements"
+says = "Smoke rising through the frame, from a stock element."
+energy = "high"
+use_when = ["After a blast, a smouldering ruin, fog of war"]
+avoid_when = ["When the production has no smoke element: it is refused, not faked"]
+
+# Composites a stock element from the production's library
+# (vfx_elements/<id>/element.toml, category = "smoke"). Name it with element: <id>.
+[params]
+x = 0.5
+y = 0.5
+scale = 1.0
+opacity = 1.0
+start = 0.0
+
+[render]
+engine = "ffmpeg"
+effect = "element"
+element_category = "smoke"

@@ -1,0 +1,15 @@
+schema_version = 1
+id = "camera-shake"
+name = "Camera shake"
+category = "motion"
+says = "The frame trembles: an impact, a blast, the ground moving."
+energy = "high"
+use_when = ["Explosions, impacts, a vehicle"]
+avoid_when = ["Calm dialogue"]
+
+[params]
+strength = 0.4
+
+[render]
+engine = "ffmpeg"
+effect = "shake"

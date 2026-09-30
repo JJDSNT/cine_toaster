@@ -1,0 +1,16 @@
+schema_version = 1
+id = "focus-pull-in"
+name = "Focus in"
+category = "lens"
+says = "The picture comes into focus: waking up, arriving, seeing clearly."
+energy = "low"
+use_when = ["Waking, the first shot of a scene"]
+avoid_when = ["Every shot"]
+
+[params]
+strength = 0.6
+length = 1.2
+
+[render]
+engine = "ffmpeg"
+effect = "defocus"

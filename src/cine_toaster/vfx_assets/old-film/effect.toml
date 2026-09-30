@@ -1,0 +1,15 @@
+schema_version = 1
+id = "old-film"
+name = "Old film"
+category = "texture"
+says = "Sepia, grain, a flickering exposure and dark corners: an archive, the past."
+energy = "medium"
+use_when = ["Flashbacks, archive material, a period montage"]
+avoid_when = ["The present day"]
+
+[params]
+strength = 0.5
+
+[render]
+engine = "ffmpeg"
+effect = "old-film"

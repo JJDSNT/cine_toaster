@@ -41,7 +41,7 @@ ROOMS = {
     "dialogue": "the dialogue room", "sequences": "sequences and their versions", "scenes": "the list of scenes",
     "review": "what waits for review", "cut": "the cut room (joins between shots)", "cast": "the cast room",
     "locations": "the sets: plans, cameras, set pieces, plates, and the scenes shot there",
-    "transitions": "the transition catalogue", "moves": "the camera-move catalogue", "titles": "the title catalogue", "library": "the media library", "knowledge": "measured knowledge",
+    "transitions": "the transition catalogue", "moves": "the camera-move catalogue", "titles": "the title catalogue", "vfx": "the visual effects catalogue and stock elements", "library": "the media library", "knowledge": "measured knowledge",
     "scene": "one scene's room: shots, workflow and gates, pictures, blocks, versions (needs scene)",
     "compare": "a shot's takes side by side, to choose (needs scene and shot)",
     "canvas": "the production canvas, focused on a scene (scene optional)",

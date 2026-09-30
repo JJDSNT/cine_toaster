@@ -1,0 +1,22 @@
+schema_version = 1
+id = "fire-over"
+name = "Fire"
+category = "elements"
+says = "Real fire composited into the shot, blended from a black-backed or alpha element."
+energy = "high"
+use_when = ["A burning car, a fire in the distance, a torch"]
+avoid_when = ["When the production has no fire element: it is refused, not faked"]
+
+# Composites a stock element from the production's library
+# (vfx_elements/<id>/element.toml, category = "fire"). Name it with element: <id>.
+[params]
+x = 0.5
+y = 0.5
+scale = 1.0
+opacity = 1.0
+start = 0.0
+
+[render]
+engine = "ffmpeg"
+effect = "element"
+element_category = "fire"

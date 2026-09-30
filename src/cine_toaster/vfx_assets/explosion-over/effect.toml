@@ -1,0 +1,22 @@
+schema_version = 1
+id = "explosion-over"
+name = "Explosion"
+category = "elements"
+says = "An explosion composited where the shot needs it."
+energy = "high"
+use_when = ["A blast; pair it with a camera shake and a flash"]
+avoid_when = ["When the production has no explosion element: it is refused, not faked"]
+
+# Composites a stock element from the production's library
+# (vfx_elements/<id>/element.toml, category = "explosion"). Name it with element: <id>.
+[params]
+x = 0.5
+y = 0.5
+scale = 1.0
+opacity = 1.0
+start = 0.0
+
+[render]
+engine = "ffmpeg"
+effect = "element"
+element_category = "explosion"

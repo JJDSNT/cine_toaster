@@ -72,6 +72,8 @@ class Segment:
     sound: str = ""
     #: A title from the catalog (CT-0031): drawn on its own card, or over the take.
     title: dict[str, Any] | None = None
+    #: Effects from the VFX catalog, applied before the title.
+    effects: list[dict[str, Any]] = field(default_factory=list)
     #: The file actually cut, when it is not the take itself (a rendered card or titled piece).
     source: str = ""
 
@@ -204,7 +206,8 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
             length = float(shot.get("duration_seconds") or 0) or 3.0
             cut = cuts.get(shot["id"]) or {}
             plan.segments.append(Segment(shot["id"], "TITLE", "", 0.0, length, cut.get("type") or "hard", "title",
-                                         None, shot.get("level_db"), title=title))
+                                         None, shot.get("level_db"), title=title,
+                                         effects=list(shot.get("effects") or [])))
             continue
         if chosen is None:
             if shot.get("source") == "composed":
@@ -234,7 +237,7 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         plan.segments.append(Segment(
             shot["id"], chosen["id"], chosen["media"], start, end, join, method,
             (spoken[0][0], spoken[-1][1]) if spoken else None, shot.get("level_db"),
-            revoice=bool(shot.get("voice_in_cut")), title=title,
+            revoice=bool(shot.get("voice_in_cut")), title=title, effects=list(shot.get("effects") or []),
         ))
     if not plan.segments:
         raise ValidationError(f"{scene['id']} has no shot with a take to assemble")
@@ -258,7 +261,7 @@ def loudness_gain(source: Path, segment: Segment) -> float:
 
 
 def _draw_title(root: Path, segment: Segment, output: Path, first: dict[str, Any], fps: float, run_process) -> None:
-    """Render a segment's title: a card on its own, or over the cut piece of its take, sound kept.
+    """Render a segment's effects and title: a card on its own, or over the cut piece of its take, sound kept.
 
     The segment is then cut from that file, which starts where the cut does.
     """
@@ -276,10 +279,28 @@ def _draw_title(root: Path, segment: Segment, output: Path, first: dict[str, Any
                          "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-shortest", str(muxed)],
                         message=f"{segment.shot}: the converted voice under the picture")
             background = muxed
-    render_title(segment.title, length, output, width=first["width"] // 2 * 2, height=first["height"] // 2 * 2,
-                 background=background, start=segment.start, root=root, fps=round(fps) or FPS,
-                 run=lambda command: run_process(command, expected_seconds=length,
-                                                 message=f"{segment.shot}: title {segment.title['id']}"))
+    from .vfx import render as render_effects
+
+    size = {"width": first["width"] // 2 * 2, "height": first["height"] // 2 * 2, "fps": round(fps) or FPS}
+
+    def run(what: str):
+        return lambda command: run_process(command, expected_seconds=length, message=f"{segment.shot}: {what}")
+
+    start = segment.start
+    if segment.effects and background is not None:  # a take: its effects, then the title over them
+        treated = output.with_suffix(".fx.mp4")
+        render_effects(segment.effects, length, treated, background=background, start=start,
+                       run=run("effects " + ", ".join(e["id"] for e in segment.effects)), **size)
+        background, start = treated, 0.0
+    if segment.title:
+        render_title(segment.title, length, output, background=background, start=start, root=root,
+                     run=run(f"title {segment.title['id']}"), **size)
+    else:
+        shutil.copyfile(background, output)
+    if segment.effects and not segment.media:  # a card: the effects over the drawn card, text included
+        treated = output.with_suffix(".fx.mp4")
+        render_effects(segment.effects, length, treated, background=output, run=run("effects"), **size)
+        treated.replace(output)
     if segment.speech:
         segment.speech = (segment.speech[0] - segment.start, segment.speech[1] - segment.start)
     segment.source, segment.start, segment.end = str(output), 0.0, length
@@ -310,7 +331,7 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
     plan.gains = segment_gain
     total = len(plan.segments)
     for index, segment in enumerate(plan.segments):
-        if segment.title and not segment.source:
+        if (segment.title or segment.effects) and not segment.source:
             _draw_title(root, segment, work / f"title-{index:03d}.mp4", first, fps, run_process)
         source = Path(segment.source) if segment.source else root / segment.media
         sound = Path(segment.sound) if segment.sound and not segment.source else None

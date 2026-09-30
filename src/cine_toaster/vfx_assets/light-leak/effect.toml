@@ -1,0 +1,16 @@
+schema_version = 1
+id = "light-leak"
+name = "Light leak"
+category = "light"
+says = "A warm glow drifts across the frame, as if light had leaked into the camera."
+energy = "medium"
+use_when = ["Memories, transitions of mood, a dreamlike beat"]
+avoid_when = ["Grave or clinical scenes"]
+
+[params]
+strength = 0.45
+color = "#FF8A3C"
+
+[render]
+engine = "ffmpeg"
+effect = "light-leak"

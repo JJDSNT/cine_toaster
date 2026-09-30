@@ -171,6 +171,16 @@ def build(root: Path, manager=None):
                 for item in catalog(runtime.root)]
 
     @server.tool(annotations=reading)
+    def list_effects() -> dict[str, Any]:
+        """The VFX catalog and the production's stock elements: a shot lists effects with `effects: [{id: …}]`."""
+        from .vfx import list_effects as catalog, list_elements
+
+        return {"effects": [{"id": item["id"], "name": item["name"], "category": item["category"], "says": item["says"],
+                             "params": item["params"], "element_category": item["element_category"]}
+                            for item in catalog(runtime.root)],
+                "elements": list_elements(runtime.root)}
+
+    @server.tool(annotations=reading)
     def plan_generation(scene: str, target: str, seed: int = 1) -> dict[str, Any]:
         """What generating a block (its id) or a lone shot (P7) would send and cost. Nothing is sent or paid."""
 

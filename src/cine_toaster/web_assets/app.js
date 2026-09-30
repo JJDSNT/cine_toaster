@@ -21,7 +21,7 @@ const state = {
 const ROOMS = new Set([
   "overview", "script", "storyboard", "dialogue",
   "sequences", "scenes", "review", "cut", "cast", "locations",
-  "transitions", "moves", "titles", "library", "knowledge",
+  "transitions", "moves", "titles", "vfx", "library", "knowledge",
 ]);
 
 /** Write where we are into the address bar.
@@ -73,6 +73,7 @@ function draw(view) {
   else if (view === "moves") renderMoves();
   else if (view === "locations") renderLocations();
   else if (view === "titles") renderTitles();
+  else if (view === "vfx") renderVfx();
   else if (view === "cast") renderCast();
   else if (view === "library") renderLibrary(state.project.id);
   else if (view === "knowledge") renderKnowledge();
@@ -1476,6 +1477,72 @@ async function renderTitles() {
   tellAssistant();
 }
 
+// The VFX catalog (CT-0031): procedural effects drawn by FFmpeg, and
+// composites of the production's own stock elements. A shot lists them:
+// effects: [{id: …}, …], applied in order before its title.
+async function renderVfx() {
+  const root = byId("workspace");
+  root.replaceChildren();
+  const heading = sectionHeading("VFX", "Visual effects",
+    "Effects chosen like titles: a shot lists them with effects: [{id: …}]. Element effects composite stock elements the production brings (vfx_elements/<id>/element.toml).");
+  heading.classList.add("page-heading");
+  root.append(heading);
+  state.vfx = (await api("/api/vfx", { optional: true })) || { effects: [], elements: [] };
+  const byCategory = new Map();
+  for (const item of state.vfx.effects) {
+    if (!byCategory.has(item.category)) byCategory.set(item.category, []);
+    byCategory.get(item.category).push(item);
+  }
+  for (const [category, items] of byCategory) {
+    const section = el("section", "transition-section");
+    section.append(sectionHeading("VFX", label(category), `${items.length} available`));
+    const grid = el("div", "transition-grid");
+    for (const item of items) {
+      const card = el("article", "transition-card move-card");
+      const box = el("div", "move-preview vfx-preview");
+      const needs = item.element_category;
+      const have = state.vfx.elements.filter((element) => element.category === needs && element.exists);
+      if (needs && !have.length) {
+        box.append(el("small", "move-note", `No ${needs} element yet: bring one to vfx_elements/`));
+      } else {
+        box.append(el("span", "muted", "Preview"));
+        let video = null;
+        box.addEventListener("mouseenter", () => {
+          if (!video) {
+            video = el("video");
+            Object.assign(video, { muted: true, loop: true, playsInline: true, src: `/api/vfx-preview?id=${encodeURIComponent(item.id)}` });
+            video.addEventListener("error", () => box.replaceChildren(el("small", "move-note", "The preview could not be drawn.")));
+            box.replaceChildren(video);
+          }
+          video.play().catch(() => {});
+        });
+        box.addEventListener("mouseleave", () => video?.pause());
+      }
+      card.append(
+        box,
+        el("strong", "", item.name),
+        el("code", "move-id", needs ? `effects: [{id: ${item.id}, element: …}]` : `effects: [{id: ${item.id}}]`),
+        el("p", "", item.says),
+        el("small", "muted", `${needs ? `composites a ${needs} element` : `FFmpeg · ${item.effect}`} · energy ${item.energy || "—"}${item.origin !== "built-in" ? ` · ${item.origin}` : ""}`),
+        guidanceList("Use when", item.use_when, "good"),
+        guidanceList("Avoid when", item.avoid_when, "warning"),
+      );
+      grid.append(card);
+    }
+    section.append(grid);
+    root.append(section);
+  }
+  const library = el("section", "panel wide-panel");
+  library.append(sectionHeading("ELEMENTS", "The production's stock elements",
+    "Packs you are licensed for (ActionVFX, FootageCrate, your own renders), each with its blend: screen or add for black-backed, alpha, or key for green."));
+  if (!state.vfx.elements.length) library.append(el("p", "empty-state", "None yet."));
+  for (const element of state.vfx.elements) {
+    library.append(el("p", "", `${element.id} · ${element.category} · ${element.blend}${element.exists ? "" : " · file missing"}${element.source ? ` · from ${element.source}` : ""}${element.license ? ` · ${element.license}` : ""}`));
+  }
+  root.append(library);
+  tellAssistant();
+}
+
 async function renderMoves() {
   const root = byId("workspace");
   root.replaceChildren();
@@ -2619,6 +2686,11 @@ async function start() {
   startEventStream();
   renderJobs().catch(() => {});
   startAssistant({ seen: assistantSeen, navigate: assistantNavigate }).catch(() => {});
+  api("/api/vfx", { optional: true }).then((vfx) => {
+    state.vfx = vfx || { effects: [], elements: [] };
+    const count = byId("vfx-nav-count");
+    if (count) count.textContent = String(state.vfx.effects.length);
+  }).catch(() => {});
   api("/api/titles", { optional: true }).then((titles) => {
     state.titles = titles || [];
     const count = byId("titles-nav-count");

@@ -1,0 +1,22 @@
+schema_version = 1
+id = "muzzle-flash"
+name = "Muzzle flash"
+category = "elements"
+says = "The flash of a gunshot at the barrel, a few frames long."
+energy = "high"
+use_when = ["Gunfire; pair it with a flash"]
+avoid_when = ["When the production has no muzzle-flash element: it is refused, not faked"]
+
+# Composites a stock element from the production's library
+# (vfx_elements/<id>/element.toml, category = "muzzle-flash"). Name it with element: <id>.
+[params]
+x = 0.5
+y = 0.5
+scale = 1.0
+opacity = 1.0
+start = 0.0
+
+[render]
+engine = "ffmpeg"
+effect = "element"
+element_category = "muzzle-flash"

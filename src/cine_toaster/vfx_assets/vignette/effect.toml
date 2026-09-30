@@ -1,0 +1,15 @@
+schema_version = 1
+id = "vignette"
+name = "Vignette"
+category = "lens"
+says = "The corners fall into shadow: the eye is led to the centre."
+energy = "low"
+use_when = ["Intimate shots, a lens with character"]
+avoid_when = ["Wide establishing shots meant to feel open"]
+
+[params]
+strength = 0.5
+
+[render]
+engine = "ffmpeg"
+effect = "vignette"

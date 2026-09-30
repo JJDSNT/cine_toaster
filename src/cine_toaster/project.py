@@ -194,6 +194,8 @@ def _load_shots(
                 "move": field(raw, "move") if isinstance(field(raw, "move"), dict) else None,
                 # A title from the catalog (CT-0031): on a card, or over the picture.
                 "title": field(raw, "title") if isinstance(field(raw, "title"), (str, dict)) else None,
+                # Effects from the VFX catalog, applied in order before the title (CT-0031).
+                "effects": field(raw, "effects") if isinstance(field(raw, "effects"), (list, dict, str)) else None,
                 "ends_on": vtext(raw, "ends_on"),
                 "motion": None,
                 "covers": field(raw, "covers"),
@@ -391,6 +393,26 @@ def _expand_camera_moves(shots: list[dict[str, Any]], scene_id: str, root: Path)
     return findings
 
 
+def _expand_effects(shots: list[dict[str, Any]], scene_id: str, root: Path) -> list[Finding]:
+    """`effects: [{id: film-grain}, ...]` take their defaults from the VFX catalog and elements (CT-0031)."""
+
+    if not any(shot.get("effects") for shot in shots):
+        return []
+    from .vfx import expand, list_effects, list_elements
+
+    catalog = {item["id"]: item for item in list_effects(root)}
+    elements = {item["id"]: item for item in list_elements(root)}
+    findings = []
+    for shot in shots:
+        if not shot.get("effects"):
+            continue
+        shot["effects"], problems = expand(shot["effects"], catalog, elements)
+        for problem in problems:
+            findings.append(Finding(code="effect_problem", severity="error", scene_id=scene_id, shots=(shot["id"],),
+                                    message=f"{shot['id']} {problem}. It would be lost, not guessed."))
+    return findings
+
+
 def _expand_titles(shots: list[dict[str, Any]], scene_id: str, root: Path) -> list[Finding]:
     """`title: {id: card, text: ...}` takes its engine, effect and defaults from the title catalog (CT-0031)."""
 
@@ -534,6 +556,7 @@ def _load_scene(
         raise ProjectFormatError(f"{error.message} (in {path})") from error
     move_findings = _expand_camera_moves(shots, scene_id, root)
     move_findings.extend(_expand_titles(shots, scene_id, root))
+    move_findings.extend(_expand_effects(shots, scene_id, root))
     motions = shot_motions(geometry, shots, scene_id=scene_id)
     positions_by_shot = {motion.shot_id: motion.start_positions for motion in motions}
     findings = [

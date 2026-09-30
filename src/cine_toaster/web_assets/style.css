@@ -701,3 +701,5 @@ dialog::backdrop { background: #000b; }
 .title-try { width: min(420px, 100%); margin: 0 0 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
   background: #101315; color: inherit; font: inherit; }
 .title-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.vfx-preview video { width: 100%; height: 100%; object-fit: cover; display: block; }

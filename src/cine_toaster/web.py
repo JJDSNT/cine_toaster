@@ -261,6 +261,31 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             self._send_json(locations_view(self.project_root, cached_production(self.project_root),
                                            {item["id"]: item for item in backlot_status(self.project_root)}))
             return
+        if parsed.path == "/api/vfx":
+            # The VFX catalog and the production's stock elements (CT-0031).
+            from .vfx import list_effects, list_elements
+
+            self._send_json({"effects": [{key: item[key] for key in ("id", "name", "category", "says", "energy", "use_when",
+                                                                     "avoid_when", "params", "effect", "element_category",
+                                                                     "origin")} for item in list_effects(self.project_root)],
+                             "elements": list_elements(self.project_root)})
+            return
+        if parsed.path == "/api/vfx-preview":
+            from .vfx import cached_preview, list_effects
+
+            wanted = query.get("id", [""])[0]
+            item = next((entry for entry in list_effects(self.project_root) if entry["id"] == wanted), None)
+            if item is None:
+                self._send_json({"error": {"code": "not_found", "message": f"No effect {wanted!r}"}}, HTTPStatus.NOT_FOUND)
+                return
+            try:
+                path = cached_preview(item, root=self.project_root)
+            except (ValidationError, OSError, subprocess.CalledProcessError) as error:
+                self._send_json({"error": {"code": "unavailable", "message": getattr(error, "message", str(error))}},
+                                HTTPStatus.SERVICE_UNAVAILABLE)
+                return
+            self._send_file(path)
+            return
         if parsed.path == "/api/titles":
             # The title catalog (CT-0031), with whether each item's engine can run here.
             from .titles import engine_missing, list_titles

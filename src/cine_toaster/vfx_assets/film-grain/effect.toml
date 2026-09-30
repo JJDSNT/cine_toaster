@@ -1,0 +1,15 @@
+schema_version = 1
+id = "film-grain"
+name = "Film grain"
+category = "texture"
+says = "Moving grain over the picture: the look of film stock, and generated images that stop looking too clean."
+energy = "low"
+use_when = ["Softening the plastic smoothness of generated frames", "Matching shots from different sources"]
+avoid_when = ["Already noisy footage"]
+
+[params]
+strength = 0.35
+
+[render]
+engine = "ffmpeg"
+effect = "grain"

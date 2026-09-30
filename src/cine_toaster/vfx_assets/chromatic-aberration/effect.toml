@@ -1,0 +1,15 @@
+schema_version = 1
+id = "chromatic-aberration"
+name = "Chromatic aberration"
+category = "lens"
+says = "Colour fringes at the edges: a cheap or damaged lens, a slight unease."
+energy = "low"
+use_when = ["A mind not quite right, found footage"]
+avoid_when = ["Clean, controlled images"]
+
+[params]
+strength = 0.4
+
+[render]
+engine = "ffmpeg"
+effect = "aberration"

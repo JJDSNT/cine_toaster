@@ -1,0 +1,17 @@
+schema_version = 1
+id = "flash"
+name = "Flash"
+category = "light"
+says = "A burst of white at one moment: a gunshot, a lightning strike, a memory hitting."
+energy = "high"
+use_when = ["A shot, lightning, a camera flash"]
+avoid_when = ["People sensitive to flashing lights: use sparingly"]
+
+[params]
+strength = 0.8
+start = 0.2
+length = 0.4
+
+[render]
+engine = "ffmpeg"
+effect = "flash"
