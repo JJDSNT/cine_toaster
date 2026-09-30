@@ -236,3 +236,22 @@ Each step ships its example, a test, and the line in this table.
 - Tests: `tests/test_splat.py` (axis mapping, shot poses from the plan,
   rotations and turntables; a real render when Chromium and the sample are
   present).
+
+# NeRF (noted 2026-09-30, the user asked whether it is worth supporting)
+
+Worth it as an *input*, not as a renderer of its own. In production,
+Gaussian splats have largely taken NeRF's place: they render in real time,
+are editable, and the same captures train both (nerfstudio trains NeRFs
+and splats from the same COLMAP data, and `splatfacto` is its splat
+method). What a NeRF adds is quality on thin, view-dependent detail at a
+far higher rendering cost, on a CUDA GPU. The useful support is therefore:
+
+1. export a shot's camera move as a **nerfstudio camera path** (the poses
+   `shot_poses` already computes) so `ns-render` renders it on a GPU
+   machine (RunPod, under the budget ceiling);
+2. bring the result back as a plate or element (an image sequence: already
+   supported);
+3. prefer converting captures to splats where possible, which Cine
+   Toaster renders itself.
+
+Not started; the export in (1) is small and could follow the splat work.

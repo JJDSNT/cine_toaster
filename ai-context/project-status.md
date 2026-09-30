@@ -194,7 +194,14 @@ remains:
   pieces and object subjects in the blocking frame with a `subject_hidden`
   check (CT-0025); master pictures from a location's plate, and a
   Locations room (SPEC-0010, CT-0030); camera-move previews (CT-0027).
-  Aerial camera moves and outdoor plans followed (CT-0027). Claude Code now
+  Aerial camera moves and outdoor plans followed (CT-0027). Catalogs of
+  titles (CT-0031: FFmpeg and Blender) and visual effects (CT-0031/0047:
+  FFmpeg, stock elements in every delivery form, OpenEXR through
+  OpenColorIO, Blender-made effects and projects, OpenVDB, OpenUSD in and
+  out, OpenFX through Natron, Gaussian splats through Spark) are in place,
+  each form with a working example; Unreal/Unity and NeRF are studied in
+  CT-0047. Sound, music and an emotion catalog are noted for later
+  (CT-0048). Claude Code now
   works on a film through an MCP server of Cine Toaster (ADR 0020, CT-0045
   option 1: `toast mcp`). Noted for later, not started: RL beyond the
   refusal reasons (CT-0041), CT-0045 options 2 and 3, Video Toaster
