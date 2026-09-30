@@ -337,6 +337,7 @@ class LtxProvider:
         control_video: tuple[Path, float] | None = None,
         label: str = "ltx",
         enhance: bool = False,
+        state_file: Path | None = None,
     ) -> GenerationResult:
         if not self.endpoint_id:
             raise ProviderNotConfigured("RUNPOD_LTX_ENDPOINT_ID is not set")
@@ -354,7 +355,9 @@ class LtxProvider:
         result = run_job(
             self.endpoint_id,
             payload,
-            state_file=output.with_suffix(output.suffix + ".job.json"),
+            # Where the remote job is remembered: beside the output by default, or
+            # wherever the caller keeps it so a retry finds it (jobs._remote_record).
+            state_file=state_file or output.with_suffix(output.suffix + ".job.json"),
             label=label,
             transport=self.transport,
         )

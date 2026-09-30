@@ -71,6 +71,14 @@ toast budget                                         # spent so far, and the las
 - What the platform bills is written to the ledger even when the
   generation fails or is cancelled. Cancelling the job also cancels the
   remote job.
+- **A retry never pays twice for the same request.** While a generation
+  waits at the remote end, its remote job is remembered under
+  `~/.local/state/cine-toaster/remote/`, keyed by the request itself:
+  scene, block or shot, seed, prompt and pictures. If the runtime dies, a
+  retry finds that job and waits for it instead of sending it again, and
+  the ledger counts it once. Once the result is adopted, or the job fails
+  or is cancelled, the record is dropped, so asking again really asks
+  again.
 - The ledger is `~/.local/state/cine-toaster/spend.json`. Deleting it
   forgets history and refuses generation until a budget is set again.
 

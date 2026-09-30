@@ -75,7 +75,16 @@ def check(estimate_usd: float, what: str) -> None:
 
 
 def record(usd: float, what: str, **details: Any) -> None:
+    """Record what a remote job cost. The same remote job is one entry, updated:
+    a retry that picks up a job already paid for does not count it twice."""
+
     with _LOCK:
         data = load()
-        data["entries"].append({"at": datetime.now(UTC).isoformat(), "usd": round(float(usd), 4), "what": what, **details})
+        entry = {"at": datetime.now(UTC).isoformat(), "usd": round(float(usd), 4), "what": what, **details}
+        remote = details.get("remote")
+        same = next((index for index, item in enumerate(data["entries"]) if remote and item.get("remote") == remote), None)
+        if same is None:
+            data["entries"].append(entry)
+        else:
+            data["entries"][same] = entry
         _write(data)

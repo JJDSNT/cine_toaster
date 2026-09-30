@@ -153,6 +153,31 @@ class GenerateBlockTests(unittest.TestCase):
         self.assertAlmostEqual(spend.spent(), 32 * 1.75 / 3600, places=4)
         self.assertEqual(spend.load()["entries"][0]["status"], "FAILED")
 
+    def test_a_retry_after_the_runtime_died_waits_for_the_remote_job_instead_of_paying_again(self) -> None:
+        class DiesWhileWaiting(FakeRunpod):
+            def __call__(self, path, body):
+                if body is None and not getattr(self, "died", False):
+                    self.died = True
+                    self.calls.append((path, body))
+                    raise RuntimeError("the runtime died while waiting")
+                return super().__call__(path, body)
+
+        fake = jobs.GENERATION_TRANSPORT = DiesWhileWaiting(self.video)
+        spend.set_limit(2)
+        first = self.manager.wait(self.manager.submit("generate_block", self.root, {"scene": "SC-030", "block": "A"})["id"], timeout=60)
+        self.assertEqual(first["state"], "failed")
+        remote = Path(os.environ["XDG_STATE_HOME"]) / "cine-toaster" / "remote"
+        self.assertEqual(len(list(remote.glob("generate_block-*.job.json"))), 1)  # kept for the retry
+        again = self.manager.wait(self.manager.retry(first["id"])["id"], timeout=60)
+        self.assertEqual(again["state"], "succeeded", again["error"])
+        runs = [path for path, _ in fake.calls if path.endswith("/run")]
+        self.assertEqual(len(runs), 1)  # sent once, paid once
+        self.assertEqual(len(spend.load()["entries"]), 1)
+        self.assertAlmostEqual(spend.spent(), 122 * 1.75 / 3600, places=4)
+        # Adopted, the request is free again: asking once more really asks.
+        self.manager.adopt(again["id"])
+        self.assertEqual(list(remote.glob("*.json")), [])
+
     def test_a_chosen_version_can_be_sliced(self) -> None:
         jobs.GENERATION_TRANSPORT = FakeRunpod(self.video)
         spend.set_limit(2)

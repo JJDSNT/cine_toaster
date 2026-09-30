@@ -99,7 +99,7 @@ class QwenEditProvider:
         self.transport = transport
 
     def edit(self, *, source: Path, references: list[Path], prompt: str, seed: int, size: tuple[int, int],
-             output: Path, label: str = "picture") -> dict[str, Any]:
+             output: Path, label: str = "picture", state_file: Path | None = None) -> dict[str, Any]:
         if not self.endpoint_id:
             raise ProviderNotConfigured("RUNPOD_QWEN_ENDPOINT_ID is not set")
         width, height = size
@@ -107,7 +107,7 @@ class QwenEditProvider:
                                    "image_base64": base64.b64encode(padded(source, width, height)).decode()}
         for index, reference in enumerate(references):
             payload[f"image_base64_{index + 2}"] = base64.b64encode(padded(reference, width, height)).decode()
-        result = run_job(self.endpoint_id, payload, state_file=output.with_name(output.name + ".job.json"),
+        result = run_job(self.endpoint_id, payload, state_file=state_file or output.with_name(output.name + ".job.json"),
                          label=label, transport=self.transport)
         data = result.get("image") if isinstance(result, dict) else None
         if not data:

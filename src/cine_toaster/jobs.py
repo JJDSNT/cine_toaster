@@ -900,6 +900,39 @@ def _paid_transport(context: JobContext, endpoint: str, working: str):
     return transport
 
 
+def _remote_record(kind: str, identity: dict[str, Any]) -> Path:
+    """Where a paid request's remote job is remembered until its result is adopted.
+
+    Keyed by the request itself (what is asked, of what, with which seed), not by
+    the job: a retry after the runtime died finds the remote job and waits for it,
+    instead of sending -- and paying for -- the same work again.
+    """
+
+    import hashlib
+
+    key = hashlib.sha256(json.dumps({"kind": kind, **identity}, sort_keys=True).encode()).hexdigest()[:24]
+    return state_root() / "remote" / f"{kind}-{key}.job.json"
+
+
+def _settle_remote(pending: Path, staged: Path | None) -> None:
+    """After a paid call: keep the record for provenance, and free the request.
+
+    A finished request (done, failed, cancelled) is forgotten, so asking again
+    really asks again; one still running at the remote end is kept for a retry.
+    """
+
+    from .providers.runpod import TERMINAL_FAILURES
+
+    if not pending.is_file():
+        return
+    record = json.loads(pending.read_text(encoding="utf-8") or "{}")
+    finished = staged is not None or record.get("status") in (*TERMINAL_FAILURES, "COMPLETED")
+    if staged is not None:
+        shutil.copyfile(pending, staged)
+    if finished:
+        pending.unlink(missing_ok=True)
+
+
 def _record_spend(context: JobContext, record_path: Path, rate: float, what: str, estimate_usd: float) -> float:
     """What the platform billed is spent whatever the outcome; returns it."""
 
@@ -939,11 +972,18 @@ def _run_generate(context: JobContext) -> dict[str, Any]:
     provider = LtxProvider(endpoint, transport=transport)
     guides = tuple(Guide(ref.path, ref.frame) for ref in plan.guides)
     record_path = output.with_name(name + JOB_SUFFIX)
+    pending = _remote_record("generate_block", plan.public_dict(root))
     try:
         result = provider.generate(image=plan.image, output=output, seconds=plan.seconds, prompt=plan.prompt,
-                                   seed=plan.seed, guides=guides, label=what)
-    finally:
-        cost = _record_spend(context, record_path, hourly_rate(root, endpoint), what, plan.estimate_usd)
+                                   seed=plan.seed, guides=guides, label=what, state_file=pending)
+    except BaseException:
+        cost = _record_spend(context, pending, hourly_rate(root, endpoint), what, plan.estimate_usd)
+        if context.cancelled():
+            pending.unlink(missing_ok=True)  # the remote job was cancelled with it
+        _settle_remote(pending, None)
+        raise
+    cost = _record_spend(context, pending, hourly_rate(root, endpoint), what, plan.estimate_usd)
+    _settle_remote(pending, record_path)
     provenance = {
         "kind": "block-generation", "scene": plan.scene, "block": plan.block, "shots": plan.shots,
         "provider": result.provider, "model": result.model, "seed": plan.seed, "seconds": plan.seconds,
@@ -1083,11 +1123,19 @@ def _run_picture(context: JobContext) -> dict[str, Any]:
     context.progress(0.02, "Sending the picture")
     provider = QwenEditProvider(endpoint, transport=_paid_transport(context, endpoint, "Painting"))
     record_path = output.with_name(name + JOB_SUFFIX)
+    pending = _remote_record("derive_picture", plan.public_dict(root))
     try:
         settings = provider.edit(source=plan.source, references=[ref["path"] for ref in plan.references],
-                                 prompt=plan.prompt, seed=plan.seed, size=plan.size, output=output, label=what)
-    finally:
-        cost = _record_spend(context, record_path, rate, what, plan.estimate_usd)
+                                 prompt=plan.prompt, seed=plan.seed, size=plan.size, output=output, label=what,
+                                 state_file=pending)
+    except BaseException:
+        cost = _record_spend(context, pending, rate, what, plan.estimate_usd)
+        if context.cancelled():
+            pending.unlink(missing_ok=True)
+        _settle_remote(pending, None)
+        raise
+    cost = _record_spend(context, pending, rate, what, plan.estimate_usd)
+    _settle_remote(pending, record_path)
     score = edge_score(output, plan.source)
     provenance = {"kind": "picture-derivation", **plan.public_dict(root), "settings": settings,
                   "edge_score": score, "cost_usd": round(cost, 4), "job_id": context.job_id}

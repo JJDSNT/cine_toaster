@@ -247,8 +247,14 @@ Tests: `tests/test_pictures.py` (3 tests).
 Remaining:
 
 - SINGULAR's `guia_no_corte` and `forca_corte` per-shot options;
-- resuming a remote job after the process dies (a retry is a new
-  submission).
+- ~~resuming a remote job after the process dies~~ done 2026-09-30.
+  - The remote job is remembered per request (`jobs._remote_record`: a hash
+    of the plan), so a retry polls it instead of resubmitting.
+  - `_settle_remote` drops the record once the job is adopted, failed or
+    cancelled.
+  - `spend.record` updates one entry per remote job.
+  - Test: a runtime that dies while waiting; the retry sends nothing and the
+    ledger has one entry.
 - The ledger counts `delayTime`, which includes queueing while no worker
   exists. That is conservative against the ceiling, but it overstates the
   cost.
