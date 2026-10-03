@@ -268,3 +268,13 @@ fog (FFmpeg). Found: a text object turned to face the camera has its local
 well as down; snow needs an early start and a longer life to fill the
 frame. All render in 2–15 s at 320×180 × 24 frames on the CPU. Test:
 `BlenderEffectTests` (each renders and composites).
+
+# Done: NeRF camera paths (2026-10-03)
+
+`nerf.py` + `toast nerf path`: a shot's move as nerfstudio's camera path
+(OpenGL camera-to-world, row-major; vertical FOV from the lens on a 36 mm
+sensor), placed in the NeRF's world by the location's `nerf:` transform
+(position, Euler rotation, scale); prints the `ns-render` command. Checked
+against nerfstudio's `get_path_from_json` source, not a running nerfstudio
+(it needs CUDA). Tests: `tests/test_nerf.py` (format, the CAM-A eye and its
+aim at Mara, the transform, the export).

@@ -660,6 +660,27 @@ def command_cut(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_nerf(args: argparse.Namespace) -> int:
+    """A shot's camera move as a nerfstudio camera path (CT-0047)."""
+
+    from .nerf import export
+    from .project import load_scene
+
+    root = Path(args.project).expanduser().resolve()
+    scene = load_scene(root, args.scene)
+    shot = next((item for item in (scene or {}).get("shots", []) if item["id"] == args.shot), None)
+    if shot is None:
+        print(f"No shot {args.scene} {args.shot}", file=sys.stderr)
+        return 1
+    output = Path(args.output) if args.output else root / "exports" / "nerf" / args.scene / f"{args.shot}.json"
+    made = export(root, scene, shot, output, frames=args.frames, width=args.width, height=args.height)
+    print(f"Wrote {made['path']} ({made['frames']} frames)")
+    if not made["placed"]:
+        print("  The location declares no nerf: transform; the plan's metres are used as the NeRF's units.")
+    print(f"  On the GPU machine: {made['command']}")
+    return 0
+
+
 def command_splat(args: argparse.Namespace) -> int:
     """A shot's camera move through its location's Gaussian splat, as a plate (CT-0047)."""
 
@@ -1714,6 +1735,18 @@ def build_parser() -> argparse.ArgumentParser:
             item.add_argument("--ms", type=int, help="the transition's duration in milliseconds")
             item.add_argument("--transition-why", default="", help="why this transition")
     cut_parser.set_defaults(function=command_cut)
+
+    nerf_parser = subparsers.add_parser("nerf", help="A shot's camera move as a nerfstudio camera path (ns-render)")
+    nerf_sub = nerf_parser.add_subparsers(dest="nerf_command", required=True)
+    nerf_path = nerf_sub.add_parser("path", help="Write camera_path.json for ns-render camera-path")
+    nerf_path.add_argument("project", type=Path)
+    nerf_path.add_argument("scene")
+    nerf_path.add_argument("shot")
+    nerf_path.add_argument("--frames", type=int, default=24)
+    nerf_path.add_argument("--width", type=int, default=1280)
+    nerf_path.add_argument("--height", type=int, default=720)
+    nerf_path.add_argument("--output")
+    nerf_parser.set_defaults(function=command_nerf)
 
     splat_parser = subparsers.add_parser("splat", help="Gaussian splats: a shot's move through its location's splat")
     splat_sub = splat_parser.add_subparsers(dest="splat_command", required=True)

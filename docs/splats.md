@@ -58,3 +58,29 @@ Dynamic (4D) splats are sequences of PLY or `.sog4d` (SuperSplat 4D);
 Blender 5.3 (November 2026) imports and renders splats natively (PLY, SPZ,
 USD). Splats are made from photos or video through COLMAP and a trainer
 (gsplat, nerfstudio, Postshot, Polycam, KIRI, Luma) and edited in SuperSplat.
+
+## NeRF: the camera goes out, the render comes back
+
+NeRFs are rendered by nerfstudio on a CUDA GPU (often a remote one). Cine
+Toaster writes the shot's camera move as the `camera_path.json` that
+`ns-render camera-path` reads, from the blocking frame's poses:
+
+```bash
+toast nerf path <project> SC-030 P3 --frames 48 --width 1280 --height 720
+# -> exports/nerf/SC-030/P3.json, and the ns-render command to run on the GPU machine
+```
+
+The location places the plan in the NeRF's world:
+
+```yaml
+nerf:
+  config: outputs/station/nerfacto/config.yml
+  position: [0, 0, 0]
+  rotation: [0, 0, 0]   # Euler degrees XYZ
+  scale: 0.25           # NeRF units per metre
+```
+
+The rendered video comes back as a plate or an element. Keyframes are
+OpenGL camera-to-world matrices (row-major) with three.js's vertical field
+of view, as nerfstudio's `get_path_from_json` reads them; the file was
+checked against that code, not yet against a running nerfstudio.
