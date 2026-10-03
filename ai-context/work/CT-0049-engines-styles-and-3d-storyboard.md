@@ -230,3 +230,13 @@ one per axis). Not yet run: the full suite after this change.
 - Tests: `tests/test_formats.py` (sizes and windows; caption groups; a
   vertical version reframed to the right with captions shown while spoken;
   one job delivering 16:9, 9:16 and 1:1 of the demo scene; bad renditions).
+
+Then (2026-10-03): the window follows the shot's subject on the plan
+(`formats.subject_window`: the followed subject, else the speaker, else the
+person in frame; its blocking-frame place at start and end; a note on
+whom, and when they move too far), a hand `reframe` winning. Sequences are
+delivered too: the production's `deliver:` renders each rendition from
+the scene versions' own renditions (`Segment.renditions`), reframing (and
+saying so) a version without one; the sequence version keeps
+`renditions`; the Sequences room plays them. Tests in
+`tests/test_formats.py`.

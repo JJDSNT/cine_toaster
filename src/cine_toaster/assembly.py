@@ -102,6 +102,8 @@ class Segment:
     #: A format's frame in the take ({x, y}, CT-0049), and the captions spoken in it, in the take's seconds.
     reframe: dict[str, Any] | None = None
     captions: list[tuple[float, float, str]] = field(default_factory=list)
+    #: A scene version's renditions, by format (a sequence's segments): the sequence's renditions use them.
+    renditions: dict[str, str] = field(default_factory=dict)
     #: The join into this shot, resolved: a transition ({id, seconds, shader | mode}) and a J/L split.
     transition: dict[str, Any] | None = None
     split: float = 0.0
@@ -282,6 +284,13 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         if plan.segments:
             _resolve_join(root, plan, cut, segment, joins)
         segment.reframe = shot.get("reframe")
+        wants_frame = ((scene.get("style") or {}).get("format") or {}).get("aspect") or scene.get("deliver")
+        if not segment.reframe and wants_frame:
+            from .formats import subject_window
+
+            segment.reframe, note = subject_window(scene, shot)
+            if note:
+                plan.notes.append(note + ".")
         # Timed whenever a version wants them: the scene's format, or a format it is delivered in.
         if (((scene.get("style") or {}).get("format") or {}).get("captions")
                 or any(item.get("captions") for item in scene.get("deliver") or [])):

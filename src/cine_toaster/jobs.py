@@ -924,7 +924,7 @@ def _sequence_plan(root: Path, sequence_id: str):
         length = probe(root / chosen["media"])["duration"]
         enter = scene.get("enter") or {}
         segment = Segment(scene_id, chosen["id"], chosen["media"], 0.0, round(length, 3), enter.get("type") or "hard",
-                          "version", normalize=False)
+                          "version", normalize=False, renditions=dict(chosen.get("renditions") or {}))
         spoken = root / (chosen["media"] + ".speech.json")
         if spoken.is_file():
             segment.speech_spans = [tuple(span) for span in json.loads(spoken.read_text(encoding="utf-8"))["speech"]]
@@ -967,13 +967,40 @@ def _validate_assemble_sequence(root: Path, params: dict[str, Any]) -> dict[str,
 def _run_assemble_sequence(context: JobContext) -> dict[str, Any]:
     from .assembly import render
 
-    plan = _sequence_plan(context.project_root, context.params["sequence"])
+    from .formats import renditions as parse_renditions
+    from .project import load_production
+    from .styles import list_styles
+
+    root = context.project_root
+    plan = _sequence_plan(root, context.params["sequence"])
+    deliver, _ = parse_renditions(load_production(root).get("deliver"),
+                                  {item["id"]: item for item in list_styles(root)})
+    deliveries = [(item, copy.deepcopy(plan)) for item in deliver]
+    share = 1.0 / (1 + len(deliveries))
     output = context.staging / "sequence.mp4"
-    render(context.project_root, plan, output, context.staging / "work", context.run_process)
+    render(root, plan, output, context.staging / "work", context.run_process, span=(0.0, share))
     shutil.rmtree(context.staging / "work", ignore_errors=True)
     sequence_id, version = context.params["sequence"], context.params["version"]
+    renditions = []
+    for index, (item, copied) in enumerate(deliveries, 1):
+        # Each scene's own rendition in this format, reframed and captioned already; a scene without one is
+        # reframed here, centred, and said.
+        for segment in copied.segments:
+            if item["id"] in segment.renditions:
+                segment.media = segment.renditions[item["id"]]
+            else:
+                plan.notes.append(f"{segment.shot}'s version {segment.take} has no {item['name']} rendition; "
+                                  "the sequence's is reframed from it, centred and without captions.")
+        copied.format = {"aspect": item["aspect"]}
+        name = f"sequence.{item['id']}.mp4"
+        render(root, copied, context.staging / name, context.staging / f"work-{item['id']}", context.run_process,
+               span=(share * index, share * (index + 1)))
+        shutil.rmtree(context.staging / f"work-{item['id']}", ignore_errors=True)
+        renditions.append({"staged": name, "destination": f"renders/sequences/{sequence_id}/{version}.{item['id']}.mp4",
+                           "rendition": item["id"]})
     return {
-        "files": [{"staged": "sequence.mp4", "destination": f"renders/sequences/{sequence_id}/{version}.mp4"}],
+        "files": [{"staged": "sequence.mp4", "destination": f"renders/sequences/{sequence_id}/{version}.mp4"},
+                  *renditions],
         "summary": {"scenes": plan.takes, "notes": plan.notes, "duration_seconds": plan.duration, "sound": plan.sound},
     }
 
@@ -997,6 +1024,8 @@ def _adopted_assemble_sequence(job: dict[str, Any], placed: list[str]) -> None:
         summary=(job["params"].get("summary") or f"Assembled from the scenes' versions (job {job['id']})")
         + (f". Notes: {notes}" if notes else "."),
         duration_seconds=summary["duration_seconds"],
+        renditions={item["rendition"]: Path(path).resolve().relative_to(root.resolve()).as_posix()
+                    for item, path in zip(job["result"]["files"], placed) if item.get("rendition")},
     )
 
 

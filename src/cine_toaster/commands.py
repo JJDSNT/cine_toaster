@@ -1011,6 +1011,7 @@ def record_sequence_version(
     scenes: dict[str, str],
     summary: str = "",
     duration_seconds: float = 0.0,
+    renditions: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Register an assembled cut of a sequence, with the scene versions it holds."""
 
@@ -1029,6 +1030,7 @@ def record_sequence_version(
         version = {
             "id": version_id, "created_at": now(), "media": media, "summary": summary.strip(),
             "duration_seconds": float(duration_seconds or 0), "scenes": dict(scenes),
+            "renditions": dict(renditions or {}),
             "verdict": "pending", "note": "", "reviewed_by": None,
         }
         entry["versions"].append(version)

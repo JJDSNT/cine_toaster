@@ -112,8 +112,11 @@ production's own is marked), MCP `list_styles`.
 The assembly applies the format axis:
 
 - **aspect** -- every take is reframed to it: a window as tall (or as
-  wide) as the take allows, centred unless the shot says where
-  (`reframe: {x: 0.3, y: 0.5}`, 0 to 1), scaled so the long side keeps the
+  wide) as the take allows, on the shot's subject as the plan places it
+  (the followed `subject`, else who speaks, else the person in frame; the
+  version's notes say on whom, and warn when they cross more of the frame
+  than a window follows), or where the shot says (`reframe: {x: 0.3,
+  y: 0.5}`, 0 to 1), else centred; scaled so the long side keeps the
   take's resolution. The whole take is reframed, so J/L-cuts keep their
   handles; titles are drawn in the new frame, so no text is cut. The takes
   themselves are not touched;
@@ -135,7 +138,10 @@ Every version is then also delivered in each format named -- the same
 takes, joins and sound, reframed and captioned for it -- kept with the
 version (`renditions`) and watchable from it in the control room:
 `renders/assemblies/SC-030/v3.mp4`, `v3.viral-vertical.mp4`,
-`v3.square.mp4`. A name is a format style (or one of its `aka`); a mapping
+`v3.square.mp4`. A sequence named by the production's `deliver:` is
+delivered the same way, from each scene version's own rendition (reframed
+and captioned already); a scene version without one is reframed centred,
+and the sequence version says so. A name is a format style (or one of its `aka`); a mapping
 gives an aspect and, optionally, `captions: true`. Anything else is
 `deliver_problem`.
 
@@ -143,6 +149,6 @@ gives an aspect and, optionally, `captions: true`. Anything else is
 
 - A format's aspect and frame rate asked of generation (today the takes
   are generated in their own frame and reframed in the cut).
-- A subject-aware reframe from the plan (the blocking frame knows where
-  the subject is); today the window is centred or placed by hand.
-- Renditions of a sequence; style for a sequence.
+- A window that moves with the subject during the shot (today one place
+  per shot).
+- Style for a sequence.

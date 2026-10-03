@@ -1571,6 +1571,7 @@ def load_production(root: Path) -> dict[str, Any]:
         "logline": _text(manifest.get("logline")),
         "look": project_look,
         "style": manifest.get("style"),
+        "deliver": manifest.get("deliver"),
         "renders": discover_renders(root),
         "script_path": _script_path(manifest, root),
         "script_files": script_files,

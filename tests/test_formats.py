@@ -132,6 +132,61 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(square["width"], square["height"])
         self.assertAlmostEqual(vertical["duration"], main["duration"], delta=0.1)
 
+    def test_the_window_follows_the_shots_subject_on_the_plan(self) -> None:
+        from cine_toaster.assembly import plan_scene
+        from cine_toaster.formats import subject_window
+        from cine_toaster.project import load_scene
+
+        scene = load_scene(self.root, "SC-030")
+        shots = {shot["id"]: shot for shot in scene["shots"]}
+        window, note = subject_window(scene, shots["P3"])
+        self.assertEqual((window["subject"], window["x"]), ("MARA", 0.5))
+        self.assertIn("reframed on Mara Vale", note)
+        # P2 made to follow the stack, which stands at the left edge of its frame.
+        window, _ = subject_window(scene, {**shots["P2"], "subject": "SPEAKER"})
+        self.assertLess(window["x"], 0.1)
+        # The cut uses it when a format asks for a frame, and a hand-set reframe wins.
+        manifest = self.root / "project.yaml"
+        manifest.write_text(manifest.read_text(encoding="utf-8") + "\nstyle: TikTok\n", encoding="utf-8")
+        scene_file = self.root / "scenes" / "030-echo-chamber" / "scene.yaml"
+        scene_file.write_text(scene_file.read_text(encoding="utf-8").replace(
+            "  - n: 2\n", "  - n: 2\n    reframe: {x: 0.8}\n", 1), encoding="utf-8")
+        plan = plan_scene(self.root, load_scene(self.root, "SC-030"))
+        frames = {segment.shot: segment.reframe for segment in plan.segments}
+        self.assertEqual(frames["P2"], {"x": 0.8})
+        self.assertEqual(frames["P3"]["from"], "plan")
+
+    def test_a_sequence_is_delivered_from_its_scenes_renditions(self) -> None:
+        from cine_toaster.assembly import probe
+        from cine_toaster.commands import Actor, record_assembly
+        from cine_toaster.jobs import JobManager, JobStore
+        from cine_toaster.project import load_production
+
+        manifest = self.root / "project.yaml"
+        manifest.write_text(manifest.read_text(encoding="utf-8") + '\ndeliver: [{name: square, aspect: "1:1"}]\n',
+                            encoding="utf-8")
+        renders = self.root / "renders"
+        renders.mkdir()
+        for name, size in (("SC-010", "160x90"), ("SC-030", "160x90"), ("SC-030.square", "90x90")):
+            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", f"color=gray:s={size}:r=24:d=2",
+                            "-f", "lavfi", "-i", "anullsrc=r=48000", "-t", "2", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                            "-c:a", "aac", str(renders / f"{name}.mp4")], check=True)
+        record_assembly(self.root, scene_id="SC-010", assembly_id="v1", actor=Actor(id="editor"),
+                        media="renders/SC-010.mp4", duration_seconds=2.0, takes={})
+        record_assembly(self.root, scene_id="SC-030", assembly_id="v1", actor=Actor(id="editor"),
+                        media="renders/SC-030.mp4", duration_seconds=2.0, takes={},
+                        renditions={"square": "renders/SC-030.square.mp4"})
+        manager = JobManager(store=JobStore(self.root.parent / "state" / "jobs.sqlite"))
+        self.addCleanup(manager.shutdown, wait=False)
+        job = manager.wait(manager.submit("assemble_sequence", self.root, {"sequence": "the-reply"})["id"], timeout=300)
+        self.assertEqual(job["state"], "succeeded", job["error"])
+        self.assertTrue(any("SC-010's version v1 has no square rendition" in note
+                            for note in job["result"]["summary"]["notes"]))
+        manager.adopt(job["id"])
+        version = next(item for item in load_production(self.root)["sequences"] if item["id"] == "the-reply")["versions"][0]
+        square = probe(self.root / version["renditions"]["square"])
+        self.assertEqual(square["width"], square["height"])
+
     def test_a_rendition_that_is_not_a_format_is_said(self) -> None:
         from cine_toaster.project import load_scene
 

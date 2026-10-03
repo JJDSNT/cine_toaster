@@ -189,3 +189,44 @@ def _slug(text: str) -> str:
     import re
 
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", text.lower().replace(":", "x"))).strip("-") or "rendition"
+
+
+def subject_window(scene: dict[str, Any], shot: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
+    """Where a format's window should sit, from the plan: on the shot's subject (CT-0049).
+
+    The subject is the one the shot follows (`subject`), else whoever speaks
+    in it, else the person in frame. Its place on the blocking frame at the
+    start and the end gives the window's centre ({x, y}, 0 to 1); a note says
+    when it moves further than a window may follow. (None, "") without a plan.
+    """
+
+    from .blocking import blocking_frame, public_frame
+
+    frames = [public_frame(frame) for frame in (blocking_frame(scene, shot, "start"), blocking_frame(scene, shot, "end"))
+              if frame]
+    if not frames:
+        return None, ""
+    speakers = [str(line.get("who") or "").upper() for line in shot.get("lines") or [] if line.get("in_take", True)]
+    wanted = [str(shot.get("subject") or "").upper(), *speakers]
+
+    def placed(frame: dict[str, Any]) -> list[dict[str, Any]]:
+        return [figure for figure in frame["figures"] if figure.get("in_frame") and "x" in figure]
+
+    seen = [figure for frame in frames for figure in placed(frame)]
+    chosen = next((name for name in wanted if name and any(f["subject"].upper() == name for f in seen)), "")
+    if not chosen:
+        people = [figure for figure in seen if figure.get("kind") == "person"]
+        chosen = (people or seen or [{}])[0].get("subject", "").upper()
+    spots = [figure for figure in seen if figure["subject"].upper() == chosen]
+    if not spots:
+        return None, ""
+    xs = [(figure["x"] + 1) / 2 for figure in spots]
+    eyes = [(1 - figure.get("eye_y", 0.0)) / 2 for figure in spots]
+    x = max(0.0, min(1.0, (min(xs) + max(xs)) / 2))
+    # The eyes a little above the window's middle, as a frame usually holds them.
+    y = max(0.0, min(1.0, sum(eyes) / len(eyes) + 0.1))
+    label = spots[0].get("label") or chosen
+    note = f"{shot['id']} is reframed on {label}, from the plan"
+    if max(xs) - min(xs) > 0.3:
+        note += f"; {label} moves across the frame, more than a narrow window follows -- set `reframe` by hand"
+    return {"x": round(x, 3), "y": round(y, 3), "subject": chosen, "from": "plan"}, note

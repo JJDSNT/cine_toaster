@@ -259,6 +259,14 @@ function renderSequenceVersions(sequence) {
     video.controls = true;
     video.preload = "none";
     card.append(video, el("p", "muted", version.summary));
+    // The same sequence in other formats (CT-0049).
+    for (const [name, media] of Object.entries(version.renditions || {})) {
+      const details = el("details", "finding-why");
+      const other = el("video");
+      Object.assign(other, { src: `/media/${media}`, controls: true, preload: "none" });
+      details.append(el("summary", "", `Watch it as ${name}`), other);
+      card.append(details);
+    }
     const actions = el("div", "job-actions");
     for (const [verdict, label] of [["approved", "Approve"], ["rejected", "Reject"]]) {
       if (version.verdict === verdict) continue;
