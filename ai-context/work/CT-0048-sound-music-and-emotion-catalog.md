@@ -235,5 +235,6 @@ Questions the research must answer before an implementation:
 7. **Monitoring**: how the user checks a 5.1 mix at home and in the
    control room (a stereo or binaural preview of it).
 
-Status: noted, not started. No implementation until this research is
-written up and the user has chosen the deliverables.
+Status: researched in CT-0052 (the user's direction: like Netflix, the
+playback follows the hardware present). No implementation until the user
+has chosen the deliverables.
