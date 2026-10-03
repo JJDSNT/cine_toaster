@@ -44,6 +44,8 @@ is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
 CT-0041, CT-0052, CT-0053.
 
+- `CT-0054` — migrating SINGULAR to ~/films/singular, the validation
+  milestone; layout proposed, awaiting the user (`review`)
 - `CT-0053` — upscaling to 4K: SeedVR2 on takes, 4K as a delivery
   target; awaiting the user's approval of a paid spike (`ready`)
 - `CT-0052` — surround and spatial sound: researched; phase 1 (a 5.1 track
