@@ -1715,28 +1715,39 @@ async function renderStyles() {
   const root = byId("workspace");
   root.replaceChildren();
   const heading = sectionHeading("STYLES", "Styles",
-    "Ways of making a film: movements, approaches, genres, manners, animation techniques and formats. Name one with style: in project.yaml or on a scene; the prompt gets its words of craft (never a name), the brief its rules, and a shot that departs from it is told so.");
+    "Three axes chosen independently and combined: technique (how the image is made), direction (how it is filmed and cut), format (what it is for). style: {technique: …, direction: …, format: …} in project.yaml, and a scene may change any axis. The prompt gets their words of craft, the brief their rules, and a shot that departs is told by which axis.");
   heading.classList.add("page-heading");
   root.append(heading);
   state.styles = (await api("/api/styles", { optional: true })) || [];
-  const current = state.production?.style;
-  const byKind = new Map();
+  // The production's style may be one name, a list, or {technique, direction, format}.
+  const declared = state.production?.style;
+  const names = (declared && typeof declared === "object" && !Array.isArray(declared) ? Object.values(declared) : [].concat(declared || []))
+    .map((name) => String(name).toLowerCase());
+  const chosen = (item) => [item.id, item.name, ...item.aka].some((name) => names.includes(String(name).toLowerCase()));
+  const AXIS_NOTES = {
+    technique: "How the image is made. Live action unless one is named.",
+    direction: "How it is filmed, cut and played: movements, approaches, genres, manners.",
+    format: "What it is for, with its rules: aspect, length, hook, captions, end card.",
+  };
+  const byAxis = new Map();
   for (const item of state.styles) {
-    if (!byKind.has(item.kind)) byKind.set(item.kind, []);
-    byKind.get(item.kind).push(item);
+    if (!byAxis.has(item.axis)) byAxis.set(item.axis, []);
+    byAxis.get(item.axis).push(item);
   }
-  for (const [kind, items] of byKind) {
+  for (const [axis, items] of byAxis) {
     const section = el("section", "transition-section");
-    section.append(sectionHeading("STYLES", label(kind), `${items.length} available`));
+    section.append(sectionHeading(`STYLES · ${axis.toUpperCase()}`, label(axis), `${AXIS_NOTES[axis] || ""} ${items.length} available.`));
     const grid = el("div", "transition-grid");
     for (const item of items) {
       const card = el("article", "transition-card move-card");
-      if (item.id === current) card.classList.add("selected");
+      const current = chosen(item);
+      if (current) card.classList.add("selected");
       const editing = item.editing.shot_seconds.length ? `shots ${item.editing.shot_seconds[0]}-${item.editing.shot_seconds[1]} s` : "";
       const form = Object.entries(item.format || {}).filter(([, value]) => value).map(([key, value]) => `${key.replace("_", " ")} ${value === true ? "" : value}`.trim());
       card.append(
-        el("strong", "", item.name + (item.id === current ? " · this production" : "")),
-        el("code", "move-id", `style: ${item.id}`),
+        el("strong", "", item.name + (current ? " · this production" : "")),
+        el("code", "move-id", `style: {${item.axis}: ${item.id}}`),
+        el("small", "muted", label(item.kind)),
         ...(item.aka.length ? [el("small", "", `Also known as: ${item.aka.join(", ")}`)] : []),
         el("p", "", item.says),
         el("small", "muted", `Framing: ${item.framing.join("; ")}`),

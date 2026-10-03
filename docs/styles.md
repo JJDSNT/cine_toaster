@@ -12,6 +12,23 @@ manner. The catalog holds six kinds:
 | animation | stop-motion, hand-drawn 2D, 3D feature, cut-out, rotoscope, pixel art, painterly, pastoral anime |
 | format | viral vertical, commercial spot, music video, trailer, explainer, interview documentary |
 
+## Three axes, combined
+
+Direction, technique and format are independent: a film can be
+stop-motion, Wes Anderson-like and a viral vertical at once.
+
+```yaml
+style: {technique: stop-motion, direction: Wes Anderson, format: viral-vertical}
+```
+
+Each axis cascades on its own (a scene may change one and keep the
+others; `{format: none}` removes one). Combined: the format owns shot
+lengths, hook, aspect and total length; the technique opens the prompt and
+sets the frame rate; the direction sets the performance register; the
+strictest intensity ceiling holds; anything an axis avoids is avoided, and
+the advice names that axis. Two entries on one axis, or an entry under the
+wrong axis, is `style_unknown`.
+
 ## Naming one
 
 ```yaml

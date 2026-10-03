@@ -203,3 +203,10 @@ animation styles and how to word them for an image model.
 Remains: applying a format's aspect and frame rate to generation and the
 assembly; captions and end cards from the format; a sequence-level style;
 Unreal/Unity adapters (section 1).
+
+Correction (2026-10-03, the user): direction, technique and format are
+distinct axes, not one exclusive choice. `style:` takes a name, a list or
+`{technique, direction, format}`; each axis cascades separately;
+`styles.summary` combines them with an owner per field; advice names the
+axis. Tests: `tests/test_styles.py` (combination, per-axis cascade, `none`,
+one per axis). Not yet run: the full suite after this change.

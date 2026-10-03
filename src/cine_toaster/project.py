@@ -420,20 +420,20 @@ def _expand_effects(shots: list[dict[str, Any]], scene_id: str, root: Path) -> l
 
 
 def _scene_style(document: dict[str, Any], scene_id: str, root: Path,
-                 project_style: str) -> tuple[dict[str, Any] | None, list[Finding]]:
-    """The style in force: the scene's, else the production's (CT-0049), and the level that decided it."""
+                 project_style: Any) -> tuple[dict[str, Any] | None, list[Finding]]:
+    """The styles in force, one per axis -- technique, direction, format -- each the scene's or else the
+    production's (CT-0049), combined."""
 
-    scene_style = vtext(document, "style")
+    scene_style = document.get("style")
     if not scene_style and not project_style:
         return None, []
     from .styles import list_styles, resolve, summary
 
-    item, level, problem = resolve({entry["id"]: entry for entry in list_styles(root)},
-                                   scene=scene_style, project=project_style)
-    if problem:
-        return None, [Finding(code="style_unknown", severity="error", scene_id=scene_id, shots=(),
-                              message=f"The {level} {problem}.")]
-    return summary(item, level), []
+    parts, problems = resolve({entry["id"]: entry for entry in list_styles(root)},
+                              scene=scene_style, project=project_style)
+    findings = [Finding(code="style_unknown", severity="error", scene_id=scene_id, shots=(), message=f"{problem}.")
+                for problem in problems]
+    return summary(parts), findings
 
 
 def _expand_emotions(shots: list[dict[str, Any]], document: dict[str, Any], scene_id: str, root: Path,
@@ -1497,7 +1497,7 @@ def load_production(root: Path) -> dict[str, Any]:
     screenplay = _read_screenplay(root, script_files)
     scenes = [
         _load_scene(path, root, declared_fields, project_look, screenplay, _shot_field_aliases(manifest),
-                    _scene_field_aliases(manifest), project_style=vtext(manifest, "style"))
+                    _scene_field_aliases(manifest), project_style=manifest.get("style"))
         for path in scene_files(root, manifest)
     ]
     scenes.sort(key=lambda scene: (scene["order"], scene["id"]))
@@ -1555,7 +1555,7 @@ def load_production(root: Path) -> dict[str, Any]:
         "format": vtext(manifest, "format") or "Film",
         "logline": _text(manifest.get("logline")),
         "look": project_look,
-        "style": vtext(manifest, "style"),
+        "style": manifest.get("style"),
         "renders": discover_renders(root),
         "script_path": _script_path(manifest, root),
         "script_files": script_files,
