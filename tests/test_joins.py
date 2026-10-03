@@ -138,5 +138,69 @@ class PlannedJoinTests(unittest.TestCase):
         self.assertEqual(self.plan().segments[2].split, 0.4)
 
 
+@unittest.skipUnless(HAS_FFMPEG, "FFmpeg is missing")
+class SceneJoinTests(unittest.TestCase):
+    """Joins between scenes: declared on the incoming scene, rendered by the sequence's assembly (CT-0051)."""
+
+    def setUp(self) -> None:
+        import os
+
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        base = Path(directory.name)
+        self.previous = {key: os.environ.get(key) for key in ("XDG_CACHE_HOME", "XDG_STATE_HOME")}
+        os.environ["XDG_CACHE_HOME"], os.environ["XDG_STATE_HOME"] = str(base / "cache"), str(base / "state")
+        self.addCleanup(self._restore)
+        self.root = base / "film"
+        shutil.copytree(DEMO, self.root)
+
+    def _restore(self) -> None:
+        import os
+
+        for key, value in self.previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+    def enter(self, text: str) -> None:
+        scene_file = self.root / "scenes" / "030-echo-chamber" / "scene.yaml"
+        scene_file.write_text(scene_file.read_text(encoding="utf-8").replace("shots:\n", text + "shots:\n", 1),
+                              encoding="utf-8")
+
+    def test_a_scene_is_entered_through_a_transition_in_the_sequence(self) -> None:
+        from cine_toaster.jobs import JobManager, JobStore, _sequence_plan
+        from cine_toaster.project import load_scene
+
+        self.enter("enter: {transition: {id: dip-to-black, duration_ms: 400, reason: night falls between them}}\n")
+        self.assertEqual(load_scene(self.root, "SC-030")["enter"]["transition"]["id"], "dip-to-black")
+        manager = JobManager(store=JobStore(self.root.parent / "state" / "jobs.sqlite"))
+        self.addCleanup(manager.shutdown, wait=False)
+        from cine_toaster.commands import Actor, record_assembly
+
+        for scene, colour in (("SC-010", "red"), ("SC-030", "blue")):
+            media = self.root / "renders" / f"{scene}.mp4"
+            media.parent.mkdir(exist_ok=True)
+            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", f"color={colour}:s=160x90:r=24:d=2",
+                            "-f", "lavfi", "-i", "sine=f=220:d=2", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                            "-c:a", "aac", "-shortest", str(media)], check=True)
+            record_assembly(self.root, scene_id=scene, assembly_id="v1", actor=Actor(id="editor"),
+                            media=media.relative_to(self.root).as_posix(), summary="a test version",
+                            duration_seconds=2.0, takes={})
+        plan = _sequence_plan(self.root, "the-reply")
+        self.assertEqual(plan.segments[1].transition["id"], "dip-to-black")
+        job = manager.wait(manager.submit("assemble_sequence", self.root, {"sequence": "the-reply"})["id"], timeout=180)
+        self.assertEqual(job["state"], "succeeded", job["error"])
+        lengths = [segment.end for segment in plan.segments]
+        self.assertAlmostEqual(job["result"]["summary"]["duration_seconds"], sum(lengths) - 0.4, delta=0.05)
+
+    def test_an_unknown_way_in_is_said(self) -> None:
+        from cine_toaster.project import load_scene
+
+        self.enter("enter: {type: wipe, transition: {id: no-such-transition}}\n")
+        codes = {finding["code"] for finding in load_scene(self.root, "SC-030")["findings"]}
+        self.assertTrue({"cut_type_unknown", "transition_unknown"} <= codes)
+
+
 if __name__ == "__main__":
     unittest.main()

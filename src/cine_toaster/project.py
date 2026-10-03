@@ -598,6 +598,8 @@ def _load_scene(
     move_findings.extend(_expand_effects(shots, scene_id, root))
     sound_beds, sound_findings = _expand_sounds(shots, document, scene_id, root)
     move_findings.extend(sound_findings)
+    enter, enter_findings = _scene_enter(document, scene_id, root)
+    move_findings.extend(enter_findings)
     motions = shot_motions(geometry, shots, scene_id=scene_id)
     positions_by_shot = {motion.shot_id: motion.start_positions for motion in motions}
     findings = [
@@ -711,6 +713,8 @@ def _load_scene(
         # CT-0048: beds under the whole scene, from the sound catalog.
         "ambience": sound_beds["ambience"],
         "music": sound_beds["music"],
+        # How the scene is entered from the previous one in its sequence (SPEC-0007, CT-0051).
+        "enter": enter,
         "findings": findings,
         "decision_log": list(reversed(state.decisions)),
         "pending_shots": pending_shots,
@@ -719,6 +723,46 @@ def _load_scene(
             state.approved_assembly().public_dict() if state.approved_assembly() else None
         ),
     }
+
+
+def _scene_enter(document: dict[str, Any], scene_id: str, root: Path) -> tuple[dict[str, Any], list[Finding]]:
+    """How the scene is entered from the one before it in its sequence (SPEC-0007, CT-0051).
+
+    `enter: {type: hard, transition: {id: dip-to-black, duration_ms: 1000, reason: …}, reason: …}`.
+    Declared on the incoming scene, as a shot's cut is.
+    """
+
+    from .cuts import CUT_TYPES
+
+    raw = document.get("enter")
+    if not isinstance(raw, dict) or not raw:
+        return {}, []
+    findings: list[Finding] = []
+    cut_type = str(raw.get("type") or "hard").strip().lower()
+    if cut_type not in CUT_TYPES:
+        findings.append(Finding(code="cut_type_unknown", severity="error", scene_id=scene_id, shots=(),
+                                message=f"{scene_id} is entered by a {cut_type!r} cut; the vocabulary is "
+                                        f"{', '.join(CUT_TYPES)}."))
+    transition = raw.get("transition") if isinstance(raw.get("transition"), dict) else {}
+    if transition.get("id"):
+        available = {item["id"] for item in list_transitions(root)}
+        if transition["id"] not in available:
+            findings.append(Finding(code="transition_unknown", severity="error", scene_id=scene_id, shots=(),
+                                    message=f"{scene_id} is entered through the transition {transition['id']!r}, "
+                                            "which is in no catalog. It would render as a cut."))
+        elif not transition.get("reason"):
+            findings.append(Finding(code="transition_reason_missing", severity="advice", scene_id=scene_id, shots=(),
+                                    message=f"The transition into {scene_id} has no reason; a choice without a "
+                                            "reason cannot be reviewed."))
+    try:
+        split = max(0.0, float(raw.get("split") or 0))
+    except (TypeError, ValueError):
+        split = 0.0
+    enter = {"type": cut_type, "reason": str(raw.get("reason") or ""),
+             "transition": {"id": str(transition["id"]), "duration_ms": transition.get("duration_ms"),
+                            "reason": str(transition.get("reason") or "")} if transition.get("id") else None,
+             **({"split": split} if split else {})}
+    return enter, findings
 
 
 def _check_transitions(

@@ -409,9 +409,15 @@ function renderSequences() {
     }
 
     const list = el("div", "shot-list");
-    for (const sceneId of sequence.scene_ids) {
+    sequence.scene_ids.forEach((sceneId, position) => {
       const scene = state.production.scenes.find((item) => item.id === sceneId);
-      if (!scene) continue;
+      if (!scene) return;
+      // The join into this scene from the previous one, declared on the scene (enter: …).
+      if (position && scene.enter && (scene.enter.transition || (scene.enter.type && scene.enter.type !== "hard"))) {
+        const type = scene.enter.type && scene.enter.type !== "hard" ? CUT_NAMES[scene.enter.type] || scene.enter.type : "";
+        const how = [type, scene.enter.transition?.id].filter(Boolean).join(" · ");
+        list.append(el("small", "muted scene-join", `↳ enters by ${how}${scene.enter.reason ? ` — ${scene.enter.reason}` : ""}`));
+      }
       const row = button("", () => renderScene(scene.id), "shot-row shot-row-open");
       const copy = el("span", "shot-copy");
       copy.append(el("b", "", scene.id), el("strong", "", scene.title));
@@ -422,7 +428,7 @@ function renderSequences() {
         el("strong", "selected-take", `${scene.progress}%`),
       );
       list.append(row);
-    }
+    });
     panel.append(list);
     root.append(panel);
   }

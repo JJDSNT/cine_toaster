@@ -160,3 +160,27 @@ A version is shorter than the sum of its shots by its transitions. Picture
 and sound are made apart (normalised picture pieces; one levelled sound
 clip per shot with its handles), then joined, then the sound catalog's
 cues (CT-0048) are laid over them on the same timeline.
+
+# Amendment: cuts between scenes (2026-10-03, CT-0051)
+
+The join between two scenes of a sequence is declared on the **incoming
+scene**, as a shot's cut is:
+
+```yaml
+enter:
+  type: hard               # the SPEC's vocabulary
+  transition: {id: dip-to-black, duration_ms: 1000, reason: Night falls between them.}
+  reason: A new day.
+```
+
+The sequence's assembly renders it with the scene assembly's joins: the
+transition takes from the end of one scene's version and the start of the
+next, the sound crossfades. A version has no sound beyond its ends, so a J
+or L join between scenes is a straight cut, said in the sequence version.
+`enter` on a sequence's first scene is said and not rendered. Checks:
+`cut_type_unknown`, `transition_unknown`, `transition_reason_missing`, as
+for shots. The Sequences room shows how each scene is entered.
+
+SINGULAR fades each scene to black at its own end; here that is a
+`dip-to-black` into the next scene, a decision on the join rather than a
+property of the scene.

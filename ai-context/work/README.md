@@ -42,6 +42,7 @@ execution history and links to those destinations.
 The order of work is the ordered plan in
 [`development/roadmap.md`](../development/roadmap.md).
 
+- `CT-0051` — joins between scenes in a sequence (`review`)
 - `CT-0050` — transitions and J/L-cuts rendered in the assembly (`review`)
 - `CT-0046` — plan step 13: the editable canvas (`done`)
 - `CT-0045` — Claude Code acting through Cine Toaster (MCP first); noted for

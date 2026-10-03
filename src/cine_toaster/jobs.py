@@ -880,7 +880,7 @@ register(JobKind("slice_block", _validate_slice, _run_slice))
 def _sequence_plan(root: Path, sequence_id: str):
     """Each scene of the sequence, in order, by its approved version or else its latest."""
 
-    from .assembly import Plan, Segment, probe
+    from .assembly import Plan, Segment, _resolve_join, probe
     from .project import load_production
 
     production = load_production(root)
@@ -889,6 +889,7 @@ def _sequence_plan(root: Path, sequence_id: str):
         raise ValidationError(f"No sequence {sequence_id!r}")
     scenes = {scene["id"]: scene for scene in production["scenes"]}
     plan = Plan(scene=sequence_id)
+    joins: dict[str, Any] = {}
     for scene_id in sequence["scene_ids"]:
         scene = scenes[scene_id]
         versions = [item for item in scene.get("assemblies") or [] if item.get("media") and (root / item["media"]).is_file()]
@@ -900,8 +901,16 @@ def _sequence_plan(root: Path, sequence_id: str):
         if chosen["id"] != approved.get("id"):
             plan.notes.append(f"{scene_id} has no approved version; its latest, {chosen['id']}, is used.")
         length = probe(root / chosen["media"])["duration"]
-        plan.segments.append(Segment(scene_id, chosen["id"], chosen["media"], 0.0, round(length, 3), "hard",
-                                     "version", normalize=False))
+        enter = scene.get("enter") or {}
+        segment = Segment(scene_id, chosen["id"], chosen["media"], 0.0, round(length, 3), enter.get("type") or "hard",
+                          "version", normalize=False)
+        if plan.segments:
+            # The join between scenes, declared on the incoming scene: a version has no sound beyond its
+            # ends, so a J/L-cut between scenes is said to be straight (its handle is nothing).
+            _resolve_join(root, plan, enter, segment, joins)
+        elif enter:
+            plan.notes.append(f"{scene_id} opens the sequence: there is no scene before it to enter from.")
+        plan.segments.append(segment)
     if not plan.segments:
         raise ValidationError(f"No scene of {sequence_id!r} has an assembled version yet")
     return plan

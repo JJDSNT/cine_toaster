@@ -453,7 +453,8 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
         room = min(room, 0.9 * (previous.end - previous.start), 0.9 * (segment.end - segment.start))
         split = round(min(segment.split, room), 3)
         if split < segment.split:
-            whose = "its take" if segment.join == "j" else f"{previous.shot}'s take"
+            unit = "version" if segment.method == "version" else "take"
+            whose = f"its {unit}" if segment.join == "j" else f"{previous.shot}'s {unit}"
             plan.notes.append(f"{segment.shot}: the {segment.join.upper()}-cut's sound runs {split:.2f} s across the "
                               f"cut, not {segment.split:.2f}: {whose} has no more sound beyond its cut point."
                               if split > 0 else

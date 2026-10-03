@@ -207,7 +207,8 @@ remains:
   (music) -- plus SINGULAR's library registered in place; the emotion
   catalog is still for later (CT-0048). A scene's version now renders its joins:
   catalog transitions (shader or FFmpeg stand-in) and J/L-cuts from the
-  takes' handles (CT-0050). Unreal/Unity render adapters, a catalog of directors and
+  takes' handles (CT-0050). Scenes declare how they are entered (`enter`), and
+  the sequence assembly renders it (CT-0051). Unreal/Unity render adapters, a catalog of directors and
   styles, and 3D storyboards (ScreenWeaver as reference) too (CT-0049). Claude Code now
   works on a film through an MCP server of Cine Toaster (ADR 0020, CT-0045
   option 1: `toast mcp`). Noted for later, not started: RL beyond the
