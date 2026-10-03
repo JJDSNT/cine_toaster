@@ -37,6 +37,19 @@ better held as a decision on the join.
   headless on a demo copy).
 - SPEC-0007 amendment.
 
+## Sound over several scenes (2026-10-03)
+
+- A sequence in `project.yaml` takes `ambience` and `music` like a scene,
+  `from`/`to`/`until` naming its scenes (`project._sequence_beds`);
+  problems go to the production's attention list and the Sequences room.
+- `_sequence_plan` places them with `sounds.place` over the versions (after
+  the joins); the sequence render mixes them as a scene's cues.
+- Ducking across scenes: the scene assembly job writes
+  `<version>.mp4.speech.json` (the cut's speech on its timeline,
+  `Plan.speech`); a sequence's segment reads it (`Segment.speech_spans`).
+  A version made before this has no sidecar, and its lines are not ducked.
+- The sequence version's summary says what was laid.
+
 # Decisions
 
 - Declared in `scene.yaml`, not in `project.yaml`'s sequence entry: a scene
@@ -49,12 +62,14 @@ better held as a decision on the join.
 - `tests/test_joins.py` `SceneJoinTests`: two recorded scene versions,
   SC-030 entered through a 0.4 s dip-to-black, the sequence job succeeds
   and is 0.4 s shorter than its scenes; an unknown type and transition are
-  reported.
+  reported; music over both scenes (0.5 s into SC-010, 3.5 s long) ducked
+  more than 7 dB under the line SC-030's speech sidecar reports; the scene
+  job writes its sidecar (`tests/test_sounds.py`).
 
 # To do
 
 - A decision command for a scene's `enter` (canvas edge between scenes).
 - Opening and closing a sequence (from and to black) without a scene
   before or after.
-- Sound across scenes (a J/L from the next scene's takes, a music cue over
-  several scenes) at the sequence level.
+- A J/L between scenes from the next scene's takes (versions have no
+  handles).

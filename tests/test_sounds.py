@@ -120,6 +120,8 @@ class MixTests(unittest.TestCase):
         manager.adopt(job["id"])
         version = load_scene(root, "SC-030")["assemblies"][0]
         self.assertIn("Sound laid: door (shot", version["summary"])
+        # Beside the version, where its speech is heard: a sequence's music ducks under it.
+        self.assertTrue((root / (version["media"] + ".speech.json")).is_file())
 
 
 class ProjectTests(unittest.TestCase):

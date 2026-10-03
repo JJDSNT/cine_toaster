@@ -163,6 +163,46 @@ class SceneJoinTests(unittest.TestCase):
             else:
                 os.environ[key] = value
 
+    def versions(self, sound: str) -> None:
+        """Each scene of the demo's sequence gets a recorded 2 s version: SC-010 red, SC-030 blue."""
+
+        from cine_toaster.commands import Actor, record_assembly
+
+        for scene, colour in (("SC-010", "red"), ("SC-030", "blue")):
+            media = self.root / "renders" / f"{scene}.mp4"
+            media.parent.mkdir(exist_ok=True)
+            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", f"color={colour}:s=160x90:r=24:d=2",
+                            "-f", "lavfi", "-i", sound, "-t", "2", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                            "-c:a", "aac", "-shortest", str(media)], check=True)
+            record_assembly(self.root, scene_id=scene, assembly_id="v1", actor=Actor(id="editor"),
+                            media=media.relative_to(self.root).as_posix(), summary="a test version",
+                            duration_seconds=2.0, takes={})
+
+    def test_music_runs_over_the_scenes_and_ducks_under_a_versions_speech(self) -> None:
+        from cine_toaster.jobs import JobManager, JobStore, _sequence_plan
+
+        manifest = self.root / "project.yaml"
+        manifest.write_text(manifest.read_text(encoding="utf-8").replace(
+            'scenes: ["SC-010", "SC-030"]',
+            'scenes: ["SC-010", "SC-030"]\n    music: {id: tension-drone, from: SC-010, at: 0.5, fade_in: 0, fade_out: 0}'),
+            encoding="utf-8")
+        self.versions("anullsrc=r=48000:cl=stereo")
+        # The scene job writes this beside every version: where its speech is heard.
+        (self.root / "renders" / "SC-030.mp4.speech.json").write_text('{"speech": [[0.8, 1.4]]}', encoding="utf-8")
+        plan = _sequence_plan(self.root, "the-reply")
+        self.assertEqual([(cue["id"], cue["start"], cue["length"]) for cue in plan.cues], [("tension-drone", 0.5, 3.5)])
+        self.assertEqual(plan.segments[1].speech_spans, [(0.8, 1.4)])
+        manager = JobManager(store=JobStore(self.root.parent / "state" / "jobs.sqlite"))
+        self.addCleanup(manager.shutdown, wait=False)
+        job = manager.wait(manager.submit("assemble_sequence", self.root, {"sequence": "the-reply"})["id"], timeout=180)
+        self.assertEqual(job["state"], "succeeded", job["error"])
+        self.assertEqual([item["id"] for item in job["result"]["summary"]["sound"]], ["tension-drone"])
+        manager.adopt(job["id"])
+        output = self.root / "renders" / "sequences" / "the-reply" / "v1.mp4"
+        clear = JoinTests.mean(None, output, 1.0, 0.6)  # music in SC-010
+        under = JoinTests.mean(None, output, 2.9, 0.4)  # SC-030's line, 0.8-1.4 s into it
+        self.assertGreater(clear - under, 7.0)
+
     def enter(self, text: str) -> None:
         scene_file = self.root / "scenes" / "030-echo-chamber" / "scene.yaml"
         scene_file.write_text(scene_file.read_text(encoding="utf-8").replace("shots:\n", text + "shots:\n", 1),
@@ -176,17 +216,7 @@ class SceneJoinTests(unittest.TestCase):
         self.assertEqual(load_scene(self.root, "SC-030")["enter"]["transition"]["id"], "dip-to-black")
         manager = JobManager(store=JobStore(self.root.parent / "state" / "jobs.sqlite"))
         self.addCleanup(manager.shutdown, wait=False)
-        from cine_toaster.commands import Actor, record_assembly
-
-        for scene, colour in (("SC-010", "red"), ("SC-030", "blue")):
-            media = self.root / "renders" / f"{scene}.mp4"
-            media.parent.mkdir(exist_ok=True)
-            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", f"color={colour}:s=160x90:r=24:d=2",
-                            "-f", "lavfi", "-i", "sine=f=220:d=2", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                            "-c:a", "aac", "-shortest", str(media)], check=True)
-            record_assembly(self.root, scene_id=scene, assembly_id="v1", actor=Actor(id="editor"),
-                            media=media.relative_to(self.root).as_posix(), summary="a test version",
-                            duration_seconds=2.0, takes={})
+        self.versions("sine=f=220:d=2")
         plan = _sequence_plan(self.root, "the-reply")
         self.assertEqual(plan.segments[1].transition["id"], "dip-to-black")
         job = manager.wait(manager.submit("assemble_sequence", self.root, {"sequence": "the-reply"})["id"], timeout=180)

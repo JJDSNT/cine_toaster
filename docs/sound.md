@@ -76,6 +76,25 @@ level, then mixed under the joined cut with a limiter. Music is lowered by
 with 0.3 s ramps. The version's summary lists what was laid, at what gain,
 under which licence.
 
+## Over several scenes
+
+A music cue or an ambience that crosses scenes is declared on the sequence,
+in `project.yaml`, with the same keys -- `from`, `to` and `until` name
+scenes:
+
+```yaml
+sequences:
+  - id: the-reply
+    scenes: [SC-010, SC-030, SC-040]
+    music: {id: main-theme, from: SC-010, at: 4.0, until: SC-040}
+```
+
+The sequence's assembly lays it over the scenes' versions, after the joins
+between them. Every scene version keeps a sidecar of where its speech is
+heard (`<version>.mp4.speech.json`), so the music ducks under the lines of
+every scene it crosses. A scene's own music stays in its version: choose
+one or the other for a stretch, or the two play together.
+
 ## Sources
 
 SINGULAR's two, and one for music. Searching writes nothing; fetching

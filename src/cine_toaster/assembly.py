@@ -97,6 +97,8 @@ class Segment:
     effects: list[dict[str, Any]] = field(default_factory=list)
     #: The file actually cut, when it is not the take itself (a rendered card or titled piece).
     source: str = ""
+    #: Speech heard within a scene version, in its own seconds (a sequence's segments): music ducks under it.
+    speech_spans: list[tuple[float, float]] = field(default_factory=list)
     #: The join into this shot, resolved: a transition ({id, seconds, shader | mode}) and a J/L split.
     transition: dict[str, Any] | None = None
     split: float = 0.0
@@ -117,6 +119,8 @@ class Plan:
     #: Sounds from the catalog placed on the cut's timeline, and, once rendered, what was laid.
     cues: list[dict[str, Any]] = field(default_factory=list)
     sound: list[dict[str, Any]] = field(default_factory=list)
+    #: Once rendered, where speech is heard on the cut's timeline: kept beside the version for the sequence.
+    speech: list[tuple[float, float]] = field(default_factory=list)
 
     @property
     def takes(self) -> dict[str, str]:
@@ -525,12 +529,18 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
                  "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-b:a", "256k", "-ar", "48000",
                  "-frames:v", str(plan_duration_frames), "-shortest", "-movflags", "+faststart", str(joined)],
                 message="Joining the shots", span=within(0.92, 0.93 if plan.cues else 1.0))
+    speech = []
+    for index, segment in enumerate(plan.segments):
+        if segment.speech_spans:
+            speech += [(starts[index] + a - segment.start, starts[index] + b - segment.start)
+                       for a, b in segment.speech_spans if b > segment.start and a < segment.end]
+        elif segment.speech:
+            speech.append((starts[index] + max(0.0, segment.speech[0] - segment.start),
+                           starts[index] + min(segment.end, segment.speech[1]) - segment.start))
+    plan.speech = [(round(a, 3), round(b, 3)) for a, b in speech]
     if plan.cues:
         from .sounds import list_sounds, mix
 
-        speech = [(starts[index] + max(0.0, segment.speech[0] - segment.start),
-                   starts[index] + min(segment.end, segment.speech[1]) - segment.start)
-                  for index, segment in enumerate(plan.segments) if segment.speech]
         catalog = {item["id"]: item for item in list_sounds(root)}
 
         def run_sound(command, expected_seconds=None, message=""):

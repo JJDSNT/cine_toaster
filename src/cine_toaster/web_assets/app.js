@@ -430,6 +430,13 @@ function renderSequences() {
       list.append(row);
     });
     panel.append(list);
+    // Sound over several scenes (CT-0051): declared on the sequence in project.yaml.
+    const beds = [...(sequence.ambience || []), ...(sequence.music || [])];
+    if (beds.length) {
+      panel.append(el("p", "muted", "Over the scenes: " + beds.map((bed) =>
+        `${bed.id} (${bed.category}${bed.from ? `, from ${bed.from}` : ""}${bed.to ? ` to ${bed.to}` : bed.until ? ` until ${bed.until}` : ""})`).join(" · ")));
+    }
+    for (const problem of sequence.problems || []) panel.append(el("p", "finding error", problem));
     root.append(panel);
   }
   if (!state.production.sequences.length) {

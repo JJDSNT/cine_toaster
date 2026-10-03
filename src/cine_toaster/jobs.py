@@ -743,8 +743,12 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
            span=(0.6, 1.0) if voices else (0.0, 1.0))
     shutil.rmtree(context.staging / "work", ignore_errors=True)
     scene_id, version = context.params["scene"], context.params["version"]
+    # Where speech is heard in this version: a sequence's music ducks under it (CT-0051).
+    (context.staging / "assembly.speech.json").write_text(json.dumps({"speech": plan.speech}), encoding="utf-8")
     return {
-        "files": [{"staged": "assembly.mp4", "destination": f"renders/assemblies/{scene_id}/{version}.mp4"}],
+        "files": [{"staged": "assembly.mp4", "destination": f"renders/assemblies/{scene_id}/{version}.mp4"},
+                  {"staged": "assembly.speech.json",
+                   "destination": f"renders/assemblies/{scene_id}/{version}.mp4.speech.json"}],
         "summary": {"segments": [{**{key: value for key, value in asdict(segment).items() if key not in ("sound", "source")},
                                   "gain_db": plan.gains.get(segment.shot, 0.0)} for segment in plan.segments],
                     "notes": plan.notes, "voices": voices, "sound": plan.sound,
@@ -904,6 +908,9 @@ def _sequence_plan(root: Path, sequence_id: str):
         enter = scene.get("enter") or {}
         segment = Segment(scene_id, chosen["id"], chosen["media"], 0.0, round(length, 3), enter.get("type") or "hard",
                           "version", normalize=False)
+        spoken = root / (chosen["media"] + ".speech.json")
+        if spoken.is_file():
+            segment.speech_spans = [tuple(span) for span in json.loads(spoken.read_text(encoding="utf-8"))["speech"]]
         if plan.segments:
             # The join between scenes, declared on the incoming scene: a version has no sound beyond its
             # ends, so a J/L-cut between scenes is said to be straight (its handle is nothing).
@@ -913,6 +920,13 @@ def _sequence_plan(root: Path, sequence_id: str):
         plan.segments.append(segment)
     if not plan.segments:
         raise ValidationError(f"No scene of {sequence_id!r} has an assembled version yet")
+    if sequence.get("ambience") or sequence.get("music"):
+        from .sounds import place
+
+        cues, notes = place({"shots": [], "ambience": sequence.get("ambience"), "music": sequence.get("music")},
+                            plan.segments)
+        plan.cues = cues
+        plan.notes.extend(note.replace(" in this version", " in this sequence version") for note in notes)
     return plan
 
 
@@ -943,7 +957,7 @@ def _run_assemble_sequence(context: JobContext) -> dict[str, Any]:
     sequence_id, version = context.params["sequence"], context.params["version"]
     return {
         "files": [{"staged": "sequence.mp4", "destination": f"renders/sequences/{sequence_id}/{version}.mp4"}],
-        "summary": {"scenes": plan.takes, "notes": plan.notes, "duration_seconds": plan.duration},
+        "summary": {"scenes": plan.takes, "notes": plan.notes, "duration_seconds": plan.duration, "sound": plan.sound},
     }
 
 
@@ -953,6 +967,9 @@ def _adopted_assemble_sequence(job: dict[str, Any], placed: list[str]) -> None:
     root = Path(job["project_root"])
     summary = job["result"]["summary"]
     notes = " ".join(summary["notes"])
+    if summary.get("sound"):
+        laid = ", ".join(f"{item['id']} ({item['kind']}, {item['start']:g} s)" for item in summary["sound"])
+        notes = f"Sound laid: {laid}. " + notes
     record_sequence_version(
         root,
         sequence_id=job["params"]["sequence"],

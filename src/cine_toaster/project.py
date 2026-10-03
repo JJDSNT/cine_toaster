@@ -1034,6 +1034,24 @@ def scene_directory(root: Path, scene_id: str) -> Path:
     raise ResourceNotFoundError(f"Scene {scene_id!r} is not part of this production")
 
 
+def _sequence_beds(raw: dict[str, Any], scene_ids: list[str],
+                   root: Path) -> tuple[dict[str, list[dict[str, Any]]], list[str]]:
+    """A sequence's `ambience` and `music`, placed over its scenes (`from`/`to`/`until` name scenes)."""
+
+    beds: dict[str, list[dict[str, Any]]] = {"ambience": [], "music": []}
+    if not any(raw.get(kind) for kind in beds):
+        return beds, []
+    from .sounds import expand, list_sounds
+
+    catalog = {item["id"]: item for item in list_sounds(root)}
+    problems: list[str] = []
+    for kind in beds:
+        beds[kind], found = expand(raw.get(kind), catalog, placed_on="scene", shots=tuple(scene_ids))
+        problems.extend(f"The {kind} of sequence {raw.get('id')} {problem.replace('its shots', 'its scenes')}. "
+                        "It would be lost, not guessed." for problem in found)
+    return beds, problems
+
+
 def _load_sequences(
     manifest: dict[str, Any],
     scenes: list[dict[str, Any]],
@@ -1069,6 +1087,7 @@ def _load_sequences(
                 f"sequence {sequence_id!r} lists unknown scenes {', '.join(missing)} in {path}"
             )
 
+        beds, problems = _sequence_beds(raw, [scene["id"] for scene in members], path.parent)
         decided = sum(
             1
             for scene in members
@@ -1094,6 +1113,10 @@ def _load_sequences(
                 if decided + undecided
                 else 0,
                 "versions": list(reversed(sequence_versions.get(sequence_id, {}).get("versions", []))),
+                # CT-0051: sound over several scenes, from the sound catalog, and what is wrong with it.
+                "ambience": beds["ambience"],
+                "music": beds["music"],
+                "problems": problems,
             }
         )
 
@@ -1440,6 +1463,9 @@ def load_production(root: Path) -> dict[str, Any]:
     attention: list[dict[str, Any]] = []
     if script_problem:
         attention.append({"kind": "screenplay", "scene_id": "", "scene_title": "", "message": script_problem})
+    for sequence in sequences:
+        for problem in sequence.get("problems") or []:
+            attention.append({"kind": "sound", "scene_id": "", "scene_title": sequence["label"], "message": problem})
     for scene in scenes:
         for finding in scene["findings"]:
             if finding["severity"] == "error":
