@@ -137,7 +137,7 @@ deliver: [TikTok, {name: square, aspect: "1:1"}]
 Every version is then also delivered in each format named -- the same
 takes, joins and sound, reframed and captioned for it -- kept with the
 version (`renditions`) and watchable from it in the control room:
-`renders/assemblies/SC-030/v3.mp4`, `v3.viral-vertical.mp4`,
+`scenes/030-echo-chamber/versions/v3.mp4`, `v3.viral-vertical.mp4`,
 `v3.square.mp4`. A sequence named by the production's `deliver:` is
 delivered the same way, from each scene version's own rendition (reframed
 and captioned already); a scene version without one is reframed centred,

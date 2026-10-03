@@ -59,7 +59,7 @@ class SequenceVersionTests(unittest.TestCase):
         self.assertEqual(job["result"]["summary"]["scenes"], {"SC-030": "v1"})
         self.assertTrue(any("SC-010" in note for note in job["result"]["summary"]["notes"]))
         version = self.sequence()["versions"][0]
-        self.assertEqual((version["id"], version["media"]), ("v1", "renders/sequences/the-reply/v1.mp4"))
+        self.assertEqual((version["id"], version["media"]), ("v1", "sequences/the-reply/versions/v1.mp4"))
         self.assertTrue((self.root / version["media"]).is_file())
         self.assertTrue((self.root / "sequences.state.json").is_file())
 

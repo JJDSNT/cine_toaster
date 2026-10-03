@@ -2,7 +2,7 @@
 id: CT-0054
 title: Migrating SINGULAR to ~/films/singular in Cine Toaster's native format
 type: work
-status: review
+status: doing
 owner: unassigned
 created_at: 2026-10-03
 updated_at: 2026-10-03
@@ -38,7 +38,15 @@ voices), `estetica/` (LUTs, visual grammar, `mundos.yaml`), `livro/`,
 `roteiro/` (V4 generated from the author's V3), `sequencias/`, `docs/`,
 `knowledge/`. `project.yaml` declares 31 SINGULAR-only shot fields.
 
-# Proposed layout (awaiting the user)
+# Layout (decided)
+
+The user (2026-10-03): the evaluation and the decision are mine -- the
+structure must run the film's production and keep the history of its
+evolution. Evaluation: SINGULAR has no git; its history is its `versoes/`
+folders (cut + breakdown + notes table), `.orig` files and screenplay
+versions. Cine Toaster kept versions away from scenes, without the
+breakdown that made them, and truncated the decision history at 200.
+Decided in ADR 0021; the layout below stands.
 
 ```
 ~/films/singular/
@@ -63,9 +71,20 @@ voices), `estetica/` (LUTs, visual grammar, `mundos.yaml`), `livro/`,
 - Media copied, not hard-linked (SINGULAR's tools overwrite files in place).
 - Working files (`trabalho/` intermediates, logs) stay out: disposable.
 
+# Done: ADR 0021 implemented (2026-10-03)
+
+- Versions in `<scene>/versions/` (and `sequences/<id>/versions/`) with
+  `vN.scene.yaml`, the breakdown that made the version; `versions.py`
+  regenerates `VERSIONS.md` after `record_assembly`, `review_assembly`,
+  `record_sequence_version`, `review_sequence_version`.
+- `history.jsonl`: every decision, append-only, deduplicated by command
+  id (`state._journal`, `read_history`).
+- Tests: the snapshot and the index with a verdict (`test_assembly`), the
+  journal beyond 200 decisions (`test_history`).
+
 # Then
 
-1. ADR: per-scene versions and `VERSIONS.md`; implement.
+1. ~~ADR: per-scene versions and `VERSIONS.md`; implement.~~ Done.
 2. `toast migrate`: field by field (SINGULAR's 31 keys to native fields or
    catalogs), with a report of converted / approximated / unhoused.
 3. Validate in the new directory: checks, storyboard, assembling real

@@ -767,6 +767,7 @@ def record_assembly(
             command_id=command_id,
         ),
     )
+    _reindex(root, scene=scene_id)
     return CommandResult(
         command_id=command_id,
         type="assembly.recorded",
@@ -778,6 +779,20 @@ def record_assembly(
         revision=committed.revision,
         event=event.public_dict(),
     )
+
+
+def _reindex(root: Path, *, scene: str = "", sequence: str = "") -> None:
+    """Regenerate the versions' index a person reads (ADR 0021); derived, so a failure only loses the index."""
+
+    from .versions import index_scene, index_sequence
+
+    try:
+        if scene:
+            index_scene(root, scene)
+        if sequence:
+            index_sequence(root, sequence)
+    except (OSError, ValidationError):
+        pass
 
 
 @_locked
@@ -870,6 +885,7 @@ def review_assembly(
             command_id=command_id,
         ),
     )
+    _reindex(root, scene=scene_id)
     return CommandResult(
         command_id=command_id,
         type="assembly.reviewed",
@@ -1040,6 +1056,7 @@ def record_sequence_version(
         "sequence.version.recorded", production["id"], sequence_id=sequence_id,
         version_id=version_id, actor=actor.public_dict(), revision=data["revision"],
     ))
+    _reindex(root, sequence=sequence_id)
     return {"sequence_id": sequence_id, "version": version, "revision": data["revision"], "event": event.public_dict()}
 
 
@@ -1068,6 +1085,7 @@ def review_sequence_version(
         "sequence.version.reviewed", production["id"], sequence_id=sequence_id,
         version_id=version_id, verdict=verdict, actor=actor.public_dict(), revision=data["revision"],
     ))
+    _reindex(root, sequence=sequence_id)
     return {"sequence_id": sequence_id, "version": version, "revision": data["revision"], "event": event.public_dict()}
 
 

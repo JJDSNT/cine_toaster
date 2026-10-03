@@ -198,7 +198,7 @@ class SceneJoinTests(unittest.TestCase):
         self.assertEqual(job["state"], "succeeded", job["error"])
         self.assertEqual([item["id"] for item in job["result"]["summary"]["sound"]], ["tension-drone"])
         manager.adopt(job["id"])
-        output = self.root / "renders" / "sequences" / "the-reply" / "v1.mp4"
+        output = self.root / "sequences" / "the-reply" / "versions" / "v1.mp4"
         clear = JoinTests.mean(None, output, 1.0, 0.6)  # music in SC-010
         under = JoinTests.mean(None, output, 2.9, 0.4)  # SC-030's line, 0.8-1.4 s into it
         self.assertGreater(clear - under, 7.0)

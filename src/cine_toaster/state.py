@@ -351,6 +351,51 @@ def load_scene_state(scene_directory: Path, scene_id: str) -> SceneState:
     )
 
 
+#: Every decision ever committed in a scene, one JSON line each, beside its state (ADR 0021).
+HISTORY_FILENAME = "history.jsonl"
+
+
+def _journal(scene_directory: Path, state: SceneState) -> None:
+    """Append the decisions the journal does not hold yet: `state.json` keeps only the latest ones.
+
+    Append-only and never truncated, it is the scene's history; a failure to
+    write it must not undo the decision already committed.
+    """
+
+    path = scene_directory / HISTORY_FILENAME
+    try:
+        known = set()
+        if path.is_file():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                try:
+                    known.add(json.loads(line).get("command_id") or line)
+                except ValueError:
+                    continue
+        new = [decision for decision in state.decisions
+               if (decision.get("command_id") or json.dumps(decision, sort_keys=True)) not in known]
+        if new:
+            with path.open("a", encoding="utf-8") as handle:
+                for decision in new:
+                    handle.write(json.dumps(decision, ensure_ascii=False, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
+def read_history(scene_directory: Path) -> list[dict[str, Any]]:
+    """The scene's whole decision history, oldest first."""
+
+    path = scene_directory / HISTORY_FILENAME
+    if not path.is_file():
+        return []
+    entries = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            entries.append(json.loads(line))
+        except ValueError:
+            continue
+    return entries
+
+
 def write_scene_state(scene_directory: Path, state: SceneState) -> None:
     """Commit scene state atomically.
 
@@ -368,6 +413,7 @@ def write_scene_state(scene_directory: Path, state: SceneState) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, path)
+        _journal(scene_directory, state)
         directory = os.open(scene_directory, os.O_RDONLY)
         try:
             os.fsync(directory)

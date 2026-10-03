@@ -748,6 +748,11 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
            span=(start, start + (1.0 - start) * share))
     shutil.rmtree(context.staging / "work", ignore_errors=True)
     scene_id, version = context.params["scene"], context.params["version"]
+    # A version lives with its scene, beside the breakdown that made it (ADR 0021).
+    from .versions import scene_versions
+
+    folder = scene_versions(scene["file"])
+    shutil.copyfile(context.project_root / scene["file"], context.staging / "assembly.scene.yaml")
     renditions = []
     for index, (item, copied) in enumerate(deliveries, 1):
         copied.format = {"aspect": item["aspect"], **({"captions": True} if item["captions"] else {})}
@@ -756,14 +761,14 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
                context.run_process, span=(start + (1.0 - start) * share * index,
                                           start + (1.0 - start) * share * (index + 1)))
         shutil.rmtree(context.staging / f"work-{item['id']}", ignore_errors=True)
-        renditions.append({"staged": name, "destination": f"renders/assemblies/{scene_id}/{version}.{item['id']}.mp4",
+        renditions.append({"staged": name, "destination": f"{folder}/{version}.{item['id']}.mp4",
                            "rendition": item["id"]})
     # Where speech is heard in this version: a sequence's music ducks under it (CT-0051).
     (context.staging / "assembly.speech.json").write_text(json.dumps({"speech": plan.speech}), encoding="utf-8")
     return {
-        "files": [{"staged": "assembly.mp4", "destination": f"renders/assemblies/{scene_id}/{version}.mp4"},
-                  {"staged": "assembly.speech.json",
-                   "destination": f"renders/assemblies/{scene_id}/{version}.mp4.speech.json"}, *renditions],
+        "files": [{"staged": "assembly.mp4", "destination": f"{folder}/{version}.mp4"},
+                  {"staged": "assembly.speech.json", "destination": f"{folder}/{version}.mp4.speech.json"},
+                  {"staged": "assembly.scene.yaml", "destination": f"{folder}/{version}.scene.yaml"}, *renditions],
         "summary": {"segments": [{**{key: value for key, value in asdict(segment).items() if key not in ("sound", "source")},
                                   "gain_db": plan.gains.get(segment.shot, 0.0)} for segment in plan.segments],
                     "notes": plan.notes, "voices": voices, "sound": plan.sound, "loudness": plan.loudness,
@@ -973,6 +978,7 @@ def _run_assemble_sequence(context: JobContext) -> dict[str, Any]:
     from .formats import renditions as parse_renditions
     from .project import load_production
     from .styles import list_styles
+    from .versions import sequence_versions
 
     root = context.project_root
     plan = _sequence_plan(root, context.params["sequence"])
@@ -999,10 +1005,10 @@ def _run_assemble_sequence(context: JobContext) -> dict[str, Any]:
         render(root, copied, context.staging / name, context.staging / f"work-{item['id']}", context.run_process,
                span=(share * index, share * (index + 1)))
         shutil.rmtree(context.staging / f"work-{item['id']}", ignore_errors=True)
-        renditions.append({"staged": name, "destination": f"renders/sequences/{sequence_id}/{version}.{item['id']}.mp4",
+        renditions.append({"staged": name, "destination": f"{sequence_versions(sequence_id)}/{version}.{item['id']}.mp4",
                            "rendition": item["id"]})
     return {
-        "files": [{"staged": "sequence.mp4", "destination": f"renders/sequences/{sequence_id}/{version}.mp4"},
+        "files": [{"staged": "sequence.mp4", "destination": f"{sequence_versions(sequence_id)}/{version}.mp4"},
                   *renditions],
         "summary": {"scenes": plan.takes, "notes": plan.notes, "duration_seconds": plan.duration, "sound": plan.sound},
     }

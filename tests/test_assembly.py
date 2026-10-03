@@ -109,9 +109,22 @@ class AssemblyTests(unittest.TestCase):
         self.assertEqual(job["params"]["version"], "v1")
         self.manager.adopt(job["id"])
         versions = {item["id"]: item for item in self.scene()["assemblies"]}
-        self.assertEqual(versions["v1"]["media"], "renders/assemblies/SC-030/v1.mp4")
+        self.assertEqual(versions["v1"]["media"], "scenes/030-echo-chamber/versions/v1.mp4")
         self.assertEqual(versions["v1"]["takes"]["P3"], "ONE-BLINK")
         self.assertTrue((self.root / versions["v1"]["media"]).is_file())
+        # Beside it, the breakdown that made it and the index a person reads (ADR 0021).
+        folder = self.root / "scenes" / "030-echo-chamber" / "versions"
+        self.assertEqual((folder / "v1.scene.yaml").read_text(encoding="utf-8"),
+                         (self.root / "scenes" / "030-echo-chamber" / "scene.yaml").read_text(encoding="utf-8"))
+        index = (folder / "VERSIONS.md").read_text(encoding="utf-8")
+        self.assertIn("| [v1](v1.mp4) |", index)
+        from cine_toaster.commands import review_assembly
+
+        review_assembly(self.root, scene_id="SC-030", assembly_id="v1", verdict="approved", note="the blink works",
+                        actor=Actor(id="director"))
+        index = (folder / "VERSIONS.md").read_text(encoding="utf-8")
+        self.assertIn("Approved: **v1**", index)
+        self.assertIn("✅ approved | the blink works |", index)
         # The next assembly is the next version; an existing one is never replaced.
         second = self.manager.submit("assemble", self.root, {"scene": "SC-030"})
         self.assertEqual(second["params"]["version"], "v2")
@@ -120,7 +133,7 @@ class AssemblyTests(unittest.TestCase):
 
     def test_a_version_file_is_never_overwritten(self) -> None:
         job = self.manager.wait(self.manager.submit("assemble", self.root, {"scene": "SC-030", "version": "cut-a"})["id"], timeout=120)
-        target = self.root / "renders" / "assemblies" / "SC-030" / "cut-a.mp4"
+        target = self.root / "scenes" / "030-echo-chamber" / "versions" / "cut-a.mp4"
         target.parent.mkdir(parents=True)
         target.write_bytes(b"someone's render")
         with self.assertRaises(JobError):
