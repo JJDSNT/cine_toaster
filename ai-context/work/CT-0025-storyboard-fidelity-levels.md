@@ -153,3 +153,10 @@ Known limits (to revisit; listed in To do item 5).
   was corrected after the first look.
 - Headless screenshot of the SC-030 blockout with P2 selected.
 - Full suite: 271 tests OK.
+
+# A 3D board level (2026-10-03, CT-0049)
+
+Between the blocking frame and the master image: a 3D board rendered from
+the plan's USD (mannequins, set pieces, the shot's lens), with depth, used
+as a picture's starting point (`derive: {from: board}`). Composition only;
+the 3D animatic is for checking the scene, never a model's input.

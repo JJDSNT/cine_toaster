@@ -111,6 +111,13 @@ def location_camera(name: str, shot: dict[str, Any] | None = None) -> str | None
 def source_picture(root: Path, scene: dict[str, Any], name: str, shot: dict[str, Any] | None = None) -> Path | None:
     """The picture a derivation edits: a file, the picture of the shot or master it names, or a location's plate."""
 
+    text = str(name or "").strip().lower()
+    if text in ("board", "board:start", "board:end"):
+        # The shot's own 3D board (CT-0049): a composition to start the picture from.
+        from .board import board_path
+
+        path = board_path(root, scene["id"], (shot or {}).get("id", ""), "end" if text.endswith("end") else "start")
+        return path if shot and path.is_file() else None
     camera = location_camera(name, shot)
     if camera is not None:
         from .locations import plate
@@ -195,6 +202,9 @@ def plan_picture(root: Path, production: dict[str, Any], scene_id: str, shot_id:
             raise ValidationError(
                 f"{shot_id} is made from the plate of {camera or 'its camera'} in {scene.get('location') or 'no location'}, "
                 f"which has none (location.yaml references: {{path, kind: plate, camera: {camera or '<id>'}}})")
+        if str(derive["from"]).lower().startswith("board"):
+            raise ValidationError(f"{shot_id} is made from its 3D board, which is not drawn yet "
+                                  f"(toast board frames <project> {scene_id} --shot {shot_id})")
         raise ValidationError(f"{shot_id} is derived from {derive['from']!r}, which has no picture yet")
     references = [face_reference(root, production, scene, name) for name in derive.get("with") or []]
     notes = []
@@ -203,6 +213,11 @@ def plan_picture(root: Path, production: dict[str, Any], scene_id: str, shot_id:
     if shot.get("picture"):
         notes.append("The picture description is what the video model is told this image shows; "
                      "check the result against it.")
+    if str(derive["from"]).lower().startswith("board"):
+        from .board import stale
+
+        if stale(root, scene, shot_id, "end" if str(derive["from"]).lower().endswith("end") else "start"):
+            notes.append("The 3D board was drawn before the plan last changed: draw it again (toast board frames).")
     return PicturePlan(
         scene=scene_id, shot=shot_id, stem=picture_stem(work_directory_for(root / scene["file"]), str(shot["number"])),
         source=source,

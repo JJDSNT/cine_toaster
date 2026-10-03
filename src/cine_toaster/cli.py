@@ -660,6 +660,31 @@ def command_cut(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_board(args: argparse.Namespace) -> int:
+    """The 3D storyboard: still boards per shot, or the scene's animatic (CT-0049)."""
+
+    from .board import animatic, boards, sheet
+    from .project import load_scene
+
+    root = Path(args.project).expanduser().resolve()
+    scene = load_scene(root, args.scene)
+    if scene is None:
+        print(f"No scene {args.scene!r}", file=sys.stderr)
+        return 1
+    if args.board_command == "sheet":
+        print(f"Made {sheet(root, scene).relative_to(root)}")
+        return 0
+    if args.board_command == "animatic":
+        video = animatic(root, scene, width=args.width, height=args.height, step=args.step)
+        print(f"Made {video.relative_to(root)}: the scene through its cameras, to check -- not given to any model")
+        return 0
+    for made in boards(root, scene, shots=args.shot or None, ends=args.end, width=args.width, height=args.height,
+                       look=args.look):
+        print(f"{made['shot']} {made['moment']}: {Path(made['board']).relative_to(root)} (+ depth)")
+    print("A board is a composition to start a picture from: derive: {from: board, with: [...], request: ...}")
+    return 0
+
+
 def command_nerf(args: argparse.Namespace) -> int:
     """A shot's camera move as a nerfstudio camera path (CT-0047)."""
 
@@ -1735,6 +1760,28 @@ def build_parser() -> argparse.ArgumentParser:
             item.add_argument("--ms", type=int, help="the transition's duration in milliseconds")
             item.add_argument("--transition-why", default="", help="why this transition")
     cut_parser.set_defaults(function=command_cut)
+
+    board_parser = subparsers.add_parser("board", help="The 3D storyboard: boards per shot, or the scene's animatic")
+    board_sub = board_parser.add_subparsers(dest="board_command", required=True)
+    board_frames = board_sub.add_parser("frames", help="Still boards (and depth) per shot, from the plan as USD")
+    board_frames.add_argument("project", type=Path)
+    board_frames.add_argument("scene")
+    board_frames.add_argument("--shot", action="append", help="only this shot (repeatable)")
+    board_frames.add_argument("--end", action="store_true", help="also each shot's last moment")
+    board_frames.add_argument("--width", type=int, default=1280)
+    board_frames.add_argument("--height", type=int, default=720)
+    board_frames.add_argument("--look", choices=("clay", "colour"), default="clay",
+                              help="clay: one grey, like a maquette (default); colour: the plan's colours")
+    board_sheet = board_sub.add_parser("sheet", help="The scene's boards as one labelled grid")
+    board_sheet.add_argument("project", type=Path)
+    board_sheet.add_argument("scene")
+    board_animatic = board_sub.add_parser("animatic", help="The scene through its cameras, to check the breakdown")
+    board_animatic.add_argument("project", type=Path)
+    board_animatic.add_argument("scene")
+    board_animatic.add_argument("--width", type=int, default=960)
+    board_animatic.add_argument("--height", type=int, default=540)
+    board_animatic.add_argument("--step", type=int, default=2, help="render every Nth frame (12 fps at 2)")
+    board_parser.set_defaults(function=command_board)
 
     nerf_parser = subparsers.add_parser("nerf", help="A shot's camera move as a nerfstudio camera path (ns-render)")
     nerf_sub = nerf_parser.add_subparsers(dest="nerf_command", required=True)

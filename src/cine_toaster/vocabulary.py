@@ -140,6 +140,11 @@ CORE_SHOT_FIELDS: frozenset[str] = frozenset(
         "n",
         "kind",
         "label",
+        # One scale of shot sizes, and kinds beside it (CT-0049): measured, and checked when declared.
+        "size",
+        "framing",
+        "title",
+        "effects",
         "duration",
         "camera",
         "camera_id",

@@ -146,18 +146,36 @@ def export(scene: dict[str, Any], output: Path) -> dict[str, Any]:
             shape.CreateSizeAttr(1.0)
             shape.CreateDisplayColorAttr([Gf.Vec3f(0.43, 0.72, 0.85)])
             UsdGeom.XformCommonAPI(shape).SetScale(Gf.Vec3f(side, side, tall))
+            lift = tall / 2
         else:
-            tall = float(subject.get("eye_height") or DEFAULT_EYE_HEIGHT) + 0.12
-            shape = UsdGeom.Capsule.Define(stage, path)
-            shape.CreateAxisAttr("Z")
-            shape.CreateRadiusAttr(0.2)
-            shape.CreateHeightAttr(max(0.1, tall - 0.4))
-            shape.CreateDisplayColorAttr([Gf.Vec3f(0.91, 0.72, 0.36)])
+            # A mannequin, not a figure: body, shoulders and a head at the eyes. No rig, no pose --
+            # it says where someone is and how high their eyes are, nothing about how they move.
+            eyes = float(subject.get("eye_height") or DEFAULT_EYE_HEIGHT)
+            shoulders = max(0.3, eyes - 0.17)
+            shape = UsdGeom.Xform.Define(stage, path)
+            skin = [Gf.Vec3f(0.91, 0.72, 0.36)]
+            body = UsdGeom.Capsule.Define(stage, path + "/Body")
+            body.CreateAxisAttr("Z")
+            body.CreateRadiusAttr(0.15)
+            body.CreateHeightAttr(max(0.1, shoulders - 0.3))
+            body.CreateDisplayColorAttr(skin)
+            UsdGeom.XformCommonAPI(body).SetTranslate(Gf.Vec3d(0, 0, shoulders / 2))
+            span = UsdGeom.Capsule.Define(stage, path + "/Shoulders")
+            span.CreateAxisAttr("X")
+            span.CreateRadiusAttr(0.08)
+            span.CreateHeightAttr(0.26)
+            span.CreateDisplayColorAttr(skin)
+            UsdGeom.XformCommonAPI(span).SetTranslate(Gf.Vec3d(0, 0, shoulders - 0.04))
+            head = UsdGeom.Sphere.Define(stage, path + "/Head")
+            head.CreateRadiusAttr(0.11)
+            head.CreateDisplayColorAttr(skin)
+            UsdGeom.XformCommonAPI(head).SetTranslate(Gf.Vec3d(0, 0, eyes + 0.02))
+            lift = 0.0
         shape.GetPrim().SetCustomDataByKey("cine_toaster:id", subject_id)
         shape.GetPrim().SetCustomDataByKey("cine_toaster:label", subject.get("label") or subject_id)
         mover = UsdGeom.XformCommonAPI(shape)
-        mover.SetTranslate(Gf.Vec3d(*subject["position"], tall / 2))
-        subject_prims[subject_id] = (mover, tall / 2)
+        mover.SetTranslate(Gf.Vec3d(*subject["position"], lift))
+        subject_prims[subject_id] = (mover, lift)
         prims += 1
 
     UsdGeom.Xform.Define(stage, "/Scene/Cameras")

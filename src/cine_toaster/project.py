@@ -192,6 +192,8 @@ def _load_shots(
                 "subjects_move": _entries(field(raw, "subjects_move")),
                 "subjects_at": _entries(field(raw, "subjects_at")),
                 "move": field(raw, "move") if isinstance(field(raw, "move"), dict) else None,
+                "size": vtext(raw, "size"),
+                "framing": vtext(raw, "framing"),
                 # A title from the catalog (CT-0031): on a card, or over the picture.
                 "title": field(raw, "title") if isinstance(field(raw, "title"), (str, dict)) else None,
                 # Effects from the VFX catalog, applied in order before the title (CT-0031).
@@ -573,6 +575,7 @@ def _load_scene(
         for shot, motion in zip(shots, motions):
             shot["motion"] = motion.public_dict()
         findings.extend(finding.public_dict() for finding in _check_hidden(geometry, shots, scene_id))
+        findings.extend(finding.public_dict() for finding in _check_sizes(geometry, shots, scene_id))
     findings.extend(finding.public_dict() for finding in _check_shot_fields(shots, scene_id))
     findings.extend(finding.public_dict() for finding in move_findings)
     findings.extend(finding.public_dict() for finding in location_findings)
@@ -769,6 +772,32 @@ def _check_plates(root: Path, location_id: str, shots: list[dict[str, Any]], sce
             continue
         findings.append(Finding(code="plate_missing", severity="warning", scene_id=scene_id, shots=(shot["id"],),
                                 message=message))
+    return findings
+
+
+def _check_sizes(geometry, shots: list[dict[str, Any]], scene_id: str) -> list[Finding]:
+    """A declared shot size that is not the scale's, or far from what the camera frames (one scale, CT-0049)."""
+
+    from .board import SIZE_NAMES, canonical, framing
+
+    plan = {"geometry": geometry.public_dict()}
+    findings = []
+    for shot in shots:
+        declared = (shot.get("extra_fields") or {}).get("size") or shot.get("size")
+        if not declared:
+            continue
+        name = canonical(declared)
+        if name not in SIZE_NAMES:
+            findings.append(Finding(code="shot_size_unknown", severity="warning", scene_id=scene_id, shots=(shot["id"],),
+                                    message=f"{shot['id']} says its size is {declared!r}; the scale is "
+                                            + ", ".join(SIZE_NAMES).lower() + "."))
+            continue
+        measured = framing(plan, shot)["size"]
+        if measured and abs(SIZE_NAMES.index(measured) - SIZE_NAMES.index(name)) > 1:
+            findings.append(Finding(code="shot_size_mismatch", severity="advice", scene_id=scene_id, shots=(shot["id"],),
+                                    message=f"{shot['id']} is declared {name.lower()}, but its camera frames a "
+                                            f"{measured.lower()} of its subject. Move the camera or change the lens, "
+                                            "or the declaration."))
     return findings
 
 

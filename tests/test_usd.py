@@ -51,7 +51,7 @@ class ExportTests(unittest.TestCase):
         self.assertAlmostEqual(camera.GetHorizontalApertureAttr().Get(), 0.36, places=3)
         world = UsdGeom.Xformable(camera).ComputeLocalToWorldTransform(time)
         mara = UsdGeom.Xformable(stage.GetPrimAtPath("/Scene/Subjects/MARA")).ComputeLocalToWorldTransform(time)
-        eyes = mara.ExtractTranslation() + Gf.Vec3d(0, 0, 1.18 - (1.18 + 0.12) / 2)
+        eyes = mara.ExtractTranslation() + Gf.Vec3d(0, 0, 1.18)  # the mannequin stands on the floor
         local = world.GetInverse().Transform(eyes)
         # In front of the camera (-Z), centred left to right and top to bottom, as the frame draws her.
         self.assertLess(local[2], 0)
