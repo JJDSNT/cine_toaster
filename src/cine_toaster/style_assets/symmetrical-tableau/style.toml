@@ -1,0 +1,34 @@
+schema_version = 1
+id = "symmetrical-tableau"
+name = "Symmetrical tableau (Wes Anderson-like)"
+kind = "manner"
+says = "The frame as a dollhouse: centred, symmetrical, flat, precise."
+# Names people know it by: shown, and accepted by `style:`.
+aka = ["Wes Anderson", "Wes Anderson-like"]
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["Wes Anderson", "the storybook tableau"]
+framing = ["the subject dead centre, symmetry left to right", "frontal, flat staging, people facing the lens", "overhead inserts of objects"]
+colour = "a curated pastel palette, every colour placed"
+sound = "chamber music, a narrator"
+titles = ["card", "film-title", "caption"]
+# What a video model is told about the image, in words of craft.
+prompt = "perfectly symmetrical centred composition, frontal flat staging, curated pastel colour palette, precise production design"
+use_when = ["Fable, deadpan comedy, a world held at arm's length"]
+avoid_when = ["Raw realism"]
+
+[camera]
+lens = "wide"
+prefer = ["locked-off", "truck-left", "truck-right", "whip-pan-left", "whip-pan-right", "top-shot"]
+avoid = ["handheld", "orbit-left", "orbit-right", "dolly-zoom"]
+
+[editing]
+shot_seconds = [2, 10]
+prefer_cuts = ["hard", "match"]
+avoid_cuts = ["jump"]
+prefer_transitions = []
+avoid_transitions = ["film-burn", "blur-dissolve"]
+
+[performance]
+intensity = "subtle"
+max = "clear"
+notes = "deadpan, emotion stated flatly"

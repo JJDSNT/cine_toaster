@@ -1,0 +1,37 @@
+schema_version = 1
+id = "explainer"
+name = "Explainer"
+kind = "format"
+says = "One idea made clear: a voice, simple images, text that lands."
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["explainer and educational video"]
+framing = ["one idea per shot", "space for text and diagrams"]
+colour = "clean, a brand palette, high contrast for text"
+sound = "a voice-over and a light music bed"
+titles = ["lower-third", "word-by-word", "caption"]
+# What a video model is told about the image, in words of craft.
+prompt = "clean bright explainer visuals, simple clear compositions, flat graphic style"
+use_when = ["Teaching, a product's how-to"]
+avoid_when = ["Mystery"]
+
+[camera]
+lens = "normal"
+prefer = ["locked-off", "push-in", "truck-left", "truck-right"]
+avoid = ["handheld", "whip-pan-left", "whip-pan-right"]
+
+[editing]
+shot_seconds = [2, 8]
+prefer_cuts = []
+avoid_cuts = []
+prefer_transitions = ["cross-dissolve", "switcher-flip"]
+avoid_transitions = []
+
+[performance]
+intensity = "subtle"
+max = "clear"
+notes = "friendly, clear"
+
+[format]
+aspect = "16:9"
+total_seconds = [30, 180]
+captions = true

@@ -1,0 +1,40 @@
+schema_version = 1
+id = "commercial-spot"
+name = "Commercial spot"
+kind = "format"
+says = "A product and a feeling in thirty seconds, ending on the brand."
+# Names people know it by: shown, and accepted by `style:`.
+aka = ["ad", "advert", "TV commercial"]
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["television and online advertising"]
+framing = ["hero shots of the product, clean and lit", "people enjoying the benefit", "an end card with the brand"]
+colour = "clean, bright, polished; the product colour true"
+sound = "music bed, a voice-over, a sonic logo at the end"
+titles = ["lower-third", "card", "film-title"]
+# What a video model is told about the image, in words of craft.
+prompt = "high-end commercial cinematography, polished product hero lighting, clean bright colours, aspirational lifestyle"
+use_when = ["A product, a cause, a launch"]
+avoid_when = ["Ambiguity"]
+
+[camera]
+lens = "normal"
+prefer = ["push-in", "orbit-left", "orbit-right", "side-tracking", "crane-up", "top-shot"]
+avoid = ["handheld"]
+
+[editing]
+shot_seconds = [1, 4]
+prefer_cuts = ["hard", "match", "action"]
+avoid_cuts = []
+prefer_transitions = ["cross-dissolve"]
+avoid_transitions = ["analog-scan", "pixelate"]
+
+[performance]
+intensity = "clear"
+max = "clear"
+notes = "aspirational, warm, believable"
+
+[format]
+aspect = "16:9"
+total_seconds = [15, 60]
+hook_seconds = 3
+end_card = true

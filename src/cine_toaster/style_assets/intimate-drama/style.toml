@@ -1,0 +1,32 @@
+schema_version = 1
+id = "intimate-drama"
+name = "Intimate drama"
+kind = "approach"
+says = "Close to faces, shallow focus, natural light: the drama is in what crosses a face."
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["contemporary independent drama"]
+framing = ["close-ups and medium close-ups", "shallow focus that isolates a face", "the other person soft in the foreground"]
+colour = "soft natural window light, warm skin tones"
+sound = "room tone, breath, sparse music"
+titles = ["card"]
+# What a video model is told about the image, in words of craft.
+prompt = "intimate close-up, shallow depth of field, soft natural window light, warm skin tones, subtle facial expression"
+use_when = ["Relationships, confession, a face that changes"]
+avoid_when = ["Spectacle"]
+
+[camera]
+lens = "long"
+prefer = ["locked-off", "push-in", "handheld"]
+avoid = ["crash-zoom-in", "whip-pan-left", "whip-pan-right", "aerial-orbit", "top-shot"]
+
+[editing]
+shot_seconds = [3, 20]
+prefer_cuts = ["hard", "j", "l"]
+avoid_cuts = ["smash"]
+prefer_transitions = []
+avoid_transitions = ["pixelate", "switcher-flip", "diamond-wipe", "clock-wipe", "iris-open", "film-burn"]
+
+[performance]
+intensity = "subtle"
+max = "clear"
+notes = "small and true; the camera close enough to see it"

@@ -60,7 +60,7 @@ def _speech(lines: list[Line], already_spoken: bool) -> list[str]:
     return parts
 
 
-def block_prompt_sections(shots: list[ShotPrompt]) -> list[str]:
+def block_prompt_sections(shots: list[ShotPrompt], style: str = "") -> list[str]:
     """The prompt in pieces: one per shot, then what holds across the block.
 
     Joined, they are the prompt the model receives (`block_prompt`); apart,
@@ -89,12 +89,13 @@ def block_prompt_sections(shots: list[ShotPrompt]) -> list[str]:
     # One sound for the block: it is one continuous room.
     sound = next((shot.sound for shot in shots if shot.sound), "quiet room")
     closing = [constant + ("" if spoken else " Nobody speaks."),
+               *([f"Style: {style.rstrip('.')}."] if style else []),
                f"Sound: {sound}{', continuing across the cuts' if len(shots) > 1 else ''}. No music."]
     sections.append(" ".join(" ".join(closing).split()))
     return sections
 
 
-def block_prompt(shots: list[ShotPrompt]) -> str:
+def block_prompt(shots: list[ShotPrompt], style: str = "") -> str:
     """One generation holding several shots, cut by the model itself.
 
     The first shot describes only what its starting picture shows (claim
@@ -102,4 +103,4 @@ def block_prompt(shots: list[ShotPrompt]) -> str:
     cut to a new shot. Setting, light and voices are held across the cuts.
     """
 
-    return " ".join(section for section in block_prompt_sections(shots) if section)
+    return " ".join(section for section in block_prompt_sections(shots, style) if section)

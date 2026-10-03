@@ -130,7 +130,8 @@ def list_emotions(project_root: Path | None = None) -> list[dict[str, Any]]:
     return sorted(by_id.values(), key=lambda item: (order.get(item["family"], 99), item["name"]))
 
 
-def expand(raw: Any, catalog: dict[str, dict[str, Any]], *, people: set[str] | None = None) -> tuple[
+def expand(raw: Any, catalog: dict[str, dict[str, Any]], *, people: set[str] | None = None,
+           default_intensity: str = "clear") -> tuple[
         list[dict[str, Any]], list[str]]:
     """A shot's `emotion` with its entry's words: (emotions, problems).
 
@@ -149,7 +150,8 @@ def expand(raw: Any, catalog: dict[str, dict[str, Any]], *, people: set[str] | N
             problems.append(f"names the emotion {declared.get('id')!r}, which is not in the emotion catalog")
             continue
         unknown = sorted(set(declared) - PLACEMENT_KEYS)
-        intensity = str(declared.get("intensity") or "clear").strip().lower()
+        # Unsaid, the intensity is the style's register (CT-0049), else clear.
+        intensity = str(declared.get("intensity") or default_intensity).strip().lower()
         arc = str(declared.get("arc") or "holds").strip().lower()
         who = str(declared.get("who") or "").strip()
         if unknown:

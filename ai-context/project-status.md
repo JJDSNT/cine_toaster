@@ -206,7 +206,10 @@ remains:
   sources -- Freesound (CC0), Sonniss (provisional mirror), Openverse
   (music) -- plus SINGULAR's library registered in place; an emotion catalog
   (describe, ask a model, express as FACS/ARKit) reaches the prompt and
-  the brief (CT-0048). A scene's version now renders its joins:
+  the brief (CT-0048). A style catalog -- direction, animation techniques
+  and formats such as viral vertical or commercial -- is named by the
+  production or a scene and reaches the prompts, the brief and the checks
+  (CT-0049). A scene's version now renders its joins:
   catalog transitions (shader or FFmpeg stand-in) and J/L-cuts from the
   takes' handles (CT-0050). Scenes declare how they are entered (`enter`), and
   the sequence assembly renders it, with music and ambience over several

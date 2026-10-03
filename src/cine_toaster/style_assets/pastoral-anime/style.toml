@@ -1,0 +1,37 @@
+schema_version = 1
+id = "pastoral-anime"
+name = "Pastoral anime (Ghibli-like)"
+kind = "animation"
+says = "Hand-painted pastoral anime: lush green, tall summer clouds, warm light, gentle faces, quiet wonder."
+# Names people know it by: shown, and accepted by `style:`.
+aka = ["Ghibli", "Ghibli-like", "Ghiblification"]
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["Studio Ghibli"]
+framing = ["wide pastoral landscapes with small figures", "quiet everyday moments held long", "low angles up into vast skies"]
+colour = "soft watercolour and gouache backgrounds, saturated greens and sky blues, warm late-afternoon light, gentle shadows"
+sound = "wind in grass, insects, a lyrical piano and strings score"
+titles = ["film-title", "card"]
+# What a video model is told about the image, in words of craft.
+prompt = "hand-painted pastoral anime style, soft watercolour background, lush green fields, towering cumulus clouds, warm afternoon light, gentle rounded character design, clean expressive line art"
+use_when = ["Childhood, nature, quiet wonder", "A gentle drawn world"]
+avoid_when = ["Grit, horror, documentary truth"]
+
+[camera]
+lens = "normal"
+prefer = ["locked-off", "pan-left", "pan-right", "tilt-up", "push-in", "flyover"]
+avoid = ["handheld", "crash-zoom-in", "whip-pan-left", "whip-pan-right", "dolly-zoom"]
+
+[editing]
+shot_seconds = [2, 12]
+prefer_cuts = ["hard", "match"]
+avoid_cuts = ["jump", "smash"]
+prefer_transitions = ["cross-dissolve"]
+avoid_transitions = ["pixelate", "analog-scan", "switcher-flip"]
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "small, honest gestures; wonder and quiet resolve over spectacle"
+
+[format]
+frame_rate = 12

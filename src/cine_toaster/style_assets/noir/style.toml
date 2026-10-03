@@ -1,0 +1,34 @@
+schema_version = 1
+id = "noir"
+name = "Noir"
+kind = "genre"
+says = "Hard shadows and bad decisions: a city at night, and someone who cannot get out."
+# Names people know it by: shown, and accepted by `style:`.
+aka = ["film noir"]
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["American film noir, 1940s-1950s"]
+framing = ["low angles, figures in doorways", "faces cut by shadow, venetian-blind light", "tilted frames when things go wrong"]
+colour = "low-key, hard light, deep blacks; black and white or neon night"
+sound = "voice-over, rain, a lone saxophone"
+titles = ["film-title", "card"]
+# What a video model is told about the image, in words of craft.
+prompt = "low-key film noir lighting, hard shadows, deep blacks, light through blinds, wet streets at night"
+use_when = ["Crime, betrayal, fate"]
+avoid_when = ["Daylight innocence"]
+
+[camera]
+lens = "wide"
+prefer = ["locked-off", "push-in", "tilt-up", "side-tracking"]
+avoid = ["time-lapse", "aerial-orbit"]
+
+[editing]
+shot_seconds = [3, 15]
+prefer_cuts = ["hard", "match"]
+avoid_cuts = []
+prefer_transitions = ["dip-to-black", "cross-dissolve"]
+avoid_transitions = ["pixelate", "switcher-flip", "diamond-wipe"]
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "clipped, cynical, held back until it is not"

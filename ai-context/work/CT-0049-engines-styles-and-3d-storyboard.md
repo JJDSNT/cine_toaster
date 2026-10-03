@@ -156,3 +156,50 @@ well seems good for the final result.
   had been reported as undeclared fields when used.
 - Tests: `SizeTests` (measured sizes, label, aliases, both findings) and a
   sheet test.
+
+# Done: the style catalog (2026-10-03)
+
+The user's reminder: a style is not only direction -- animation
+techniques, viral videos, adverts too. Ghibli was named as a well-known
+example of a possible style, not as a conversion feature. Guide:
+`docs/styles.md`.
+
+- `styles.py`, `style_assets/<id>/style.toml` (layered: built in,
+  `CINE_TOASTER_STYLES_PATH`, the production's `styles/`); 28 entries in six
+  kinds: movement, approach, genre, manner, animation (stop-motion,
+  hand-drawn 2D, 3D feature, cut-out, rotoscope, pixel art, painterly,
+  pastoral anime), format (viral vertical, commercial spot, music video,
+  trailer, explainer, interview documentary).
+- An entry: framing, lens, moves preferred/avoided, shot lengths, cuts and
+  transitions preferred/avoided, performance register and ceiling, colour,
+  sound, titles, `prompt` (words of craft), `format` (aspect, total length,
+  hook, captions, end card, frame rate), `inspired_by` (for people only).
+- `style:` in `project.yaml`, overridden per scene (`scene["style"]` with
+  its level). It reaches the video prompt ("Style: …"), the derived
+  picture ("Render the whole image as …", `derive.style: false` to keep
+  the source's look), the brief (`STYLE`), the emotions' default intensity;
+  `style_unknown` (error), `style_departure` (advice: move, cut,
+  transition, shot length, emotion ceiling, the format's hook and length).
+- `toast style list|show`, `/api/styles`, the Styles room (the
+  production's own marked), MCP `list_styles`.
+
+Validation: `tests/test_styles.py` (all kinds; every id an entry names
+exists; no filmmaker or studio name in a prompt; formats' rules; the
+nearest style wins; departures as advice; the emotion register and
+ceiling; prompt and brief); the room checked headless (28 cards, the
+production's style marked, no page errors).
+
+Names people recognise (the user, 2026-10-03: the name is what makes a
+style recognisable): entries carry `aka` ("Ghibli", "Wes Anderson",
+"Kubrick", "TikTok", "advert"...), shown in the catalog and accepted by
+`style:` (`styles.lookup`); several names read "(Ghibli-like)". The prompt
+still describes the traits rather than a name.
+
+Reference only, not implemented (the user): Midlibrary's guide to
+animation styles in Midjourney,
+https://midlibrary.io/midguide/animation-in-midjourney-ai -- a survey of
+animation styles and how to word them for an image model.
+
+Remains: applying a format's aspect and frame rate to generation and the
+assembly; captions and end cards from the format; a sequence-level style;
+Unreal/Unity adapters (section 1).

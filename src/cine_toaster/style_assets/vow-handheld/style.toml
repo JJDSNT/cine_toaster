@@ -1,0 +1,34 @@
+schema_version = 1
+id = "vow-handheld"
+name = "Vow handheld (Dogme 95)"
+kind = "movement"
+says = "Rules against artifice: handheld, location sound, no added light, no music, no effects."
+# Names people know it by: shown, and accepted by `style:`.
+aka = ["Dogme 95", "Dogme"]
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["the Dogme 95 manifesto"]
+framing = ["handheld always", "the camera finds the action rather than the action being staged"]
+colour = "only the light that is there"
+sound = "only the sound recorded with the picture; no music"
+titles = []
+# What a video model is told about the image, in words of craft.
+prompt = "shaky handheld camera, available light only, raw unpolished video look, no stylisation"
+use_when = ["Family drama, confession, a story that must feel caught"]
+avoid_when = ["Anything designed"]
+
+[camera]
+lens = "normal"
+prefer = ["handheld", "follow", "walk-and-talk"]
+avoid = ["locked-off", "crane-up", "crane-down", "aerial-orbit", "dolly-zoom", "top-shot", "time-lapse"]
+
+[editing]
+shot_seconds = [1, 30]
+prefer_cuts = ["jump", "hard"]
+avoid_cuts = []
+prefer_transitions = []
+avoid_transitions = ["cross-dissolve", "blur-dissolve", "dip-to-black", "film-burn", "pixelate", "switcher-flip", "diamond-wipe", "clock-wipe", "iris-open", "analog-scan"]
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "raw, overlapping, unpolished"

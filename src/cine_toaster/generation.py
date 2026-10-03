@@ -199,6 +199,8 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
         sound = shot.get("sound")
         prompts.append(ShotPrompt(picture, _camera(scene, shot), shot.get("description") or "", lines,
                                   sound if isinstance(sound, str) else "", _acting(production, scene, shot)))
+    # The style in force reaches the model in words of craft, never a name (CT-0049).
+    style = (scene.get("style") or {}).get("prompt", "")
     frames = requested_cuts(block.durations, FPS)
     # Frame 0 is guided with the first picture too: alone, the first image gives
     # way in a long block (claim frame-zero-guide); each later shot's picture
@@ -217,7 +219,7 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
         guides.append(Reference(shot_id, ref, frame, _digest(ref), strength(shot_id)))
     return BlockPlan(
         scene=scene_id, block=block.id, shots=block.shots, seconds=int(seconds), image=references[0],
-        guides=guides, prompt=block_prompt(prompts), seed=seed, estimate_usd=estimate(seconds, rate), notes=notes,
+        guides=guides, prompt=block_prompt(prompts, style), seed=seed, estimate_usd=estimate(seconds, rate), notes=notes,
         sections=[{"shot": shot_id, "text": text}
-                  for shot_id, text in zip([*block.shots, ""], block_prompt_sections(prompts))],
+                  for shot_id, text in zip([*block.shots, ""], block_prompt_sections(prompts, style))],
     )

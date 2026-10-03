@@ -304,6 +304,13 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
                                                              "avoid_when", "params", "engine", "effect", "origin")},
                               "unavailable": engine_missing(item["engine"])} for item in list_titles(self.project_root)])
             return
+        if parsed.path == "/api/styles":
+            # The style catalog (CT-0049): direction, animation techniques, formats.
+            from .styles import list_styles
+
+            self._send_json([{key: value for key, value in item.items() if key != "directory"}
+                             for item in list_styles(self.project_root)])
+            return
         if parsed.path == "/api/emotions":
             # The emotion catalog (CT-0048), each entry with its face at a clear intensity.
             from .emotions import face, list_emotions

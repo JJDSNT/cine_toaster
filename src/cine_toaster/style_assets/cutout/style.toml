@@ -1,0 +1,35 @@
+schema_version = 1
+id = "cutout"
+name = "Cut-out"
+kind = "animation"
+says = "Paper shapes moved on a table: flat, jointed, collage."
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["paper cut-out animation", "collage animation"]
+framing = ["flat frontal layers", "characters in profile or front view"]
+colour = "paper textures, collage, printed patterns"
+sound = "playful, percussive"
+titles = ["card", "word-by-word"]
+# What a video model is told about the image, in words of craft.
+prompt = "paper cut-out animation, flat layered paper shapes, visible paper texture and edges, collage, jointed limbs"
+use_when = ["Explainers, folk tales, satire"]
+avoid_when = ["Depth and realism"]
+
+[camera]
+lens = "normal"
+prefer = ["locked-off", "truck-left", "truck-right", "push-in"]
+avoid = ["orbit-left", "orbit-right", "dolly-zoom", "handheld"]
+
+[editing]
+shot_seconds = [1.5, 8]
+prefer_cuts = []
+avoid_cuts = []
+prefer_transitions = []
+avoid_transitions = []
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "jointed limbs, swapped mouths, graphic gestures"
+
+[format]
+frame_rate = 12

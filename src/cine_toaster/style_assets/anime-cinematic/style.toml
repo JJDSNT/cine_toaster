@@ -1,0 +1,32 @@
+schema_version = 1
+id = "anime-cinematic"
+name = "Anime cinematic"
+kind = "genre"
+says = "Drawn cinema: held frames, sudden dramatic close-ups, the sky as emotion."
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["Japanese theatrical animation"]
+framing = ["held still frames with small motion", "extreme close-ups on eyes at the turn", "wide skies and detailed backgrounds"]
+colour = "clean cel shading, luminous skies, painted backgrounds"
+sound = "a swelling score, ambient insects and wind"
+titles = ["film-title", "card"]
+# What a video model is told about the image, in words of craft.
+prompt = "anime style, cel-shaded characters, clean line art, painted detailed background, luminous sky, cinematic composition"
+use_when = ["Coming of age, the fantastic, a story told in drawings (manga boards, CT-0049)"]
+avoid_when = ["Photographic realism"]
+
+[camera]
+lens = "normal"
+prefer = ["locked-off", "push-in", "pan-left", "pan-right", "tilt-up"]
+avoid = ["handheld"]
+
+[editing]
+shot_seconds = [1, 8]
+prefer_cuts = ["hard", "smash", "match"]
+avoid_cuts = []
+prefer_transitions = ["cross-dissolve", "film-burn"]
+avoid_transitions = ["analog-scan"]
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "faces and bodies drawn to the feeling, eyes carrying it"

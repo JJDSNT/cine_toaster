@@ -1,0 +1,36 @@
+schema_version = 1
+id = "music-video"
+name = "Music video"
+kind = "format"
+says = "Cut to the beat: performance, image and rhythm before story."
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["music video"]
+framing = ["performance coverage", "striking images over continuity"]
+colour = "bold, stylised, a look per section"
+sound = "the song is the timeline"
+titles = ["card"]
+# What a video model is told about the image, in words of craft.
+prompt = "stylised music video, bold lighting, striking graphic images, performance to camera"
+use_when = ["A song"]
+avoid_when = ["Dialogue"]
+
+[camera]
+lens = "normal"
+prefer = ["handheld", "orbit-left", "orbit-right", "crash-zoom-in", "whip-pan-left", "push-in", "time-lapse"]
+avoid = []
+
+[editing]
+shot_seconds = [0.5, 6]
+prefer_cuts = ["smash", "jump", "hard", "match"]
+avoid_cuts = []
+prefer_transitions = []
+avoid_transitions = []
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "performed to the lens, lip-synced"
+
+[format]
+aspect = "16:9"
+total_seconds = [120, 300]

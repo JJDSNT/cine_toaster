@@ -419,8 +419,25 @@ def _expand_effects(shots: list[dict[str, Any]], scene_id: str, root: Path) -> l
     return findings
 
 
+def _scene_style(document: dict[str, Any], scene_id: str, root: Path,
+                 project_style: str) -> tuple[dict[str, Any] | None, list[Finding]]:
+    """The style in force: the scene's, else the production's (CT-0049), and the level that decided it."""
+
+    scene_style = vtext(document, "style")
+    if not scene_style and not project_style:
+        return None, []
+    from .styles import list_styles, resolve, summary
+
+    item, level, problem = resolve({entry["id"]: entry for entry in list_styles(root)},
+                                   scene=scene_style, project=project_style)
+    if problem:
+        return None, [Finding(code="style_unknown", severity="error", scene_id=scene_id, shots=(),
+                              message=f"The {level} {problem}.")]
+    return summary(item, level), []
+
+
 def _expand_emotions(shots: list[dict[str, Any]], document: dict[str, Any], scene_id: str, root: Path,
-                     people: set[str]) -> list[Finding]:
+                     people: set[str], default_intensity: str = "clear") -> list[Finding]:
     """`emotion: {id, who, intensity, arc}` takes its words from the emotion catalog (CT-0048)."""
 
     if not any(shot.get("emotion") for shot in shots):
@@ -433,7 +450,8 @@ def _expand_emotions(shots: list[dict[str, Any]], document: dict[str, Any], scen
         if not shot.get("emotion"):
             continue
         known = people | {str(line.get("who") or "").upper() for line in shot.get("lines") or []}
-        shot["emotion"], problems = expand(shot["emotion"], catalog, people={name for name in known if name})
+        shot["emotion"], problems = expand(shot["emotion"], catalog, people={name for name in known if name},
+                                           default_intensity=default_intensity)
         findings.extend(Finding(code="emotion_problem", severity="error", scene_id=scene_id, shots=(shot["id"],),
                                 message=f"{shot['id']} {problem}. It would be lost, not guessed.")
                         for problem in problems)
@@ -573,6 +591,7 @@ def _load_scene(
     screenplay: script_model.Screenplay | None = None,
     aliases: dict[str, tuple[str, dict[str, str]]] | None = None,
     scene_aliases: dict[str, str] | None = None,
+    project_style: str = "",
 ) -> dict[str, Any]:
     document = _read_yaml(path)
     scene_id = vtext(document, "scene") or _text(document.get("id"))
@@ -623,9 +642,19 @@ def _load_scene(
     move_findings.extend(sound_findings)
     enter, enter_findings = _scene_enter(document, scene_id, root)
     move_findings.extend(enter_findings)
+    style, style_findings = _scene_style(document, scene_id, root, project_style)
     people = {str(subject_id).upper() for subject_id in geometry.subjects}
     people |= {str(name).upper() for name in (_scene_field(document, "cast", scene_aliases) or {})}
-    move_findings.extend(_expand_emotions(shots, document, scene_id, root, people))
+    move_findings.extend(_expand_emotions(shots, document, scene_id, root, people,
+                                          (style or {}).get("performance", {}).get("intensity", "clear")))
+    if style:
+        from .styles import departures
+
+        style_findings.extend(
+            Finding(code="style_departure", severity="advice", scene_id=scene_id, shots=(shot_id,) if shot_id else (),
+                    message=f"{shot_id or scene_id} {what}.")
+            for shot_id, what in departures(style, shots))
+    move_findings.extend(style_findings)
     motions = shot_motions(geometry, shots, scene_id=scene_id)
     positions_by_shot = {motion.shot_id: motion.start_positions for motion in motions}
     findings = [
@@ -741,6 +770,8 @@ def _load_scene(
         "music": sound_beds["music"],
         # How the scene is entered from the previous one in its sequence (SPEC-0007, CT-0051).
         "enter": enter,
+        # The style in force (CT-0049): the scene's, else the production's.
+        "style": style,
         "findings": findings,
         "decision_log": list(reversed(state.decisions)),
         "pending_shots": pending_shots,
@@ -1466,7 +1497,7 @@ def load_production(root: Path) -> dict[str, Any]:
     screenplay = _read_screenplay(root, script_files)
     scenes = [
         _load_scene(path, root, declared_fields, project_look, screenplay, _shot_field_aliases(manifest),
-                    _scene_field_aliases(manifest))
+                    _scene_field_aliases(manifest), project_style=vtext(manifest, "style"))
         for path in scene_files(root, manifest)
     ]
     scenes.sort(key=lambda scene: (scene["order"], scene["id"]))
@@ -1524,6 +1555,7 @@ def load_production(root: Path) -> dict[str, Any]:
         "format": vtext(manifest, "format") or "Film",
         "logline": _text(manifest.get("logline")),
         "look": project_look,
+        "style": vtext(manifest, "style"),
         "renders": discover_renders(root),
         "script_path": _script_path(manifest, root),
         "script_files": script_files,

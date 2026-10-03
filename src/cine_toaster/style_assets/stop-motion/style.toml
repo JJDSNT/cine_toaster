@@ -1,0 +1,37 @@
+schema_version = 1
+id = "stop-motion"
+name = "Stop-motion"
+kind = "animation"
+says = "Real objects and puppets moved a frame at a time: the hand of the maker shows."
+# Names people know it by: shown, and accepted by `style:`.
+aka = ["claymation", "Laika-like", "Aardman-like"]
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["puppet and clay animation studios"]
+framing = ["miniature sets at puppet scale", "shallow focus that betrays the miniature", "locked camera, small deliberate moves"]
+colour = "practical miniature lighting, tactile textures, fingerprints in the clay"
+sound = "Foley made big and close"
+titles = ["card", "film-title"]
+# What a video model is told about the image, in words of craft.
+prompt = "stop-motion animation, handmade clay and fabric puppets, miniature set, tactile textures, slightly stepped motion, shallow depth of field"
+use_when = ["Fable, the uncanny, a handmade warmth"]
+avoid_when = ["Fluid photoreal motion"]
+
+[camera]
+lens = "normal"
+prefer = ["locked-off", "push-in", "truck-left", "truck-right"]
+avoid = ["handheld", "aerial-orbit", "drone-push-in", "crash-zoom-in"]
+
+[editing]
+shot_seconds = [2, 10]
+prefer_cuts = []
+avoid_cuts = []
+prefer_transitions = []
+avoid_transitions = ["pixelate", "analog-scan"]
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "broad, readable gestures; expressions swapped, not blended"
+
+[format]
+frame_rate = 12

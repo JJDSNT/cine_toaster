@@ -1,0 +1,32 @@
+schema_version = 1
+id = "kinetic-action"
+name = "Kinetic action"
+kind = "genre"
+says = "Momentum: fast cutting, a camera that runs with the body, impacts you feel."
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["modern action cinema"]
+framing = ["tight on bodies in motion", "wide to show the geography, then into it", "the camera inside the action"]
+colour = "punchy contrast, teal and orange"
+sound = "hard impacts, driving percussion"
+titles = ["film-title"]
+# What a video model is told about the image, in words of craft.
+prompt = "dynamic action cinematography, fast camera movement, motion blur, high contrast, intense physical action"
+use_when = ["Chases, fights, escapes"]
+avoid_when = ["Reflection, grief"]
+
+[camera]
+lens = "wide"
+prefer = ["handheld", "follow", "whip-pan-left", "whip-pan-right", "crash-zoom-in", "body-mounted", "first-person"]
+avoid = ["locked-off", "time-lapse"]
+
+[editing]
+shot_seconds = [0.5, 4]
+prefer_cuts = ["action", "smash", "hard"]
+avoid_cuts = []
+prefer_transitions = []
+avoid_transitions = ["cross-dissolve", "blur-dissolve", "iris-open", "clock-wipe"]
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "physical, all in"

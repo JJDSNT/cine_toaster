@@ -1,0 +1,32 @@
+schema_version = 1
+id = "painterly"
+name = "Painterly"
+kind = "animation"
+says = "Every frame a painting: oil or watercolour that moves."
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["painted animation", "oil-on-glass animation"]
+framing = ["compositions like canvases"]
+colour = "visible brush strokes, a painter's palette"
+sound = "score and ambience"
+titles = ["card"]
+# What a video model is told about the image, in words of craft.
+prompt = "painterly animation, every frame an oil painting, visible brush strokes, rich textured colour, impressionistic light"
+use_when = ["Art, memory, the inner life"]
+avoid_when = ["Fast action"]
+
+[camera]
+lens = "normal"
+prefer = ["locked-off", "push-in", "pan-left", "pan-right"]
+avoid = ["handheld", "crash-zoom-in"]
+
+[editing]
+shot_seconds = [3, 15]
+prefer_cuts = []
+avoid_cuts = []
+prefer_transitions = []
+avoid_transitions = []
+
+[performance]
+intensity = "subtle"
+max = "clear"
+notes = "gesture over detail"

@@ -1,0 +1,32 @@
+schema_version = 1
+id = "observational"
+name = "Observational"
+kind = "approach"
+says = "The camera is a witness in the room: nothing is staged for it."
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["direct cinema", "cinema verite"]
+framing = ["long lens from across the room", "reframing on the fly", "zooms to find a face"]
+colour = "whatever light the place has"
+sound = "location sound, overheard"
+titles = ["caption", "lower-third"]
+# What a video model is told about the image, in words of craft.
+prompt = "observational documentary footage, long lens, handheld, available light, candid unposed moments"
+use_when = ["A real place, a work, a ritual"]
+avoid_when = ["Fantasy"]
+
+[camera]
+lens = "long"
+prefer = ["handheld", "zoom-in", "zoom-out", "follow", "pan-left", "pan-right"]
+avoid = ["crane-up", "crane-down", "dolly-zoom", "top-shot", "aerial-orbit"]
+
+[editing]
+shot_seconds = [3, 40]
+prefer_cuts = ["hard", "jump"]
+avoid_cuts = []
+prefer_transitions = []
+avoid_transitions = ["film-burn", "pixelate", "switcher-flip", "diamond-wipe", "clock-wipe", "iris-open"]
+
+[performance]
+intensity = "subtle"
+max = "clear"
+notes = "people behaving, unaware"

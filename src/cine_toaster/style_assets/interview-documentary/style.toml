@@ -1,0 +1,36 @@
+schema_version = 1
+id = "interview-documentary"
+name = "Interview documentary"
+kind = "format"
+says = "People telling their own story, cut with what they talk about."
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["talking-head documentary"]
+framing = ["the subject off-centre, looking past the lens", "b-roll over the voice"]
+colour = "soft key light on the subject, natural b-roll"
+sound = "the interview leads, b-roll under it"
+titles = ["lower-third", "caption"]
+# What a video model is told about the image, in words of craft.
+prompt = "documentary interview setup, soft key light, subject looking just off camera, shallow depth of field, natural b-roll"
+use_when = ["Testimony, a portrait, history"]
+avoid_when = ["Fiction pretending to be real without saying so"]
+
+[camera]
+lens = "long"
+prefer = ["locked-off", "push-in", "handheld", "drone-pull-back"]
+avoid = ["crash-zoom-in", "whip-pan-left", "whip-pan-right"]
+
+[editing]
+shot_seconds = [3, 30]
+prefer_cuts = ["hard", "j", "l"]
+avoid_cuts = []
+prefer_transitions = []
+avoid_transitions = []
+
+[performance]
+intensity = "subtle"
+max = "clear"
+notes = "real people, unperformed"
+
+[format]
+aspect = "16:9"
+captions = true

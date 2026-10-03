@@ -1,0 +1,34 @@
+schema_version = 1
+id = "neorealist"
+name = "Neorealist"
+kind = "movement"
+says = "Real streets, real light, ordinary people: life observed rather than staged."
+# Names people know it by: shown, and accepted by `style:`.
+aka = ["Italian neorealism"]
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["Italian neorealism, 1945-1952"]
+framing = ["people placed in their surroundings", "medium and wide shots that keep the place in view", "little coverage, few close-ups"]
+colour = "available daylight, grey and unpolished"
+sound = "the street's own sound; music sparing"
+titles = ["card"]
+# What a video model is told about the image, in words of craft.
+prompt = "natural available light, real location, documentary-like realism, ordinary clothes, unglamorous everyday detail"
+use_when = ["Social reality, the everyday, a story about place"]
+avoid_when = ["Spectacle and fantasy"]
+
+[camera]
+lens = "normal"
+prefer = ["follow", "handheld", "locked-off", "walk-and-talk"]
+avoid = ["crane-up", "crane-down", "dolly-zoom", "top-shot", "aerial-orbit"]
+
+[editing]
+shot_seconds = [4, 20]
+prefer_cuts = ["hard"]
+avoid_cuts = ["smash"]
+prefer_transitions = []
+avoid_transitions = ["film-burn", "pixelate", "switcher-flip", "diamond-wipe", "iris-open", "clock-wipe"]
+
+[performance]
+intensity = "subtle"
+max = "clear"
+notes = "understated, as non-professionals would play it"

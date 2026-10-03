@@ -1,0 +1,32 @@
+schema_version = 1
+id = "rotoscope"
+name = "Rotoscope"
+kind = "animation"
+says = "Live action traced into drawing: real motion, a dreamlike surface."
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["rotoscoped features"]
+framing = ["live-action framing, drawn over"]
+colour = "flat colour fields over traced outlines, shifting line"
+sound = "naturalistic"
+titles = ["card"]
+# What a video model is told about the image, in words of craft.
+prompt = "rotoscoped animation, traced over live action, flat colour fields, wobbling hand-drawn outlines, realistic human motion"
+use_when = ["Dreams, memory, altered states"]
+avoid_when = ["Clean commercial gloss"]
+
+[camera]
+lens = "normal"
+prefer = ["handheld", "follow", "locked-off", "walk-and-talk"]
+avoid = []
+
+[editing]
+shot_seconds = [2, 15]
+prefer_cuts = []
+avoid_cuts = []
+prefer_transitions = []
+avoid_transitions = []
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "naturalistic acting kept by the tracing"

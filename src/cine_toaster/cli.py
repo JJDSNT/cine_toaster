@@ -815,6 +815,39 @@ def command_sound(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_style(args: argparse.Namespace) -> int:
+    """The style catalog: direction, animation techniques, formats (CT-0049)."""
+
+    from .styles import list_styles
+
+    root = Path(args.project).expanduser().resolve()
+    catalog = {item["id"]: item for item in list_styles(root)}
+    if args.style_command == "list":
+        for item in catalog.values():
+            aka = f" (aka {', '.join(item['aka'])})" if item["aka"] else ""
+            print(f"{item['id']:24} {item['kind']:10} {item['name']}{aka}")
+        return 0
+    item = catalog.get(args.id)
+    if item is None:
+        print(f"No style {args.id!r} in the catalog", file=sys.stderr)
+        return 1
+    print(f"{item['name']} ({item['kind']}): {item['says']}")
+    if item["inspired_by"]:
+        print(f"  inspired by (for people, never sent to a model): {', '.join(item['inspired_by'])}")
+    print(f"  framing: {'; '.join(item['framing'])}")
+    print(f"  moves: prefer {', '.join(item['camera']['prefer']) or '-'}; avoid {', '.join(item['camera']['avoid']) or '-'}")
+    editing = item["editing"]
+    if editing["shot_seconds"]:
+        print(f"  shots: {editing['shot_seconds'][0]:g}-{editing['shot_seconds'][1]:g} s; cuts {', '.join(editing['prefer_cuts']) or '-'}")
+    print(f"  performance: {item['performance']['intensity']}, at most {item['performance']['max']} -- {item['performance']['notes']}")
+    print(f"  colour: {item['colour']}\n  sound: {item['sound']}")
+    form = {key: value for key, value in item["format"].items() if value}
+    if form:
+        print(f"  format: {form}")
+    print(f"  prompt: {item['prompt']}")
+    return 0
+
+
 def command_emotion(args: argparse.Namespace) -> int:
     """The emotion catalog: what shows, what a model is asked, and the face as blendshapes (CT-0048)."""
 
@@ -1896,6 +1929,15 @@ def build_parser() -> argparse.ArgumentParser:
         item = vfx_sub.add_parser(name, help=text)
         item.add_argument("project", type=Path)
     vfx_parser.set_defaults(function=command_vfx)
+
+    style_parser = subparsers.add_parser("style", help="The style catalog: direction, animation techniques, formats (CT-0049)")
+    style_sub = style_parser.add_subparsers(dest="style_command", required=True)
+    style_list = style_sub.add_parser("list", help="Every style in the catalog")
+    style_list.add_argument("project", type=Path)
+    style_show = style_sub.add_parser("show", help="What a style means for moves, cuts, performance, format and the prompt")
+    style_show.add_argument("project", type=Path)
+    style_show.add_argument("id")
+    style_parser.set_defaults(function=command_style)
 
     emotion_parser = subparsers.add_parser("emotion", help="The emotion catalog: describe, ask a model, put on a face (CT-0048)")
     emotion_sub = emotion_parser.add_subparsers(dest="emotion_command", required=True)

@@ -1,0 +1,34 @@
+schema_version = 1
+id = "classical-continuity"
+name = "Classical continuity"
+kind = "movement"
+says = "The cut is invisible: the story is told so clearly that nobody notices how."
+# Names people know it by: shown, and accepted by `style:`.
+aka = ["Classic Hollywood"]
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["the Hollywood studio era, 1930s-1950s"]
+framing = ["eye-level camera", "establishing wide, then closer as the scene tightens", "shot/reverse shot in dialogue, eyelines matched"]
+colour = "even, motivated three-point light; nothing drawn to itself"
+sound = "score carries emotion; dialogue always clear"
+titles = ["film-title", "card"]
+# What a video model is told about the image, in words of craft.
+prompt = "classical, clean studio cinematography, eye-level camera, balanced three-point lighting, steady composed framing"
+use_when = ["A story that should carry the audience without friction"]
+avoid_when = ["When the form itself should be felt"]
+
+[camera]
+lens = "normal"
+prefer = ["locked-off", "push-in", "side-tracking", "crane-up"]
+avoid = ["handheld", "crash-zoom-in", "whip-pan-left", "whip-pan-right"]
+
+[editing]
+shot_seconds = [3, 12]
+prefer_cuts = ["hard", "match", "action"]
+avoid_cuts = ["jump", "smash"]
+prefer_transitions = ["cross-dissolve", "dip-to-black"]
+avoid_transitions = ["pixelate", "switcher-flip", "diamond-wipe"]
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "performances read clearly from the back row"

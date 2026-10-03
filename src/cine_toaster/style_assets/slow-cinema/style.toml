@@ -1,0 +1,32 @@
+schema_version = 1
+id = "slow-cinema"
+name = "Slow cinema"
+kind = "approach"
+says = "Long takes and stillness: time itself is the subject."
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["contemplative cinema of the 1970s to today"]
+framing = ["static wide frames held long", "people small in the landscape", "action at the edge of the frame or outside it"]
+colour = "muted natural palette, soft overcast light"
+sound = "long ambiences, the room breathing, little or no music"
+titles = ["card"]
+# What a video model is told about the image, in words of craft.
+prompt = "a static, very long held shot, wide composition, muted natural colours, soft overcast light, stillness"
+use_when = ["Grief, waiting, a place that matters more than an event"]
+avoid_when = ["Action, comedy timing"]
+
+[camera]
+lens = "wide"
+prefer = ["locked-off", "push-in", "side-tracking"]
+avoid = ["crash-zoom-in", "crash-zoom-out", "whip-pan-left", "whip-pan-right", "handheld", "dolly-zoom"]
+
+[editing]
+shot_seconds = [10, 120]
+prefer_cuts = ["hard"]
+avoid_cuts = ["smash", "jump", "action"]
+prefer_transitions = []
+avoid_transitions = ["pixelate", "switcher-flip", "diamond-wipe", "clock-wipe", "iris-open", "film-burn"]
+
+[performance]
+intensity = "subtle"
+max = "clear"
+notes = "almost no display; feeling held inside"

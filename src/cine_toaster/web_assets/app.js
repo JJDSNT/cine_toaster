@@ -21,7 +21,7 @@ const state = {
 const ROOMS = new Set([
   "overview", "script", "storyboard", "dialogue",
   "sequences", "scenes", "review", "cut", "cast", "locations",
-  "transitions", "moves", "titles", "vfx", "sounds", "emotions", "library", "knowledge",
+  "transitions", "moves", "titles", "vfx", "sounds", "emotions", "styles", "library", "knowledge",
 ]);
 
 /** Write where we are into the address bar.
@@ -76,6 +76,7 @@ function draw(view) {
   else if (view === "vfx") renderVfx();
   else if (view === "sounds") renderSounds();
   else if (view === "emotions") renderEmotions();
+  else if (view === "styles") renderStyles();
   else if (view === "cast") renderCast();
   else if (view === "library") renderLibrary(state.project.id);
   else if (view === "knowledge") renderKnowledge();
@@ -1707,6 +1708,54 @@ async function renderEmotions() {
   tellAssistant();
 }
 
+// The style catalog (CT-0049): not only a director's manner -- movements,
+// animation techniques, formats such as a viral vertical or a commercial.
+// The production names one (style: in project.yaml), a scene may name another.
+async function renderStyles() {
+  const root = byId("workspace");
+  root.replaceChildren();
+  const heading = sectionHeading("STYLES", "Styles",
+    "Ways of making a film: movements, approaches, genres, manners, animation techniques and formats. Name one with style: in project.yaml or on a scene; the prompt gets its words of craft (never a name), the brief its rules, and a shot that departs from it is told so.");
+  heading.classList.add("page-heading");
+  root.append(heading);
+  state.styles = (await api("/api/styles", { optional: true })) || [];
+  const current = state.production?.style;
+  const byKind = new Map();
+  for (const item of state.styles) {
+    if (!byKind.has(item.kind)) byKind.set(item.kind, []);
+    byKind.get(item.kind).push(item);
+  }
+  for (const [kind, items] of byKind) {
+    const section = el("section", "transition-section");
+    section.append(sectionHeading("STYLES", label(kind), `${items.length} available`));
+    const grid = el("div", "transition-grid");
+    for (const item of items) {
+      const card = el("article", "transition-card move-card");
+      if (item.id === current) card.classList.add("selected");
+      const editing = item.editing.shot_seconds.length ? `shots ${item.editing.shot_seconds[0]}-${item.editing.shot_seconds[1]} s` : "";
+      const form = Object.entries(item.format || {}).filter(([, value]) => value).map(([key, value]) => `${key.replace("_", " ")} ${value === true ? "" : value}`.trim());
+      card.append(
+        el("strong", "", item.name + (item.id === current ? " · this production" : "")),
+        el("code", "move-id", `style: ${item.id}`),
+        ...(item.aka.length ? [el("small", "", `Also known as: ${item.aka.join(", ")}`)] : []),
+        el("p", "", item.says),
+        el("small", "muted", `Framing: ${item.framing.join("; ")}`),
+        el("small", "muted", [item.camera.prefer.length ? `Moves: ${item.camera.prefer.join(", ")}` : "", editing,
+          `performance ${item.performance.intensity}, at most ${item.performance.max}`].filter(Boolean).join(" · ")),
+        el("small", "muted", `Colour: ${item.colour}`),
+        el("small", "muted", `Sound: ${item.sound}`),
+      );
+      if (form.length) card.append(el("small", "", `Format: ${form.join(" · ")}`));
+      if (item.inspired_by.length) card.append(el("small", "muted", `Inspired by (for people, never sent to a model): ${item.inspired_by.join("; ")}`));
+      card.append(guidanceList("Use when", item.use_when, "good"), guidanceList("Avoid when", item.avoid_when, "warning"));
+      grid.append(card);
+    }
+    section.append(grid);
+    root.append(section);
+  }
+  tellAssistant();
+}
+
 async function renderMoves() {
   const root = byId("workspace");
   root.replaceChildren();
@@ -2858,6 +2907,11 @@ async function start() {
     state.vfx = vfx || { effects: [], elements: [] };
     const count = byId("vfx-nav-count");
     if (count) count.textContent = String(state.vfx.effects.length);
+  }).catch(() => {});
+  api("/api/styles", { optional: true }).then((styles) => {
+    state.styles = styles || [];
+    const count = byId("styles-nav-count");
+    if (count) count.textContent = String(state.styles.length);
   }).catch(() => {});
   api("/api/emotions", { optional: true }).then((emotions) => {
     state.emotions = emotions || [];

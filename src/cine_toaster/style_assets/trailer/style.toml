@@ -1,0 +1,38 @@
+schema_version = 1
+id = "trailer"
+name = "Trailer"
+kind = "format"
+says = "The film's promise in two minutes: build, a turn, a rush, the title."
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["film trailers"]
+framing = ["the film's strongest images", "title cards between beats"]
+colour = "the film's look"
+sound = "a riser, hits on the cuts, silence before the title"
+titles = ["film-title", "card", "grow"]
+# What a video model is told about the image, in words of craft.
+prompt = "cinematic trailer footage, epic dramatic lighting, high production value"
+use_when = ["Announcing a film"]
+avoid_when = []
+
+[camera]
+lens = "normal"
+prefer = ["push-in", "rise-and-reveal", "drone-pull-back", "crash-zoom-in"]
+avoid = []
+
+[editing]
+shot_seconds = [0.5, 5]
+prefer_cuts = ["smash", "hard", "match"]
+avoid_cuts = []
+prefer_transitions = ["dip-to-black"]
+avoid_transitions = []
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "the film's peaks"
+
+[format]
+aspect = "2.39:1"
+total_seconds = [60, 150]
+hook_seconds = 3
+end_card = true

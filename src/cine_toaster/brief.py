@@ -245,6 +245,25 @@ def scene_brief(scene: dict[str, Any], looks: dict[str, dict[str, Any]] | None =
     )
     brief.staging.append(_logic(scene, labels))
     brief.staging.append(_aesthetic(scene, looks or {}))
+    style = scene.get("style")
+    if style:
+        lines = [f"{style['name']} ({style['level']}): {style['says']}"]
+        if style["framing"]:
+            lines.append("framing: " + "; ".join(style["framing"]))
+        if style["camera"]["prefer"]:
+            lines.append("moves: " + ", ".join(style["camera"]["prefer"]))
+        seconds = style["editing"]["shot_seconds"]
+        if seconds:
+            lines.append(f"shots of {seconds[0]:g}-{seconds[1]:g} s")
+        lines.append(f"performance: {style['performance']['intensity']}, at most {style['performance']['max']}")
+        form = style.get("format") or {}
+        if form.get("aspect"):
+            lines.append(f"aspect {form['aspect']}")
+        if form.get("hook_seconds"):
+            lines.append(f"hook within {form['hook_seconds']:g} s")
+        if form.get("captions"):
+            lines.append("burned-in captions")
+        brief.staging.append(Slot("STYLE", " · ".join(lines), "authored"))
     voices = _voices(scene, cast or {})
     if voices:
         brief.staging.append(voices)

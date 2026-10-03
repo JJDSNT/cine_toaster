@@ -218,11 +218,18 @@ def plan_picture(root: Path, production: dict[str, Any], scene_id: str, shot_id:
 
         if stale(root, scene, shot_id, "end" if str(derive["from"]).lower().endswith("end") else "start"):
             notes.append("The 3D board was drawn before the plan last changed: draw it again (toast board frames).")
+    # The style in force restyles the picture -- a board, a plate or a photo drawn into it (CT-0049).
+    style = scene.get("style") or {}
+    styled = f"Render the whole image as {style['prompt']}." if style.get("prompt") and derive.get("style", True) else ""
+    if styled:
+        notes.append(f"The style {style['name']} ({style['level']}) is asked of the picture; `style: false` on the "
+                     "derive keeps the source's look.")
     return PicturePlan(
         scene=scene_id, shot=shot_id, stem=picture_stem(work_directory_for(root / scene["file"]), str(shot["number"])),
         source=source,
         references=references, request=derive["request"],
-        prompt=edit_prompt(" ".join(filter(None, [derive["request"], corrections(feedback)])), bool(references)),
+        prompt=edit_prompt(" ".join(filter(None, [derive["request"], styled, corrections(feedback)])),
+                           bool(references)),
         seed=seed, size=size_like(source), estimate_usd=estimate(rate), notes=notes,
     )
 

@@ -1,0 +1,37 @@
+schema_version = 1
+id = "hand-drawn-2d"
+name = "Hand-drawn 2D"
+kind = "animation"
+says = "Line and paint, frame by frame: drawings that breathe."
+# Names people know it by: shown, and accepted by `style:`.
+aka = ["Disney classic", "cel animation"]
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["classical cel animation", "Studio Ghibli"]
+framing = ["layouts like illustrations", "painted backgrounds, characters in line"]
+colour = "cel colours over painted watercolour or gouache backgrounds"
+sound = "score-led"
+titles = ["film-title", "card"]
+# What a video model is told about the image, in words of craft.
+prompt = "hand-drawn 2D animation, clean ink line art, flat cel colours, painted watercolour background, animated on twos"
+use_when = ["Wonder, childhood, the fantastic"]
+avoid_when = ["Photographic realism"]
+
+[camera]
+lens = "normal"
+prefer = ["locked-off", "pan-left", "pan-right", "tilt-up", "push-in"]
+avoid = ["handheld", "dolly-zoom", "orbit-left", "orbit-right"]
+
+[editing]
+shot_seconds = [1.5, 8]
+prefer_cuts = []
+avoid_cuts = []
+prefer_transitions = []
+avoid_transitions = ["analog-scan"]
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "drawn to the feeling: squash, stretch, held poses"
+
+[format]
+frame_rate = 12

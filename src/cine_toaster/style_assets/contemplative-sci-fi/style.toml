@@ -1,0 +1,34 @@
+schema_version = 1
+id = "contemplative-sci-fi"
+name = "Contemplative science fiction"
+kind = "approach"
+says = "Vast spaces, small people, and a sound you feel in the chest: the future as awe and unease."
+# Names people know it by: shown, and accepted by `style:`.
+aka = ["Tarkovsky", "Villeneuve", "Tarkovsky-like", "Villeneuve-like"]
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["Andrei Tarkovsky", "Denis Villeneuve", "2001: A Space Odyssey"]
+framing = ["very wide frames where people are tiny", "monumental architecture and empty horizons", "slow reveals of scale"]
+colour = "desaturated, one dominant hue (sodium orange, cold blue), haze and fog"
+sound = "low drones, the machine hum, long silences"
+titles = ["card", "film-title"]
+# What a video model is told about the image, in words of craft.
+prompt = "monumental wide-angle composition, tiny human figure against vast architecture, atmospheric haze, desaturated palette with one dominant hue, slow deliberate camera"
+use_when = ["Contact, machines, memory, a future that dwarfs us"]
+avoid_when = ["Fast comedy, action"]
+
+[camera]
+lens = "wide"
+prefer = ["locked-off", "push-in", "drone-pull-back", "rise-and-reveal", "flyover", "crane-up"]
+avoid = ["crash-zoom-in", "whip-pan-left", "whip-pan-right", "handheld"]
+
+[editing]
+shot_seconds = [5, 40]
+prefer_cuts = ["hard", "match"]
+avoid_cuts = ["jump"]
+prefer_transitions = ["dip-to-black"]
+avoid_transitions = ["pixelate", "switcher-flip", "diamond-wipe", "clock-wipe", "iris-open"]
+
+[performance]
+intensity = "subtle"
+max = "clear"
+notes = "inward, quiet, faces that listen"

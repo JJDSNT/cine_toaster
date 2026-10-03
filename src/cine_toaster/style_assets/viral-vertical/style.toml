@@ -1,0 +1,40 @@
+schema_version = 1
+id = "viral-vertical"
+name = "Viral vertical"
+kind = "format"
+says = "Short, vertical, made to stop a thumb: a hook at once, a payoff before they swipe."
+# Names people know it by: shown, and accepted by `style:`.
+aka = ["TikTok", "Reels", "Shorts"]
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["short-form social video"]
+framing = ["vertical 9:16, the subject centred and close", "faces and text in the safe area", "punch-ins instead of new setups"]
+colour = "bright, punchy, phone-native"
+sound = "a trending track or a voice hook in the first second; captions do the work with sound off"
+titles = ["caption", "word-by-word"]
+# What a video model is told about the image, in words of craft.
+prompt = "vertical smartphone video, close and centred subject, bright punchy colours, energetic, authentic phone-camera look"
+use_when = ["Social reach, a teaser, a challenge"]
+avoid_when = ["Slow build"]
+
+[camera]
+lens = "normal"
+prefer = ["handheld", "push-in", "crash-zoom-in", "whip-pan-left", "whip-pan-right", "first-person"]
+avoid = ["aerial-orbit", "time-lapse"]
+
+[editing]
+shot_seconds = [0.5, 4]
+prefer_cuts = ["jump", "smash", "hard"]
+avoid_cuts = []
+prefer_transitions = []
+avoid_transitions = ["cross-dissolve", "blur-dissolve", "dip-to-black", "clock-wipe", "iris-open"]
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "direct to camera, energetic"
+
+[format]
+aspect = "9:16"
+total_seconds = [7, 60]
+hook_seconds = 2
+captions = true

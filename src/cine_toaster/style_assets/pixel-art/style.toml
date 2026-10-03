@@ -1,0 +1,35 @@
+schema_version = 1
+id = "pixel-art"
+name = "Pixel art"
+kind = "animation"
+says = "Low resolution on purpose: a game's memory."
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["8-bit and 16-bit video games"]
+framing = ["side view or three-quarter top view", "tile-based scenes"]
+colour = "a limited palette, hard pixel edges, no anti-aliasing"
+sound = "chiptune"
+titles = ["typewriter", "card"]
+# What a video model is told about the image, in words of craft.
+prompt = "pixel art animation, low resolution sprites, limited colour palette, crisp hard pixel edges, retro video game look"
+use_when = ["Games, nostalgia, a character inside a machine"]
+avoid_when = ["Subtle faces"]
+
+[camera]
+lens = "normal"
+prefer = ["locked-off", "truck-left", "truck-right", "pan-left", "pan-right"]
+avoid = ["dolly-zoom", "orbit-left", "orbit-right", "handheld"]
+
+[editing]
+shot_seconds = [1, 6]
+prefer_cuts = []
+avoid_cuts = []
+prefer_transitions = ["pixelate", "iris-open"]
+avoid_transitions = ["blur-dissolve", "film-burn"]
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "small sprites, big gestures"
+
+[format]
+frame_rate = 12

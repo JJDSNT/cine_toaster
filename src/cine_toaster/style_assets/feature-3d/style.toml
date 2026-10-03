@@ -1,0 +1,34 @@
+schema_version = 1
+id = "feature-3d"
+name = "3D feature animation"
+kind = "animation"
+says = "Soft, appealing computer animation: stylised people, real light."
+# Names people know it by: shown, and accepted by `style:`.
+aka = ["Pixar-like"]
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["computer-animated studio features"]
+framing = ["clear staging and silhouettes", "cinematic lenses and depth of field", "appealing shapes, big eyes"]
+colour = "global illumination, warm bounce light, subsurface skin"
+sound = "orchestral score, detailed Foley"
+titles = ["film-title"]
+# What a video model is told about the image, in words of craft.
+prompt = "3D animated feature film style, stylised appealing characters, soft global illumination, subsurface scattering, cinematic depth of field"
+use_when = ["Family audiences, comedy, adventure"]
+avoid_when = ["Documentary truth"]
+
+[camera]
+lens = "normal"
+prefer = ["push-in", "orbit-left", "orbit-right", "crane-up", "follow", "side-tracking"]
+avoid = []
+
+[editing]
+shot_seconds = [1.5, 8]
+prefer_cuts = []
+avoid_cuts = []
+prefer_transitions = []
+avoid_transitions = []
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "appealing, exaggerated, every beat readable"

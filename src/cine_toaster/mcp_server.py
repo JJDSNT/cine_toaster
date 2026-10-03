@@ -181,6 +181,17 @@ def build(root: Path, manager=None):
                 "elements": list_elements(runtime.root)}
 
     @server.tool(annotations=reading)
+    def list_styles() -> list[dict[str, Any]]:
+        """The style catalog -- direction, animation techniques, formats (viral vertical, commercial, trailer...).
+        A production names one with `style:` in project.yaml, a scene may name another. Choosing it is the
+        director's."""
+        from .styles import list_styles as catalog
+
+        return [{key: item[key] for key in ("id", "name", "kind", "says", "camera", "editing", "performance",
+                                            "format", "prompt", "use_when", "avoid_when")}
+                for item in catalog(runtime.root)]
+
+    @server.tool(annotations=reading)
     def list_emotions() -> list[dict[str, Any]]:
         """The emotion catalog: a shot names `emotion: {id, who, intensity: subtle|clear|overwhelming,
         arc: holds|builds|fades|breaks}`. How a character feels is the director's to decide."""
