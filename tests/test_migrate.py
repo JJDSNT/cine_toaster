@@ -124,6 +124,8 @@ class MigrationTests(unittest.TestCase):
             """)
         write(s / "elenco" / "fichas" / "kael_boreal.png", b"face")
         write(s / "cenarios" / "quarto" / "blockout" / "A.png", b"set")
+        write(s / "cenarios" / "quarto" / "FICHA.md", "# O quarto\n\n**PROPOSTA.** Cena: **9-01**.\n\n"
+              "Um quarto pequeno, luz fria.\n\n```\nblender ...\n```\n")
         write(s / "roteiro" / "v4" / "roteiro.fountain", "INT. TESTE - NOITE\n")
         self.before = self.digest(s)
 
@@ -160,6 +162,12 @@ class MigrationTests(unittest.TestCase):
         self.assertFalse(fourth["cast_references"])
         self.assertEqual(fifth["from"], [{"ref": "1-02 c03", "relation": "reuses"}])
         self.assertTrue((scene_dir / fourth["from"][0]["ref"]).is_file())
+        # The set its sheet names the scene in, as a location the scene is shot in.
+        self.assertEqual(scene["location"], "QUARTO")
+        location = yaml.safe_load((self.target / "locations" / "quarto" / "location.yaml").read_text(encoding="utf-8"))
+        self.assertEqual((location["label"], location["description"], location["scenes"]),
+                         ("O quarto", "Um quarto pequeno, luz fria.", ["9-01"]))
+        self.assertEqual(location["references"], [{"path": "blockout/A.png", "kind": "blockout"}])
         self.assertEqual((first["kind"], first["label"], first["sounds"]), ("black", "Tela preta.", ["breath"]))
         self.assertEqual((second["sound"], second["trim"], second["generated_seconds"]),
                          ("a quiet room hum", {"before": 0.4, "after": 0.3}, 4))

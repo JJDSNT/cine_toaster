@@ -143,6 +143,18 @@ Decided in ADR 0021; the layout below stands.
   that every file a shot points at exists in the migrated film -- which
   found the blockout paths. Result: identical, the 6 real findings only.
 
+# Done: pass 2b, locations (2026-10-03)
+
+- Each set of `cenarios/` becomes a location (`location.yaml` beside its
+  `FICHA.md`): id from the folder, label from the sheet's title, the set's
+  first descriptive paragraph, its reference pictures and blockouts. The
+  sheet names its scenes in bold ("Cena: **3-01**"): read, not guessed;
+  1-02 joins Claire's room by having the same set fragments as 1-02C
+  (approximated). 3-02's corridor and 1-01's prologue have no sheet.
+  Scenes say `location:`; the comparison stays at the 6 real findings.
+  SINGULAR's `cenario` (prompt fragments for parts of a set: CABECEIRA,
+  JANELA...) stays on the scene: its generators read it.
+
 # Pass 2 (next)
 
 - `cenario` and the plans (`geografia`) into locations; `referencias_3d`.
