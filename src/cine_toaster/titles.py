@@ -279,45 +279,83 @@ def ffmpeg_filters(title: dict[str, Any], duration: float, width: int, height: i
 
 
 def _neon_graph(picture: str, title: dict[str, Any], duration: float, width: int, height: int, fps: int, font: str,
-                work: Path) -> str:
-    """A neon sign: a pale core over two blurred halos of the tube's colour, lighting up with a stutter.
+                work: Path, root: Path | None = None) -> str:
+    """A neon sign: tubes of light over the picture, lighting it, striking with a stutter.
 
-    The core and both halos share one deterministic flicker (sines of time,
-    not `random`), so they blink together: a tube striking, then a faint buzz.
+    Each line of the sign (the title, and `line2` if given, each with its
+    own font, colour and size) is drawn as a tube -- a hollow stroke with a
+    pale core line inside when `tube` is on, solid letters otherwise --
+    over two halos and a wide spill of its colour. The halos and the spill
+    are *added* to the picture, so a wall behind the sign is lit by it. All
+    layers share one deterministic flicker (sines of time), so they blink
+    together: a tube striking, then a faint buzz.
     """
 
     params = title["params"]
     scale = height / REFERENCE_HEIGHT
-    size = float(params["size"]) * scale
-    text = _spaced(str(params.get("text") or "")) if params.get("spaced") else str(params.get("text") or "")
     work.mkdir(parents=True, exist_ok=True)
-    (work / "neon.txt").write_text(text, encoding="utf-8")
-    y = {"centre": "(h-text_h)/2", "bottom": f"h-text_h-{46 * scale:.0f}", "top": "h*0.16"}[params["position"]]
     enter, ignite = float(params["enter_at"]), max(0.05, float(params.get("ignite", 0.9)))
     fade_out = max(0.001, float(params["fade_out"]))
     # geq names time T; inside its quoted expressions commas need no escaping.
     flicker = "gt(sin(T*97)*sin(T*61+1.3),-0.2)"
     buzz = "(0.88+0.12*gt(sin(T*53)*sin(T*29+0.7),0.55))"
-    alpha = (f"if(lt(T,{enter:.3f}),0,if(lt(T,{enter + ignite:.3f}),{flicker},{buzz}))"
-             f"*min(1,max(0,({duration:.3f}-T)/{fade_out:.3f}))")
-    neon = _colour(params.get("color") or "#FF2E9A")
-    core = _colour(params.get("core_color") or "#FFF2FA")
+    lit = (f"if(lt(T,{enter:.3f}),0,if(lt(T,{enter + ignite:.3f}),{flicker},{buzz}))"
+           f"*min(1,max(0,({duration:.3f}-T)/{fade_out:.3f}))")
     glow = float(params.get("glow", 1.0))
-    text_file = _escape(str(work / "neon.txt"))
+    tube = bool(params.get("tube", False))
+    lines = [{"text": str(params.get("text") or ""), "font": font, "color": params.get("color") or "#FF2E9A",
+              "size": float(params["size"]), "y": params.get("y")}]
+    if params.get("line2"):
+        lines.append({"text": str(params["line2"]),
+                      "font": font_file({"font": params.get("line2_font") or ""}, root) if params.get("line2_font") else font,
+                      "color": params.get("line2_color") or "#FF2E9A", "size": float(params.get("line2_size") or params["size"]),
+                      "y": params.get("line2_y")})
+    if len(lines) == 2:  # two lines stacked about the centre unless placed
+        lines[0]["y"] = lines[0]["y"] if lines[0]["y"] is not None else 0.38
+        lines[1]["y"] = lines[1]["y"] if lines[1]["y"] is not None else 0.66
+    core = _colour(params.get("core_color") or "#FFF6FB")
+    steps, halos, cores = [], [], []
+    for index, line in enumerate(lines):
+        text = _spaced(line["text"]) if params.get("spaced") and index == 0 else line["text"]
+        path = work / f"neon-{index}.txt"
+        path.write_text(text, encoding="utf-8")
+        size = line["size"] * scale
+        if line["y"] is not None:
+            y = f"h*{float(line['y']):.3f}-text_h/2"
+        else:
+            y = {"centre": "(h-text_h)/2", "bottom": f"h-text_h-{46 * scale:.0f}", "top": "h*0.16"}[params["position"]]
+        colour = _colour(line["color"])
+        stroke = max(2, round(size * 0.07))  # the tube's thickness, from the letter size
 
-    def layer(name: str, colour: str, border: int) -> str:
-        return (f"color=c=black@0.0:s={width}x{height}:r={fps}:d={duration:.3f},format=rgba,"
-                f"drawtext=fontfile='{_escape(font)}':textfile='{text_file}':fontsize={size:.1f}:"
-                f"fontcolor={colour}:borderw={border}:bordercolor={colour}:x=(w-text_w)/2:y={y}[{name}]")
+        def letters(fill: str, border: int, border_colour: str) -> str:
+            return (f"drawtext=fontfile='{_escape(line['font'])}':textfile='{_escape(str(path))}':fontsize={size:.1f}:"
+                    f"fontcolor={fill}:borderw={border}:bordercolor={border_colour}:x=(w-text_w)/2:y={y}")
 
-    wide, near = max(2, round(26 * scale * glow)), max(1, round(9 * scale * glow))
-    return (f"{layer('far', neon, max(3, round(12 * scale)))};{layer('near', neon, max(2, round(5 * scale)))};"
-            f"{layer('core', core, 0)};"
-            f"[far]gblur=sigma={wide},geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='min(255,alpha(X,Y)*4.5*{glow:.2f})*{alpha}'[farg];"
-            f"[near]gblur=sigma={near},geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='min(255,alpha(X,Y)*2.8*{glow:.2f})*{alpha}'[nearg];"
-            f"[core]geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*{alpha}'[coreg];"
-            f"{picture},format=rgba[base];[base][farg]overlay=format=auto[b1];[b1][nearg]overlay=format=auto[b2];"
-            f"[b2][coreg]overlay=format=auto,format=yuv420p[v]")
+        # A tube is a hollow stroke; otherwise the letters are filled.
+        shape = letters(f"{colour}@0", stroke, colour) if tube else letters(colour, max(1, stroke // 2), colour)
+        on_black = f"color=c=black:s={width}x{height}:r={fps}:d={duration:.3f}"
+        for name, sigma, gain in ((f"spill{index}", 90, 1.1), (f"far{index}", 20, 1.2), (f"near{index}", 6, 1.4)):
+            steps.append(f"{on_black},{shape},gblur=sigma={max(1, round(sigma * scale * glow))},format=gbrp,"
+                         f"geq=r='min(255,r(X,Y)*{gain * glow:.2f}*({lit}))':g='min(255,g(X,Y)*{gain * glow:.2f}*({lit}))':"
+                         f"b='min(255,b(X,Y)*{gain * glow:.2f}*({lit}))'[{name}]")
+            halos.append(name)
+        # The tube itself: its colour, and a pale core line along its middle.
+        inner = letters(f"{core}@0", max(1, stroke // 3), core) if tube else letters(core, 0, core)
+        steps.append(f"color=c=black@0.0:s={width}x{height}:r={fps}:d={duration:.3f},format=rgba,{shape},{inner},"
+                     f"geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*({lit})'[tube{index}]")
+        cores.append(f"tube{index}")
+    graph = steps + [f"{picture},format=gbrp[lit0]"]
+    current = "lit0"
+    for index, name in enumerate(halos, 1):  # light adds up: the wall behind is lit
+        graph.append(f"[{current}][{name}]blend=all_mode=addition[lit{index}]")
+        current = f"lit{index}"
+    graph.append(f"[{current}]format=rgba[withlight]")
+    current = "withlight"
+    for index, name in enumerate(cores):
+        graph.append(f"[{current}][{name}]overlay=format=auto[signed{index}]")
+        current = f"signed{index}"
+    graph.append(f"[{current}]format=yuv420p[v]")
+    return ";".join(graph)
 
 
 def _blender_overlay(title: dict[str, Any], duration: float, width: int, height: int, font: str,
@@ -365,7 +403,7 @@ def render(title: dict[str, Any], duration: float, output: Path, *, width: int =
             picture = "[0:v]format=yuv420p"
             sound = []
         if title["engine"] == "ffmpeg" and title["effect"] == "neon":
-            graph = _neon_graph(picture, title, duration, width // 2 * 2, height // 2 * 2, fps, font, work)
+            graph = _neon_graph(picture, title, duration, width // 2 * 2, height // 2 * 2, fps, font, work, root)
         elif title["engine"] == "ffmpeg":
             graph = f"{picture},{ffmpeg_filters(title, duration, width, height, font, work)}[v]"
         else:

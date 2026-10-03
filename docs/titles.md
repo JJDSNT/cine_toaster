@@ -21,7 +21,18 @@ frame), `color`, `position` (centre, bottom, top), `spaced` (letters
 tracked out), `fade_in`, `fade_out`, `enter_at`, `font` (a file in the
 production), `background` (a card's colour), `subtitle` (a lower third's
 role, a card's second line). A neon sign also takes `color` (the tube),
-`core_color`, `glow` (halo strength) and `ignite` (seconds of stutter).
+`core_color`, `glow` (halo and spill strength), `ignite` (seconds of
+stutter), `tube` (hollow strokes, the default), and a second line:
+`line2`, `line2_font`, `line2_color`, `line2_size`, with `y`/`line2_y` as
+fractions of the frame's height. Its halos are added to the picture, so a
+wall behind it is lit. Neon wants single-stroke fonts: rounded sans
+(Comfortaa) and scripts (Pacifico) from Google Fonts (OFL) work well, or
+Monoton, drawn as tubes.
+
+```yaml
+title: {id: neon-sign, text: Neon, color: "#2BFF6E", size: 230, font: fonts/Comfortaa.ttf,
+        line2: Light, line2_font: fonts/Pacifico-Regular.ttf, line2_color: "#FF3FD0", line2_size: 150}
+```
 
 ## The catalog
 
@@ -32,7 +43,7 @@ role, a card's second line). A neon sign also takes `color` (the tube),
 | motion | slide-up, grow | FFmpeg |
 | lower thirds | caption, lower-third | FFmpeg |
 | credits | credits-roll (lines separated by `\n`) | FFmpeg |
-| texture | flicker, neon-sign (a pale core in a coloured halo, striking with a stutter, then a faint buzz) | FFmpeg |
+| texture | flicker, neon-sign (hollow tubes, light spilling onto the picture, a stutter then a buzz; two lines) | FFmpeg |
 | 3d | letters-turn-in, letters-rise | Blender |
 
 Catalogs layer: built in, `CINE_TOASTER_TITLES_PATH`, then the production's

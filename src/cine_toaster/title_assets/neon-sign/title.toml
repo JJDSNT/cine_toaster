@@ -2,14 +2,16 @@ schema_version = 1
 id = "neon-sign"
 name = "Neon sign"
 category = "texture"
-says = "A neon tube: a pale core inside a coloured halo, striking with a stutter when it lights, then buzzing faintly."
+says = "A neon sign: hollow tubes with a pale core, their light spilling onto whatever is behind, striking with a stutter, then buzzing. Up to two lines, each with its own font and colour."
 energy = "medium"
 use_when = ["Signs, bars, motels, a city at night, a retro-futurist title"]
 avoid_when = ["Daylight scenes; grave, quiet titles"]
 
 [params]
 size = 64
-spaced = true
+spaced = false
+tube = true          # hollow strokes with a pale core line; false: solid letters
+line2 = ""           # a second line, with line2_font, line2_color, line2_size, line2_y
 color = "#FF2E9A"
 core_color = "#FFF2FA"
 glow = 1.0
