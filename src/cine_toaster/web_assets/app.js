@@ -21,7 +21,7 @@ const state = {
 const ROOMS = new Set([
   "overview", "script", "storyboard", "dialogue",
   "sequences", "scenes", "review", "cut", "cast", "locations",
-  "transitions", "moves", "titles", "vfx", "library", "knowledge",
+  "transitions", "moves", "titles", "vfx", "sounds", "library", "knowledge",
 ]);
 
 /** Write where we are into the address bar.
@@ -74,6 +74,7 @@ function draw(view) {
   else if (view === "locations") renderLocations();
   else if (view === "titles") renderTitles();
   else if (view === "vfx") renderVfx();
+  else if (view === "sounds") renderSounds();
   else if (view === "cast") renderCast();
   else if (view === "library") renderLibrary(state.project.id);
   else if (view === "knowledge") renderKnowledge();
@@ -1588,6 +1589,64 @@ async function renderVfx() {
   tellAssistant();
 }
 
+// The sound catalog (CT-0048): ambiences, effects, Foley and music, heard at
+// their level. A shot places sounds: [{id: …, at: …}]; a scene names its
+// ambience and music. Recordings come from Freesound, Sonniss or Openverse
+// (toast sound search/fetch) with their licence; generated ones are ours.
+async function renderSounds() {
+  const root = byId("workspace");
+  root.replaceChildren();
+  const heading = sectionHeading("SOUND", "Sound",
+    "Placed like effects: a shot lists sounds: [{id: …, at: 1.2}]; a scene names ambience: … and music: {id: …, from: P2}. Music is lowered under speech. Fetch recordings with toast sound search/fetch (Freesound CC0, Sonniss, Openverse).");
+  heading.classList.add("page-heading");
+  root.append(heading);
+  state.sounds = (await api("/api/sounds", { optional: true })) || [];
+  const byCategory = new Map();
+  for (const item of state.sounds) {
+    if (!byCategory.has(item.category)) byCategory.set(item.category, []);
+    byCategory.get(item.category).push(item);
+  }
+  const placing = { ambience: (id) => `ambience: ${id}`, music: (id) => `music: {id: ${id}, from: …}` };
+  for (const [category, items] of byCategory) {
+    const section = el("section", "transition-section");
+    section.append(sectionHeading("SOUND", label(category), `${items.length} available`));
+    const grid = el("div", "transition-grid");
+    for (const item of items) {
+      const card = el("article", "transition-card move-card");
+      const box = el("div", "sound-preview");
+      if (!item.exists) {
+        box.append(el("small", "move-note", "Its file is missing."));
+      } else {
+        const play = el("button", "secondary-button", "Listen");
+        play.type = "button";
+        play.addEventListener("click", () => {
+          const audio = el("audio");
+          Object.assign(audio, { controls: true, autoplay: true, src: `/api/sound-preview?id=${encodeURIComponent(item.id)}` });
+          audio.addEventListener("error", () => box.replaceChildren(el("small", "move-note", "The preview could not be made.")));
+          box.replaceChildren(audio);
+        });
+        box.append(play);
+      }
+      const where = (placing[category] || ((id) => `sounds: [{id: ${id}, at: …}]`))(item.id);
+      const status = item.status ? ` · ${item.status}` : "";
+      card.append(
+        el("strong", "", item.name),
+        el("code", "move-id", where),
+        el("p", "", item.says),
+        box,
+        el("small", "muted", `${item.generated ? "generated, ours" : `${item.provenance || "a recording"} · ${item.licence || "licence not stated"}`}${status} · ${item.params.level} LUFS${item.origin !== "built-in" ? ` · ${item.origin}` : ""}`),
+        guidanceList("Use when", item.use_when, "good"),
+      );
+      if (item.credit) card.append(el("small", "muted", `Credit: ${item.credit}`));
+      if (item.status === "provisional") card.append(el("small", "warning", "Provisional: replace with the official file before release."));
+      grid.append(card);
+    }
+    section.append(grid);
+    root.append(section);
+  }
+  tellAssistant();
+}
+
 async function renderMoves() {
   const root = byId("workspace");
   root.replaceChildren();
@@ -2735,6 +2794,11 @@ async function start() {
     state.vfx = vfx || { effects: [], elements: [] };
     const count = byId("vfx-nav-count");
     if (count) count.textContent = String(state.vfx.effects.length);
+  }).catch(() => {});
+  api("/api/sounds", { optional: true }).then((sounds) => {
+    state.sounds = sounds || [];
+    const count = byId("sounds-nav-count");
+    if (count) count.textContent = String(state.sounds.length);
   }).catch(() => {});
   api("/api/titles", { optional: true }).then((titles) => {
     state.titles = titles || [];

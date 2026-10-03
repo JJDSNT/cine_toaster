@@ -198,6 +198,8 @@ def _load_shots(
                 "title": field(raw, "title") if isinstance(field(raw, "title"), (str, dict)) else None,
                 # Effects from the VFX catalog, applied in order before the title (CT-0031).
                 "effects": field(raw, "effects") if isinstance(field(raw, "effects"), (list, dict, str)) else None,
+                # Sounds from the catalog, placed on the shot as cut (CT-0048).
+                "sounds": field(raw, "sounds") if isinstance(field(raw, "sounds"), (list, dict, str)) else None,
                 "ends_on": vtext(raw, "ends_on"),
                 "motion": None,
                 "covers": field(raw, "covers"),
@@ -415,6 +417,41 @@ def _expand_effects(shots: list[dict[str, Any]], scene_id: str, root: Path) -> l
     return findings
 
 
+def _expand_sounds(shots: list[dict[str, Any]], document: dict[str, Any], scene_id: str,
+                   root: Path) -> tuple[dict[str, list[dict[str, Any]]], list[Finding]]:
+    """Shot `sounds` and scene `ambience` and `music` take their defaults from the sound catalog (CT-0048)."""
+
+    beds: dict[str, list[dict[str, Any]]] = {"ambience": [], "music": []}
+    if not any(shot.get("sounds") for shot in shots) and not any(document.get(kind) for kind in beds):
+        return beds, []
+    from .sounds import expand, list_sounds
+
+    catalog = {item["id"]: item for item in list_sounds(root)}
+    ids = tuple(shot["id"] for shot in shots)
+    findings = []
+    for shot in shots:
+        if not shot.get("sounds"):
+            continue
+        shot["sounds"], problems = expand(shot["sounds"], catalog)
+        findings.extend(Finding(code="sound_problem", severity="error", scene_id=scene_id, shots=(shot["id"],),
+                                message=f"{shot['id']} {problem}. It would be lost, not guessed.")
+                        for problem in problems)
+    for kind in beds:
+        beds[kind], problems = expand(document.get(kind), catalog, placed_on="scene", shots=ids)
+        findings.extend(Finding(code="sound_problem", severity="error", scene_id=scene_id, shots=(),
+                                message=f"The scene's {kind} {problem}. It would be lost, not guessed.")
+                        for problem in problems)
+    used = {sound["id"] for shot in shots for sound in shot.get("sounds") or []}
+    used |= {sound["id"] for kind in beds for sound in beds[kind]}
+    for sound_id in sorted(used):
+        if catalog[sound_id].get("status") == "provisional":
+            findings.append(Finding(
+                code="sound_provisional", severity="advice", scene_id=scene_id, shots=(),
+                message=f"The sound {sound_id!r} comes from {catalog[sound_id]['provenance'] or 'a provisional source'}; "
+                        "replace it with the official file before the film is released."))
+    return beds, findings
+
+
 def _expand_titles(shots: list[dict[str, Any]], scene_id: str, root: Path) -> list[Finding]:
     """`title: {id: card, text: ...}` takes its engine, effect and defaults from the title catalog (CT-0031)."""
 
@@ -559,6 +596,8 @@ def _load_scene(
     move_findings = _expand_camera_moves(shots, scene_id, root)
     move_findings.extend(_expand_titles(shots, scene_id, root))
     move_findings.extend(_expand_effects(shots, scene_id, root))
+    sound_beds, sound_findings = _expand_sounds(shots, document, scene_id, root)
+    move_findings.extend(sound_findings)
     motions = shot_motions(geometry, shots, scene_id=scene_id)
     positions_by_shot = {motion.shot_id: motion.start_positions for motion in motions}
     findings = [
@@ -669,6 +708,9 @@ def _load_scene(
         "voices": _scene_field(document, "voices", scene_aliases) or {},
         # How a generation model should refer to each speaker ("The man beside the bed").
         "refer_as": _scene_field(document, "refer_as", scene_aliases) or {},
+        # CT-0048: beds under the whole scene, from the sound catalog.
+        "ambience": sound_beds["ambience"],
+        "music": sound_beds["music"],
         "findings": findings,
         "decision_log": list(reversed(state.decisions)),
         "pending_shots": pending_shots,

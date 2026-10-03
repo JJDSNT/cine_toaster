@@ -1,0 +1,12 @@
+schema_version = 1
+id = "beep"
+name = "Beep"
+category = "effect"
+says = "A clean electronic beep, twice a second."
+use_when = ["A device that answers, a monitor"]
+
+[source]
+generate = '''sine=f=1046:r=48000:d={d},volume='0.5*lt(mod(t,0.5),0.1)':eval=frame'''
+
+[params]
+duration = 0.5

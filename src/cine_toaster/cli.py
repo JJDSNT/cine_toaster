@@ -769,6 +769,52 @@ def command_vfx(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_sound(args: argparse.Namespace) -> int:
+    """The sound catalog, and the sources recorded sound and music come from (CT-0048)."""
+
+    from . import sound_sources
+    from .providers.runpod import load_credentials
+    from .sounds import list_sounds, preview
+
+    if getattr(args, "env_file", None):
+        load_credentials(Path(args.env_file).expanduser())  # never printed
+    if args.sound_command == "search":
+        search = {"freesound": sound_sources.freesound_search, "sonniss": sound_sources.sonniss_search,
+                  "openverse": lambda terms, count: sound_sources.openverse_search(terms, count, music=not args.effects)}
+        for item in search[args.source](args.terms, args.count):
+            extra = item.get("pack") or item.get("by") or ""
+            length = f"{item['seconds']:7.1f} s" if item.get("seconds") is not None else f"{item.get('megabytes', 0):6.1f} MB"
+            print(f"{item['name'][:44]:44} {length}  {extra[:28]:28} {item['licence'][:30]}\n    {item['id']}")
+        return 0
+    root = Path(args.project).expanduser().resolve()
+    if args.sound_command == "fetch":
+        fetch = {"freesound": sound_sources.freesound_fetch, "sonniss": sound_sources.sonniss_fetch,
+                 "openverse": sound_sources.openverse_fetch}[args.source]
+        options = {"sound_id": args.as_id or "", "says": args.says or ""}
+        if args.category:
+            options["category"] = args.category
+        manifest = fetch(root, args.item, **options)
+        print(f"made {manifest.relative_to(root)}")
+        return 0
+    if args.sound_command == "import":
+        made = sound_sources.import_library(root, Path(args.folder), prefix=args.prefix)
+        print(f"registered {len(made)} sounds from {args.folder}")
+        return 0
+    catalog = {item["id"]: item for item in list_sounds(root)}
+    if args.sound_command == "preview":
+        if args.id not in catalog:
+            print(f"No sound {args.id!r} in the catalog", file=sys.stderr)
+            return 1
+        output = Path(args.output or f"{args.id}.wav")
+        print(preview(catalog[args.id], output, seconds=args.seconds))
+        return 0
+    for item in catalog.values():
+        state = "" if item["exists"] else "  (missing)"
+        status = f" [{item['status']}]" if item["status"] else ""
+        print(f"{item['id']:28} {item['category']:9} {item['licence'][:22]:22}{status} {item['says'][:60]}{state}")
+    return 0
+
+
 def command_mcp(args: argparse.Namespace) -> int:
     """Serve the project to Claude Code over MCP, on stdio (CT-0045)."""
 
@@ -1821,6 +1867,35 @@ def build_parser() -> argparse.ArgumentParser:
         item = vfx_sub.add_parser(name, help=text)
         item.add_argument("project", type=Path)
     vfx_parser.set_defaults(function=command_vfx)
+
+    sound_parser = subparsers.add_parser("sound", help="The sound catalog and its sources: Freesound, Sonniss, Openverse (CT-0048)")
+    sound_sub = sound_parser.add_subparsers(dest="sound_command", required=True)
+    sound_list = sound_sub.add_parser("list", help="Ambiences, effects, Foley and music, built in and the production's")
+    sound_list.add_argument("project", type=Path)
+    sound_preview = sound_sub.add_parser("preview", help="Hear one item alone, at its level (a WAV)")
+    sound_preview.add_argument("project", type=Path)
+    sound_preview.add_argument("id")
+    sound_preview.add_argument("--seconds", type=float, default=0.0)
+    sound_preview.add_argument("--output")
+    sound_search = sound_sub.add_parser("search", help="Search a source; nothing is written")
+    sound_search.add_argument("source", choices=("freesound", "sonniss", "openverse"))
+    sound_search.add_argument("terms")
+    sound_search.add_argument("--count", type=int, default=10)
+    sound_search.add_argument("--effects", action="store_true", help="openverse: any audio, not only music")
+    sound_search.add_argument("--env-file", help="FREESOUND_API_KEY (read, never printed)")
+    sound_fetch = sound_sub.add_parser("fetch", help="Download one item into the production's sounds/ with its licence")
+    sound_fetch.add_argument("project", type=Path)
+    sound_fetch.add_argument("source", choices=("freesound", "sonniss", "openverse"))
+    sound_fetch.add_argument("item", help="the id (Freesound, Openverse) or file path (Sonniss) a search printed")
+    sound_fetch.add_argument("--as", dest="as_id", help="the id it takes in the catalog")
+    sound_fetch.add_argument("--category", choices=("ambience", "effect", "foley", "music"))
+    sound_fetch.add_argument("--says", help="what it is, in a line")
+    sound_fetch.add_argument("--env-file", help="FREESOUND_API_KEY (read, never printed)")
+    sound_import = sound_sub.add_parser("import", help="Register a library on disk described by its manifest.csv")
+    sound_import.add_argument("project", type=Path)
+    sound_import.add_argument("folder")
+    sound_import.add_argument("--prefix", default="")
+    sound_parser.set_defaults(function=command_sound)
 
     mcp_parser = subparsers.add_parser(
         "mcp", help="Serve a project to Claude Code over MCP (stdio): claude mcp add cine-toaster -- toast mcp <project>")

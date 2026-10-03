@@ -1,0 +1,13 @@
+schema_version = 1
+id = "thunder"
+name = "Thunder"
+category = "effect"
+says = "A crack, then a long rolling rumble."
+use_when = ["Lightning (with the VFX), a storm"]
+
+[source]
+generate = '''aevalsrc='(random(0)-0.5)*(exp(-25*t)+0.5*exp(-0.7*t)*(0.6+0.4*sin(2*PI*1.3*t)))':s=48000:d={d},lowpass=f=600'''
+
+[params]
+duration = 5.0
+level = -20.0

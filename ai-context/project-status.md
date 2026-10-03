@@ -200,8 +200,12 @@ remains:
   OpenColorIO, Blender-made effects and projects, OpenVDB, OpenUSD in and
   out, OpenFX through Natron, Gaussian splats through Spark) are in place,
   each form with a working example; Unreal/Unity and NeRF are studied in
-  CT-0047. Sound, music and an emotion catalog are noted for later
-  (CT-0048); Unreal/Unity render adapters, a catalog of directors and
+  CT-0047. Sound and music are on the cut (CT-0048, 2026-10-03): a sound
+  catalog (26 generated items from SINGULAR's practice), shot sounds,
+  scene ambience and music levelled and ducked under speech, and three
+  sources -- Freesound (CC0), Sonniss (provisional mirror), Openverse
+  (music) -- plus SINGULAR's library registered in place; the emotion
+  catalog is still for later (CT-0048). Unreal/Unity render adapters, a catalog of directors and
   styles, and 3D storyboards (ScreenWeaver as reference) too (CT-0049). Claude Code now
   works on a film through an MCP server of Cine Toaster (ADR 0020, CT-0045
   option 1: `toast mcp`). Noted for later, not started: RL beyond the

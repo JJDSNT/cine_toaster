@@ -1,0 +1,13 @@
+schema_version = 1
+id = "sad-pad"
+name = "Sad pad"
+category = "music"
+says = "A slow minor chord (A minor), soft: loss, solitude."
+use_when = ["Grief, a farewell, a memory"]
+
+[source]
+generate = '''sine=f=220:r=48000:d={d},volume=0.3[a];sine=f=261.6:r=48000:d={d},volume=0.25[b];sine=f=329.6:r=48000:d={d},volume=0.2[c];sine=f=110:r=48000:d={d},volume=0.25[d];[a][b][c][d]amix=inputs=4:normalize=0,tremolo=f=4:d=0.08,aecho=0.8:0.6:400|700:0.3|0.2,lowpass=f=1800'''
+
+[params]
+fade_in = 3.0
+fade_out = 3.0

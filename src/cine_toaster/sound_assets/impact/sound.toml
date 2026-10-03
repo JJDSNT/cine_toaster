@@ -1,0 +1,13 @@
+schema_version = 1
+id = "impact"
+name = "Impact"
+category = "effect"
+says = "A short, hard hit with a low body."
+use_when = ["A blow, a fall, a hard cut"]
+
+[source]
+generate = '''aevalsrc='(0.9*(random(0)-0.5)*exp(-18*t)+0.8*sin(2*PI*60*t)*exp(-6*t))':s=48000:d={d},lowpass=f=1500'''
+
+[params]
+duration = 0.8
+level = -18.0

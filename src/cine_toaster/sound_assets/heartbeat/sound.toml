@@ -1,0 +1,13 @@
+schema_version = 1
+id = "heartbeat"
+name = "Heartbeat"
+category = "effect"
+says = "A heartbeat, lub-dub, at rest (60 per minute)."
+use_when = ["A body heard from inside, a held moment"]
+
+[source]
+generate = '''aevalsrc='0.8*sin(2*PI*55*t)*(exp(-30*mod(t,1))+0.6*exp(-30*mod(t-0.28,1))*gte(mod(t,1),0.28))':s=48000:d={d},lowpass=f=160'''
+
+[params]
+duration = 4.0
+level = -26.0

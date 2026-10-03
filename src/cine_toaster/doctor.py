@@ -352,6 +352,23 @@ def _mcp() -> Capability:
     )
 
 
+def _sound_sources() -> Capability:
+    import os
+
+    key = bool(os.environ.get("FREESOUND_API_KEY", "").strip())
+    return Capability(
+        name="Sound sources",
+        what_it_enables="recorded sound and music for the sound catalog (CT-0048): `toast sound search|fetch` from "
+                        "Freesound (CC0, needs a key), Sonniss GDC (archive.org mirror, provisional) and Openverse "
+                        "(music, CC0/CC BY); the built-in sounds are generated and need nothing",
+        required=False,
+        status=OK if key else MISSING,
+        detail="Freesound key set" if key else "Sonniss and Openverse need no key; Freesound does",
+        remedy="" if key else "a free key from https://freesound.org/apiv2/apply, as FREESOUND_API_KEY in the "
+                              "environment or in the .env given with --env-file",
+    )
+
+
 def _whisper() -> Capability:
     path = _binary("whisper-cli") or _binary("whisper-cpp") or _binary("main")
     ok = bool(path) or _module("faster_whisper")
@@ -386,6 +403,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _usd,
     _natron,
     _splat,
+    _sound_sources,
     # Detected, not yet used. See `report`.
     _sox,
     _blender,

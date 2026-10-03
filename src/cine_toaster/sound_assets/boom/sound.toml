@@ -1,0 +1,13 @@
+schema_version = 1
+id = "boom"
+name = "Boom"
+category = "effect"
+says = "A deep boom that dies away: a distant blast, a weight falling."
+use_when = ["An impact felt more than heard"]
+
+[source]
+generate = '''aevalsrc='0.9*(random(0)-0.5)*exp(-3*t)':s=48000:d={d},lowpass=f=250'''
+
+[params]
+duration = 1.2
+level = -20.0

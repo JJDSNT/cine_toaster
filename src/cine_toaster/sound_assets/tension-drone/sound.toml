@@ -1,0 +1,9 @@
+schema_version = 1
+id = "tension-drone"
+name = "Tension drone"
+category = "music"
+says = "A dark, slowly beating drone: two low notes a breath apart, a high one that comes and goes."
+use_when = ["Unease that grows under a scene, before a reveal"]
+
+[source]
+generate = '''sine=f=55:r=48000:d={d},volume=0.5[a];sine=f=55.6:r=48000:d={d},volume=0.5[b];sine=f=82.4:r=48000:d={d},volume=0.25[c];sine=f=659:r=48000:d={d},volume='0.04*(0.5+0.5*sin(2*PI*t/9))':eval=frame[h];[a][b][c][h]amix=inputs=4:normalize=0,tremolo=f=0.25:d=0.3'''

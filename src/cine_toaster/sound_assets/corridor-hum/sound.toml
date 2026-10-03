@@ -1,0 +1,9 @@
+schema_version = 1
+id = "corridor-hum"
+name = "Corridor"
+category = "ambience"
+says = "A corridor's lower hum, with a beep beyond a door, muffled."
+use_when = ["Between rooms; the room we left is still heard"]
+
+[source]
+generate = '''anoisesrc=color=brown:a=0.04:d={d}:r=48000,lowpass=f=150,volume=0.6[n];sine=f=1046:r=48000:d={d},volume='0.02*lt(mod(t,2.4),0.09)':eval=frame,lowpass=f=500[b];[n][b]amix=inputs=2:normalize=0'''

@@ -1,0 +1,9 @@
+schema_version = 1
+id = "air-conditioning"
+name = "Air conditioning"
+category = "ambience"
+says = "Air conditioning and nothing else: an office, an administration corridor."
+use_when = ["Offices and corridors where the takes bring the keyboards and voices"]
+
+[source]
+generate = '''anoisesrc=color=brown:a=0.05:d={d}:r=48000,lowpass=f=260,volume=0.6'''

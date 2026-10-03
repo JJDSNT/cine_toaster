@@ -747,7 +747,7 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
         "files": [{"staged": "assembly.mp4", "destination": f"renders/assemblies/{scene_id}/{version}.mp4"}],
         "summary": {"segments": [{**{key: value for key, value in asdict(segment).items() if key not in ("sound", "source")},
                                   "gain_db": plan.gains.get(segment.shot, 0.0)} for segment in plan.segments],
-                    "notes": plan.notes, "voices": voices,
+                    "notes": plan.notes, "voices": voices, "sound": plan.sound,
                     "duration_seconds": plan.duration, "takes": plan.takes},
     }
 
@@ -763,6 +763,9 @@ def _adopted_assemble(job: dict[str, Any], placed: list[str]) -> None:
     notes = " ".join(summary["notes"])
     if summary.get("voices"):
         notes = f"Heard in the cast's own voices: {', '.join(summary['voices'])}. " + notes
+    if summary.get("sound"):
+        laid = ", ".join(f"{item['id']} ({item['kind']}, {item['start']:g} s)" for item in summary["sound"])
+        notes = f"Sound laid: {laid}. " + notes
     record_assembly(
         root,
         scene_id=job["params"]["scene"],

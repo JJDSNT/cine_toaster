@@ -1,0 +1,12 @@
+schema_version = 1
+id = "low-pulse"
+name = "Low pulse"
+category = "ambience"
+says = "Only a regular pulse, very low: it may be a machine or a breath."
+use_when = ["A prologue, a dark opening, a place not yet named"]
+
+[source]
+generate = '''anoisesrc=color=brown:a=0.03:d={d}:r=48000,lowpass=f=120,volume=0.6[n];sine=f=62:r=48000:d={d},volume='0.16*exp(-14*mod(t,1.5))':eval=frame[p];[n][p]amix=inputs=2:normalize=0'''
+
+[params]
+fade_in = 1.2

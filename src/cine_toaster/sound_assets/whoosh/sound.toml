@@ -1,0 +1,12 @@
+schema_version = 1
+id = "whoosh"
+name = "Whoosh"
+category = "effect"
+says = "Air rushing past, rising and falling: a fast move, a transition."
+use_when = ["A whip pan, a cut on movement, a flash"]
+
+[source]
+generate = '''anoisesrc=color=pink:a=0.6:d={d}:r=48000,bandpass=f=900:width_type=h:w=700,volume='sin(PI*t/{d})^3':eval=frame'''
+
+[params]
+duration = 0.9

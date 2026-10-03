@@ -1,0 +1,14 @@
+schema_version = 1
+id = "rising-tension"
+name = "Riser"
+category = "music"
+says = "A tone and noise that rise over its length to a cut."
+use_when = ["The seconds before a hard cut, a revelation"]
+
+[source]
+generate = '''aevalsrc='0.3*sin(2*PI*(80*t+160*t*t/{d}))+0.15*(random(0)-0.5)*t/{d}':s=48000:d={d},volume='t/{d}':eval=frame'''
+
+[params]
+duration = 6.0
+fade_in = 0.5
+fade_out = 0.05

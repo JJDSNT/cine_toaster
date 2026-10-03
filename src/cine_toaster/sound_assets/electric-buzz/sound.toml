@@ -1,0 +1,12 @@
+schema_version = 1
+id = "electric-buzz"
+name = "Electric buzz"
+category = "effect"
+says = "A mains buzz, 50 Hz and its harmonics, unsteady: a failing light, a live wire."
+use_when = ["Electrical failure, neon, an arc"]
+
+[source]
+generate = '''sine=f=50:r=48000:d={d},volume=0.5[a];sine=f=150:r=48000:d={d},volume=0.3[b];sine=f=250:r=48000:d={d},volume=0.2[c];[a][b][c]amix=inputs=3:normalize=0,volume='0.6+0.4*gt(random(1),0.3)':eval=frame,acrusher=bits=8'''
+
+[params]
+duration = 2.0

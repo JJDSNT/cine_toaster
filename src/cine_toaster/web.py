@@ -304,6 +304,33 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
                                                              "avoid_when", "params", "engine", "effect", "origin")},
                               "unavailable": engine_missing(item["engine"])} for item in list_titles(self.project_root)])
             return
+        if parsed.path == "/api/sounds":
+            # The sound catalog (CT-0048): built in, the library's, the production's -- each with its licence.
+            from .sounds import list_sounds
+
+            self._send_json([{key: item[key] for key in ("id", "name", "category", "says", "use_when", "avoid_when",
+                                                          "params", "licence", "credit", "provenance", "url", "status",
+                                                          "exists", "origin")} | {"generated": bool(item["generate"])}
+                             for item in list_sounds(self.project_root)])
+            return
+        if parsed.path == "/api/sound-preview":
+            # The item heard alone at its level; cached, disposable.
+            from .sounds import cached_preview, list_sounds
+
+            wanted = query.get("id", [""])[0]
+            item = next((entry for entry in list_sounds(self.project_root) if entry["id"] == wanted), None)
+            if item is None or not item["exists"]:
+                self._send_json({"error": {"code": "not_found", "message": f"No sound {wanted!r} to hear"}},
+                                HTTPStatus.NOT_FOUND)
+                return
+            try:
+                path = cached_preview(item)
+            except (ValidationError, OSError, subprocess.CalledProcessError) as error:
+                self._send_json({"error": {"code": "unavailable", "message": getattr(error, "message", str(error))}},
+                                HTTPStatus.SERVICE_UNAVAILABLE)
+                return
+            self._send_file(path)
+            return
         if parsed.path == "/api/title-preview":
             # One frame, drawn by the item's own engine; cached, since Blender takes seconds.
             from .titles import cached_preview, list_titles

@@ -1,0 +1,9 @@
+schema_version = 1
+id = "station-hum"
+name = "Station hum"
+category = "ambience"
+says = "A facility's low machine hum with a slow, soft beep every 2.4 s: a place that runs on its own."
+use_when = ["A control room, a lab, a ship -- machines that keep watch"]
+
+[source]
+generate = '''anoisesrc=color=brown:a=0.05:d={d}:r=48000,lowpass=f=180,volume=0.6[n];sine=f=1046:r=48000:d={d},volume='0.035*lt(mod(t,2.4),0.09)':eval=frame[b];[n][b]amix=inputs=2:normalize=0'''

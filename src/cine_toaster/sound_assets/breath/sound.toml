@@ -1,0 +1,13 @@
+schema_version = 1
+id = "breath"
+name = "Breath"
+category = "effect"
+says = "A slow breath in and out, close."
+use_when = ["A waking, a held fear, a body before words"]
+
+[source]
+generate = '''aevalsrc='0.25*(random(0)-0.5)*sin(PI*t/{d})^2':s=48000:d={d},lowpass=f=900,highpass=f=150'''
+
+[params]
+duration = 1.6
+level = -30.0

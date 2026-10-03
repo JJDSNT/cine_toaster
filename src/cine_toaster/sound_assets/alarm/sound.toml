@@ -1,0 +1,12 @@
+schema_version = 1
+id = "alarm"
+name = "Alarm"
+category = "effect"
+says = "A fast two-state alarm."
+use_when = ["An emergency, a breach"]
+
+[source]
+generate = '''sine=f=740:r=48000:d={d},volume='0.25*lt(mod(t,0.3),0.15)':eval=frame'''
+
+[params]
+duration = 2.4

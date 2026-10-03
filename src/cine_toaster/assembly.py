@@ -23,6 +23,10 @@ A shot decided to be heard in the cast's own voices (`set_voice`, CT-0040)
 takes its sound from the chosen take with each speaker's voice converted;
 the job does the conversion and keeps it in a disposable cache.
 
+Sound from the catalog (CT-0048) is laid under the joined cut: effects and
+Foley a shot places, the scene's ambience beds and music cues, each at its
+loudness, the music lowered under the speech. What was laid is recorded.
+
 Shots are joined with straight cuts. Transitions and split edits (J/L) are
 listed as not rendered yet, not approximated. Picture is normalised to the
 first take's size and frame rate, sound to 48 kHz stereo.
@@ -84,6 +88,9 @@ class Plan:
     segments: list[Segment] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     gains: dict[str, float] = field(default_factory=dict)
+    #: Sounds from the catalog placed on the cut's timeline, and, once rendered, what was laid.
+    cues: list[dict[str, Any]] = field(default_factory=list)
+    sound: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def takes(self) -> dict[str, str]:
@@ -241,6 +248,11 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         ))
     if not plan.segments:
         raise ValidationError(f"{scene['id']} has no shot with a take to assemble")
+    if scene.get("ambience") or scene.get("music") or any(shot.get("sounds") for shot in scene["shots"]):
+        from .sounds import place
+
+        plan.cues, notes = place(scene, plan.segments)
+        plan.notes.extend(notes)
     return plan
 
 
@@ -357,6 +369,22 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
         pieces.append(piece)
     listing = work / "pieces.txt"
     listing.write_text("".join(f"file '{piece.name}'\n" for piece in pieces), encoding="utf-8")
+    joined = work / "joined.mp4" if plan.cues else output
     run_process([ffmpeg, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing),
-                 "-c", "copy", "-movflags", "+faststart", str(output)],
-                message="Joining the shots", span=within(0.9, 1.0))
+                 "-c", "copy", "-movflags", "+faststart", str(joined)],
+                message="Joining the shots", span=within(0.9, 0.93 if plan.cues else 1.0))
+    if plan.cues:
+        from .sounds import list_sounds, mix
+
+        speech, clock = [], 0.0
+        for segment in plan.segments:
+            if segment.speech:
+                speech.append((clock + max(0.0, segment.speech[0] - segment.start),
+                               clock + min(segment.end, segment.speech[1]) - segment.start))
+            clock += segment.end - segment.start
+        catalog = {item["id"]: item for item in list_sounds(root)}
+
+        def run_sound(command, expected_seconds=None, message=""):
+            run_process(command, expected_seconds=expected_seconds, message=message, span=within(0.93, 1.0))
+
+        plan.sound = mix(joined, plan.cues, catalog, speech, output, work / "sound", run_sound)

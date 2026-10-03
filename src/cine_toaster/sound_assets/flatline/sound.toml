@@ -1,0 +1,13 @@
+schema_version = 1
+id = "flatline"
+name = "Flatline"
+category = "effect"
+says = "A continuous monitor tone: the line goes flat."
+use_when = ["A heart stops; a machine's verdict"]
+
+[source]
+generate = '''sine=f=1046:r=48000:d={d},volume=0.45[t];sine=f=2092:r=48000:d={d},volume=0.08[h];[t][h]amix=inputs=2:normalize=0'''
+
+[params]
+duration = 6.0
+fade_in = 0.05

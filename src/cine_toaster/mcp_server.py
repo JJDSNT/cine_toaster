@@ -181,6 +181,14 @@ def build(root: Path, manager=None):
                 "elements": list_elements(runtime.root)}
 
     @server.tool(annotations=reading)
+    def list_sounds() -> list[dict[str, Any]]:
+        """The sound catalog: a shot places `sounds: [{id: …, at: …}]`; a scene names `ambience` and `music`."""
+        from .sounds import list_sounds as catalog
+
+        return [{key: item[key] for key in ("id", "name", "category", "says", "params", "licence", "credit",
+                                            "status", "exists")} for item in catalog(runtime.root)]
+
+    @server.tool(annotations=reading)
     def plan_generation(scene: str, target: str, seed: int = 1) -> dict[str, Any]:
         """What generating a block (its id) or a lone shot (P7) would send and cost. Nothing is sent or paid."""
 

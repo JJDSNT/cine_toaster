@@ -1,0 +1,13 @@
+schema_version = 1
+id = "rain"
+name = "Rain"
+category = "ambience"
+says = "Steady rain, close: a window, a street."
+use_when = ["A rainy exterior, or the room beside it"]
+
+[source]
+generate = '''anoisesrc=color=white:a=0.2:d={d}:r=48000,highpass=f=800,lowpass=f=7000,volume=0.5[r];anoisesrc=color=brown:a=0.08:d={d}:r=48000,lowpass=f=200[l];[r][l]amix=inputs=2:normalize=0'''
+
+[params]
+fade_in = 1.5
+fade_out = 1.5

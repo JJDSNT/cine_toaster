@@ -1,0 +1,12 @@
+schema_version = 1
+id = "door"
+name = "Door"
+category = "foley"
+says = "A heavy door: a push, a thud."
+use_when = ["A door seen or heard closing"]
+
+[source]
+generate = '''aevalsrc='0.3*(random(0)-0.5)*exp(-2.5*t)*(1-exp(-40*t))':s=48000:d={d},lowpass=f=700,highpass=f=80'''
+
+[params]
+duration = 1.0

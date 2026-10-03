@@ -1,0 +1,12 @@
+schema_version = 1
+id = "dissonant-beep"
+name = "Dissonant beep"
+category = "effect"
+says = "Two monitors beeping out of step, close: something is wrong."
+use_when = ["A vital sign that changes"]
+
+[source]
+generate = '''sine=f=1046:r=48000:d={d},volume='0.45*lt(mod(t,0.62),0.09)':eval=frame[a];sine=f=987:r=48000:d={d},volume='0.3*lt(mod(t-0.31,0.74),0.09)':eval=frame[b];[a][b]amix=inputs=2:normalize=0'''
+
+[params]
+duration = 1.2

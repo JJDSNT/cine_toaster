@@ -1,0 +1,13 @@
+schema_version = 1
+id = "city-distant"
+name = "Distant city"
+category = "ambience"
+says = "A city heard from far off, breathing slowly: dawn, a window, a rooftop."
+use_when = ["An exterior over a city, a room with the window open"]
+
+[source]
+generate = '''anoisesrc=color=brown:a=0.06:d={d}:r=48000,lowpass=f=320,volume='0.55+0.1*sin(2*PI*t/11)':eval=frame'''
+
+[params]
+fade_in = 1.5
+fade_out = 1.5

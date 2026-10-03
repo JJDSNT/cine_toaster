@@ -145,6 +145,8 @@ CORE_SHOT_FIELDS: frozenset[str] = frozenset(
         "framing",
         "title",
         "effects",
+        # CT-0048: sounds from the catalog, placed on the shot as cut.
+        "sounds",
         "duration",
         "camera",
         "camera_id",

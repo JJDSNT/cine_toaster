@@ -1,0 +1,12 @@
+schema_version = 1
+id = "footsteps"
+name = "Footsteps"
+category = "foley"
+says = "Steps on a hard floor, at a walk (about two a second)."
+use_when = ["Someone crossing a room out of frame"]
+
+[source]
+generate = '''aevalsrc='0.6*(random(0)-0.5)*exp(-60*mod(t,0.55))':s=48000:d={d},bandpass=f=900:width_type=h:w=1000'''
+
+[params]
+duration = 3.3

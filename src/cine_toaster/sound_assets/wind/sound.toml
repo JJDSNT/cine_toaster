@@ -1,0 +1,13 @@
+schema_version = 1
+id = "wind"
+name = "Wind"
+category = "ambience"
+says = "Wind in gusts, open air, cold."
+use_when = ["An exterior in the open, a frozen landscape, a rooftop"]
+
+[source]
+generate = '''anoisesrc=color=pink:a=0.25:d={d}:r=48000,bandpass=f=500:width_type=h:w=400,volume='0.35+0.3*sin(2*PI*t/7)*sin(2*PI*t/3.1)':eval=frame,lowpass=f=1800'''
+
+[params]
+fade_in = 2.0
+fade_out = 2.0
