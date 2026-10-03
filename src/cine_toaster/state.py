@@ -93,12 +93,15 @@ class Assembly:
     reviewed_by: Actor | None = None
     revision: int = 0
     takes: dict[str, str] = field(default_factory=dict)
+    #: The same cut delivered in other formats (CT-0049): rendition id -> media.
+    renditions: dict[str, str] = field(default_factory=dict)
 
     def public_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "created_at": self.created_at,
             "media": self.media,
+            "renditions": dict(self.renditions),
             "summary": self.summary,
             "duration_seconds": self.duration_seconds,
             "verdict": self.verdict,
@@ -323,6 +326,7 @@ def load_scene_state(scene_directory: Path, scene_id: str) -> SceneState:
                 reviewed_by=_actor_from(reviewer) if reviewer else None,
                 revision=int(raw.get("revision", 0)),
                 takes={str(key): str(value) for key, value in (raw.get("takes") or {}).items()},
+                renditions={str(key): str(value) for key, value in (raw.get("renditions") or {}).items()},
             )
         )
 

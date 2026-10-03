@@ -199,6 +199,13 @@ export function renderVersions(scene, { onChanged }) {
       details.append(player(scene, assembly));
       card.append(details);
     }
+    // The same cut in other formats (CT-0049), each watchable on its own.
+    for (const [name, media] of Object.entries(assembly.renditions || {})) {
+      const details = el("details", "finding-why");
+      details.append(el("summary", "", `Watch it as ${name}`));
+      details.append(player(scene, { ...assembly, media }));
+      card.append(details);
+    }
 
     const actions = el("div", "take-actions");
     for (const [verdict, label] of VERDICTS) {

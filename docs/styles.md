@@ -107,9 +107,42 @@ catalog (a test checks the built-in ones).
 `toast style list|show`, the control room's **Styles** room (the
 production's own is marked), MCP `list_styles`.
 
+## A format on the cut
+
+The assembly applies the format axis:
+
+- **aspect** -- every take is reframed to it: a window as tall (or as
+  wide) as the take allows, centred unless the shot says where
+  (`reframe: {x: 0.3, y: 0.5}`, 0 to 1), scaled so the long side keeps the
+  take's resolution. The whole take is reframed, so J/L-cuts keep their
+  handles; titles are drawn in the new frame, so no text is cut. The takes
+  themselves are not touched;
+- **captions** -- the words spoken, in groups of up to four broken at
+  pauses, from the word sidecar's words (`{start, end, word}`), else the
+  shot's lines spread over its speech, burned in the lower part of the
+  frame;
+- **end card** -- stays the author's: a format that wants one advises when
+  the scene does not end on a title card.
+
+## Several formats at once
+
+```yaml
+# project.yaml (or a scene)
+deliver: [TikTok, {name: square, aspect: "1:1"}]
+```
+
+Every version is then also delivered in each format named -- the same
+takes, joins and sound, reframed and captioned for it -- kept with the
+version (`renditions`) and watchable from it in the control room:
+`renders/assemblies/SC-030/v3.mp4`, `v3.viral-vertical.mp4`,
+`v3.square.mp4`. A name is a format style (or one of its `aka`); a mapping
+gives an aspect and, optionally, `captions: true`. Anything else is
+`deliver_problem`.
+
 ## Not yet
 
-- A format's aspect ratio and frame rate applied to generation and the
-  assembly (today they are stated in the brief).
-- Burned-in captions and an end card made from the format.
-- Style for a sequence (between production and scene).
+- A format's aspect and frame rate asked of generation (today the takes
+  are generated in their own frame and reframed in the cut).
+- A subject-aware reframe from the plan (the blocking frame knows where
+  the subject is); today the window is centred or placed by hand.
+- Renditions of a sequence; style for a sequence.

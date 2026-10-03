@@ -210,3 +210,23 @@ distinct axes, not one exclusive choice. `style:` takes a name, a list or
 `styles.summary` combines them with an owner per field; advice names the
 axis. Tests: `tests/test_styles.py` (combination, per-axis cascade, `none`,
 one per axis). Not yet run: the full suite after this change.
+
+# Done: formats on the cut, and delivery in several formats (2026-10-03)
+
+- `formats.py`: target size from an aspect (the long side kept), the
+  reframe crop (`reframe: {x, y}` on a shot, a core field), caption groups
+  (≤ 4 words, broken at 0.6 s pauses, from the word sidecar's text or a
+  line spread over its speech), an ASS file burned with libass.
+- The assembly: `Plan.format` from the scene's format axis; every take
+  reframed whole into the work folder (handles kept, the take untouched,
+  titles drawn in the new frame); captions placed on the timeline and
+  burned when the format carries them. The format's `end_card` is advice
+  when the last shot is not a title card.
+- The user asked whether it could produce several formats at once: yes.
+  `deliver:` (production or scene) lists format styles or `{name, aspect,
+  captions}`; the assemble job plans once and renders each rendition from
+  a copy of the plan; the version keeps `renditions` (state: an optional
+  field, older files read as before); the control room plays each.
+- Tests: `tests/test_formats.py` (sizes and windows; caption groups; a
+  vertical version reframed to the right with captions shown while spoken;
+  one job delivering 16:9, 9:16 and 1:1 of the demo scene; bad renditions).

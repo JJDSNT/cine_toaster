@@ -99,6 +99,9 @@ class Segment:
     source: str = ""
     #: Speech heard within a scene version, in its own seconds (a sequence's segments): music ducks under it.
     speech_spans: list[tuple[float, float]] = field(default_factory=list)
+    #: A format's frame in the take ({x, y}, CT-0049), and the captions spoken in it, in the take's seconds.
+    reframe: dict[str, Any] | None = None
+    captions: list[tuple[float, float, str]] = field(default_factory=list)
     #: The join into this shot, resolved: a transition ({id, seconds, shader | mode}) and a J/L split.
     transition: dict[str, Any] | None = None
     split: float = 0.0
@@ -121,6 +124,8 @@ class Plan:
     sound: list[dict[str, Any]] = field(default_factory=list)
     #: Once rendered, where speech is heard on the cut's timeline: kept beside the version for the sequence.
     speech: list[tuple[float, float]] = field(default_factory=list)
+    #: The format's rules the render applies (CT-0049): {aspect, captions}.
+    format: dict[str, Any] = field(default_factory=dict)
 
     @property
     def takes(self) -> dict[str, str]:
@@ -276,9 +281,25 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         )
         if plan.segments:
             _resolve_join(root, plan, cut, segment, joins)
+        segment.reframe = shot.get("reframe")
+        # Timed whenever a version wants them: the scene's format, or a format it is delivered in.
+        if (((scene.get("style") or {}).get("format") or {}).get("captions")
+                or any(item.get("captions") for item in scene.get("deliver") or [])):
+            from .formats import groups, spoken_words, spread
+
+            words = [word for word in spoken_words(path, words_sidecar) if start - 0.05 <= word[0] and word[1] <= end + 0.05]
+            if words:
+                segment.captions = groups(words)
+            else:
+                text = " ".join(str(line.get("en") or line.get("text") or "") for line in shot.get("lines") or []
+                                if line.get("in_take", True)).strip()
+                begin, finish = segment.speech or (start, end)
+                segment.captions = spread(text, begin, finish)
         plan.segments.append(segment)
     if not plan.segments:
         raise ValidationError(f"{scene['id']} has no shot with a take to assemble")
+    form = (scene.get("style") or {}).get("format") or {}
+    plan.format = {key: form[key] for key in ("aspect", "captions") if form.get(key)}
     if scene.get("ambience") or scene.get("music") or any(shot.get("sounds") for shot in scene["shots"]):
         from .sounds import place
 
@@ -412,9 +433,11 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
     work.mkdir(parents=True, exist_ok=True)
     real = next((segment for segment in plan.segments if segment.media), None)
     first = probe(root / real.media) if real else {"width": 1280, "height": 720, "fps": FPS, "audio": False}
+    fps = first["fps"] or FPS
+    if plan.format.get("aspect"):
+        first = _reframe(root, plan, first, work, run_process, within(0.0, 0.05))
     width, height = first["width"] // 2 * 2, first["height"] // 2 * 2
     size = f"{width}:{height}"
-    fps = first["fps"] or FPS
     segment_gain: dict[str, float] = {}
     plan.gains = segment_gain
     total = len(plan.segments)
@@ -514,6 +537,18 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
         sounds.append((clip, max(0.0, starts[index] - before)))
     picture = _join_pictures(ffmpeg, plan, pictures, count, overlap, work, fps, width, height, run_process,
                              within(0.85, 0.9))
+    captions = [(starts[index] + max(0.0, a - segment.start), starts[index] + min(segment.end, b) - segment.start, text)
+                for index, segment in enumerate(plan.segments) for a, b, text in segment.captions
+                if b > segment.start and a < segment.end] if plan.format.get("captions") else []
+    if captions:
+        from .formats import subtitles_filter, write_ass
+
+        ass = write_ass(captions, (width, height), work / "captions.ass")
+        captioned = work / "picture-captioned.mp4"
+        run_process([ffmpeg, "-y", "-loglevel", "error", "-i", str(picture), "-vf", subtitles_filter(ass),
+                     "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", str(captioned)],
+                    message=f"Burning {len(captions)} captions", span=within(0.9, 0.91))
+        picture = captioned
     mixed = work / "sound.wav"
     inputs = [part for clip, _ in sounds for part in ("-i", str(clip))]
     delays = ";".join(f"[{index}:a]adelay={int(round(at * 1000))}:all=1[s{index}]"
@@ -560,6 +595,32 @@ def _frames_in(path: Path) -> int:
         return int(completed.stdout.strip().split(",")[0])
     except ValueError:
         return 0
+
+
+def _reframe(root: Path, plan: Plan, first: dict[str, Any], work: Path, run_process,
+             span: tuple[float, float]) -> dict[str, Any]:
+    """Each take reframed to the format's aspect, whole (its handles kept for J/L-cuts); the new frame's size."""
+
+    from .formats import reframe_filter, target_size
+
+    target = target_size(first["width"], first["height"], plan.format["aspect"])
+    for index, segment in enumerate(plan.segments):
+        if not segment.media:
+            continue
+        source = root / segment.media
+        info = probe(source)
+        if (info["width"] // 2 * 2, info["height"] // 2 * 2) == target:
+            continue
+        where = segment.reframe or {}
+        reframed = work / f"reframed-{index:03d}.mp4"
+        run_process(["ffmpeg", "-y", "-loglevel", "error", "-i", str(source), "-vf",
+                     reframe_filter(info["width"], info["height"], target, float(where.get("x", 0.5)),
+                                    float(where.get("y", 0.5))),
+                     "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p", "-c:a", "copy",
+                     str(reframed)], expected_seconds=info["duration"],
+                    message=f"{segment.shot}: reframed to {plan.format['aspect']}", span=span)
+        segment.media = str(reframed)  # an absolute path: the take is left as it is
+    return {**first, "width": target[0], "height": target[1]}
 
 
 def _join_pictures(ffmpeg: str, plan: Plan, pictures: list[Path], count: list[int], overlap: list[int], work: Path,

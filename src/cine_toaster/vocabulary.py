@@ -149,6 +149,8 @@ CORE_SHOT_FIELDS: frozenset[str] = frozenset(
         "sounds",
         # CT-0048: how the people in the shot feel, from the emotion catalog.
         "emotion",
+        # CT-0049: where a format's frame sits in the take ({x, y}, 0 to 1).
+        "reframe",
         "duration",
         "camera",
         "camera_id",

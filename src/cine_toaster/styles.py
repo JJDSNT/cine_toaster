@@ -279,6 +279,12 @@ def departures(style: dict[str, Any], shots: list[dict[str, Any]]) -> list[tuple
         if first > form["hook_seconds"] * 1.5:
             found.append((shots[0]["id"], f"opens for {first:g} s before anything changes; {owner} hooks within "
                                           f"{form['hook_seconds']:g} s"))
+    from .formats import end_card_missing
+
+    if end_card_missing(style, shots):
+        kept = [shot for shot in shots if not shot.get("out_of_cut")]
+        found.append((kept[-1]["id"], f"ends the scene, but {owner} ends on an end card: a title card shot "
+                                      "(`title:` with no take) with the brand or the title"))
     total = sum(float(shot.get("duration_seconds") or 0) for shot in shots if not shot.get("out_of_cut"))
     if form.get("total_seconds") and total:
         low, high = form["total_seconds"]

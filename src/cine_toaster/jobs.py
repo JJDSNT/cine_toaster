@@ -13,6 +13,7 @@ stop.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -739,16 +740,30 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
     context.progress(0.01, f"{len(plan.segments)} shots")
     voices = _voices_for_cut(context, production, scene["id"], plan)
     output = context.staging / "assembly.mp4"
+    # The same cut in every format it is delivered in (CT-0049): planned once, rendered per format.
+    deliveries = [(item, copy.deepcopy(plan)) for item in scene.get("deliver") or []]
+    share = 1.0 / (1 + len(deliveries))
+    start = 0.6 if voices else 0.0
     render(context.project_root, plan, output, context.staging / "work", context.run_process,
-           span=(0.6, 1.0) if voices else (0.0, 1.0))
+           span=(start, start + (1.0 - start) * share))
     shutil.rmtree(context.staging / "work", ignore_errors=True)
     scene_id, version = context.params["scene"], context.params["version"]
+    renditions = []
+    for index, (item, copied) in enumerate(deliveries, 1):
+        copied.format = {"aspect": item["aspect"], **({"captions": True} if item["captions"] else {})}
+        name = f"assembly.{item['id']}.mp4"
+        render(context.project_root, copied, context.staging / name, context.staging / f"work-{item['id']}",
+               context.run_process, span=(start + (1.0 - start) * share * index,
+                                          start + (1.0 - start) * share * (index + 1)))
+        shutil.rmtree(context.staging / f"work-{item['id']}", ignore_errors=True)
+        renditions.append({"staged": name, "destination": f"renders/assemblies/{scene_id}/{version}.{item['id']}.mp4",
+                           "rendition": item["id"]})
     # Where speech is heard in this version: a sequence's music ducks under it (CT-0051).
     (context.staging / "assembly.speech.json").write_text(json.dumps({"speech": plan.speech}), encoding="utf-8")
     return {
         "files": [{"staged": "assembly.mp4", "destination": f"renders/assemblies/{scene_id}/{version}.mp4"},
                   {"staged": "assembly.speech.json",
-                   "destination": f"renders/assemblies/{scene_id}/{version}.mp4.speech.json"}],
+                   "destination": f"renders/assemblies/{scene_id}/{version}.mp4.speech.json"}, *renditions],
         "summary": {"segments": [{**{key: value for key, value in asdict(segment).items() if key not in ("sound", "source")},
                                   "gain_db": plan.gains.get(segment.shot, 0.0)} for segment in plan.segments],
                     "notes": plan.notes, "voices": voices, "sound": plan.sound,
@@ -780,6 +795,8 @@ def _adopted_assemble(job: dict[str, Any], placed: list[str]) -> None:
         + (f". Notes: {notes}" if notes else "."),
         duration_seconds=summary["duration_seconds"],
         takes=summary["takes"],
+        renditions={item["rendition"]: Path(path).resolve().relative_to(root.resolve()).as_posix()
+                    for item, path in zip(job["result"]["files"], placed) if item.get("rendition")},
     )
 
 

@@ -209,6 +209,8 @@ def _load_shots(
                 # CT-0037: shots made together in one generation share a block.
                 "block": _text(field(raw, "block")),
                 "trim": field(raw, "trim") if isinstance(field(raw, "trim"), dict) else None,
+                # Where a format's frame sits in the take (CT-0049): {x, y}, 0 to 1, centred by default.
+                "reframe": field(raw, "reframe") if isinstance(field(raw, "reframe"), dict) else None,
                 "derive": _derive(field(raw, "derive")),
                 "guide_at_cut": field(raw, "guide_at_cut") if isinstance(field(raw, "guide_at_cut"), bool) else None,
                 "guide_strength": field(raw, "guide_strength"),
@@ -591,7 +593,8 @@ def _load_scene(
     screenplay: script_model.Screenplay | None = None,
     aliases: dict[str, tuple[str, dict[str, str]]] | None = None,
     scene_aliases: dict[str, str] | None = None,
-    project_style: str = "",
+    project_style: Any = "",
+    project_deliver: Any = None,
 ) -> dict[str, Any]:
     document = _read_yaml(path)
     scene_id = vtext(document, "scene") or _text(document.get("id"))
@@ -655,6 +658,15 @@ def _load_scene(
                     message=f"{shot_id or scene_id} {what}.")
             for shot_id, what in departures(style, shots))
     move_findings.extend(style_findings)
+    deliver = document.get("deliver") if document.get("deliver") is not None else project_deliver
+    renditions: list[dict[str, Any]] = []
+    if deliver:
+        from .formats import renditions as parse_renditions
+        from .styles import list_styles
+
+        renditions, problems = parse_renditions(deliver, {entry["id"]: entry for entry in list_styles(root)})
+        move_findings.extend(Finding(code="deliver_problem", severity="error", scene_id=scene_id, shots=(),
+                                     message=f"{scene_id} {problem}.") for problem in problems)
     motions = shot_motions(geometry, shots, scene_id=scene_id)
     positions_by_shot = {motion.shot_id: motion.start_positions for motion in motions}
     findings = [
@@ -772,6 +784,8 @@ def _load_scene(
         "enter": enter,
         # The style in force (CT-0049): the scene's, else the production's.
         "style": style,
+        # The same cut in other formats, delivered with every version (CT-0049).
+        "deliver": renditions,
         "findings": findings,
         "decision_log": list(reversed(state.decisions)),
         "pending_shots": pending_shots,
@@ -1497,7 +1511,8 @@ def load_production(root: Path) -> dict[str, Any]:
     screenplay = _read_screenplay(root, script_files)
     scenes = [
         _load_scene(path, root, declared_fields, project_look, screenplay, _shot_field_aliases(manifest),
-                    _scene_field_aliases(manifest), project_style=manifest.get("style"))
+                    _scene_field_aliases(manifest), project_style=manifest.get("style"),
+                    project_deliver=manifest.get("deliver"))
         for path in scene_files(root, manifest)
     ]
     scenes.sort(key=lambda scene: (scene["order"], scene["id"]))

@@ -693,6 +693,7 @@ def record_assembly(
     duration_seconds: float = 0.0,
     expected_revision: int | None = None,
     takes: dict[str, str] | None = None,
+    renditions: dict[str, str] | None = None,
 ) -> CommandResult:
     """Register a rendered version of the scene, with the takes it contains.
 
@@ -738,6 +739,7 @@ def record_assembly(
         takes=dict(takes) if takes is not None else {
             shot_id: selection.take_id for shot_id, selection in state.selections.items()
         },
+        renditions=dict(renditions or {}),
     )
     record = {
         "kind": "assembly.recorded",
