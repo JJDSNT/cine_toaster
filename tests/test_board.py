@@ -113,6 +113,20 @@ class BoardTests(unittest.TestCase):
         grid = Image.open(sheet(self.root, scene, tile=(160, 90)))
         self.assertGreater(grid.width, 3 * 160)
 
+    def test_boards_are_a_job_adopted_into_the_scenes_renders(self) -> None:
+        from cine_toaster.board import listing
+        from cine_toaster.jobs import JobManager, JobStore
+
+        manager = JobManager(store=JobStore(Path(os.environ["XDG_STATE_HOME"]) / "jobs.sqlite"))
+        self.addCleanup(manager.shutdown, wait=False)
+        job = manager.wait(manager.submit("boards", self.root, {"scene": "SC-030"})["id"], timeout=300)
+        self.assertEqual(job["state"], "succeeded", job["error"])
+        manager.adopt(job["id"])
+        listed = listing(self.root, self.scene())
+        self.assertEqual(set(listed["shots"]["P3"]["boards"]), {"start"})
+        self.assertFalse(listed["shots"]["P3"]["boards"]["start"]["stale"])
+        self.assertIn("sheet.png", listed)
+
     def test_the_animatic_plays_the_scene_through_its_cameras(self) -> None:
         from cine_toaster.assembly import probe
         from cine_toaster.board import animatic

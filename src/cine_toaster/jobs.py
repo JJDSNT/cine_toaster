@@ -590,6 +590,56 @@ def _run_build(context: JobContext) -> dict[str, Any]:
 
 
 register(JobKind("previs", _validate_previs, _run_previs))
+
+
+def _validate_boards(root: Path, params: dict[str, Any]) -> dict[str, Any]:
+    from .project import load_scene
+
+    scene_id = str(params.get("scene", "")).strip()
+    scene = load_scene(root, scene_id) if scene_id else None
+    if scene is None:
+        raise ValidationError(f"No scene {scene_id!r}")
+    if not (scene.get("geometry") or {}).get("cameras"):
+        raise ValidationError(f"{scene_id} has no cameras in its plan to draw boards from")
+    look = str(params.get("look") or "clay")
+    if look not in ("clay", "colour"):
+        raise ValidationError(f"Unknown board look {look!r}", allowed=["clay", "colour"])
+    return {"scene": scene_id, "ends": bool(params.get("ends")), "look": look}
+
+
+def _run_boards(context: JobContext) -> dict[str, Any]:
+    """The scene's 3D boards, depth maps and labelled sheet (CT-0049), adopted into renders/boards/."""
+
+    from .board import boards, sheet
+    from .project import load_scene
+
+    scene = load_scene(context.project_root, context.params["scene"])
+    context.progress(0.05, "Drawing the boards in Blender")
+    out = context.staging / "boards"
+    out.mkdir()
+    made = boards(context.project_root, scene, ends=context.params["ends"], look=context.params["look"], folder=out)
+    sheet(context.project_root, scene, folder=out)
+    prefix = f"renders/boards/{scene['id']}"
+    return {"files": [{"staged": f"boards/{path.name}", "destination": f"{prefix}/{path.name}"}
+                      for path in sorted(out.iterdir()) if path.is_file()],
+            "summary": {"boards": len(made), "scene": scene["id"]}}
+
+
+def _run_board_animatic(context: JobContext) -> dict[str, Any]:
+    """The scene played through its cameras in 3D, to check the breakdown (never a model's input)."""
+
+    from .board import animatic
+    from .project import load_scene
+
+    scene = load_scene(context.project_root, context.params["scene"])
+    context.progress(0.05, "Playing the scene through its cameras")
+    animatic(context.project_root, scene, output=context.staging / "animatic.mp4")
+    return {"files": [{"staged": "animatic.mp4", "destination": f"renders/boards/{scene['id']}/animatic.mp4"}],
+            "summary": {"scene": scene["id"]}}
+
+
+register(JobKind("boards", _validate_boards, _run_boards))
+register(JobKind("board_animatic", _validate_boards, _run_board_animatic))
 register(JobKind("build", _validate_build, _run_build))
 
 

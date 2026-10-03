@@ -31,8 +31,12 @@ SCRIPT = Path(__file__).with_name("vfx_assets") / "_blender" / "board.py"
 FPS = 24
 
 
+def board_folder(root: Path, scene_id: str) -> Path:
+    return root / "renders" / "boards" / scene_id
+
+
 def board_path(root: Path, scene_id: str, shot_id: str, moment: str = "start") -> Path:
-    return root / "renders" / "boards" / scene_id / f"{shot_id}-{moment}.png"
+    return board_folder(root, scene_id) / f"{shot_id}-{moment}.png"
 
 
 def _stage(scene: dict[str, Any], work: Path) -> tuple[Path, list[dict[str, Any]]]:
@@ -74,8 +78,8 @@ def _depth_png(exr: Path, png: Path) -> None:
 
 
 def boards(root: Path, scene: dict[str, Any], *, shots: list[str] | None = None, ends: bool = False,
-           width: int = 1280, height: int = 720, look: str = "clay") -> list[dict[str, Any]]:
-    """Draw the boards of a scene's shots (all, or `shots`); returns what was written."""
+           width: int = 1280, height: int = 720, look: str = "clay", folder: Path | None = None) -> list[dict[str, Any]]:
+    """Draw the boards of a scene's shots (all, or `shots`) into `folder` (the scene's boards by default)."""
 
     import tempfile
 
@@ -97,7 +101,7 @@ def boards(root: Path, scene: dict[str, Any], *, shots: list[str] | None = None,
         made = []
         for still in stills:
             shot_id, moment = still["name"].rsplit("-", 1)
-            target = board_path(root, scene["id"], shot_id, moment)
+            target = (folder or board_folder(root, scene["id"])) / f"{shot_id}-{moment}.png"
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(work / "out" / f"{still['name']}.png", target)
             _depth_png(work / "out" / f"{still['name']}.exr", target.with_name(f"{target.stem}-depth.png"))
@@ -109,7 +113,8 @@ def boards(root: Path, scene: dict[str, Any], *, shots: list[str] | None = None,
     return made
 
 
-def animatic(root: Path, scene: dict[str, Any], *, width: int = 960, height: int = 540, step: int = 2) -> Path:
+def animatic(root: Path, scene: dict[str, Any], *, width: int = 960, height: int = 540, step: int = 2,
+             output: Path | None = None) -> Path:
     """The scene played through its shots' cameras, for people to check; returns the video."""
 
     import tempfile
@@ -123,7 +128,7 @@ def animatic(root: Path, scene: dict[str, Any], *, width: int = 960, height: int
         _run({"usd": str(stage), "output": str(work / "out"), "width": width, "height": height,
               "animatic": {"shots": [{"camera": item["shot"], "first": item["first_frame"], "frames": item["frames"]}
                                      for item in timeline], "step": step}}, work)
-        output = root / "renders" / "boards" / scene["id"] / "animatic.mp4"
+        output = output or board_folder(root, scene["id"]) / "animatic.mp4"
         output.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run([ffmpeg, "-v", "error", "-y", "-framerate", f"{FPS / step:g}", "-i",
                         str(work / "out" / "animatic" / "f_%04d.png"), "-vf", "format=yuv420p", "-c:v", "libx264",
@@ -213,14 +218,16 @@ def shot_size(scene: dict[str, Any], shot: dict[str, Any]) -> str:
     return framing(scene, shot)["size"]
 
 
-def sheet(root: Path, scene: dict[str, Any], *, columns: int = 3, tile: tuple[int, int] = (480, 270)) -> Path:
+def sheet(root: Path, scene: dict[str, Any], *, columns: int = 3, tile: tuple[int, int] = (480, 270),
+          folder: Path | None = None) -> Path:
     """The scene's boards as one labelled grid, shot by shot, as a board wall is pinned up."""
 
     from PIL import Image, ImageDraw, ImageFont
 
     items = []
+    folder = folder or board_folder(root, scene["id"])
     for number, shot in enumerate(scene.get("shots") or [], 1):
-        path = board_path(root, scene["id"], shot["id"])
+        path = folder / f"{shot['id']}-start.png"
         if path.is_file():
             items.append((number, shot, path))
     if not items:
@@ -244,6 +251,26 @@ def sheet(root: Path, scene: dict[str, Any], *, columns: int = 3, tile: tuple[in
         box = draw.textbbox((0, 0), text, font=font)
         draw.rectangle((x + 8, y + height - 30, x + 20 + box[2], y + height - 8), fill=(20, 22, 26))
         draw.text((x + 14, y + height - 28), text, fill=(235, 236, 238), font=font)
-    output = root / "renders" / "boards" / scene["id"] / "sheet.png"
+    output = folder / "sheet.png"
     canvas.save(output)
     return output
+
+
+def listing(root: Path, scene: dict[str, Any]) -> dict[str, Any]:
+    """What boards a scene has, which are stale, and its sheet and animatic (for the control room)."""
+
+    folder = board_folder(root, scene["id"])
+    shots = {}
+    for shot in scene.get("shots") or []:
+        moments = {}
+        for moment in ("start", "end"):
+            path = board_path(root, scene["id"], shot["id"], moment)
+            if path.is_file():
+                depth = path.with_name(f"{path.stem}-depth.png")
+                moments[moment] = {"path": path.relative_to(root).as_posix(), "version": path.stat().st_mtime_ns,
+                                   "depth": depth.relative_to(root).as_posix() if depth.is_file() else "",
+                                   "stale": stale(root, scene, shot["id"], moment)}
+        shots[shot["id"]] = {"label": label(scene, shot, len(shots) + 1), "boards": moments}
+    extra = {name: (folder / name).relative_to(root).as_posix() for name in ("sheet.png", "animatic.mp4")
+             if (folder / name).is_file()}
+    return {"scene": scene["id"], "shots": shots, **extra}

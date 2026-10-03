@@ -261,6 +261,16 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             self._send_json(locations_view(self.project_root, cached_production(self.project_root),
                                            {item["id"]: item for item in backlot_status(self.project_root)}))
             return
+        if parsed.path == "/api/boards":
+            # A scene's 3D boards (CT-0049): which exist, which are stale, the sheet and the animatic.
+            from .board import listing
+
+            scene = self._scene(query.get("scene", [""])[0])
+            if scene is None:
+                self._send_json({"error": {"code": "not_found", "message": "No such scene"}}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json(listing(self.project_root, scene))
+            return
         if parsed.path == "/api/vfx":
             # The VFX catalog and the production's stock elements (CT-0031).
             from .vfx import list_effects, list_elements

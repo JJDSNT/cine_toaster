@@ -827,12 +827,57 @@ function renderBlockout(scene) {
     }
     panel.append(chips);
   }
-  // Beside the plan, what the selected shot's camera sees (CT-0025).
+  // The 3D storyboard (CT-0049): boards fix composition; the animatic is for checking, never a model's input.
+  let boardsInfo = null;
+  const storyboard = el("div", "board-bar");
+  const loadBoards = async () => {
+    boardsInfo = await api(`/api/boards?scene=${encodeURIComponent(scene.id)}`, { optional: true });
+    storyboard.replaceChildren(el("strong", "", "3D storyboard"));
+    const job = (kind, text, title) => {
+      const action = button(text, () => {
+        action.disabled = true;
+        startJob(kind, { scene: scene.id }).catch((error) => alert(error.message)).finally(() => { action.disabled = false; });
+      }, "blockout-chip");
+      action.title = title;
+      return action;
+    };
+    storyboard.append(
+      job("boards", "Draw boards", "Clay boards of every shot's first frame, from the plan, with depth. A background job; adopt it from Jobs."),
+      job("board_animatic", "3D animatic", "The scene through its cameras, to check timing and sides. Never given to a model."),
+    );
+    if (boardsInfo?.["sheet.png"]) {
+      const link = el("a", "blockout-chip", "Board sheet");
+      link.href = `/media/${boardsInfo["sheet.png"]}`;
+      link.target = "_blank";
+      storyboard.append(link);
+    }
+    if (boardsInfo?.["animatic.mp4"]) {
+      const link = el("a", "blockout-chip", "Watch the animatic");
+      link.href = `/media/${boardsInfo["animatic.mp4"]}`;
+      link.target = "_blank";
+      storyboard.append(link);
+    }
+    if (activeShot) showFrames(activeShot);
+  };
+  loadBoards().catch(() => {});
+  panel.append(storyboard);
+
+  // Beside the plan, what the selected shot's camera sees (CT-0025), and its 3D board.
   const frames = el("div", "blocking-frames");
   const showFrames = (shotId) => {
     frames.replaceChildren();
     const motion = motions.find((item) => item.shot_id === shotId);
     if (!motion || !motion.start.camera) return;
+    const board = boardsInfo?.shots?.[shotId];
+    for (const [moment, item] of Object.entries(board?.boards || {})) {
+      const figure = el("figure", "blocking-frame board-frame");
+      const image = el("img");
+      image.src = `/media/${item.path}?v=${item.version}`;
+      image.alt = `${shotId} 3D board at ${moment}`;
+      figure.append(image, el("figcaption", "", `${board.label} · 3D board${moment === "end" ? " · end" : ""}`));
+      if (item.stale) figure.append(el("small", "finding warning", "Drawn before the plan last changed: draw the boards again."));
+      frames.append(figure);
+    }
     const changes = motion.kind !== "static" || motion.moved_subjects.length;
     if (changes) frames.append(previsPlayer(scene, shotId));
     for (const at of changes ? ["start", "end"] : ["start"]) {

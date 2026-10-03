@@ -97,7 +97,13 @@ the AI model.
   picture plan's notes.
 - Tests: `tests/test_board.py` (boards and depth; derive from a board and
   the stale note; the animatic).
-- Not done: boards in the control room's scene room.
+- Boards in the control room (2026-10-03): job kinds `boards` (boards,
+  depth, sheet into staging, adopted into `renders/boards/<scene>/`) and
+  `board_animatic`; `GET /api/boards?scene=` (`board.listing`: per shot,
+  start/end, depth, stale, version); the scene room's blockout gains a 3D
+  storyboard bar and shows a selected shot's board beside its blocking
+  frames. Checked headless on a demo copy (draw → adopt → P3's board shown,
+  "3 · MEDIUM CLOSE-UP · 3D board"); test: the job adopted and listed.
 
 Correction (2026-10-03): a ScreenWeaver post the user shared (Instagram,
 2026-10-01) shows what its site did not: a grid of nine grey clay 3D

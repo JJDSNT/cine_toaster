@@ -11,6 +11,13 @@ toast board sheet <project> SC-030                       # the boards on one lab
 toast board animatic <project> SC-030                    # renders/boards/SC-030/animatic.mp4
 ```
 
+In the control room, the scene room's blockout has a **3D storyboard** bar:
+**Draw boards** and **3D animatic** start background jobs (adopt them from
+Jobs: they land in `renders/boards/<scene>/`), and links open the board
+sheet and the animatic once they exist. Select a shot on the plan to see its
+board beside its blocking frames, labelled with its size, and marked when
+it was drawn before the plan last changed.
+
 ## Two products, kept apart
 
 - **Boards are composition.** One still per shot -- its start, and its end
