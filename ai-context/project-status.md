@@ -201,7 +201,8 @@ remains:
   out, OpenFX through Natron, Gaussian splats through Spark) are in place,
   each form with a working example; Unreal/Unity and NeRF are studied in
   CT-0047. Sound, music and an emotion catalog are noted for later
-  (CT-0048). Claude Code now
+  (CT-0048); Unreal/Unity render adapters, a catalog of directors and
+  styles, and 3D storyboards (ScreenWeaver as reference) too (CT-0049). Claude Code now
   works on a film through an MCP server of Cine Toaster (ADR 0020, CT-0045
   option 1: `toast mcp`). Noted for later, not started: RL beyond the
   refusal reasons (CT-0041), CT-0045 options 2 and 3, Video Toaster
