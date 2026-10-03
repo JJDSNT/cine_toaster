@@ -1,0 +1,23 @@
+schema_version = 1
+id = "neon-sign"
+name = "Neon sign"
+category = "texture"
+says = "A neon tube: a pale core inside a coloured halo, striking with a stutter when it lights, then buzzing faintly."
+energy = "medium"
+use_when = ["Signs, bars, motels, a city at night, a retro-futurist title"]
+avoid_when = ["Daylight scenes; grave, quiet titles"]
+
+[params]
+size = 64
+spaced = true
+color = "#FF2E9A"
+core_color = "#FFF2FA"
+glow = 1.0
+enter_at = 0.2
+ignite = 0.9
+fade_in = 0.0
+fade_out = 0.6
+
+[render]
+engine = "ffmpeg"
+effect = "neon"

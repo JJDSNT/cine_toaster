@@ -20,7 +20,8 @@ A bare string is a `card`'s text (`title: SINGULARITY`). Anything besides
 frame), `color`, `position` (centre, bottom, top), `spaced` (letters
 tracked out), `fade_in`, `fade_out`, `enter_at`, `font` (a file in the
 production), `background` (a card's colour), `subtitle` (a lower third's
-role, a card's second line).
+role, a card's second line). A neon sign also takes `color` (the tube),
+`core_color`, `glow` (halo strength) and `ignite` (seconds of stutter).
 
 ## The catalog
 
@@ -31,7 +32,7 @@ role, a card's second line).
 | motion | slide-up, grow | FFmpeg |
 | lower thirds | caption, lower-third | FFmpeg |
 | credits | credits-roll (lines separated by `\n`) | FFmpeg |
-| texture | flicker | FFmpeg |
+| texture | flicker, neon-sign (a pale core in a coloured halo, striking with a stutter, then a faint buzz) | FFmpeg |
 | 3d | letters-turn-in, letters-rise | Blender |
 
 Catalogs layer: built in, `CINE_TOASTER_TITLES_PATH`, then the production's

@@ -39,7 +39,7 @@ BUILTIN = Path(__file__).with_name("title_assets")
 BLENDER_SCRIPT = BUILTIN / "_blender" / "title.py"
 CATEGORIES = ("cards", "reveal", "motion", "lower thirds", "credits", "texture", "3d")
 ENGINES = ("ffmpeg", "blender")
-EFFECTS = {"ffmpeg": ("fade", "typewriter", "words", "slide", "grow", "roll", "lower-third", "flicker"),
+EFFECTS = {"ffmpeg": ("fade", "typewriter", "words", "slide", "grow", "roll", "lower-third", "flicker", "neon"),
            "blender": ("letters-turn-in", "letters-rise")}
 #: Parameters every item has, whatever its own manifest says.
 BASE_PARAMS: dict[str, Any] = {
@@ -278,6 +278,48 @@ def ffmpeg_filters(title: dict[str, Any], duration: float, width: int, height: i
     return ",".join(filters)
 
 
+def _neon_graph(picture: str, title: dict[str, Any], duration: float, width: int, height: int, fps: int, font: str,
+                work: Path) -> str:
+    """A neon sign: a pale core over two blurred halos of the tube's colour, lighting up with a stutter.
+
+    The core and both halos share one deterministic flicker (sines of time,
+    not `random`), so they blink together: a tube striking, then a faint buzz.
+    """
+
+    params = title["params"]
+    scale = height / REFERENCE_HEIGHT
+    size = float(params["size"]) * scale
+    text = _spaced(str(params.get("text") or "")) if params.get("spaced") else str(params.get("text") or "")
+    work.mkdir(parents=True, exist_ok=True)
+    (work / "neon.txt").write_text(text, encoding="utf-8")
+    y = {"centre": "(h-text_h)/2", "bottom": f"h-text_h-{46 * scale:.0f}", "top": "h*0.16"}[params["position"]]
+    enter, ignite = float(params["enter_at"]), max(0.05, float(params.get("ignite", 0.9)))
+    fade_out = max(0.001, float(params["fade_out"]))
+    # geq names time T; inside its quoted expressions commas need no escaping.
+    flicker = "gt(sin(T*97)*sin(T*61+1.3),-0.2)"
+    buzz = "(0.88+0.12*gt(sin(T*53)*sin(T*29+0.7),0.55))"
+    alpha = (f"if(lt(T,{enter:.3f}),0,if(lt(T,{enter + ignite:.3f}),{flicker},{buzz}))"
+             f"*min(1,max(0,({duration:.3f}-T)/{fade_out:.3f}))")
+    neon = _colour(params.get("color") or "#FF2E9A")
+    core = _colour(params.get("core_color") or "#FFF2FA")
+    glow = float(params.get("glow", 1.0))
+    text_file = _escape(str(work / "neon.txt"))
+
+    def layer(name: str, colour: str, border: int) -> str:
+        return (f"color=c=black@0.0:s={width}x{height}:r={fps}:d={duration:.3f},format=rgba,"
+                f"drawtext=fontfile='{_escape(font)}':textfile='{text_file}':fontsize={size:.1f}:"
+                f"fontcolor={colour}:borderw={border}:bordercolor={colour}:x=(w-text_w)/2:y={y}[{name}]")
+
+    wide, near = max(2, round(26 * scale * glow)), max(1, round(9 * scale * glow))
+    return (f"{layer('far', neon, max(3, round(12 * scale)))};{layer('near', neon, max(2, round(5 * scale)))};"
+            f"{layer('core', core, 0)};"
+            f"[far]gblur=sigma={wide},geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='min(255,alpha(X,Y)*4.5*{glow:.2f})*{alpha}'[farg];"
+            f"[near]gblur=sigma={near},geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='min(255,alpha(X,Y)*2.8*{glow:.2f})*{alpha}'[nearg];"
+            f"[core]geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*{alpha}'[coreg];"
+            f"{picture},format=rgba[base];[base][farg]overlay=format=auto[b1];[b1][nearg]overlay=format=auto[b2];"
+            f"[b2][coreg]overlay=format=auto,format=yuv420p[v]")
+
+
 def _blender_overlay(title: dict[str, Any], duration: float, width: int, height: int, font: str,
                      work: Path, run) -> Path:
     """Render a Blender title as a transparent PNG sequence; returns its pattern."""
@@ -322,7 +364,9 @@ def render(title: dict[str, Any], duration: float, output: Path, *, width: int =
             inputs = ["-f", "lavfi", "-i", f"color=c={colour}:s={width // 2 * 2}x{height // 2 * 2}:r={fps}:d={duration:.3f}"]
             picture = "[0:v]format=yuv420p"
             sound = []
-        if title["engine"] == "ffmpeg":
+        if title["engine"] == "ffmpeg" and title["effect"] == "neon":
+            graph = _neon_graph(picture, title, duration, width // 2 * 2, height // 2 * 2, fps, font, work)
+        elif title["engine"] == "ffmpeg":
             graph = f"{picture},{ffmpeg_filters(title, duration, width, height, font, work)}[v]"
         else:
             pattern = _blender_overlay(title, duration, width, height, font, work, run)
