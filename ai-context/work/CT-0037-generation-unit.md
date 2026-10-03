@@ -2,10 +2,10 @@
 id: CT-0037
 title: The generation unit — evidence from SINGULAR's pipeline (plan step 9)
 type: work
-status: doing
+status: done
 owner: development agent
 created_at: 2026-09-29
-updated_at: 2026-09-29
+updated_at: 2026-10-03
 tags:
   - generation
   - decision
@@ -283,3 +283,9 @@ Remaining:
 
 - ~~Whether `block` becomes a core shot field~~ decided: it is.
 - ~~Spending~~ decided: a US$ 2 ceiling, enforced by `spend.py`.
+
+# Closed (2026-10-03, close-out pass)
+
+The generation unit is delivered: blocks, budgeted generation (`spend.py`), master pictures by `derive`, slicing into takes with lineage.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): Nothing; the open questions were decided.

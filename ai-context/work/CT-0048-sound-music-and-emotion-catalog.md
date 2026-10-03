@@ -2,7 +2,7 @@
 id: CT-0048
 title: Sound effects, music, and a catalog of emotional expression (later)
 type: work
-status: review
+status: done
 owner: unassigned
 created_at: 2026-09-30
 updated_at: 2026-10-03
@@ -238,3 +238,9 @@ Questions the research must answer before an implementation:
 Status: researched in CT-0052 (the user's direction: like Netflix, the
 playback follows the hardware present). No implementation until the user
 has chosen the deliverables.
+
+# Closed (2026-10-03, close-out pass)
+
+Sound effects and music (catalog, beds, ducking, three sources, SINGULAR's library), the emotion catalog, and surround phase 1 (CT-0052) are delivered.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): Model-generated sound and music; stems for a final mix; a delivery-versus-emotion check; a rigged face for the 3D board; BEAT-style gesture data.

@@ -14,13 +14,24 @@ tags:
 
 # Project status
 
-Last updated: 2026-09-29
+Last updated: 2026-10-03
 
 ## Current phase
 
-The first canonical production write is delivered. Cine Toaster is no longer a
-read-only prototype: a human or an agent can compare registered alternatives and
-commit a decision through one shared command.
+The ordered plan (steps 1-13) is complete, and its work was closed out on
+2026-10-03: 19 records closed, their loose ends gathered in one prioritised
+backlog (`development/roadmap.md` § Backlog). Five records stay open on
+purpose (CT-0020, CT-0028, CT-0041 future; CT-0052 paused by the user;
+CT-0053 awaiting approval).
+
+Next recommended action: validate on SINGULAR end to end with what was
+built since CT-0035 -- sound and music, joins, styles, emotions, formats
+and renditions -- on a scratch copy (backlog "Next" item 1). Waiting for
+the user: Kael's voice re-check, the 4K spike's cost, what feeds the 5.1.
+
+Earlier: the first canonical production write is delivered. Cine Toaster is
+no longer a read-only prototype: a human or an agent can compare registered
+alternatives and commit a decision through one shared command.
 
 ## Product state
 

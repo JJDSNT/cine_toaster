@@ -2,10 +2,10 @@
 id: CT-0039
 title: What Cine Toaster and SINGULAR can learn from each other
 type: work
-status: doing
+status: done
 owner: development agent
 created_at: 2026-09-29
-updated_at: 2026-09-29
+updated_at: 2026-10-03
 tags:
   - real-production
   - roadmap
@@ -170,3 +170,9 @@ priority order below.
 - Declared speech against detected words: in 2 of about 80 clips, words were
   detected in shots declared silent (3-01 P8, "Halts the reactor."; 1-02 P40,
   breathing). Trims must follow **declared** speech, not detected words.
+
+# Closed (2026-10-03, close-out pass)
+
+All of the Cine Toaster side of the order is delivered: speech-aware trims and loudness, `.job.json` lineage, LTX rules in knowledge, sequence assembly, the generation adapter.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): SINGULAR's side (cast subjects and geometry, generators writing screenplay links), for its author.

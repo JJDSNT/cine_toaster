@@ -2,10 +2,10 @@
 id: CT-0035
 title: Validation on a real production (SINGULAR) — what the demos did not catch
 type: work
-status: doing
+status: done
 owner: development agent
 created_at: 2026-09-29
-updated_at: 2026-09-29
+updated_at: 2026-10-03
 tags:
   - validation
   - real-production
@@ -182,3 +182,9 @@ state with no history.
   - a jump test with different declared subjects;
   - a layout wrap test.
 - Full suite: 337 tests OK; `frontend` has 5 tests and a clean typecheck.
+
+# Closed (2026-10-03, close-out pass)
+
+The seven problems found on SINGULAR were fixed in Cine Toaster.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): SINGULAR's own decisions, for its author: screenplay links written by its generators, shot subjects where one camera covers several framings, `cut: {type: continuation, chain: frame}` on 3-01 P3b.

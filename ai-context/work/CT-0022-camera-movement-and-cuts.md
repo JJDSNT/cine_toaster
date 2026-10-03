@@ -2,10 +2,10 @@
 id: CT-0022
 title: Camera movement, cuts between clips, and an Arcads-style graph
 type: work
-status: doing
+status: done
 owner: development agent
 created_at: 2026-09-29
-updated_at: 2026-09-29
+updated_at: 2026-10-03
 tags:
   - camera
   - editing
@@ -187,3 +187,9 @@ on the subject side.
 - SPEC-0007: `tests/test_cuts.py` (14 tests), the full suite, `toast check` on
   both demos, and a headless screenshot of the Cut room with a scratch-only
   `chain: frame` finding.
+
+# Closed (2026-10-03, close-out pass)
+
+Movement (SPEC-0005), the cut record (SPEC-0007), the brief and SceneFlow export are delivered; the joins render in versions (CT-0050, CT-0051).
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): Review records (re-timed cues, adherence verdicts) through a command; a per-shot brief override; `[STATE OUT]` from wardrobe and props; the shots-per-generation granularity measured on a real sequence.

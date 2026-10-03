@@ -2,10 +2,10 @@
 id: CT-0017
 title: The production schema, and the reel that exercises it
 type: work
-status: doing
+status: done
 owner: unassigned
 created_at: 2026-09-22
-updated_at: 2026-09-22
+updated_at: 2026-10-03
 tags:
   - project-core
   - schema
@@ -118,3 +118,9 @@ dialogue rooms get built against.
 - 31 undeclared keys surfaced across 104 findings. Nothing was dropped and
   nothing was silently accepted, which is the behaviour the tiers exist for.
 - The reel loads clean: four scenes, zero findings.
+
+# Closed (2026-10-03, close-out pass)
+
+The schema's tiers, `shot_field_undeclared`, `source`/`engine`, transition reasons and the reel are delivered; the sound family now has the sound catalog (CT-0048), titles and effects their catalogs (CT-0031), framing its scale (CT-0049).
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): SINGULAR's remaining vocabulary mapped through `shot_fields` or new core fields: its sound keys (`som_montagem`, `silenciar`, `som_baixa_de`, `ambiente`) to the sound catalog; image operations (`apaga_luz`, `clarao`, `escurece`, `foco`, `zoom`, `recorte`, `espelhar`, `sobrepor`, `ajuste_imagem`); variation; screen text; its one-off keys.

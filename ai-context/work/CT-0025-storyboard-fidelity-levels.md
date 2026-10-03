@@ -2,10 +2,10 @@
 id: CT-0025
 title: Storyboard fidelity levels — computed blocking frame, sketch, master image
 type: work
-status: doing
+status: done
 owner: development agent
 created_at: 2026-09-29
-updated_at: 2026-09-30
+updated_at: 2026-10-03
 tags:
   - storyboard
   - geometry
@@ -160,3 +160,9 @@ Between the blocking frame and the master image: a 3D board rendered from
 the plan's USD (mannequins, set pieces, the shot's lens), with depth, used
 as a picture's starting point (`derive: {from: board}`). Composition only;
 the 3D animatic is for checking the scene, never a model's input.
+
+# Closed (2026-10-03, close-out pass)
+
+The blocking frame, set pieces, object subjects, hidden subjects, one scale of shot sizes and the 3D boards (CT-0049) are delivered.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): Facing direction, height changes within a shot, a picture's fidelity level as a record, adherence of a result to its frame.

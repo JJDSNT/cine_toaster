@@ -2,7 +2,7 @@
 id: CT-0049
 title: Unreal/Unity support, a catalog of directors and styles, and 3D storyboards (later)
 type: work
-status: doing
+status: done
 owner: unassigned
 created_at: 2026-10-03
 updated_at: 2026-10-03
@@ -240,3 +240,9 @@ the scene versions' own renditions (`Segment.renditions`), reframing (and
 saying so) a version without one; the sequence version keeps
 `renditions`; the Sequences room plays them. Tests in
 `tests/test_formats.py`.
+
+# Closed (2026-10-03, close-out pass)
+
+The 3D storyboard, the style catalog on three axes (direction, technique, format), formats on the cut (reframing on the subject, captions) and delivery in several formats are delivered.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): Unreal/Unity render adapters; drawn (manga and other) boards; detailed proxies from image-to-3D; a format's aspect and frame rate asked of generation; a sequence-level style; a window that moves within a shot.

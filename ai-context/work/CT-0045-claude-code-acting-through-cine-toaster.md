@@ -2,10 +2,10 @@
 id: CT-0045
 title: Letting Claude Code do the work through Cine Toaster, as in SINGULAR (later)
 type: work
-status: doing
+status: done
 owner: unassigned
 created_at: 2026-09-30
-updated_at: 2026-09-30
+updated_at: 2026-10-03
 tags:
   - agents
   - mcp
@@ -90,3 +90,9 @@ Validation:
 
 Remaining: option 2 (reviewed diffs for breakdowns and the screenplay) and
 option 3 (the assistant delegating to Claude Code) stay for later.
+
+# Closed (2026-10-03, close-out pass)
+
+Option 1, the MCP server (`toast mcp`), is delivered and was run for real by Claude Code on SINGULAR's scratch copy.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): Option 2 (reviewed diffs for breakdowns and the screenplay) and option 3 (the assistant delegating to Claude Code).

@@ -2,10 +2,10 @@
 id: CT-0031
 title: VFX, motion graphics and titles through external tools (Natron, Friction, Blender)
 type: work
-status: doing
+status: done
 owner: unassigned
 created_at: 2026-09-29
-updated_at: 2026-09-29
+updated_at: 2026-10-03
 tags:
   - vfx
   - motion-graphics
@@ -128,3 +128,9 @@ Pillow cards (`build.py`); a real title, a composite, or a graphic has no path.
 - Found: drawbox's `h` is the box's height (the lower third's bar was at
   the top); expressions with commas must be quoted in drawtext; two
   concurrent requests for one preview raced on the cache file.
+
+# Closed (2026-10-03, close-out pass)
+
+Superseded by delivery: the title catalog (FFmpeg, Blender) and the VFX catalog (FFmpeg, elements, Blender, OpenFX through Natron) exist, with shared catalog loading, rendering in versions and rooms (CT-0031 sections above, CT-0047).
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): Friction and QuickTitling were not needed; nothing remains here.

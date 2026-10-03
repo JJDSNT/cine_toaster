@@ -2,10 +2,10 @@
 id: CT-0021
 title: Evaluate Fountain editing and Final Draft interchange
 type: work
-status: doing
+status: done
 owner: unassigned
 created_at: 2026-09-27
-updated_at: 2026-09-29
+updated_at: 2026-10-03
 tags:
   - interface
   - screenplay
@@ -122,3 +122,9 @@ cover these functions more reliably than a new parser or editor built here.
 
 - Read-only code audit and official/project documentation review. No candidate
   has yet been installed or exercised against Cine Toaster fixtures.
+
+# Closed (2026-10-03, close-out pass)
+
+Fountain parsing, coverage, the editor (ADR 0016) and FDX interchange (ADR 0014) are delivered.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): Open an FDX export in Final Draft itself, and a real file with notes, tags and revisions.

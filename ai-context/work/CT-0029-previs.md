@@ -2,10 +2,10 @@
 id: CT-0029
 title: Previs — the shot in motion, from the same records as the blocking frame
 type: work
-status: doing
+status: done
 owner: development agent
 created_at: 2026-09-29
-updated_at: 2026-09-29
+updated_at: 2026-10-03
 tags:
   - previs
   - camera
@@ -111,3 +111,9 @@ Known limits:
   99 % were inspected.
 - Headless screenshot of the player scrubbed to 60 % (5.4 of 9 s).
 - Full suite: 292 tests OK.
+
+# Closed (2026-10-03, close-out pass)
+
+Light previs and the 3D animatic (CT-0049) are delivered.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): The previs limits listed above: move timing within a shot, waypoints, separate walk and camera timing, easing, tilt/roll/handheld, scene playback, sound on the animatic.

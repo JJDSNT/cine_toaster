@@ -2,10 +2,10 @@
 id: CT-0015
 title: The cast entity — sheet, executable reference, and lineage
 type: work
-status: ready
+status: done
 owner: unassigned
 created_at: 2026-09-22
-updated_at: 2026-09-22
+updated_at: 2026-10-03
 tags:
   - project-core
   - continuity
@@ -89,3 +89,9 @@ and evidence of which image a finished take used.
 - Available real data for validating the checks once implemented: a production
   of 9 scenes, 242 shots and 230 registered takes, whose character divergence is
   already measured and can serve as the expected finding set.
+
+# Closed (2026-10-03, close-out pass)
+
+The cast entity is delivered: `cast.py` (sheets, one master per reference kind, the closed vocabulary), subject resolution with findings, `check_cast`, references with digests in take and picture provenance, face references sent with derived pictures, the Cast room.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): SPEC-0003's lineage checks (`cast_reference_unused`, `cast_reference_superseded`), master references attached to video generation requests, per-scene sheet overrides.

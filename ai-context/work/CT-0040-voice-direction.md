@@ -2,10 +2,10 @@
 id: CT-0040
 title: Voice direction — identity, state and delivery (intonation, accent, pace)
 type: work
-status: doing
+status: done
 owner: unassigned
 created_at: 2026-09-29
-updated_at: 2026-09-29
+updated_at: 2026-10-03
 tags:
   - voice
   - cast
@@ -220,3 +220,9 @@ Remaining:
   scene-level `vozes` read for comparison).
 - **Later:** ~~a voice-conversion spike~~ done on CPU at no cost; expressive TTS
   for voice-over lines is still open.
+
+# Closed (2026-10-03, close-out pass)
+
+Voice identity, state and delivery, the drift check, voice conversion with the cache and the voice in the cut are delivered.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): The author re-checks Kael's converted voice; expressive TTS for voice-over lines.

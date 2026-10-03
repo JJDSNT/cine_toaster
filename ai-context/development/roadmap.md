@@ -154,38 +154,58 @@ Exit: met for comparison and selection; open for frame-accurate playback.
 Exit: an agent can analyze a scene, present alternatives, request a canonical
 decision, and continue from the committed result without bypassing permissions.
 
-## Later evaluation
+## Backlog after the close-out (2026-10-03)
 
-- Claude Code doing the work through Cine Toaster, as in SINGULAR (`CT-0045`):
-  first an MCP server over the commands and queries; then more assistant
-  actions, each confirmed; then delegating long tasks to a headless session;
-- learning from gate decisions to reduce refused pictures and takes, up to
-  reinforcement learning (`CT-0041`): refusals already record what was
-  wrong; start by counting and by feeding refusals into the next attempt;
-- the light previs's recorded limits (`CT-0029` To do): move timing within a
-  shot, waypoints, separate walk and camera timing, easing, tilt, roll and
-  handheld, scene-level playback, and sound;
-- the blocking frame's recorded limits (`CT-0025` To do item 5): subject kind
-  and size, facing, height changes, set pieces, in-between frames, and camera
-  roll, sensor and aspect;
-- 3D previs in Blender, and previs as the motion reference for generation
-  (`CT-0029` stages 2 and 3), after step 9;
-- locations as entities, then a shared backlot of sets that productions pin
-  (`CT-0030`), after step 9;
-- effect and title catalogs chosen like transitions, rendered by external
-  engines (Natron, Friction, Blender with QuickTitling) (`CT-0031`), after
-  steps 6 and 9;
-- a camera-movement catalog shaped like the transition catalog (`CT-0027`),
-  after the blocking frame;
-- a separate project recreating Video Toaster transitions as gl-transitions
-  shaders (`CT-0028`);
-- Okay Wannabe's production-stage UI (`CT-0020`). The node editor is now
-  steps 5, 7, and 10 of the ordered plan;
-- ComfyUI local and remote generation adapters;
-- Fountain screenplay editing and Final Draft FDX interchange (`CT-0021`);
-- ADK or orchestrators other than LangGraph (LangGraph is scheduled as step 8
-  of the ordered plan);
-- MLT/Kdenlive exchange and timeline integration;
-- detached workers and execution across full application exit or machine
-  restart;
-- professional frame-accurate comparison if product requirements justify it.
+The ordered plan is complete (steps 1-13; 14 cancelled), and the work it
+spawned was closed out on 2026-10-03: what each record delivered is in its
+"Closed" section; what it left is gathered here, in priority order. Five
+records stay open on purpose: `CT-0020`, `CT-0028`, `CT-0041` (future, not
+started), `CT-0052` (paused by the user after phase 1), `CT-0053` (awaiting
+the user's approval).
+
+### Waiting for the user
+
+- Re-check Kael's converted voice (`CT-0040`).
+- Approve the cost of the 4K upscaling spike (`CT-0053`).
+- Say what feeds the 5.1 system: the TV's apps, a PC, Kodi, Jellyfin, a
+  stick (`CT-0052`).
+- SINGULAR's own decisions (`CT-0035`, `CT-0039`): screenplay links written
+  by its generators, shot subjects where one camera covers several
+  framings, `cut: {type: continuation, chain: frame}` on 3-01 P3b.
+
+### Next, in order
+
+1. **Validation on SINGULAR, end to end** with what was built since
+   `CT-0035`: sound and music, joins, styles, emotions, formats and
+   renditions, on a scratch copy. Every earlier pass on real data found
+   what the demos missed.
+2. **SINGULAR's remaining vocabulary** (`CT-0017`): its sound keys to the
+   sound catalog, image operations, variation, screen text, one-off keys.
+3. **Joins between scenes as decisions** (`CT-0051`): a command for a
+   scene's `enter`; opening and closing a sequence from and to black.
+4. **Formats in generation** (`CT-0049`): aspect and frame rate asked of
+   the model; then 4K (`CT-0053`, after the spike).
+5. **Review records** (`CT-0022`): re-timed cues and adherence verdicts
+   through a command; a per-shot brief override.
+6. **Cast lineage** (`CT-0015`): `cast_reference_unused` and
+   `_superseded`; master references attached to video generation.
+
+### Later
+
+- Sound: generated sound and music, stems, spatial phases 2-4 (`CT-0048`,
+  `CT-0052`); expressive TTS for voice-over (`CT-0040`).
+- Faces and 3D: a rigged face for the 3D board, gesture data, detailed
+  proxies from image-to-3D, drawn boards in several styles, Unreal/Unity
+  render adapters, a window that moves within a shot, a sequence-level
+  style (`CT-0048`, `CT-0049`).
+- Previs and the blocking frame's recorded limits (`CT-0029`, `CT-0025`).
+- Backlot: a location specification with pinning and versioning, a demo
+  plate (`CT-0030`).
+- Transitions: WebM compositing contracts, per-cut parameter overrides
+  (`CT-0050`); the Video Toaster port (`CT-0028`).
+- Agents: MCP options 2 and 3 (`CT-0045`); learning from gate decisions
+  (`CT-0041`).
+- Tools: an FDX export opened in Final Draft (`CT-0021`); Okay Wannabe's
+  UI (`CT-0020`); Arcads first-hand (`CT-0024`); a finer liquid simulation
+  and a running nerfstudio (`CT-0047`); MLT/Kdenlive exchange; detached
+  workers; frame-accurate comparison.

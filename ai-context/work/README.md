@@ -39,18 +39,20 @@ execution history and links to those destinations.
 
 ## Work queue
 
-The order of work is the ordered plan in
-[`development/roadmap.md`](../development/roadmap.md).
+The ordered plan in [`development/roadmap.md`](../development/roadmap.md)
+is complete; after the close-out of 2026-10-03, what remains is its
+**Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
+CT-0041, CT-0052, CT-0053.
 
 - `CT-0053` — upscaling to 4K: SeedVR2 on takes, 4K as a delivery
   target; awaiting the user's approval of a paid spike (`ready`)
 - `CT-0052` — surround and spatial sound: researched; phase 1 (a 5.1 track
   beside the stereo) done; the rest paused by the user (`blocked`)
-- `CT-0051` — joins between scenes in a sequence (`review`)
-- `CT-0050` — transitions and J/L-cuts rendered in the assembly (`review`)
+- `CT-0051` — joins between scenes in a sequence (`done`)
+- `CT-0050` — transitions and J/L-cuts rendered in the assembly (`done`)
 - `CT-0046` — plan step 13: the editable canvas (`done`)
 - `CT-0045` — Claude Code acting through Cine Toaster (MCP first); noted for
-  later at the user's request (`proposed`)
+  later at the user's request (`done`)
 - `CT-0044` — plan step 12: the directing assistant; ADR 0018 (`done`)
 - `CT-0043` — plan step 11: LangGraph spike with CoAgents and a CLI model;
   ADR 0017 (`done`)
@@ -59,44 +61,43 @@ The order of work is the ordered plan in
 - `CT-0041` — learning from gate decisions, up to reinforcement learning;
   noted for later at the user's request (`proposed`)
 - `CT-0040` — voice direction: cast sheets, voice conversion (`toast
-  revoice`) done; the author re-checks the ill/healthy voice later (`doing`)
+  revoice`) done; the author re-checks the ill/healthy voice later (`done`)
 - `CT-0039` — lessons between Cine Toaster and SINGULAR, with the working
   order: speech trims and loudness, job lineage, LTX rules, SINGULAR geometry,
-  sequences, generation (`doing`)
+  sequences, generation (`done`)
 - `CT-0037` — the generation unit: blocks, budgeted generation, master
-  pictures by `derive`; plan step 9 done (`doing`)
+  pictures by `derive`; plan step 9 done (`done`)
 - `CT-0035` — validation on SINGULAR: seven problems the demos missed,
   including the screenplay path, legacy fields, jump false positives,
-  continuation, and canvas scale and speed (`ready`)
+  continuation, and canvas scale and speed (`done`)
 
 - `CT-0031` — VFX, motion graphics and titles through external tools
-  (Natron, Friction, Blender + QuickTitling) (`ready`)
+  (Natron, Friction, Blender + QuickTitling) (`done`)
 - `CT-0030` — backlot: locations as entities, shared sets that productions
-  pin (`ready`)
+  pin (`done`)
 - `CT-0029` — previs: light in-app previs done; Blender and motion
-  references after step 9 (`doing`)
+  references after step 9 (`done`)
 - `CT-0028` — separate project: Video Toaster-style transitions as
   gl-transitions shaders, recreated from observation (`ready`)
 - `CT-0027` — camera-movement catalog, shaped like the transition catalog;
   after the blocking frame (`ready`)
 - `CT-0025` — storyboard fidelity levels; blocking frame delivered
-  (`doing`)
+  (`done`)
 - `CT-0024` — spike: node canvases in the reference repositories and Arcads
-  (`doing`; Arcads first-hand verification pending)
+  (`doing`; Arcads first-hand verification pending) (`done`)
 - `CT-0023` — two graphs: the production canvas and orchestration
   (LangGraph as a later adapter candidate) (`ready`)
 - `CT-0022` — camera movement, cuts between clips, and an Arcads-style
-  graph; SceneFlow spike done (`doing`)
+  graph; SceneFlow spike done (`done`)
 - `CT-0021` — Fountain and Final Draft: scheduled as plan steps 3, 5, and 8
-  (`ready`)
+  (`done`)
 - `CT-0020` — evaluate Okay Wannabe's UI and a visual graph for transitions
   between clips (`ready`)
-- `CT-0017` — SPEC-0004 slice and the Amiga reel (`doing`)
+- `CT-0017` — SPEC-0004 slice and the Amiga reel (`done`)
 - `CT-0015` — the `cast` entity: sheet, executable reference, and
   generation lineage (`ready`, design accepted as `SPEC-0003`)
 
-## Recently completed
-
+## Recently completed (`done`)
 - `CT-0038` — scene assembly from the chosen takes, as kept versions (`done`)
 - `CT-0036` — screenplay editor, byte-exact and revision-checked (ADR 0016)
   (`done`)

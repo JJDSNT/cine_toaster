@@ -2,7 +2,7 @@
 id: CT-0050
 title: Transitions and J/L-cuts rendered in the assembly
 type: work
-status: review
+status: done
 owner: unassigned
 created_at: 2026-10-03
 updated_at: 2026-10-03
@@ -84,3 +84,9 @@ demo reel; the assembly did not use them.
 - Cuts between scenes (the sequence assembly) and their transitions.
 - WebM transitions (overlays, luma mattes) as compositing contracts.
 - A per-cut transition parameter override.
+
+# Closed (2026-10-03, close-out pass)
+
+Transitions and J/L-cuts render in a scene's version.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): WebM transitions as compositing contracts; a per-cut transition parameter override.

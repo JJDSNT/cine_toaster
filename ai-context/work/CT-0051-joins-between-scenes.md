@@ -2,7 +2,7 @@
 id: CT-0051
 title: Joins between scenes in a sequence
 type: work
-status: review
+status: done
 owner: unassigned
 created_at: 2026-10-03
 updated_at: 2026-10-03
@@ -73,3 +73,9 @@ better held as a decision on the join.
   before or after.
 - A J/L between scenes from the next scene's takes (versions have no
   handles).
+
+# Closed (2026-10-03, close-out pass)
+
+Joins between scenes, and sound over several scenes, render in a sequence's version.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): A decision command for a scene's `enter`; opening and closing a sequence from and to black; a J/L between scenes from the next scene's takes.

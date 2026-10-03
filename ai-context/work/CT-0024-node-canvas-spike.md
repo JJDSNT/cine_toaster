@@ -2,10 +2,10 @@
 id: CT-0024
 title: Spike — how the reference repositories and Arcads build a node canvas
 type: work
-status: doing
+status: done
 owner: development agent
 created_at: 2026-09-29
-updated_at: 2026-09-29
+updated_at: 2026-10-03
 tags:
   - interface
   - nodes
@@ -188,3 +188,9 @@ directly before treating Arcads as the model.
   BeatDesign's `react-flow-editor.tsx`, `canvas-projection.ts`,
   `core/commands/canvas-commands.ts`, and `mcp/server.ts` imports.
 - Arcads was not verified; see above.
+
+# Closed (2026-10-03, close-out pass)
+
+Superseded: the stack was decided (ADR 0015), the canvas built read-only (CT-0034) and editable (CT-0046), positions computed.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): First-hand verification of Arcads, if still wanted.

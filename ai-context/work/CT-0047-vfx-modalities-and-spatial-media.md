@@ -2,10 +2,10 @@
 id: CT-0047
 title: VFX modalities, external engines, game engines and Gaussian splatting — study and working examples
 type: work
-status: doing
+status: done
 owner: development agent
 created_at: 2026-09-30
-updated_at: 2026-09-30
+updated_at: 2026-10-03
 tags:
   - vfx
   - color
@@ -284,3 +284,9 @@ aim at Mara, the transform, the export).
 Element `alembic = ...` (format `alembic`), imported by `_blender/usd.py`
 (`wm.alembic_import`) and played from frame 1; framed on the first frame's
 bounds. Test: `AlembicTests` (Blender writes a cache, the element renders).
+
+# Closed (2026-10-03, close-out pass)
+
+Every VFX modality has a working example (FFmpeg, element blends, PNG/EXR with OCIO, matte, Blender, `.blend`, OpenVDB, OpenUSD in and out, OpenFX, splats, Alembic) and NeRF camera paths.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): A finer liquid simulation; a NeRF rendered by a running nerfstudio (needs CUDA).

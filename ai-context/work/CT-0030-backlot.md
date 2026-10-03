@@ -2,10 +2,10 @@
 id: CT-0030
 title: Backlot — sets and locations as reusable entities
 type: work
-status: doing
+status: done
 owner: unassigned
 created_at: 2026-09-29
-updated_at: 2026-09-30
+updated_at: 2026-10-03
 tags:
   - locations
   - geometry
@@ -117,3 +117,9 @@ ADR 0012. ADR 0012 names locations as the next entity of the same shape.
   take the screen there (`locations`). Read-only: a location is edited in
   its file. Validated: a test of the view on the demo; headless screenshot
   with a test plate on a demo copy.
+
+# Closed (2026-10-03, close-out pass)
+
+Locations as entities, set pieces, plates as generation sources and the Locations room are delivered.
+
+What remains moved to the backlog (`development/roadmap.md` § Backlog): A location specification with pinning and versioning of a shared backlot; a demo plate.

@@ -2,7 +2,7 @@
 id: CT-0041
 title: Learning from gate decisions — fewer wrong pictures and takes (reinforcement learning, later)
 type: work
-status: proposed
+status: ready
 owner: unassigned
 created_at: 2026-09-29
 updated_at: 2026-09-29
