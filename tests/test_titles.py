@@ -33,7 +33,7 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual((problem, title["id"], title["text"], title["params"]["spaced"]), ("", "card", "SINGULARITY", True))
         title, _ = expand({"id": "caption", "text": "03:13", "size": 24, "reason": "the time passes"}, catalog)
         self.assertEqual((title["params"]["size"], title["params"]["position"], title["reason"]), (24, "bottom", "the time passes"))
-        _, problem = expand({"id": "neon-sign", "text": "x"}, catalog)
+        _, problem = expand({"id": "no-such-title", "text": "x"}, catalog)
         self.assertIn("not in the title catalog", problem)
         _, problem = expand({"id": "card", "text": "x", "position": "sideways"}, catalog)
         self.assertIn("positions are", problem)
@@ -129,7 +129,7 @@ class AssemblyTests(unittest.TestCase):
         from cine_toaster.project import load_scene
 
         scene = self.root / "scenes" / "030-echo-chamber" / "scene.yaml"
-        scene.write_text(scene.read_text(encoding="utf-8").replace("id: caption", "id: neon-sign"), encoding="utf-8")
+        scene.write_text(scene.read_text(encoding="utf-8").replace("id: caption", "id: no-such-title"), encoding="utf-8")
         codes = [f["code"] for f in load_scene(self.root, "SC-030")["findings"]]
         self.assertIn("title_unknown", codes)
 
