@@ -86,6 +86,27 @@ where its speaker is on screen (or behind the camera), an effect where its
 source is, and the placement follows the cut -- object positions most
 productions author by hand.
 
+**Added after the user's own search (2026-10-03).**
+
+- *Cavern* (github.com/VoidXH/Cavern, C#/.NET, active): an object-based
+  engine that decodes Dolby Atmos (E-AC-3 JOC, TrueHD), reads ADM BWF and
+  DAMF, renders to any layout, HRTF, room correction, upmixing. Its licence
+  is **source-available, not open**: no selling, attribution, and the
+  author's permission for public or commercial use. It cannot be part of
+  Cine Toaster (ADR 0011: the terms bind any use in the product); it can
+  be a personal tool for the user to check a mix on the 5.1 system or
+  decode Atmos material for reference.
+- *Grapes 3D Audio Control* (grapes-3d.com): commercial and closed (VST3
+  and standalone); a controller that choreographs sound objects over time
+  and sends positions over OSC to an existing renderer (Atmos, d&b, L-ISA).
+  Not an engine, not a dependency. Its idea -- object movement on a
+  timeline -- is what Cine Toaster derives from the plan; OSC or ADM
+  automation out of the plan could later drive such tools.
+- *IAMF* (Sounding Future, 2025-10): confirms IAMF as the open alternative
+  among MPEG-H, Dolby Atmos and DTS:X.
+- *Sony 360 Reality Audio* (built on MPEG-H, mostly music) and *DTS:X*:
+  proprietary, the same rule as Atmos.
+
 # Recommended architecture (for the user to approve)
 
 *Master once, deliver several, let the player choose.*
@@ -147,3 +168,6 @@ read from GitHub; local FFmpeg checked (6.1.1: `ac3`, `eac3`, `pan`,
 - EBU ADM Renderer: https://tech.ebu.ch/news/2018/03/ebu-publishes-open-source-renderer-for-adm-next-generation-audio , https://github.com/ebu/libear
 - libspatialaudio 0.4: https://jbkempf.com/blog/2025/libspatialaudio-0.4
 - Jellyfin passthrough and device profiles: https://forum.jellyfin.org/t-force-audio-passthrough
+- Cavern and its licence: https://github.com/VoidXH/Cavern
+- Grapes 3D Audio Control: https://grapes-3d.com
+- IAMF, an open 3D audio format: https://soundingfuture.com
