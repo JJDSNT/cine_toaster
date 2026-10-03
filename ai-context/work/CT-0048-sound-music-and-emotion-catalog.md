@@ -188,3 +188,52 @@ Remains: driving a 3D board's face (the mannequins have none yet: a rigged
 proxy, CT-0049); BEAT-style gesture data for the body; a check that a line's
 delivery and its emotion do not contradict; style catalog entries choosing
 intensities (CT-0049).
+
+# Noted for later: surround and spatial sound -- research first (2026-10-03)
+
+The user's request: surround/spatial sound as a future feature (their
+home theatre is 5.1), with a reference they were unsure was relevant, and
+the instruction to research it in depth before implementing anything.
+
+The reference: github.com/danieldotwav/Spatial-Audio-Renderer -- a small
+real-time renderer for games (C++, OpenAL: 3D sources, EFX reverb, a
+"beamforming" simulation; Dolby Atmos and HRTF only listed as future).
+Useful as a concept, not as a dependency: it has **no licence** (so
+nothing may be incorporated), it is real-time where a film is mixed
+offline, and it is small and inactive (4 stars, last push 2024-10).
+
+What Cine Toaster already has toward it: every sound placed on a timeline
+(takes, catalog cues, ambience, music), speech spans, and -- unusually --
+the plan's geometry: where each subject and the camera stand in every
+shot, so a voice or an effect could be panned to where it is on screen
+(or behind the camera) rather than by hand.
+
+Questions the research must answer before an implementation:
+
+1. **Deliverable**: 5.1 (and 7.1) channel-based mixes first? Encoded how
+   (AAC 5.1, AC-3/E-AC-3 for home theatre, FLAC/WAV stems), and played by
+   what the user owns (a 5.1 receiver over HDMI from which player)?
+2. **Mixing conventions**: dialogue in the centre, music and ambience in
+   L/R and surrounds, LFE for low effects, downmix to stereo checked;
+   loudness for 5.1 (EBU R128 / ATSC A/85 with the LFE excluded).
+3. **Panning from the plan**: map a subject's screen side and depth (the
+   blocking frame) to a pan position per shot; how far to follow movement;
+   off-screen sound to the surrounds; the cut's J/L handles.
+4. **Object-based and scene-based audio**: Dolby Atmos (ADM BWF; the
+   renderer is proprietary and licensed), MPEG-H, ambisonics (first or
+   higher order; IAMF/Eclipsa from AOM, open), and binaural/HRTF for
+   headphones (SOFA files; FFmpeg's `sofalizer`). Which are open enough to
+   adopt (ADR 0011: external programs on files, permissive licences)?
+5. **Tools to evaluate**: FFmpeg channel layouts and `pan`/`amerge`/
+   `surround`/`sofalizer`; libspatialaudio, Spatial Audio Framework
+   (SAF), Google Resonance Audio, OpenAL Soft (LGPL, as an external
+   program), Blender's audio (speakers in a scene, 5.1 mixdown) given the
+   USD stage already exists; their licences.
+6. **Sources**: the catalog's recordings are mostly mono or stereo;
+   ambisonic ambience libraries and their licences; whether generated
+   sound can be produced spatially.
+7. **Monitoring**: how the user checks a 5.1 mix at home and in the
+   control room (a stereo or binaural preview of it).
+
+Status: noted, not started. No implementation until this research is
+written up and the user has chosen the deliverables.
