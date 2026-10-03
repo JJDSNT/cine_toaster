@@ -59,6 +59,7 @@ and the production's `vfx_elements/`.
 | PNG sequence with alpha | `file = "frames/f_%04d.png"`, `blend = "alpha"` |
 | OpenEXR sequence (scene-linear) | `file = "frames/f_%04d.exr"`, `colorspace = "Linear Rec.709 (sRGB)"`, `view = "..."` |
 | A Blender project | `project = "sparks.blend"`, `frames = 36` |
+| An Alembic cache (animated geometry) | `alembic = "debris.abc"`, `[params] spin, camera` |
 | An OpenVDB volume (or `%04d` sequence) | `volume = "explosion.vdb"`, `[params] density, fire, temperature, spin` |
 
 EXR frames go through **OpenColorIO** to the picture's encoding before they
@@ -130,3 +131,10 @@ production adds one as an item with its `plugin` id.
 Natron is found as `NatronRenderer` on PATH, `CINE_TOASTER_NATRON`, or
 under `~/.local/opt/Natron*/`. It is GPL and runs as a separate program:
 nothing of it is linked or bundled (ADR 0011).
+
+## Alembic caches
+
+An `.abc` cache (a simulation's debris, an animated character exported from
+another package) is imported by Blender and played from frame 1 over the
+shot, framed by a turning camera (`spin`) or through a camera in the cache
+(`camera`), then composited like any rendered element.

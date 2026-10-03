@@ -322,3 +322,43 @@ class BlenderEffectTests(unittest.TestCase):
                     os.environ.pop("XDG_STATE_HOME", None)
                 else:
                     os.environ["XDG_STATE_HOME"] = previous
+
+
+@unittest.skipUnless(HAS_FFMPEG and __import__("cine_toaster.titles").titles.blender_binary(), "Blender is not installed")
+class AlembicTests(unittest.TestCase):
+    def test_an_alembic_cache_is_played_and_composited(self) -> None:
+        from cine_toaster.titles import blender_binary
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            previous = os.environ.get("XDG_STATE_HOME")
+            os.environ["XDG_STATE_HOME"] = str(root / "state")
+            try:
+                folder = root / "vfx_elements" / "monkey"
+                folder.mkdir(parents=True)
+                maker = root / "make.py"
+                maker.write_text(
+                    "import bpy, sys\n"
+                    "bpy.ops.wm.read_factory_settings(use_empty=True)\n"
+                    "bpy.ops.mesh.primitive_monkey_add(size=2)\n"
+                    "o = bpy.context.active_object\n"
+                    "o.keyframe_insert('location', frame=1)\n"
+                    "o.location = (0, 0, 1)\n"
+                    "o.keyframe_insert('location', frame=6)\n"
+                    "bpy.ops.wm.alembic_export(filepath=sys.argv[-1], start=1, end=6)\n", encoding="utf-8")
+                subprocess.run([blender_binary(), "--background", "--factory-startup", "--python", str(maker), "--",
+                                str(folder / "monkey.abc")], check=True, capture_output=True)
+                (folder / "element.toml").write_text('id = "monkey"\ncategory = "other"\nblend = "alpha"\n'
+                                                     'alembic = "monkey.abc"\n[params]\nsamples = 2\nspin = 0\n',
+                                                     encoding="utf-8")
+                [element_] = list_elements(root)
+                self.assertEqual((element_["format"], element_["exists"]), ("alembic", True))
+                effects, problems = expand([{"id": "explosion-over", "element": "monkey"}],
+                                           {item["id"]: item for item in list_effects(root)}, {"monkey": element_})
+                self.assertEqual(problems, [])
+                self.assertTrue(render(effects, 0.25, root / "monkey.mp4", width=160, height=90).is_file())
+            finally:
+                if previous is None:
+                    os.environ.pop("XDG_STATE_HOME", None)
+                else:
+                    os.environ["XDG_STATE_HOME"] = previous

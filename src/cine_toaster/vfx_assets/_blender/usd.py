@@ -1,9 +1,11 @@
-"""Runs inside Blender: an OpenUSD scene rendered as a VFX element or a plate (CT-0047).
+"""Runs inside Blender: an OpenUSD stage or an Alembic cache rendered as a VFX element or a plate (CT-0047).
 
     blender --background --factory-startup --python usd.py -- spec.json
 
-The spec's `usd` is a `.usd/.usda/.usdc/.usdz` stage. It is imported with
-its materials (UsdPreviewSurface). With `camera` (a camera prim's name in
+The spec's `usd` is a `.usd/.usda/.usdc/.usdz` stage, imported with its
+materials (UsdPreviewSurface); or its `alembic` is an `.abc` cache (animated
+geometry from a simulation or an animation package), imported and played
+from frame 1. With `camera` (a camera prim's name in
 the stage) it is rendered through that camera over its own time range;
 otherwise a camera frames the whole stage and turns about it by `spin`
 degrees over the shot. Cycles on the CPU, a soft sky and a sun, transparent
@@ -25,7 +27,10 @@ out = Path(spec["output"]) / "exr"
 out.mkdir(parents=True, exist_ok=True)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.wm.usd_import(filepath=spec["usd"])
+if spec.get("alembic"):
+    bpy.ops.wm.alembic_import(filepath=spec["alembic"], as_background_job=False)
+else:
+    bpy.ops.wm.usd_import(filepath=spec["usd"])
 scene = bpy.context.scene
 scene.render.engine = "CYCLES"
 scene.cycles.device = "CPU"

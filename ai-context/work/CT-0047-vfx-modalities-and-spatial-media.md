@@ -47,7 +47,7 @@ user may have forgotten is left to the development agent's judgement.
 | 11 | OpenVDB volumes | Blender imports `.vdb`, renders with alpha → element | openvdb.org `explosion.vdb` / `smoke.vdb` | done |
 | 12 | OpenUSD scenes | Blender imports USD; Cine Toaster exports its plan (room, cameras, marks, set pieces) as USD | usd-wg Teapot; the demo's set as USD | done |
 | 13 | OpenFX plugins | Natron (an OFX host) run headless (`NatronRenderer`) on a generated project | bloom, lens distortion, glow | done |
-| 14 | Alembic caches (added) | Blender imports `.abc` | a cache rendered as an element | later |
+| 14 | Alembic caches (added) | Blender imports `.abc` | a Blender-made cache rendered as an element | done |
 | 15 | Gaussian splats | Spark (three.js, MIT) viewer + camera path rendered headless; Blender 5.3 native | a `.spz` as a location plate / element | done |
 
 Engines are external programs run on files, never linked (ADR 0011): FFmpeg,
@@ -278,3 +278,9 @@ sensor), placed in the NeRF's world by the location's `nerf:` transform
 against nerfstudio's `get_path_from_json` source, not a running nerfstudio
 (it needs CUDA). Tests: `tests/test_nerf.py` (format, the CAM-A eye and its
 aim at Mara, the transform, the export).
+
+# Done: Alembic (2026-10-03)
+
+Element `alembic = ...` (format `alembic`), imported by `_blender/usd.py`
+(`wm.alembic_import`) and played from frame 1; framed on the first frame's
+bounds. Test: `AlembicTests` (Blender writes a cache, the element renders).
