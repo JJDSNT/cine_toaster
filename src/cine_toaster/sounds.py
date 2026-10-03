@@ -171,6 +171,7 @@ def place(scene: dict[str, Any], segments: list[Any]) -> tuple[list[dict[str, An
 
     starts, ends, clock = {}, {}, 0.0
     for segment in segments:
+        clock -= getattr(segment, "overlap", 0.0)  # a transition takes from both shots it joins
         starts[segment.shot] = clock
         clock += segment.end - segment.start
         ends[segment.shot] = clock
@@ -312,7 +313,10 @@ def mix(picture: Path, cues: list[dict[str, Any]], catalog: dict[str, dict[str, 
         shutil.copyfile(picture, output)
         return []
     labels = "".join(f"[c{index}]" for index in range(len(chains)))
-    graph = ";".join(chains) + (f";[0:a]{labels}amix=inputs={len(chains) + 1}:normalize=0:duration=first,"
+    # amix's duration=first ends early when a delayed input is still playing; mix them all, then trim to the cut.
+    total = _probe_seconds(picture)
+    graph = ";".join(chains) + (f";[0:a]{labels}amix=inputs={len(chains) + 1}:normalize=0:duration=longest,"
+                                f"apad=whole_dur={total:.3f},atrim=0:{total:.3f},"
                                 "alimiter=limit=0.95:level=disabled[a]")
     run_process([_ffmpeg(), "-y", "-loglevel", "error", "-i", str(picture), *inputs, "-filter_complex", graph,
                  "-map", "0:v:0", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "256k", "-ar", "48000",

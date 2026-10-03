@@ -2469,6 +2469,10 @@ function renderJoins(scene) {
     middle.append(el("b", "", CUT_NAMES[cut.type] || cut.type));
     if (cut.chain) middle.append(el("small", "", "frames chained"));
     if (cut.transition?.id) middle.append(el("small", "", `↳ ${cut.transition.id}`));
+    if (cut.type === "j" || cut.type === "l") {
+      const seconds = cut.split || 0.8;
+      middle.append(el("small", "", cut.type === "j" ? `sound leads ${seconds} s` : `sound runs on ${seconds} s`));
+    }
     top.append(side(cut.from), middle, side(cut.to));
     card.append(top);
 

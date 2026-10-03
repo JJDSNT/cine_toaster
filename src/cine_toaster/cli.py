@@ -648,7 +648,7 @@ def command_cut(args: argparse.Namespace) -> int:
     else:
         transition = {"id": args.transition, "duration_ms": args.ms, "reason": args.transition_why} if args.transition else None
         payload["cut"] = {"type": args.type, "chain": "frame" if args.chain else "", "reason": args.reason,
-                          "transition": transition}
+                          "transition": transition, "split": args.split}
         result = dispatch(root, "set_cut", payload)
     cut = next(item for item in load_production(root)["scenes"] if item["id"] == args.scene)
     record = next((item for item in cut["cuts"] if item["to"] == args.shot), {})
@@ -1804,6 +1804,8 @@ def build_parser() -> argparse.ArgumentParser:
             item.add_argument("--reason", default="", help="what the cut does")
             item.add_argument("--transition", help="a catalog transition id, e.g. cross-dissolve")
             item.add_argument("--ms", type=int, help="the transition's duration in milliseconds")
+            item.add_argument("--split", type=float,
+                              help="a j or l cut: seconds its sound crosses the picture cut (default 0.8)")
             item.add_argument("--transition-why", default="", help="why this transition")
     cut_parser.set_defaults(function=command_cut)
 

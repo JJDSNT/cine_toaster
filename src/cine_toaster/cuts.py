@@ -184,6 +184,8 @@ def scene_cuts(
                 "type": cut_type,
                 "chain": chain,
                 "reason": str(declared.get("reason") or ""),
+                # A J- or L-cut's sound across the picture cut, in seconds (0: the assembly's default).
+                "split": _split(declared.get("split")) if cut_type in ("j", "l") else 0.0,
                 "transition": transition,
                 "exit": {**_state(out, "end"), "ends_on": out.ends_on if out else "", "unit": _edge_unit(before, True)},
                 "entry": {**_state(into, "start"), "unit": _edge_unit(after, False)},
@@ -192,6 +194,13 @@ def scene_cuts(
         )
         findings.extend(pair)
     return records, findings
+
+
+def _split(raw: Any) -> float:
+    try:
+        return max(0.0, round(float(raw or 0), 3))
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _finding(code: str, severity: str, scene_id: str, before: dict, after: dict, message: str) -> Finding:

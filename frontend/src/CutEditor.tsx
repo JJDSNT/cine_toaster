@@ -33,6 +33,7 @@ export function CutEditor({ scene, shot, data, onSaved }: { scene: string; shot:
   const [transition, setTransition] = useState(data.transition || "");
   const [ms, setMs] = useState(data.transition_ms || 0);
   const [why, setWhy] = useState(data.transition_reason || "");
+  const [split, setSplit] = useState(data.split || 0);
   const [options, setOptions] = useState<Transition[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -52,7 +53,7 @@ export function CutEditor({ scene, shot, data, onSaved }: { scene: string; shot:
   };
   const save = () => run("set_cut", {
     cut: {
-      type, chain: chain ? "frame" : "", reason,
+      type, chain: chain ? "frame" : "", reason, split: (type === "j" || type === "l") && split ? split : null,
       transition: transition ? { id: transition, duration_ms: ms || null, reason: why } : null,
     },
   });
@@ -64,6 +65,12 @@ export function CutEditor({ scene, shot, data, onSaved }: { scene: string; shot:
           {Object.entries(CUT_NAMES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
         </select>
       </label>
+      {(type === "j" || type === "l") && (
+        <label>{type === "j" ? "Sound leads by (s)" : "Sound runs on for (s)"}
+          <input type="number" min={0} max={5} step={0.1} value={split} placeholder="0.8"
+            onChange={(event) => setSplit(Number(event.target.value))} />
+        </label>
+      )}
       <label className="inline"><input type="checkbox" checked={chain} onChange={(event) => setChain(event.target.checked)} /> Opens on the previous last frame</label>
       <label>Why
         <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="What the cut does" />

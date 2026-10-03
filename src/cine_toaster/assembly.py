@@ -27,9 +27,22 @@ Sound from the catalog (CT-0048) is laid under the joined cut: effects and
 Foley a shot places, the scene's ambience beds and music cues, each at its
 loudness, the music lowered under the speech. What was laid is recorded.
 
-Shots are joined with straight cuts. Transitions and split edits (J/L) are
-listed as not rendered yet, not approximated. Picture is normalised to the
-first take's size and frame rate, sound to 48 kHz stereo.
+How shots are joined (SPEC-0007):
+
+- a straight cut, unless the cut says otherwise;
+- a **transition** from the catalog replaces the outgoing shot's last frames
+  and the incoming one's first, as `toast build` does: its own GLSL shader
+  when GL can run, else the FFmpeg stand-in its manifest declares; one that
+  can do neither is a straight cut, and the version says so. The sound
+  crossfades over it;
+- a **J-cut** lets the incoming shot's sound lead the picture by `split`
+  seconds, an **L-cut** lets the outgoing shot's sound run on: the sound
+  comes from the take beyond its cut point (its handle), the other side
+  fades under it. A take without enough sound there shortens the split, and
+  the version says so.
+
+Picture is normalised to the first take's size and frame rate, sound to
+48 kHz stereo.
 
 A production's own montage tools can register their renders as versions too;
 this module is not the only way a version is made.
@@ -55,6 +68,10 @@ SPEECH_BEFORE = 1.0
 SPEECH_AFTER = 0.9
 SPEECH_LUFS = -20.0
 AMBIENT_LUFS = -34.0
+#: A J- or L-cut's sound across the picture cut when the cut does not say.
+DEFAULT_SPLIT = 0.8
+#: The leading (J) or trailing (L) sound's own edge, so it does not click in.
+SPLIT_EDGE = 0.15
 
 
 @dataclass(slots=True)
@@ -80,6 +97,15 @@ class Segment:
     effects: list[dict[str, Any]] = field(default_factory=list)
     #: The file actually cut, when it is not the take itself (a rendered card or titled piece).
     source: str = ""
+    #: The join into this shot, resolved: a transition ({id, seconds, shader | mode}) and a J/L split.
+    transition: dict[str, Any] | None = None
+    split: float = 0.0
+
+    @property
+    def overlap(self) -> float:
+        """Seconds the transition into this shot takes from the shots on both sides."""
+
+        return float(self.transition["seconds"]) if self.transition else 0.0
 
 
 @dataclass(slots=True)
@@ -99,7 +125,7 @@ class Plan:
 
     @property
     def duration(self) -> float:
-        return round(sum(segment.end - segment.start for segment in self.segments), 3)
+        return round(sum(segment.end - segment.start - segment.overlap for segment in self.segments), 3)
 
 
 def probe(path: Path) -> dict[str, Any]:
@@ -200,6 +226,7 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
 
     plan = Plan(scene=scene["id"])
     cuts = {cut["to"]: cut for cut in scene.get("cuts") or []}
+    joins: dict[str, Any] = {}  # the transition catalog and the GL check, read once if a cut needs them
     for shot in scene["shots"]:
         if shot.get("out_of_cut"):
             continue
@@ -212,9 +239,11 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
             # A card: the title drawn over its background, as long as the shot plays.
             length = float(shot.get("duration_seconds") or 0) or 3.0
             cut = cuts.get(shot["id"]) or {}
-            plan.segments.append(Segment(shot["id"], "TITLE", "", 0.0, length, cut.get("type") or "hard", "title",
-                                         None, shot.get("level_db"), title=title,
-                                         effects=list(shot.get("effects") or [])))
+            segment = Segment(shot["id"], "TITLE", "", 0.0, length, cut.get("type") or "hard", "title",
+                              None, shot.get("level_db"), title=title, effects=list(shot.get("effects") or []))
+            if plan.segments:
+                _resolve_join(root, plan, cut, segment, joins)
+            plan.segments.append(segment)
             continue
         if chosen is None:
             if shot.get("source") == "composed":
@@ -236,16 +265,14 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
             plan.notes.append(f"{shot['id']} {note}.")
         cut = cuts.get(shot["id"]) or {}
         join = cut.get("type") or "hard"
-        if plan.segments and join in ("j", "l"):
-            plan.notes.append(f"{shot['id']}: the {join.upper()}-cut is rendered as a straight cut in this version.")
-        transition = (cut.get("transition") or {}).get("id")
-        if plan.segments and transition:
-            plan.notes.append(f"{shot['id']}: the transition {transition!r} is not rendered in this version.")
-        plan.segments.append(Segment(
+        segment = Segment(
             shot["id"], chosen["id"], chosen["media"], start, end, join, method,
             (spoken[0][0], spoken[-1][1]) if spoken else None, shot.get("level_db"),
             revoice=bool(shot.get("voice_in_cut")), title=title, effects=list(shot.get("effects") or []),
-        ))
+        )
+        if plan.segments:
+            _resolve_join(root, plan, cut, segment, joins)
+        plan.segments.append(segment)
     if not plan.segments:
         raise ValidationError(f"{scene['id']} has no shot with a take to assemble")
     if scene.get("ambience") or scene.get("music") or any(shot.get("sounds") for shot in scene["shots"]):
@@ -254,6 +281,46 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         plan.cues, notes = place(scene, plan.segments)
         plan.notes.extend(notes)
     return plan
+
+
+def _resolve_join(root: Path, plan: Plan, cut: dict[str, Any], segment: Segment, joins: dict[str, Any]) -> None:
+    """The transition and split into `segment`, as this machine can render them; what it cannot, said."""
+
+    previous = plan.segments[-1]
+    reference = cut.get("transition") or {}
+    if reference.get("id"):
+        if "catalog" not in joins:
+            from .shader_render import gl_unavailable_reason
+            from .transitions import list_transitions
+
+            joins["catalog"] = {item["id"]: item for item in list_transitions(root)}
+            joins["gl"] = gl_unavailable_reason()
+        item = joins["catalog"].get(reference["id"])
+        seconds = float(reference.get("duration_ms") or (item or {}).get("duration_ms") or 1000) / 1000.0
+        room = 0.5 * min(previous.end - previous.start, segment.end - segment.start)
+        mode = ((item or {}).get("render") or {}).get("ffmpeg")
+        if item is None:
+            plan.notes.append(f"{segment.shot}: the transition {reference['id']!r} is in no catalog; a straight cut.")
+        elif item["kind"] != "glsl" and not mode or item["kind"] == "glsl" and joins["gl"] and not mode:
+            why = f"GL cannot run here ({joins['gl']})" if item["kind"] == "glsl" else "it is not a shader"
+            plan.notes.append(f"{segment.shot}: the transition {item['id']!r} cannot be rendered: {why}, and it "
+                              "declares no FFmpeg stand-in; a straight cut in this version.")
+        else:
+            if seconds > room:
+                plan.notes.append(f"{segment.shot}: the transition {item['id']!r} is shortened to {room:.2f} s, half "
+                                  "the shorter of the shots it joins.")
+                seconds = room
+            if item["kind"] == "glsl" and not joins["gl"]:
+                segment.transition = {"id": item["id"], "seconds": round(seconds, 3),
+                                      "shader": str(item["asset_path"]), "params": item.get("params") or []}
+            else:
+                segment.transition = {"id": item["id"], "seconds": round(seconds, 3), "mode": str(mode)}
+    if segment.join in ("j", "l"):
+        if segment.transition:
+            plan.notes.append(f"{segment.shot}: a {segment.join.upper()}-cut with a transition: the sound "
+                              "crossfades over the transition instead.")
+        else:
+            segment.split = float(cut.get("split") or DEFAULT_SPLIT)
 
 
 def loudness_gain(source: Path, segment: Segment) -> float:
@@ -320,7 +387,12 @@ def _draw_title(root: Path, segment: Segment, output: Path, first: dict[str, Any
 
 def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
            span: tuple[float, float] = (0.0, 1.0)) -> None:
-    """Cut each take, normalise it, and join the pieces without re-encoding twice.
+    """Cut each take, normalise it, join the pictures and lay the sound.
+
+    Picture and sound are made apart: the picture as normalised pieces,
+    joined by straight cuts and transitions; the sound as one levelled clip
+    per shot, with the handles a J- or L-cut needs, placed on the timeline
+    and faded where the joins say; then the catalog's sound over both.
 
     ``run_process(command, expected_seconds=..., message=..., span=...)`` is
     the job's process runner, so progress and cancellation work per piece;
@@ -336,55 +408,191 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
     work.mkdir(parents=True, exist_ok=True)
     real = next((segment for segment in plan.segments if segment.media), None)
     first = probe(root / real.media) if real else {"width": 1280, "height": 720, "fps": FPS, "audio": False}
-    size = f"{first['width'] // 2 * 2}:{first['height'] // 2 * 2}"
+    width, height = first["width"] // 2 * 2, first["height"] // 2 * 2
+    size = f"{width}:{height}"
     fps = first["fps"] or FPS
-    pieces = []
     segment_gain: dict[str, float] = {}
     plan.gains = segment_gain
     total = len(plan.segments)
+    count = [0] * total  # frames of each piece
+    overlap = [0] * (total + 1)  # frames each transition takes, into segment i
+    pictures, sounds = [], []
     for index, segment in enumerate(plan.segments):
         if (segment.title or segment.effects) and not segment.source:
             _draw_title(root, segment, work / f"title-{index:03d}.mp4", first, fps, run_process)
         source = Path(segment.source) if segment.source else root / segment.media
+        length = segment.end - segment.start
+        picture = work / f"picture-{index:03d}.mp4"
+        run_process([ffmpeg, "-y", "-loglevel", "error", "-ss", f"{segment.start:.3f}", "-t", f"{length:.3f}",
+                     "-i", str(source), "-map", "0:v:0",
+                     "-vf", f"scale={size}:force_original_aspect_ratio=decrease,pad={size}:(ow-iw)/2:(oh-ih)/2,"
+                            f"setsar=1,fps={fps},format=yuv420p",
+                     "-frames:v", str(max(1, round(length * fps))), "-an", "-c:v", "libx264", "-preset", "veryfast",
+                     "-crf", "18", str(picture)],
+                    expected_seconds=length, message=f"Cutting {segment.shot}",
+                    span=within(0.6 * index / total, 0.6 * (index + 1) / total))
+        pictures.append(picture)
+        # What the take really gave: a take that ends mid-frame gives one frame less than its length says.
+        count[index] = _frames_in(picture) or max(1, round(length * fps))
+    for index, segment in enumerate(plan.segments[1:], 1):
+        wanted = round(segment.overlap * fps)
+        overlap[index] = min(wanted, count[index - 1] // 2, count[index] // 2)
+    # The splits each take can give: sound from beyond its cut point.
+    lead = [0.0] * total  # sound before the picture, for a J-cut into the shot
+    trail = [0.0] * total  # sound after the picture, for an L-cut out of the shot
+    for index, segment in enumerate(plan.segments[1:], 1):
+        if not segment.split:
+            continue
+        previous = plan.segments[index - 1]
+        if segment.join == "j":
+            room = segment.start if not segment.source else 0.0
+        else:
+            sound = Path(previous.sound) if previous.sound and not previous.source else (
+                Path(previous.source) if previous.source else root / previous.media)
+            room = max(0.0, probe(sound)["duration"] - previous.end) if previous.media else 0.0
+        room = min(room, 0.9 * (previous.end - previous.start), 0.9 * (segment.end - segment.start))
+        split = round(min(segment.split, room), 3)
+        if split < segment.split:
+            whose = "its take" if segment.join == "j" else f"{previous.shot}'s take"
+            plan.notes.append(f"{segment.shot}: the {segment.join.upper()}-cut's sound runs {split:.2f} s across the "
+                              f"cut, not {segment.split:.2f}: {whose} has no more sound beyond its cut point."
+                              if split > 0 else
+                              f"{segment.shot}: the {segment.join.upper()}-cut is a straight cut: {whose} has no "
+                              "sound beyond its cut point.")
+        segment.split = split
+        if segment.join == "j":
+            lead[index] = split
+        else:
+            trail[index - 1] = split
+    starts, clock = [], 0.0
+    for index in range(total):
+        clock -= overlap[index] / fps
+        starts.append(clock)
+        clock += count[index] / fps
+    duration = clock
+    plan_duration_frames = round(duration * fps)
+    for index, segment in enumerate(plan.segments):
+        source = Path(segment.source) if segment.source else root / segment.media
         sound = Path(segment.sound) if segment.sound and not segment.source else None
         has_audio = bool(sound) or probe(source)["audio"]
-        length = segment.end - segment.start
+        length = count[index] / fps
         gain = loudness_gain(sound or source, segment) if has_audio and segment.normalize else 0.0
         segment_gain[segment.shot] = gain
-        piece = work / f"piece-{index:03d}.mp4"
-        command = [ffmpeg, "-y", "-loglevel", "error", "-ss", f"{segment.start:.3f}", "-t", f"{length:.3f}", "-i", str(source)]
-        if sound:
-            command += ["-ss", f"{segment.start:.3f}", "-t", f"{length:.3f}", "-i", str(sound)]
-        elif not has_audio:
-            command += ["-f", "lavfi", "-t", f"{length:.3f}", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"]
-        command += [
-            "-vf", f"scale={size}:force_original_aspect_ratio=decrease,pad={size}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps},format=yuv420p",
-            "-map", "0:v:0", "-map", "0:a:0" if has_audio and not sound else "1:a:0",
-            "-af", f"volume={gain}dB,aresample=async=1",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
-            "-c:a", "aac", "-ar", "48000", "-ac", "2", "-shortest", str(piece),
-        ]
-        run_process(command, expected_seconds=length, message=f"Cutting {segment.shot}",
-                    span=within(0.9 * index / total, 0.9 * (index + 1) / total))
-        pieces.append(piece)
-    listing = work / "pieces.txt"
-    listing.write_text("".join(f"file '{piece.name}'\n" for piece in pieces), encoding="utf-8")
+        # The sound: the shot's span, plus what a J/L-cut takes from beyond it, faded as the joins say.
+        before, after = lead[index], trail[index]
+        span_seconds = before + length + after
+        fade_in = (overlap[index] / fps if overlap[index] else
+                   segment.split if segment.join == "l" and segment.split else
+                   min(SPLIT_EDGE, before) if before else 0.0)
+        following = plan.segments[index + 1] if index + 1 < total else None
+        fade_out = (overlap[index + 1] / fps if overlap[index + 1] else
+                    following.split if following and following.join == "j" and following.split else
+                    min(SPLIT_EDGE, after) if after else 0.0)
+        # A trailing L sound fades at its own end; otherwise the fade ends with the picture.
+        fade_end = span_seconds if after else before + length
+        fades = ([f"afade=t=in:d={fade_in:.3f}"] if fade_in else []) + (
+            [f"afade=t=out:st={fade_end - fade_out:.3f}:d={fade_out:.3f}"] if fade_out else [])
+        clip = work / f"sound-{index:03d}.wav"
+        if has_audio:
+            command = [ffmpeg, "-y", "-loglevel", "error", "-ss", f"{segment.start - before:.3f}",
+                       "-t", f"{span_seconds:.3f}", "-i", str(sound or source), "-map", "0:a:0"]
+        else:
+            command = [ffmpeg, "-y", "-loglevel", "error", "-f", "lavfi", "-t", f"{span_seconds:.3f}",
+                       "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"]
+        run_process(command + ["-af", ",".join([f"volume={gain}dB", "aresample=48000",
+                                                 "aformat=sample_fmts=fltp:channel_layouts=stereo",
+                                                 f"apad=whole_dur={span_seconds:.3f}", f"atrim=0:{span_seconds:.3f}",
+                                                 *fades]),
+                               "-ar", "48000", "-ac", "2", str(clip)],
+                    expected_seconds=span_seconds, message=f"{segment.shot}: its sound",
+                    span=within(0.6 + 0.25 * index / total, 0.6 + 0.25 * (index + 1) / total))
+        sounds.append((clip, max(0.0, starts[index] - before)))
+    picture = _join_pictures(ffmpeg, plan, pictures, count, overlap, work, fps, width, height, run_process,
+                             within(0.85, 0.9))
+    mixed = work / "sound.wav"
+    inputs = [part for clip, _ in sounds for part in ("-i", str(clip))]
+    delays = ";".join(f"[{index}:a]adelay={int(round(at * 1000))}:all=1[s{index}]"
+                      for index, (_, at) in enumerate(sounds))
+    labels = "".join(f"[s{index}]" for index in range(len(sounds)))
+    run_process([ffmpeg, "-y", "-loglevel", "error", *inputs, "-filter_complex",
+                 f"{delays};{labels}amix=inputs={len(sounds)}:normalize=0:duration=longest,"
+                 f"apad=whole_dur={duration:.3f},atrim=0:{duration:.3f}[a]",
+                 "-map", "[a]", "-ar", "48000", "-ac", "2", str(mixed)],
+                message="Laying the takes' sound", span=within(0.9, 0.92))
     joined = work / "joined.mp4" if plan.cues else output
-    run_process([ffmpeg, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing),
-                 "-c", "copy", "-movflags", "+faststart", str(joined)],
-                message="Joining the shots", span=within(0.9, 0.93 if plan.cues else 1.0))
+    run_process([ffmpeg, "-y", "-loglevel", "error", "-i", str(picture), "-i", str(mixed), "-map", "0:v:0",
+                 "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-b:a", "256k", "-ar", "48000",
+                 "-frames:v", str(plan_duration_frames), "-shortest", "-movflags", "+faststart", str(joined)],
+                message="Joining the shots", span=within(0.92, 0.93 if plan.cues else 1.0))
     if plan.cues:
         from .sounds import list_sounds, mix
 
-        speech, clock = [], 0.0
-        for segment in plan.segments:
-            if segment.speech:
-                speech.append((clock + max(0.0, segment.speech[0] - segment.start),
-                               clock + min(segment.end, segment.speech[1]) - segment.start))
-            clock += segment.end - segment.start
+        speech = [(starts[index] + max(0.0, segment.speech[0] - segment.start),
+                   starts[index] + min(segment.end, segment.speech[1]) - segment.start)
+                  for index, segment in enumerate(plan.segments) if segment.speech]
         catalog = {item["id"]: item for item in list_sounds(root)}
 
         def run_sound(command, expected_seconds=None, message=""):
             run_process(command, expected_seconds=expected_seconds, message=message, span=within(0.93, 1.0))
 
         plan.sound = mix(joined, plan.cues, catalog, speech, output, work / "sound", run_sound)
+
+
+def _frames_in(path: Path) -> int:
+    """The frames a video file holds, counted from its packets."""
+
+    ffprobe = shutil.which("ffprobe")
+    completed = subprocess.run([ffprobe, "-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries",
+                                "stream=nb_read_packets", "-of", "csv=p=0", str(path)],
+                               capture_output=True, text=True, timeout=120)
+    try:
+        return int(completed.stdout.strip().split(",")[0])
+    except ValueError:
+        return 0
+
+
+def _join_pictures(ffmpeg: str, plan: Plan, pictures: list[Path], count: list[int], overlap: list[int], work: Path,
+                   fps: float, width: int, height: int, run_process, span: tuple[float, float]) -> Path:
+    """The pieces joined: straight cuts, and each transition as its own clip between the bodies (as `toast build`)."""
+
+    destination = work / "picture.mp4"
+    encode = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-r", f"{fps:g}"]
+    pieces: list[Path] = []
+    total = len(pictures)
+    for index, picture in enumerate(pictures):
+        start, end = overlap[index], count[index] - overlap[index + 1]
+        if start == 0 and end == count[index]:
+            pieces.append(picture)
+        elif end > start:
+            body = work / f"body-{index:03d}.mp4"
+            run_process([ffmpeg, "-y", "-loglevel", "error", "-i", str(picture), "-vf",
+                         f"trim=start_frame={start}:end_frame={end},setpts=PTS-STARTPTS", *encode, str(body)],
+                        message=f"Trimming {plan.segments[index].shot}", span=span)
+            pieces.append(body)
+        if index + 1 < total and overlap[index + 1]:
+            following = plan.segments[index + 1]
+            transition, frames = following.transition, overlap[index + 1]
+            clip = work / f"join-{index + 1:03d}.mp4"
+            if transition.get("shader"):
+                from .build import Join, _shader_join
+
+                join = Join(transition["id"], frames / fps, shader=Path(transition["shader"]),
+                            params=transition.get("params") or [])
+                _shader_join(ffmpeg, picture, pictures[index + 1], count[index], frames, join, clip, width, height, fps)
+            else:
+                tail = count[index] - frames
+                run_process([ffmpeg, "-y", "-loglevel", "error", "-i", str(picture), "-i", str(pictures[index + 1]),
+                             "-filter_complex",
+                             f"[0:v]trim=start_frame={tail}:end_frame={count[index]},setpts=PTS-STARTPTS[a];"
+                             f"[1:v]trim=end_frame={frames},setpts=PTS-STARTPTS[b];"
+                             f"[a][b]xfade=transition={transition['mode']}:duration={frames / fps:.3f}:offset=0[v]",
+                             "-map", "[v]", "-frames:v", str(frames), *encode, str(clip)],
+                            message=f"{following.shot}: {transition['id']}", span=span)
+            pieces.append(clip)
+    listing = work / "pictures.txt"
+    listing.write_text("".join(f"file '{piece.name}'\n" for piece in pieces), encoding="utf-8")
+    # Pieces straight from the takes join as they are; with transition clips among them, encoded once more.
+    codec = ["-c", "copy"] if not any(overlap) else encode
+    run_process([ffmpeg, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing),
+                 *codec, str(destination)], message="Joining the pictures", span=span)
+    return destination

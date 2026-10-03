@@ -307,6 +307,10 @@ def clear_selection(
     )
 
 
+#: How far a J- or L-cut's sound may run across the picture cut.
+SPLIT_MAX_SECONDS = 5.0
+
+
 def _validated_cut(root: Path, scene: dict[str, Any], shot_id: str, cut: dict[str, Any]) -> dict[str, Any]:
     """A cut as it will be recorded, or refused: the SPEC-0007 vocabulary and a catalogue transition."""
 
@@ -333,7 +337,20 @@ def _validated_cut(root: Path, scene: dict[str, Any], shot_id: str, cut: dict[st
         milliseconds = raw.get("duration_ms")
         transition = {"id": str(raw["id"]), "duration_ms": int(milliseconds) if milliseconds else None,
                       "reason": _clean_rationale(raw.get("reason"))}
-    return {"type": cut_type, "chain": chain, "reason": _clean_rationale(cut.get("reason")), "transition": transition}
+    split = cut.get("split")
+    if split not in (None, ""):
+        if cut_type not in ("j", "l"):
+            raise ValidationError(f"Only a J- or L-cut has a split; this cut is {cut_type!r}")
+        try:
+            split = round(float(split), 3)
+        except (TypeError, ValueError):
+            raise ValidationError(f"A split is seconds, not {split!r}") from None
+        if not 0 < split <= SPLIT_MAX_SECONDS:
+            raise ValidationError(f"A split is between 0 and {SPLIT_MAX_SECONDS:g} seconds")
+    else:
+        split = None
+    return {"type": cut_type, "chain": chain, "reason": _clean_rationale(cut.get("reason")), "transition": transition,
+            **({"split": split} if split else {})}
 
 
 @_locked

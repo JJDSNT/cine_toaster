@@ -211,17 +211,20 @@ def build(root: Path, manager=None):
 
     @server.tool(annotations=deciding)
     def set_cut(scene: str, shot: str, cut_type: str, reason: str = "", transition: str = "",
-                why: str = "") -> dict[str, Any]:
-        """Decide the cut into `shot` (hard, match, action, j, l, smash, jump, continuation), optionally with a catalog transition."""
-        cut = {"type": cut_type, "reason": reason, "transition": {"id": transition} if transition else None}
+                split: float = 0.0, why: str = "") -> dict[str, Any]:
+        """Decide the cut into `shot` (hard, match, action, j, l, smash, jump, continuation), optionally with a
+        catalog transition; a j or l cut may say how many seconds its sound crosses the picture cut (`split`)."""
+        cut = {"type": cut_type, "reason": reason, "transition": {"id": transition} if transition else None,
+               "split": split or None}
         return _answer(lambda: runtime.command("set_cut", {"scene_id": scene, "shot_id": shot, "cut": cut,
                                                             "rationale": why}))
 
     @server.tool(annotations=deciding)
     def set_cuts(scene: str, cuts: list[dict[str, Any]], why: str = "") -> dict[str, Any]:
-        """Decide several cuts of one scene together, all or none: cuts = [{shot, cut_type, reason?, transition?}]."""
+        """Decide several cuts of one scene together, all or none: cuts = [{shot, cut_type, reason?, transition?, split?}]."""
         payload = [{"shot": item.get("shot"), "cut": {
             "type": item.get("cut_type") or item.get("type") or "hard", "reason": item.get("reason", ""),
+            "split": item.get("split") or None,
             "transition": {"id": item["transition"]} if item.get("transition") else None}} for item in cuts]
         return _answer(lambda: runtime.command("set_cuts", {"scene_id": scene, "cuts": payload, "rationale": why}))
 

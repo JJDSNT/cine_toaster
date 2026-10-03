@@ -217,6 +217,8 @@ def production_graph(production: dict[str, Any], root: Path | None = None) -> di
                     "decided": bool(after.get("cut_decision")),
                     "authored": (after.get("authored_cut") or {}).get("type", "hard") if after.get("cut_decision") else "",
                     "transition_ms": transition.get("duration_ms") or 0,
+                    # A J/L-cut's sound across the picture cut, in seconds (0: the assembly's default).
+                    "split": cut.get("split") or 0,
                     "transition_reason": transition.get("reason") or "",
                     "revision": scene.get("revision", 0),
                 },

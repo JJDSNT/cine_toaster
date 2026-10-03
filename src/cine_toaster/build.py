@@ -462,33 +462,36 @@ def _assemble(
     )
 
 
-def _frames(ffmpeg: str, source: Path, start: int, end: int) -> list[bytes]:
+def _frames(ffmpeg: str, source: Path, start: int, end: int, width: int = WIDTH,
+            height: int = HEIGHT) -> list[bytes]:
     """Frames [start, end) of a clip as packed RGB, bottom row first for GL."""
 
     completed = subprocess.run(
         [ffmpeg, "-loglevel", "error", "-i", str(source),
-         "-vf", f"trim=start_frame={start}:end_frame={end},scale={WIDTH}:{HEIGHT},vflip",
+         "-vf", f"trim=start_frame={start}:end_frame={end},scale={width}:{height},vflip",
          "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
         capture_output=True, timeout=900,
     )
     if completed.returncode != 0:
         raise BuildError(f"Reading frames from {source.name} failed: {completed.stderr.decode()[-300:]}")
-    size = WIDTH * HEIGHT * 3
+    size = width * height * 3
     data = completed.stdout
     return [data[offset:offset + size] for offset in range(0, len(data) - size + 1, size)]
 
 
 def _shader_join(
-    ffmpeg: str, outgoing: Path, incoming: Path, outgoing_frames: int, count: int, join: Join, clip: Path
+    ffmpeg: str, outgoing: Path, incoming: Path, outgoing_frames: int, count: int, join: Join, clip: Path,
+    width: int = WIDTH, height: int = HEIGHT, fps: float = FPS,
 ) -> None:
-    tail = _frames(ffmpeg, outgoing, outgoing_frames - count, outgoing_frames)
-    head = _frames(ffmpeg, incoming, 0, count)
+    tail = _frames(ffmpeg, outgoing, outgoing_frames - count, outgoing_frames, width, height)
+    head = _frames(ffmpeg, incoming, 0, count, width, height)
     if not tail or not head:
         raise BuildError(f"No frames to run {join.transition_id} over.")
-    renderer = ShaderTransition(join.shader, join.params, WIDTH, HEIGHT)
+    renderer = ShaderTransition(join.shader, join.params, width, height)
+    encode = ["-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-r", f"{fps:g}"]
     encoder = subprocess.Popen(
         [ffmpeg, "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
-         "-s", f"{WIDTH}x{HEIGHT}", "-r", str(FPS), "-i", "-", "-vf", "vflip", *_ENCODE, str(clip)],
+         "-s", f"{width}x{height}", "-r", f"{fps:g}", "-i", "-", "-vf", "vflip", *encode, str(clip)],
         stdin=subprocess.PIPE, stderr=subprocess.PIPE,
     )
     try:

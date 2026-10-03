@@ -137,3 +137,26 @@ Several cuts of one scene may be decided together through `set_cuts`: every
 cut is checked first, one refusal refuses the set, and an accepted set is
 one revision with one `cuts.set` entry in the history. It is how an agent's
 proposal of several cuts is accepted or refused as a whole.
+
+# Amendment: the assembly renders the joins (2026-10-03, CT-0050)
+
+A version of a scene now renders what its cuts say, instead of a straight
+cut and a note:
+
+- `cut.split` (seconds, `j` and `l` only, at most 5; 0.8 by default) says
+  how far a split edit's sound crosses the picture cut. A **J-cut** takes
+  the incoming take's sound from before its cut point (its handle); an
+  **L-cut** takes the outgoing take's from after it. The other side's sound
+  fades across the split; the borrowed sound has a 0.15 s edge. A take with
+  less handle shortens the split, and the version says by how much.
+- A **transition** replaces the outgoing shot's last frames and the
+  incoming one's first, as `toast build` does: its GLSL shader through GL
+  when a context can be made, otherwise its `[render].ffmpeg` stand-in; one
+  that can do neither is a straight cut, said in the version. It is at most
+  half the shorter shot. The sound crossfades over it; a J/L-cut with a
+  transition crossfades instead of splitting.
+
+A version is shorter than the sum of its shots by its transitions. Picture
+and sound are made apart (normalised picture pieces; one levelled sound
+clip per shot with its handles), then joined, then the sound catalog's
+cues (CT-0048) are laid over them on the same timeline.

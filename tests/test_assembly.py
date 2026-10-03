@@ -99,7 +99,8 @@ class AssemblyTests(unittest.TestCase):
         select_take(self.root, scene_id="SC-030", shot_id="P3", take_id="ONE-BLINK", actor=Actor(id="editor"))
         plan = plan_scene(self.root, self.scene())
         self.assertEqual(plan.takes, {"P1": "CUT", "P2": "CUT", "P3": "ONE-BLINK"})
-        self.assertTrue(any("J-cut is rendered as a straight cut" in note for note in plan.notes))
+        # SC-030 P3 is a J-cut: its sound will lead the picture by the default split.
+        self.assertEqual((plan.segments[2].join, plan.segments[2].split), ("j", 0.8))
 
     def test_an_adopted_assembly_is_a_kept_version_with_its_takes(self) -> None:
         select_take(self.root, scene_id="SC-030", shot_id="P3", take_id="ONE-BLINK", actor=Actor(id="editor"))

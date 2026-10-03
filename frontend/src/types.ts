@@ -97,6 +97,8 @@ export interface CutData {
   transition: string;
   transition_ms: number;
   transition_reason: string;
+  /** A J/L-cut's sound across the picture cut, in seconds; 0 is the assembly's default. */
+  split: number;
   findings: string[];
   severity: Severity;
   /** Decided in the runtime over the breakdown (plan step 13). */

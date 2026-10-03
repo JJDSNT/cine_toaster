@@ -490,7 +490,7 @@ def _apply_cut_decisions(shots: list[dict[str, Any]], state: SceneState) -> None
         if not decision:
             continue
         shot["authored_cut"], shot["authored_transition"] = shot.get("cut"), shot.get("transition")
-        shot["cut"] = {key: decision[key] for key in ("type", "chain", "reason") if decision.get(key)}
+        shot["cut"] = {key: decision[key] for key in ("type", "chain", "reason", "split") if decision.get(key)}
         shot["transition"] = decision.get("transition") or None
 
 
