@@ -99,6 +99,9 @@ def scene_files(root: Path, manifest: dict[str, Any] | None = None) -> list[Path
         candidates.extend(sorted(directory.glob(f"*/**/{name}")))
         candidates.extend(sorted(directory.glob(f"*/{name}")))
     for path in candidates:
+        # A scene's archive and its versions' snapshots are history, never a scene competing for its id (ADR 0021).
+        if {"archive", "versions"} & set(path.relative_to(directory).parts[:-1]):
+            continue
         document = _read_yaml(path)
         scene_id = vtext(document, "scene") or _text(document.get("id"))
         if not scene_id:

@@ -191,6 +191,14 @@ def _finding(code: str, severity: str, scene_id: str, message: str, shots: tuple
     return Finding(code=code, severity=severity, message=message, scene_id=scene_id, shots=shots)
 
 
+def _bare(label: str) -> str:
+    """A plan label without its pose or mark: "Líra L1 (sentada)" -> "líra"."""
+
+    text = re.sub(r"\([^)]*\)", " ", label)
+    text = re.sub(r"\b[A-Z]\d+\b", " ", text)
+    return " ".join(text.lower().split())
+
+
 def check_cast(scenes: list[dict[str, Any]], cast: dict[str, Member]) -> dict[str, list[Finding]]:
     """Findings per scene. Nothing is reported for a production without a cast."""
 
@@ -250,10 +258,16 @@ def check_cast(scenes: list[dict[str, Any]], cast: dict[str, Member]) -> dict[st
                 f"This scene describes {member.label}'s voice itself (\"{str(text)[:80]}\"). The sheet owns the "
                 f"voice's identity (\"{member.voice.describe()}\"); keep only how it sounds now in voice_state."))
     for key, seen in labels.items():
-        names = {label for _, label in seen if label}
-        if len(names) > 1:
+        # Drift is one person named differently from scene to scene. A pose or a mark in the plan's label
+        # ("Kael (sentado)", "Líra L1") is not a name, and several people of a group in one scene are not drift.
+        by_scene: dict[str, set[str]] = {}
+        for scene, label in seen:
+            if label:
+                by_scene.setdefault(scene, set()).add(_bare(label))
+        if len(by_scene) > 1 and len({name for names in by_scene.values() for name in names}) > 1 and not all(
+                len(names) > 1 for names in by_scene.values()):
             where = ", ".join(f"{scene} as {label!r}" for scene, label in sorted(seen))
-            for scene_id, _ in seen:
+            for scene_id in sorted(by_scene):
                 findings[scene_id].append(_finding("cast_label_drift", "advice", scene_id,
                     f"{cast[key].label} is labelled differently across scenes: {where}."))
     return findings

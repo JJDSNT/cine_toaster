@@ -82,6 +82,79 @@ Decided in ADR 0021; the layout below stands.
 - Tests: the snapshot and the index with a verdict (`test_assembly`), the
   journal beyond 200 decisions (`test_history`).
 
+# Done: the migration, pass 1 (2026-10-03)
+
+`migrate.py`, `toast migrate singular <source> <target> [--replace]
+[--proposals] [--no-git]`. Trial runs into a scratch folder only;
+`~/films/singular` not written yet.
+
+- Layout as decided; 4,448 files, 4.9 GB copied (never hard-linked), in
+  about 50 s; the source verified untouched (no file newer than the run).
+- Scenes: the active breakdown becomes `scene.yaml` in the English schema
+  (scene and shot keys renamed; `ambiente` to an ambience from the sound
+  catalog, `som` lists and `som_montagem` to catalog sounds; `fala` to
+  `lines`; the variant dropped and the scene's own title kept); paths
+  rewritten (`trabalho/` to `work/`, `../trabalho/` to the archived main
+  breakdown's work, `propostas/` to `story/proposals/`); work keeps takes,
+  pictures, voices and sidecars (`_tomadas`/`_descartados` to
+  `_takes`/`_rejected`), leaves a run's scratch (`partes/`, logs); the
+  other breakdown archived whole.
+- History: every surviving cut becomes a version record with its date,
+  length, what changed, the author's note and a verdict read from the note
+  (approved; `not_sent` for "não enviada"; rejected for a sent version's
+  critique; pending without a note) -- 33 versions, 3-01 v2-v12 with v12
+  approved; the breakdown snapshots kept as `vN.decupagem.yaml` (history is
+  not translated); `history.jsonl` and `VERSIONS.md` per scene; the
+  overview `README.md`; sequences' versions.
+- Cast: 7 sheets gathered from every scene (variants from `fichas` with
+  their face pictures, every wording of a variant's description and of a
+  voice kept, the most used leading); plan names by pose tied to their
+  person. Looks: 1 look definition per id from the scenes' descriptions.
+  Sounds: SINGULAR's library copied and registered with licences (relative
+  paths). The author's proposals brought in. Git started for the text.
+- `MIGRATION.md`: converted, approximated, read through the legacy
+  vocabulary, kept as written.
+- **Equivalence** (`migrate.compare`): scenes, shots, durations, labels,
+  sources, engines, lines and takes identical across the 9 scenes and 242
+  shots; findings changed only by checks the cast switches on: 4
+  `cast_reference_missing` (Narrador, Enfermeira, Diretor have no face --
+  a real gap) and 2 `voice_identity_restated` (1-03 "very tired", 3-01
+  "weak, hoarse": a state mixed into identity -- real, for the author).
+- Found and fixed in Cine Toaster on the way: scene discovery read an
+  archived breakdown as the scene (archives and versions folders now
+  never compete, ADR 0021); `cast_label_drift` accused poses ("Kael
+  (sentado)") -- SPEC-0003 amended: a pose or mark is not a name.
+- Tests: `tests/test_migrate.py` (layout, schema, takes, archive, history
+  with verdicts, index, journal, cast, looks, overview, report,
+  equivalence, the source untouched, refusals); `tests/test_cast.py`.
+
+# Done: pass 2a, sources (2026-10-03)
+
+- SINGULAR's source fields as native relations, their meaning read from
+  its own `cena_ltx.py` (`origem`, `ultimo_quadro`): `usa`/`usa_de` ->
+  `picture_of`, `usa_arquivo` -> `file`, `usa_ultimo_de` ->
+  `last_frame_of`, `reusa` -> `reuses` ("1-02/ltx c03" -> "1-02 c03":
+  variants are gone); `deriva` -> the native `derive {from, with,
+  request}` (16 shots: picture planning with cast faces now works for
+  them); `ref: false` -> `cast_references: false` (it was never a source).
+- Paths out of the scene rewritten: the sets (`../../../cenarios/` ->
+  `../../locations/`, 1-02A's blockouts).
+- `compare` now checks every shot's sources after the intended moves, and
+  that every file a shot points at exists in the migrated film -- which
+  found the blockout paths. Result: identical, the 6 real findings only.
+
+# Pass 2 (next)
+
+- `cenario` and the plans (`geografia`) into locations; `referencias_3d`.
+- SINGULAR's montage operations (`silenciar`, `escurece`, `espelhar`,
+  `recorte`, `apaga_luz`, `so_a_luz`, `sobrepor`, `fade`, `entra_sai`,
+  `ajuste_imagem`) into effects and titles; screen text (`corpo`,
+  `cor_texto`, `pos`, `texto_entra`) into titles.
+- Generation prompts (`quadro`, `still`, `cam`, `variacao*`, `guias`,
+  `in_frame`, `lira`) -- they feed SINGULAR's own generators.
+- Then run into `~/films/singular` and validate there: assembling real
+  scenes against SINGULAR's own cuts.
+
 # Then
 
 1. ~~ADR: per-scene versions and `VERSIONS.md`; implement.~~ Done.

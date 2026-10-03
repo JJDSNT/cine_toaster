@@ -241,6 +241,15 @@ AMBIENCE = re.compile(r"(^|[^a-z])(amb|ambience|ambiance|room ?tone|tom de sala|
 MUSIC = re.compile(r"(^|[^a-z])(pad|music|score|theme|chimes)", re.I)
 
 
+def _where(path: Path, folder: Path) -> str:
+    """A library file as the manifest names it: relative when it is inside the production, so the film can move."""
+
+    root = folder.parent.parent.resolve()
+    if path.resolve().is_relative_to(root):
+        return os.path.relpath(path.resolve(), folder.resolve())
+    return str(path)
+
+
 def import_library(root: Path, folder: Path, *, prefix: str = "") -> list[str]:
     """Register a library already on disk, described by its manifest CSV, as the production's sounds.
 
@@ -267,7 +276,8 @@ def import_library(root: Path, folder: Path, *, prefix: str = "") -> list[str]:
             described = path.name + " " + use
             category = "music" if MUSIC.search(described) else "ambience" if AMBIENCE.search(described) else "effect"
             write_item(root, sound_id, name=use or path.stem, category=category, says=use or path.stem,
-                       file=str(path), provenance=value["provenance"], licence=value["licence"],
+                       file=_where(path, Path(root) / "sounds" / sound_id), provenance=value["provenance"],
+                       licence=value["licence"],
                        url=value["url"], status=STATUS.get(value["status"], value["status"]),
                        use_when=[use] if use else [])
             made.append(sound_id)

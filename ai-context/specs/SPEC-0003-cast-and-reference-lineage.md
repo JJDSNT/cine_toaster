@@ -134,6 +134,9 @@ that explains it (`enforced_by`, ADR 0009).
   master. Advisory, not an error: a scene approved under the old master is not
   retroactively wrong, it is retroactively dated.
 - `cast_label_drift` — two scenes give the same cast id different labels.
+  A pose or a mark in a plan's label ("Kael (sentado)", "Líra L1") is not a
+  different name, and several people of a group in one scene are not drift
+  (amended 2026-10-03, CT-0054: SINGULAR's plans label poses).
 
 Every check reads declared state. None infers who a character is from prose, in
 keeping with ADR 0007: a tool that guesses will eventually accuse a correct

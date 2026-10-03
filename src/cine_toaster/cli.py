@@ -815,6 +815,19 @@ def command_sound(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_migrate(args: argparse.Namespace) -> int:
+    """Migrate a production made outside Cine Toaster into its own format (CT-0054)."""
+
+    from .migrate import migrate
+
+    report = migrate(Path(args.source), Path(args.target), replace=args.replace,
+                     proposals=Path(args.proposals).expanduser() if args.proposals else None, git=not args.no_git)
+    print(f"{report.copied_files} files, {report.copied_bytes / 1e9:.2f} GB; {len(report.scenes)} scenes; "
+          f"{len(report.converted)} converted, {len(report.approximated)} approximated, "
+          f"{len(report.kept)} kinds of field kept as written. See {Path(args.target) / 'MIGRATION.md'}")
+    return 0
+
+
 def command_style(args: argparse.Namespace) -> int:
     """The style catalog: direction, animation techniques, formats (CT-0049)."""
 
@@ -1929,6 +1942,16 @@ def build_parser() -> argparse.ArgumentParser:
         item = vfx_sub.add_parser(name, help=text)
         item.add_argument("project", type=Path)
     vfx_parser.set_defaults(function=command_vfx)
+
+    migrate_parser = subparsers.add_parser("migrate", help="Migrate a production made outside Cine Toaster (CT-0054)")
+    migrate_sub = migrate_parser.add_subparsers(dest="migrate_kind", required=True)
+    migrate_singular = migrate_sub.add_parser("singular", help="SINGULAR's layout and vocabulary, into a new directory")
+    migrate_singular.add_argument("source", help="the production as it is (never written)")
+    migrate_singular.add_argument("target", help="the new directory")
+    migrate_singular.add_argument("--replace", action="store_true", help="replace an earlier migration in target")
+    migrate_singular.add_argument("--proposals", help="the art-direction proposals folder to bring along")
+    migrate_singular.add_argument("--no-git", action="store_true", help="do not start git for the film's text")
+    migrate_parser.set_defaults(function=command_migrate)
 
     style_parser = subparsers.add_parser("style", help="The style catalog: direction, animation techniques, formats (CT-0049)")
     style_sub = style_parser.add_subparsers(dest="style_command", required=True)

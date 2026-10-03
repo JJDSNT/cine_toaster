@@ -92,9 +92,18 @@ class CheckTests(unittest.TestCase):
     def test_the_same_person_labelled_differently_is_noticed(self) -> None:
         loaded = production({"kael": KAEL}, {
             "010": SCENE.format(id="S1", who="KAEL", label="Kael"),
-            "020": SCENE.format(id="S2", who="KAEL", label="Kael (seated)"),
+            "020": SCENE.format(id="S2", who="KAEL", label="Kael Vance"),
         })
         self.assertIn("cast_label_drift", codes(loaded["scenes"][0]))
+
+    def test_a_pose_or_a_mark_in_the_label_is_not_drift(self) -> None:
+        # SINGULAR's plans label a pose: "Kael (sentado)", "Líra L1 (sentada)". The name is the same (SPEC-0003).
+        loaded = production({"kael": KAEL}, {
+            "010": SCENE.format(id="S1", who="KAEL", label="Kael"),
+            "020": SCENE.format(id="S2", who="KAEL", label="Kael (seated)"),
+            "030": SCENE.format(id="S3", who="KAEL", label="Kael K1"),
+        })
+        self.assertNotIn("cast_label_drift", codes(loaded["scenes"][0]))
 
     def test_a_scene_that_restates_the_voice_is_advised(self) -> None:
         scene = SCENE.format(id="S1", who="KAEL", label="Kael") + "vozes: {KAEL: a weak hoarse voice}\n"
