@@ -204,8 +204,9 @@ remains:
   catalog (26 generated items from SINGULAR's practice), shot sounds,
   scene ambience and music levelled and ducked under speech, and three
   sources -- Freesound (CC0), Sonniss (provisional mirror), Openverse
-  (music) -- plus SINGULAR's library registered in place; the emotion
-  catalog is still for later (CT-0048). A scene's version now renders its joins:
+  (music) -- plus SINGULAR's library registered in place; an emotion catalog
+  (describe, ask a model, express as FACS/ARKit) reaches the prompt and
+  the brief (CT-0048). A scene's version now renders its joins:
   catalog transitions (shader or FFmpeg stand-in) and J/L-cuts from the
   takes' handles (CT-0050). Scenes declare how they are entered (`enter`), and
   the sequence assembly renders it, with music and ambience over several

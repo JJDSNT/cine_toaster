@@ -1,0 +1,32 @@
+schema_version = 1
+id = "sadness"
+name = "Sadness"
+family = "sadness"
+says = "Loss felt from inside; energy drains away."
+near = ["grief", "longing", "loneliness"]
+
+[signals]
+face = ["inner brows draw up and together", "lip corners pull down", "the gaze drops"]
+body = ["head lowers", "shoulders round", "slow, heavy movement"]
+voice = ["quiet, low, slower"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "the inner brows lift slightly and the gaze lowers"
+clear = "the inner brows rise, the corners of the mouth pull down and the eyes glisten"
+overwhelming = "the face crumples, the chin trembles, tears run, the shoulders shake"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "quiet and a little slower"
+clear = "low and heavy, trailing off"
+overwhelming = "the voice catching and cracking"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+1 = 0.9
+4 = 0.6
+15 = 0.8
+17 = 0.5
+64 = 0.5
+54 = 0.4

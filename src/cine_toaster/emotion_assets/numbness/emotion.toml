@@ -1,0 +1,28 @@
+schema_version = 1
+id = "numbness"
+name = "Numbness"
+family = "thought"
+says = "Feeling switched off: too much, so nothing."
+near = ["shock", "grief"]
+
+[signals]
+face = ["a blank face", "slow or no blinking", "an unfocused stare"]
+body = ["heavy, mechanical movements", "no reaction to touch or sound"]
+voice = ["flat, toneless"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "a face that shows nothing"
+clear = "a blank, unfocused stare, the movements slow and mechanical"
+overwhelming = "utterly still, not hearing them, staring through everything"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "flat"
+clear = "toneless and slow"
+overwhelming = "absent, as if far away"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+43 = 0.2
+64 = 0.3

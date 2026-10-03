@@ -30,6 +30,8 @@ class ShotPrompt:
     action: str = ""
     lines: list[Line] = field(default_factory=list)
     sound: str = ""
+    #: How the people in it feel, as behaviour to act (the emotion catalog, CT-0048).
+    acting: list[str] = field(default_factory=list)
 
 
 def _sentence(text: str) -> str:
@@ -77,6 +79,7 @@ def block_prompt_sections(shots: list[ShotPrompt]) -> list[str]:
             parts.append(f"{opening}: {_lower_first(shot.picture)}." if shot.picture else f"{opening}.")
         if shot.action:
             parts.append(_sentence(shot.action))
+        parts += [_sentence(text) for text in shot.acting]
         parts += _speech(shot.lines, spoken)
         spoken = spoken or bool(shot.lines)
         sections.append(" ".join(" ".join(part for part in parts if part).split()))

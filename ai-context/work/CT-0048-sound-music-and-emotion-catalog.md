@@ -2,7 +2,7 @@
 id: CT-0048
 title: Sound effects, music, and a catalog of emotional expression (later)
 type: work
-status: doing
+status: review
 owner: unassigned
 created_at: 2026-09-30
 updated_at: 2026-10-03
@@ -146,3 +146,45 @@ Remains:
   come from an unofficial mirror -- both must be replaced before release
   (the status says which);
 - the emotion catalog (section 2).
+
+# Done: the emotion catalog (2026-10-03)
+
+The three parts of an entry, as the user framed them -- describe, ask,
+express -- in `emotions.py` and `emotion_assets/<id>/emotion.toml`
+(layered: built in, `CINE_TOASTER_EMOTIONS_PATH`, the production's
+`emotions/`). Guide: `docs/emotions.md`.
+
+- 25 built-in entries in nine families (joy, sadness, fear, anger,
+  surprise, disgust, connection, self, thought), including what SINGULAR
+  needs now: recognition, shock, tenderness, dread, numbness, grief.
+- **Describe**: face, body and voice signals, in our own words.
+- **Ask**: what a video model sees at subtle, clear and overwhelming --
+  behaviour, not a label (the principle behind micro-expression prompting);
+  `arc` holds, builds (subtle → the intensity), fades, breaks (sudden).
+- **Express**: FACS action units with weights (EMFACS prototypes for the
+  basic six, composed for the rest) scaled by intensity, mapped to the 52
+  ARKit blendshapes (`emotions.face`, `toast emotion face`) so a Unity,
+  Blender or Unreal (Live Link) rig can wear it; head and gaze units kept
+  apart.
+- A shot names `emotion: {id, who, intensity, arc, reason}` (or several);
+  checked (`emotion_problem`: unknown id, key, intensity, arc, or a `who`
+  outside the scene's cast, subjects and speakers). The generation prompt
+  gets a sentence per person ("The woman at the console: at first only …,
+  growing until …"); a line without its own delivery takes the feeling's
+  voice at that intensity; the brief gets an `ACTING` slot.
+- `toast emotion list|show|face`, `/api/emotions`, the Emotions room,
+  MCP `list_emotions`.
+
+Licensing, as recorded above: nothing is copied from the Emotion
+Thesaurus, Viddo, ShotDeck or the FACS/HeadBox/BEAT repositories; FACS
+numbers are a public coding system; the ARKit names are Apple's public
+API. References may be added to an entry by link (`references`).
+
+Validation: `tests/test_emotions.py` (every entry complete; arcs; the
+face scaled and mapped; placements checked; the prompt and the brief), the
+MCP tool, the room checked headless (25 cards, no page errors).
+
+Remains: driving a 3D board's face (the mannequins have none yet: a rigged
+proxy, CT-0049); BEAT-style gesture data for the body; a check that a line's
+delivery and its emotion do not contradict; style catalog entries choosing
+intensities (CT-0049).

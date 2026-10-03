@@ -1,0 +1,30 @@
+schema_version = 1
+id = "unease"
+name = "Unease"
+family = "fear"
+says = "Something is wrong and cannot yet be named."
+near = ["dread", "suspicion"]
+
+[signals]
+face = ["a slight frown", "eyes moving to check", "the mouth tightening"]
+body = ["a glance over the shoulder", "shifting weight", "fidgeting hands"]
+voice = ["hesitant"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "a small frown and a quick glance aside"
+clear = "the brow knits, the eyes check the room, the weight shifts"
+overwhelming = "restless, looking around again and again, unable to settle"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "hesitant"
+clear = "uncertain, with pauses"
+overwhelming = "clipped and nervous"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+4 = 0.5
+7 = 0.3
+24 = 0.3
+61 = 0.3

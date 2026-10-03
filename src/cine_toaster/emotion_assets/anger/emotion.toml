@@ -1,0 +1,31 @@
+schema_version = 1
+id = "anger"
+name = "Anger"
+family = "anger"
+says = "Something is wrong and must be stopped: force rises."
+near = ["contempt", "determination"]
+
+[signals]
+face = ["brows lowered and pulled together", "a hard stare", "lips pressed or bared"]
+body = ["chest forward", "fists or jaw clenched", "sharp movements"]
+voice = ["louder, harder, clipped"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "the jaw tightens and the eyes hold, the brow lowering"
+clear = "the brows pull down hard, the eyes narrow, the lips press thin, the jaw set"
+overwhelming = "the face flushed, teeth bared, shouting, leaning forward"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "clipped and controlled"
+clear = "hard, each word struck"
+overwhelming = "shouting"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+4 = 1.0
+5 = 0.5
+7 = 0.8
+23 = 0.8
+24 = 0.6

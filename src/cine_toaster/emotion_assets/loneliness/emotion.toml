@@ -1,0 +1,29 @@
+schema_version = 1
+id = "loneliness"
+name = "Loneliness"
+family = "sadness"
+says = "Being apart from everyone, and feeling it."
+near = ["sadness", "longing"]
+
+[signals]
+face = ["an empty, unfocused gaze", "a flat mouth"]
+body = ["arms wrapped around the self", "small posture in a large space", "slow, purposeless movement"]
+voice = ["flat, quiet"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "a blank look, the arms folded close"
+clear = "sitting small, staring at nothing, arms wrapped around the body"
+overwhelming = "curled in on themself, the eyes wet and unfocused"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "flat and quiet"
+clear = "hollow, without energy"
+overwhelming = "a near whisper, without hope of an answer"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+1 = 0.4
+15 = 0.4
+64 = 0.6

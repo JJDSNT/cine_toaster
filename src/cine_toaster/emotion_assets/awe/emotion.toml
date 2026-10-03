@@ -1,0 +1,33 @@
+schema_version = 1
+id = "awe"
+name = "Awe"
+family = "thought"
+says = "Before something vast: the self feels small."
+near = ["surprise", "wonder"]
+
+[signals]
+face = ["brows lifted", "eyes wide and soft", "lips parted"]
+body = ["stillness", "head tilting back to look up", "a breath held"]
+voice = ["hushed"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "the eyes widen softly and the breath slows"
+clear = "lips parted, eyes wide, the head tilting back to take it in"
+overwhelming = "utterly still, mouth open, tears forming as they look up at it"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "hushed"
+clear = "a whisper"
+overwhelming = "no words, only a breath"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+1 = 0.6
+2 = 0.5
+5 = 0.4
+25 = 0.6
+26 = 0.3
+63 = 0.4
+53 = 0.4

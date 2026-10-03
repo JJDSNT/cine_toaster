@@ -181,6 +181,15 @@ def build(root: Path, manager=None):
                 "elements": list_elements(runtime.root)}
 
     @server.tool(annotations=reading)
+    def list_emotions() -> list[dict[str, Any]]:
+        """The emotion catalog: a shot names `emotion: {id, who, intensity: subtle|clear|overwhelming,
+        arc: holds|builds|fades|breaks}`. How a character feels is the director's to decide."""
+        from .emotions import list_emotions as catalog
+
+        return [{key: item[key] for key in ("id", "name", "family", "says", "near", "signals", "ask")}
+                for item in catalog(runtime.root)]
+
+    @server.tool(annotations=reading)
     def list_sounds() -> list[dict[str, Any]]:
         """The sound catalog: a shot places `sounds: [{id: …, at: …}]`; a scene names `ambience` and `music`."""
         from .sounds import list_sounds as catalog

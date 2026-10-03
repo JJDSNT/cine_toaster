@@ -1,0 +1,29 @@
+schema_version = 1
+id = "contempt"
+name = "Contempt"
+family = "anger"
+says = "Looking down on someone: they are not worth the trouble."
+near = ["disgust", "anger"]
+
+[signals]
+face = ["one lip corner tightens up", "a slight raise of the chin", "eyes half-lidded"]
+body = ["leaning back", "turning partly away"]
+voice = ["cool, slow, a little drawn out"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "one corner of the mouth tightens, barely"
+clear = "a one-sided curl of the lip, the chin raised, the eyes cool"
+overwhelming = "a sneering half smile, the head tilted back, looking down at them"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "cool and slow"
+clear = "drawn out, mocking"
+overwhelming = "openly sneering"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+12 = 0.4
+14 = 0.7
+53 = 0.3

@@ -147,6 +147,8 @@ CORE_SHOT_FIELDS: frozenset[str] = frozenset(
         "effects",
         # CT-0048: sounds from the catalog, placed on the shot as cut.
         "sounds",
+        # CT-0048: how the people in the shot feel, from the emotion catalog.
+        "emotion",
         "duration",
         "camera",
         "camera_id",

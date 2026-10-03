@@ -815,6 +815,33 @@ def command_sound(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_emotion(args: argparse.Namespace) -> int:
+    """The emotion catalog: what shows, what a model is asked, and the face as blendshapes (CT-0048)."""
+
+    from .emotions import face, list_emotions
+
+    root = Path(args.project).expanduser().resolve()
+    catalog = {item["id"]: item for item in list_emotions(root)}
+    if args.emotion_command == "list":
+        for item in catalog.values():
+            print(f"{item['id']:16} {item['family']:11} {item['says'][:80]}")
+        return 0
+    item = catalog.get(args.id)
+    if item is None:
+        print(f"No emotion {args.id!r} in the catalog", file=sys.stderr)
+        return 1
+    if args.emotion_command == "face":
+        print(json.dumps(face(item, args.intensity), indent=2))
+        return 0
+    print(f"{item['name']} ({item['family']}): {item['says']}")
+    for part in ("face", "body", "voice"):
+        print(f"  {part}: {'; '.join(item['signals'][part])}")
+    for level in ("subtle", "clear", "overwhelming"):
+        print(f"  ask, {level}: {item['ask'][level]}")
+        print(f"  voice, {level}: {item['voice'][level]}")
+    return 0
+
+
 def command_mcp(args: argparse.Namespace) -> int:
     """Serve the project to Claude Code over MCP, on stdio (CT-0045)."""
 
@@ -1869,6 +1896,19 @@ def build_parser() -> argparse.ArgumentParser:
         item = vfx_sub.add_parser(name, help=text)
         item.add_argument("project", type=Path)
     vfx_parser.set_defaults(function=command_vfx)
+
+    emotion_parser = subparsers.add_parser("emotion", help="The emotion catalog: describe, ask a model, put on a face (CT-0048)")
+    emotion_sub = emotion_parser.add_subparsers(dest="emotion_command", required=True)
+    emotion_list = emotion_sub.add_parser("list", help="Every feeling in the catalog")
+    emotion_list.add_argument("project", type=Path)
+    emotion_show = emotion_sub.add_parser("show", help="What shows, and what a model is asked at each intensity")
+    emotion_show.add_argument("project", type=Path)
+    emotion_show.add_argument("id")
+    emotion_face = emotion_sub.add_parser("face", help="FACS action units and ARKit blendshape weights, as JSON")
+    emotion_face.add_argument("project", type=Path)
+    emotion_face.add_argument("id")
+    emotion_face.add_argument("--intensity", default="clear", choices=("subtle", "clear", "overwhelming"))
+    emotion_parser.set_defaults(function=command_emotion)
 
     sound_parser = subparsers.add_parser("sound", help="The sound catalog and its sources: Freesound, Sonniss, Openverse (CT-0048)")
     sound_sub = sound_parser.add_subparsers(dest="sound_command", required=True)

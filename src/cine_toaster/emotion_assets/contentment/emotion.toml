@@ -1,0 +1,28 @@
+schema_version = 1
+id = "contentment"
+name = "Contentment"
+family = "joy"
+says = "Quiet ease with how things are; nothing is wanted."
+near = ["joy", "relief"]
+
+[signals]
+face = ["a small closed-mouth smile", "relaxed brow", "slow blinks"]
+body = ["settled weight", "unhurried breathing", "still hands"]
+voice = ["low, warm, unhurried"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "the face at rest with the faintest smile"
+clear = "a calm, closed-mouth smile and slow, easy blinks"
+overwhelming = "eyes half closed in a deep, peaceful smile, the whole body settled"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "warm and unhurried"
+clear = "soft and slow, with a smile in it"
+overwhelming = "almost murmured, sleepy with ease"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+6 = 0.4
+12 = 0.6

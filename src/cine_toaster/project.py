@@ -198,6 +198,8 @@ def _load_shots(
                 "title": field(raw, "title") if isinstance(field(raw, "title"), (str, dict)) else None,
                 # Effects from the VFX catalog, applied in order before the title (CT-0031).
                 "effects": field(raw, "effects") if isinstance(field(raw, "effects"), (list, dict, str)) else None,
+                # How the people in it feel, from the emotion catalog (CT-0048).
+                "emotion": field(raw, "emotion") if isinstance(field(raw, "emotion"), (list, dict, str)) else None,
                 # Sounds from the catalog, placed on the shot as cut (CT-0048).
                 "sounds": field(raw, "sounds") if isinstance(field(raw, "sounds"), (list, dict, str)) else None,
                 "ends_on": vtext(raw, "ends_on"),
@@ -417,6 +419,27 @@ def _expand_effects(shots: list[dict[str, Any]], scene_id: str, root: Path) -> l
     return findings
 
 
+def _expand_emotions(shots: list[dict[str, Any]], document: dict[str, Any], scene_id: str, root: Path,
+                     people: set[str]) -> list[Finding]:
+    """`emotion: {id, who, intensity, arc}` takes its words from the emotion catalog (CT-0048)."""
+
+    if not any(shot.get("emotion") for shot in shots):
+        return []
+    from .emotions import expand, list_emotions
+
+    catalog = {item["id"]: item for item in list_emotions(root)}
+    findings = []
+    for shot in shots:
+        if not shot.get("emotion"):
+            continue
+        known = people | {str(line.get("who") or "").upper() for line in shot.get("lines") or []}
+        shot["emotion"], problems = expand(shot["emotion"], catalog, people={name for name in known if name})
+        findings.extend(Finding(code="emotion_problem", severity="error", scene_id=scene_id, shots=(shot["id"],),
+                                message=f"{shot['id']} {problem}. It would be lost, not guessed.")
+                        for problem in problems)
+    return findings
+
+
 def _expand_sounds(shots: list[dict[str, Any]], document: dict[str, Any], scene_id: str,
                    root: Path) -> tuple[dict[str, list[dict[str, Any]]], list[Finding]]:
     """Shot `sounds` and scene `ambience` and `music` take their defaults from the sound catalog (CT-0048)."""
@@ -600,6 +623,9 @@ def _load_scene(
     move_findings.extend(sound_findings)
     enter, enter_findings = _scene_enter(document, scene_id, root)
     move_findings.extend(enter_findings)
+    people = {str(subject_id).upper() for subject_id in geometry.subjects}
+    people |= {str(name).upper() for name in (_scene_field(document, "cast", scene_aliases) or {})}
+    move_findings.extend(_expand_emotions(shots, document, scene_id, root, people))
     motions = shot_motions(geometry, shots, scene_id=scene_id)
     positions_by_shot = {motion.shot_id: motion.start_positions for motion in motions}
     findings = [

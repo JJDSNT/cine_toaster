@@ -1,0 +1,31 @@
+schema_version = 1
+id = "dread"
+name = "Dread"
+family = "fear"
+says = "Fear of what is coming, slowly understood."
+near = ["fear", "unease"]
+
+[signals]
+face = ["a fixed stare", "the jaw held", "a slow swallow"]
+body = ["stillness", "shallow breathing", "a hand stopping halfway"]
+voice = ["low, careful, held"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "a stillness, the eyes fixed, a slow swallow"
+clear = "the face goes still and pale, the eyes fixed on the source, the breath shallow"
+overwhelming = "frozen, the eyes wide and unblinking, the lips pressed white, trembling"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "low and careful"
+clear = "held, almost a whisper"
+overwhelming = "barely able to speak"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+1 = 0.5
+4 = 0.5
+5 = 0.5
+7 = 0.4
+24 = 0.6

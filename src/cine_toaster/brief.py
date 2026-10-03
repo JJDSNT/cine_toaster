@@ -44,7 +44,7 @@ CUT_NAMES = {"hard": "Hard cut", "match": "Match cut", "action": "Cut on action"
 
 #: SceneFlow's cue types, by the tag that produced the text.
 _CUE_TYPES = {"CAM": "camera", "BLOCK": "shot", "ACT": "action", "DIAL": "dialogue",
-              "AUDIO": "audio", "CUT IN": "transition"}
+              "AUDIO": "audio", "CUT IN": "transition", "ACTING": "action"}
 
 
 @dataclass(slots=True)
@@ -298,6 +298,11 @@ def scene_brief(scene: dict[str, Any], looks: dict[str, dict[str, Any]] | None =
             slots.append(Slot("ACT", description, "authored", shot_id))
         if actions:
             slots.append(Slot("ACT", " ".join(actions), "screenplay", shot_id))
+        for item in shot.get("emotion") or []:
+            who = f"{item['who']}: " if item.get("who") else ""
+            reason = f" ({item['reason']})" if item.get("reason") else ""
+            slots.append(Slot("ACTING", f"{who}{item['name'].lower()}, {item['intensity']}, {item['arc']} -- "
+                              f"{item['ask']}{reason}", "authored", shot_id, speaker=item.get("who") or None))
         if not description and not actions:
             slots.append(Slot("ACT", "No action: describe what happens, or link the screenplay "
                               "(`covers`).", "missing", shot_id))

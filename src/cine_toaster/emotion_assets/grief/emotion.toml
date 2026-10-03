@@ -1,0 +1,33 @@
+schema_version = 1
+id = "grief"
+name = "Grief"
+family = "sadness"
+says = "Sadness for someone lost: it comes in waves and does not reason."
+near = ["sadness", "longing"]
+
+[signals]
+face = ["brows pulled up in the middle", "the mouth trembling open", "eyes red, tightly closing"]
+body = ["the body folds in", "hands cover the face or hold something of theirs", "rocking"]
+voice = ["breaking, wet, ragged breath"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "a stillness, the eyes fixed and wet, the jaw held"
+clear = "the face crumples, the chin trembles and tears fall"
+overwhelming = "sobbing that bends the body forward, the mouth open, gasping for breath"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "held, a tremor under it"
+clear = "thick with tears, words breaking"
+overwhelming = "sobbing, words barely formed"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+1 = 1.0
+4 = 0.7
+15 = 0.9
+17 = 0.6
+43 = 0.3
+25 = 0.4
+54 = 0.5

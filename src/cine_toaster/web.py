@@ -304,6 +304,14 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
                                                              "avoid_when", "params", "engine", "effect", "origin")},
                               "unavailable": engine_missing(item["engine"])} for item in list_titles(self.project_root)])
             return
+        if parsed.path == "/api/emotions":
+            # The emotion catalog (CT-0048), each entry with its face at a clear intensity.
+            from .emotions import face, list_emotions
+
+            self._send_json([{**{key: item[key] for key in ("id", "name", "family", "says", "near", "signals", "ask",
+                                                             "voice", "references", "origin")},
+                              "face": face(item)} for item in list_emotions(self.project_root)])
+            return
         if parsed.path == "/api/sounds":
             # The sound catalog (CT-0048): built in, the library's, the production's -- each with its licence.
             from .sounds import list_sounds

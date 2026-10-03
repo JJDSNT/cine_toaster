@@ -93,6 +93,16 @@ def _camera(scene: dict[str, Any], shot: dict[str, Any]) -> str:
     return str((shot.get("move") or {}).get("prompt") or "")
 
 
+def _acting(production: dict[str, Any], scene: dict[str, Any], shot: dict[str, Any]) -> list[str]:
+    """Each feeling the shot names, as what the model should show (CT-0048)."""
+
+    acting = []
+    for item in shot.get("emotion") or []:
+        who = _voice(production, scene, item["who"])[0] if item.get("who") else ""
+        acting.append(f"{who}: {item['ask']}" if who else item["ask"])
+    return acting
+
+
 def _voice(production: dict[str, Any], scene: dict[str, Any], who: str) -> tuple[str, str]:
     """(how to refer to the speaker, the voice) from the cast sheet, else the scene."""
 
@@ -176,16 +186,19 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
             raise ValidationError(f"{shot_id} has no reference picture to start or guide from "
                                   f"(its still, p<n>.png, or the image of the shot it is made from)")
         references.append(reference)
+        feelings = {cast_key(item["who"]): item for item in shot.get("emotion") or [] if item.get("who")}
         lines = []
         for line in shot.get("lines") or []:
             if not line.get("in_take", True):
                 continue
             refer, voice = _voice(production, scene, line.get("who", ""))
             voice = line.get("voice") or voice
-            lines.append(Line(refer, line.get("en") or line.get("text") or "", line.get("delivery", ""), voice))
+            # A line without its own delivery is spoken as the speaker feels (CT-0048).
+            manner = line.get("delivery") or (feelings.get(cast_key(line.get("who", ""))) or {}).get("voice", "")
+            lines.append(Line(refer, line.get("en") or line.get("text") or "", manner, voice))
         sound = shot.get("sound")
         prompts.append(ShotPrompt(picture, _camera(scene, shot), shot.get("description") or "", lines,
-                                  sound if isinstance(sound, str) else ""))
+                                  sound if isinstance(sound, str) else "", _acting(production, scene, shot)))
     frames = requested_cuts(block.durations, FPS)
     # Frame 0 is guided with the first picture too: alone, the first image gives
     # way in a long block (claim frame-zero-guide); each later shot's picture

@@ -1,0 +1,30 @@
+schema_version = 1
+id = "disgust"
+name = "Disgust"
+family = "disgust"
+says = "Something repellent: get it away."
+near = ["contempt"]
+
+[signals]
+face = ["nose wrinkles", "upper lip lifts", "eyes narrow"]
+body = ["pulling back", "turning the head away", "a hand raised to block"]
+voice = ["throaty, tight"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "the nose wrinkles slightly and the upper lip lifts"
+clear = "the nose wrinkles, the upper lip curls, the head pulls back"
+overwhelming = "gagging, turning away, a hand over the mouth"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "a tight edge"
+clear = "throaty and tight"
+overwhelming = "choking on the words"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+9 = 0.9
+10 = 0.8
+15 = 0.4
+17 = 0.3

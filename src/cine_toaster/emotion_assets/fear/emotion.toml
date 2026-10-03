@@ -1,0 +1,33 @@
+schema_version = 1
+id = "fear"
+name = "Fear"
+family = "fear"
+says = "Danger, now: the body gets ready to flee."
+near = ["dread", "shock"]
+
+[signals]
+face = ["brows raised and drawn together", "upper lids wide, whites showing", "lips stretched back"]
+body = ["freezing, then backing away", "shallow fast breath", "hands up or gripping"]
+voice = ["higher, faster, breathy"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "the eyes widen for a moment and the breath stops"
+clear = "the eyes go wide, the brows lift and pull together, the lips stretch back, the body freezes"
+overwhelming = "eyes stretched wide with terror, mouth open, backing away, the breath ragged"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "tight and quick"
+clear = "breathy, the pitch rising"
+overwhelming = "high and shaking, near a scream"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+1 = 0.8
+2 = 0.6
+4 = 0.6
+5 = 1.0
+7 = 0.4
+20 = 0.8
+26 = 0.5

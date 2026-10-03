@@ -1,0 +1,30 @@
+schema_version = 1
+id = "determination"
+name = "Determination"
+family = "self"
+says = "A decision made: nothing will stop it now."
+near = ["anger", "hope"]
+
+[signals]
+face = ["a steady, level gaze", "jaw set", "a slight lowering of the brow"]
+body = ["upright", "still, then moving with purpose", "a firm grip"]
+voice = ["steady, low, even"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "a steady look and a small set of the jaw"
+clear = "the gaze level and fixed, the jaw set, the brow lowered"
+overwhelming = "eyes burning, the jaw locked, moving forward without hesitation"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "steady and even"
+clear = "low and firm"
+overwhelming = "hard, unstoppable"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+4 = 0.5
+7 = 0.4
+17 = 0.4
+24 = 0.5

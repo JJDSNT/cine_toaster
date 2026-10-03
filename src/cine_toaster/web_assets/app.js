@@ -21,7 +21,7 @@ const state = {
 const ROOMS = new Set([
   "overview", "script", "storyboard", "dialogue",
   "sequences", "scenes", "review", "cut", "cast", "locations",
-  "transitions", "moves", "titles", "vfx", "sounds", "library", "knowledge",
+  "transitions", "moves", "titles", "vfx", "sounds", "emotions", "library", "knowledge",
 ]);
 
 /** Write where we are into the address bar.
@@ -75,6 +75,7 @@ function draw(view) {
   else if (view === "titles") renderTitles();
   else if (view === "vfx") renderVfx();
   else if (view === "sounds") renderSounds();
+  else if (view === "emotions") renderEmotions();
   else if (view === "cast") renderCast();
   else if (view === "library") renderLibrary(state.project.id);
   else if (view === "knowledge") renderKnowledge();
@@ -1660,6 +1661,52 @@ async function renderSounds() {
   tellAssistant();
 }
 
+// The emotion catalog (CT-0048): what shows, the words a model gets at each
+// intensity, and the face as FACS units and ARKit blendshapes. A shot names
+// emotion: {id, who, intensity, arc}; how a character feels is the director's.
+async function renderEmotions() {
+  const root = byId("workspace");
+  root.replaceChildren();
+  const heading = sectionHeading("EMOTIONS", "Emotions",
+    "A shot names emotion: {id: …, who: MARA, intensity: subtle | clear | overwhelming, arc: holds | builds | fades | breaks}. The model is asked for what can be seen, never a label; the face is given as FACS units and ARKit blendshapes for a rig.");
+  heading.classList.add("page-heading");
+  root.append(heading);
+  state.emotions = (await api("/api/emotions", { optional: true })) || [];
+  const byFamily = new Map();
+  for (const item of state.emotions) {
+    if (!byFamily.has(item.family)) byFamily.set(item.family, []);
+    byFamily.get(item.family).push(item);
+  }
+  for (const [family, items] of byFamily) {
+    const section = el("section", "transition-section");
+    section.append(sectionHeading("EMOTIONS", label(family), `${items.length} available`));
+    const grid = el("div", "transition-grid");
+    for (const item of items) {
+      const card = el("article", "transition-card move-card");
+      const levels = el("dl", "emotion-levels");
+      for (const level of ["subtle", "clear", "overwhelming"]) {
+        levels.append(el("dt", "", level), el("dd", "", item.ask[level]));
+      }
+      const shapes = Object.entries(item.face.arkit || {}).map(([shape, weight]) => `${shape} ${weight}`).join(", ");
+      const units = (item.face.action_units || []).map((unit) => `AU${unit.au}`).join("+");
+      card.append(
+        el("strong", "", item.name),
+        el("code", "move-id", `emotion: {id: ${item.id}, who: …}`),
+        el("p", "", item.says),
+        el("small", "muted", `Face: ${item.signals.face.join("; ")}`),
+        el("small", "muted", `Body: ${item.signals.body.join("; ")}`),
+        levels,
+        el("small", "muted", `Voice (clear): ${item.voice.clear}`),
+        el("small", "muted", `FACS ${units}${shapes ? ` · ARKit ${shapes}` : ""}`),
+      );
+      grid.append(card);
+    }
+    section.append(grid);
+    root.append(section);
+  }
+  tellAssistant();
+}
+
 async function renderMoves() {
   const root = byId("workspace");
   root.replaceChildren();
@@ -2811,6 +2858,11 @@ async function start() {
     state.vfx = vfx || { effects: [], elements: [] };
     const count = byId("vfx-nav-count");
     if (count) count.textContent = String(state.vfx.effects.length);
+  }).catch(() => {});
+  api("/api/emotions", { optional: true }).then((emotions) => {
+    state.emotions = emotions || [];
+    const count = byId("emotions-nav-count");
+    if (count) count.textContent = String(state.emotions.length);
   }).catch(() => {});
   api("/api/sounds", { optional: true }).then((sounds) => {
     state.sounds = sounds || [];

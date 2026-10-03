@@ -1,0 +1,30 @@
+schema_version = 1
+id = "shock"
+name = "Shock"
+family = "surprise"
+says = "The mind stops: what happened cannot be taken in."
+near = ["surprise", "fear", "numbness"]
+
+[signals]
+face = ["the face goes slack", "eyes wide and unblinking", "the mouth falls open"]
+body = ["frozen", "whatever is held is dropped", "no breath"]
+voice = ["no voice, or a single broken word"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "a beat of total stillness, the eyes widening"
+clear = "the face goes slack, the mouth falls open, the eyes fixed and wide"
+overwhelming = "frozen completely, unblinking, the mouth open, the body swaying as if hit"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "a word that trails off"
+clear = "a stunned, toneless voice"
+overwhelming = "only a broken breath, no words"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+1 = 0.7
+2 = 0.7
+5 = 0.9
+26 = 0.8

@@ -1,0 +1,29 @@
+schema_version = 1
+id = "confusion"
+name = "Confusion"
+family = "thought"
+says = "Not understanding: the mind searching."
+near = ["unease", "surprise"]
+
+[signals]
+face = ["brows knit", "eyes narrowing or searching", "the head tilting"]
+body = ["a pause in movement", "looking from one thing to another"]
+voice = ["questioning, uneven"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "a small knit of the brow"
+clear = "the brows knit, the head tilts, the eyes searching for sense"
+overwhelming = "looking from one thing to another, bewildered, the mouth open on an unasked question"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "questioning"
+clear = "uneven, rising at the ends"
+overwhelming = "lost, words stopping"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+4 = 0.6
+7 = 0.3
+56 = 0.4

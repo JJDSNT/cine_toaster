@@ -1,0 +1,30 @@
+schema_version = 1
+id = "relief"
+name = "Relief"
+family = "joy"
+says = "A held weight let go: the danger has passed."
+near = ["contentment", "joy"]
+
+[signals]
+face = ["the brow unknots", "eyes close for a moment", "a short exhale through parted lips"]
+body = ["shoulders drop", "the body sags or leans on something", "a long breath out"]
+voice = ["breathy, falling at the end of phrases"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "a slow breath out and the shoulders lower slightly"
+clear = "a long exhale, eyes closing for a moment, the shoulders dropping"
+overwhelming = "the knees nearly give, a shaky laugh or a sob of release, a hand to the chest"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "a sigh before the words"
+clear = "breathy, the pitch falling away"
+overwhelming = "words broken by a shaky laugh"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+43 = 0.4
+25 = 0.5
+12 = 0.4
+54 = 0.3

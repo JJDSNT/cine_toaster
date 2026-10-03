@@ -1,0 +1,30 @@
+schema_version = 1
+id = "surprise"
+name = "Surprise"
+family = "surprise"
+says = "The unexpected, for a moment; it passes into something else."
+near = ["shock", "recognition"]
+
+[signals]
+face = ["brows shoot up", "eyes widen", "jaw drops"]
+body = ["a small step back", "the head pulls back"]
+voice = ["a sharp intake, a rising pitch"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "the brows lift and the eyes widen for a moment"
+clear = "the brows shoot up, the eyes widen and the jaw drops"
+overwhelming = "a gasp, a step back, hands up, the eyes and mouth wide open"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "a quick lift in pitch"
+clear = "a sharp breath, then the words rising"
+overwhelming = "a gasp before the words"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+1 = 1.0
+2 = 1.0
+5 = 0.8
+26 = 0.7

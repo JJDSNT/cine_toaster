@@ -1,0 +1,30 @@
+schema_version = 1
+id = "tenderness"
+name = "Tenderness"
+family = "connection"
+says = "Gentle care for someone close."
+near = ["love", "compassion"]
+
+[signals]
+face = ["a soft smile", "warm eyes", "the head tilted"]
+body = ["slow, careful touch", "leaning close", "a hand on a cheek or a shoulder"]
+voice = ["soft, low, close"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "a soft look and the faintest smile"
+clear = "a warm, soft smile, the head tilted, a gentle touch"
+overwhelming = "eyes wet with feeling, holding them close, a hand on their face"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "soft and close"
+clear = "low and gentle, almost a murmur"
+overwhelming = "a whisper, the voice catching"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+6 = 0.4
+12 = 0.5
+1 = 0.3
+55 = 0.3

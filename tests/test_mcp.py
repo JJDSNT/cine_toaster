@@ -71,6 +71,7 @@ class McpTests(unittest.TestCase):
         self.assertEqual(locations[0]["id"], "LISTENING-STATION")
         self.assertTrue(any(move["id"] == "rise-and-reveal" for move in self.call("list_camera_moves")))
         self.assertTrue(any(sound["id"] == "room-tone" for sound in self.call("list_sounds")))
+        self.assertTrue(any(item["id"] == "dread" for item in self.call("list_emotions")))
 
     def test_a_decision_is_recorded_as_claude_codes_and_a_refusal_is_an_answer(self) -> None:
         answer = self.call("set_cut", {"scene": "SC-030", "shot": "P2", "cut_type": "match", "why": "the stack's light"})

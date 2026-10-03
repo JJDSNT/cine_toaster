@@ -1,0 +1,30 @@
+schema_version = 1
+id = "recognition"
+name = "Recognition"
+family = "surprise"
+says = "Knowing a face, a voice or a truth all at once."
+near = ["surprise", "shock", "joy"]
+
+[signals]
+face = ["a start, then the eyes searching the face", "brows lifting", "lips parting on a name"]
+body = ["stopping mid-movement", "a step toward"]
+voice = ["a name spoken before thinking"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "a small start, the eyes narrowing to look closer"
+clear = "the eyes search the face, the brows lift, the lips part on a name"
+overwhelming = "a sharp breath, a step toward them, the face caught between disbelief and joy"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "half a question"
+clear = "a name breaking out"
+overwhelming = "a cry of the name"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+1 = 0.6
+2 = 0.6
+5 = 0.6
+25 = 0.6

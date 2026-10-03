@@ -1,0 +1,30 @@
+schema_version = 1
+id = "shame"
+name = "Shame"
+family = "self"
+says = "Being seen as less: the wish to disappear."
+near = ["guilt", "embarrassment"]
+
+[signals]
+face = ["gaze down and away", "lips pressed", "colour rising in the face"]
+body = ["head lowered", "shoulders curled", "turning away"]
+voice = ["quiet, mumbled"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "the gaze drops and the lips press together"
+clear = "head lowered, eyes down and away, the shoulders curling in"
+overwhelming = "the face hidden in the hands, turning away, unable to look at anyone"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "quiet, a little mumbled"
+clear = "low, avoiding the words"
+overwhelming = "almost inaudible"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+64 = 0.8
+54 = 0.6
+24 = 0.4
+15 = 0.3

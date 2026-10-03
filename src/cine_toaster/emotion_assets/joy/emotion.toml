@@ -1,0 +1,29 @@
+schema_version = 1
+id = "joy"
+name = "Joy"
+family = "joy"
+says = "Delight that cannot be held in: the whole face takes part."
+near = ["contentment", "elation"]
+
+[signals]
+face = ["cheeks lift and narrow the eyes", "the mouth widens into a full smile", "small lines gather at the eye corners"]
+body = ["shoulders loosen", "the body opens and leans in", "quick, light movements"]
+voice = ["brighter and quicker", "laughter under the words"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "the corners of the mouth lift a little and the eyes soften"
+clear = "a wide smile reaches the eyes, the cheeks rise and the eyes crinkle"
+overwhelming = "a full open-mouthed laugh, head tipping back, eyes nearly closed with it"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "a smile in the voice"
+clear = "bright and quick, close to a laugh"
+overwhelming = "breaking into laughter mid-word"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+6 = 1.0
+12 = 1.0
+25 = 0.5

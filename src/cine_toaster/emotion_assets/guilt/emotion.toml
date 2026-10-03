@@ -1,0 +1,30 @@
+schema_version = 1
+id = "guilt"
+name = "Guilt"
+family = "self"
+says = "Having done harm, and knowing it."
+near = ["shame", "regret"]
+
+[signals]
+face = ["eyes avoiding theirs", "a troubled brow", "a hard swallow"]
+body = ["fidgeting", "a step back", "hands rubbing together"]
+voice = ["hesitant, apologetic"]
+
+# How a video model is asked to act it: what can be seen, not a label.
+[ask]
+subtle = "a glance away and a hard swallow"
+clear = "eyes avoiding theirs, the brow troubled, the hands restless"
+overwhelming = "unable to meet their eyes, the face twisting, close to tears"
+
+# The delivery of a line spoken in it, when the line has none of its own.
+[voice]
+subtle = "hesitant"
+clear = "apologetic, words stumbling"
+overwhelming = "broken, pleading"
+
+# FACS action units (the public coding system) and their weight at full intensity.
+[facs]
+1 = 0.4
+4 = 0.4
+64 = 0.6
+24 = 0.3
