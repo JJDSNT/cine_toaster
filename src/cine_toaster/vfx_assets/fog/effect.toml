@@ -1,0 +1,16 @@
+schema_version = 1
+id = "fog"
+name = "Fog"
+category = "weather"
+says = "Soft banks of mist drift across the frame."
+energy = "low"
+use_when = ["Mornings, mystery, depth in a wide shot"]
+avoid_when = ["Interiors that must feel dry and close"]
+
+[params]
+strength = 0.25
+drift = 0.5
+
+[render]
+engine = "ffmpeg"
+effect = "fog"

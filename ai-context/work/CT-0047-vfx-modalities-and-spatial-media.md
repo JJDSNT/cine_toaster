@@ -255,3 +255,16 @@ far higher rendering cost, on a CUDA GPU. The useful support is therefore:
    Toaster renders itself.
 
 Not started; the export in (1) is small and could follow the splat work.
+
+# Done: the visual categories the user listed (2026-10-03)
+
+28 effects. Added: rain, snow (weather); lightning (electricity: a
+recursive midpoint bolt with branches, keyframed flash/re-strike);
+shatter (Explode modifier on a solidified mesh, one shard per face) and
+melt (a clamped, contrasted Clouds displacement downward plus smoothing)
+for destruction; liquid-splash (Mantaflow, baked headless); hologram and
+fog (FFmpeg). Found: a text object turned to face the camera has its local
+"down" on -Y, not -Z; unclamped high-contrast noise pushes vertices up as
+well as down; snow needs an early start and a longer life to fill the
+frame. All render in 2–15 s at 320×180 × 24 frames on the CPU. Test:
+`BlenderEffectTests` (each renders and composites).

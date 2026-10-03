@@ -1,0 +1,20 @@
+schema_version = 1
+id = "melt"
+name = "Melt"
+category = "destruction"
+says = "A word or an object softens and drips down, unevenly, as if heated."
+energy = "medium"
+use_when = ["Heat, decay, a dream losing its shape"]
+avoid_when = ["When Blender is not installed (refused, not faked)"]
+
+[params]
+x = 0.5
+y = 0.5
+scale = 1.0
+text = ""
+amount = 1.8
+begin = 0.2
+
+[render]
+engine = "blender"
+effect = "melt"

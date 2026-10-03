@@ -1,0 +1,20 @@
+schema_version = 1
+id = "snow"
+name = "Snow"
+category = "weather"
+says = "Snowflakes drifting down through the frame."
+energy = "low"
+use_when = ["Winter, silence, a soft ending"]
+avoid_when = ["When Blender is not installed (refused, not faked)"]
+
+[params]
+x = 0.5
+y = 0.5
+scale = 1.0
+count = 900
+speed = 1.2
+drift = 0.25
+
+[render]
+engine = "blender"
+effect = "snow"

@@ -297,3 +297,28 @@ class OpenFxTests(unittest.TestCase):
                                                capture_output=True, check=True).stdout  # noqa: E731
             difference = sum(abs(a - b) for a, b in zip(grab(plate), grab(out))) / 3200
             self.assertGreater(difference, 2)
+
+
+@unittest.skipUnless(HAS_FFMPEG and __import__("cine_toaster.titles").titles.blender_binary(), "Blender is not installed")
+class BlenderEffectTests(unittest.TestCase):
+    """Weather, electricity, destruction and liquids, rendered by Blender for the shot (CT-0047)."""
+
+    def test_each_one_renders_and_composites(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            previous = os.environ.get("XDG_STATE_HOME")
+            os.environ["XDG_STATE_HOME"] = str(root / "state")
+            try:
+                catalog = {item["id"]: item for item in list_effects()}
+                for effect_id, extra in (("rain", {}), ("snow", {}), ("lightning", {"begin": 0.1}),
+                                         ("shatter", {"text": "AB"}), ("melt", {"text": "AB"}),
+                                         ("liquid-splash", {"resolution": 16}), ("hologram", {}), ("fog", {})):
+                    effects, problems = expand([{"id": effect_id, "samples": 2, **extra}], catalog, {})
+                    self.assertEqual(problems, [], effect_id)
+                    out = render(effects, 0.25, root / f"{effect_id}.mp4", width=160, height=90)
+                    self.assertTrue(out.is_file() and out.stat().st_size > 0, effect_id)
+            finally:
+                if previous is None:
+                    os.environ.pop("XDG_STATE_HOME", None)
+                else:
+                    os.environ["XDG_STATE_HOME"] = previous

@@ -76,9 +76,25 @@ catalog and the elements with their forms.
 
 ## Effects Blender renders for the shot
 
-`sparks-burst` and `disintegrate` (a word or an object coming apart into
-drifting dust) are rendered by Blender with the shot's parameters when the
-shot is drawn, through the same EXR and OpenColorIO path, then composited.
+Rendered by Blender with the shot's parameters when the shot is drawn,
+through the same EXR and OpenColorIO path, then composited:
+
+| Category | Effect | What it is |
+| --- | --- | --- |
+| particles | `sparks-burst` | sparks thrown from a point, falling |
+| particles | `disintegrate` | a word or object coming apart into drifting dust |
+| weather | `rain`, `snow` | streaks of rain; drifting flakes (the sky full from the first frame) |
+| electricity | `lightning` | a branching bolt that strikes, flickers, re-strikes (a new bolt per `seed`) |
+| destruction | `shatter` | a word or object breaking into shards that fly and fall (Explode) |
+| destruction | `melt` | a word or object dripping down unevenly, softening |
+| liquids | `liquid-splash` | a mass of water falling and splashing (Mantaflow, baked) |
+
+`text` makes the word the subject of disintegrate, shatter and melt.
+
+## More procedural effects
+
+`hologram` (cyan light, scanlines, colour fringe, unsteady brightness) and
+`fog` (drifting banks of mist) are drawn by FFmpeg.
 
 ## Looks
 

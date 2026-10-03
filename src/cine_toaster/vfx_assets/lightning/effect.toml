@@ -1,0 +1,21 @@
+schema_version = 1
+id = "lightning"
+name = "Lightning"
+category = "electricity"
+says = "A branching bolt that strikes, flickers, re-strikes and is gone: a new bolt for every seed."
+energy = "high"
+use_when = ["A storm, a revelation, a machine coming to life"]
+avoid_when = ["When Blender is not installed (refused, not faked)"]
+
+[params]
+x = 0.5
+y = 0.5
+scale = 1.0
+seed = 7
+branches = 3
+glow = 25
+begin = 0.25
+
+[render]
+engine = "blender"
+effect = "lightning"

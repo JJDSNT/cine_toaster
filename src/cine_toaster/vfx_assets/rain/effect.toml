@@ -1,0 +1,20 @@
+schema_version = 1
+id = "rain"
+name = "Rain"
+category = "weather"
+says = "Rain falling across the whole frame, streaks of light: rendered by Blender for the shot."
+energy = "medium"
+use_when = ["Exteriors, a storm, a mood of melancholy"]
+avoid_when = ["When Blender is not installed (refused, not faked)"]
+
+[params]
+x = 0.5
+y = 0.5
+scale = 1.0
+count = 2500
+speed = 9.0
+view = "ACES 2.0 - SDR 100 nits (Rec.709)"
+
+[render]
+engine = "blender"
+effect = "rain"

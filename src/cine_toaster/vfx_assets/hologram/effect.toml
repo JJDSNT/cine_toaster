@@ -1,0 +1,15 @@
+schema_version = 1
+id = "hologram"
+name = "Hologram"
+category = "holograms"
+says = "The picture becomes a projection: cyan light, scanlines, a colour fringe, an unsteady brightness."
+energy = "medium"
+use_when = ["A projected figure, a message from far away, a memory replayed by a machine"]
+avoid_when = ["Shots that must look real"]
+
+[params]
+strength = 0.6
+
+[render]
+engine = "ffmpeg"
+effect = "hologram"

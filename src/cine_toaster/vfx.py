@@ -33,14 +33,16 @@ from typing import Any
 from .errors import ValidationError
 
 BUILTIN = Path(__file__).with_name("vfx_assets")
-CATEGORIES = ("texture", "lens", "light", "motion", "glitch", "particles", "elements")
+CATEGORIES = ("texture", "lens", "light", "motion", "glitch", "particles", "weather", "electricity", "destruction",
+              "liquids", "holograms", "elements")
 EFFECTS = ("grain", "vignette", "light-leak", "aberration", "glitch", "shake", "flash", "defocus", "old-film",
-           "element", "sparks-burst", "disintegrate", "look", "ofx")
+           "element", "sparks-burst", "disintegrate", "look", "ofx", "hologram", "fog", "rain", "snow", "lightning",
+           "shatter", "melt", "liquid-splash")
 ENGINES = ("ffmpeg", "blender", "ofx")
 #: OpenFX plugins run in Natron, an OFX host driven headless (vfx_assets/_natron/chain.py).
 NATRON_CHAIN_SCRIPT = BUILTIN / "_natron" / "chain.py"
 #: Effects Blender renders as an element on the fly (vfx_assets/_blender/element.py).
-BLENDER_EFFECTS = ("sparks-burst", "disintegrate")
+BLENDER_EFFECTS = ("sparks-burst", "disintegrate", "rain", "snow", "lightning", "shatter", "melt", "liquid-splash")
 BLENDER_ELEMENT_SCRIPT = BUILTIN / "_blender" / "element.py"
 VIDEO_SUFFIXES = (".mp4", ".mov", ".webm", ".mkv", ".avi")
 BLENDS = ("screen", "add", "alpha", "key")
@@ -260,6 +262,21 @@ def _chain(effect: dict[str, Any], label: str, out: str, duration: float, width:
         return (f"[{label}]colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131,"
                 f"noise=alls={max(1, round(strength * 30))}:allf=t+u,vignette=angle=0.6,"
                 f"eq=brightness='0.03*sin(t*23)':eval=frame[{out}]")
+    if kind == "hologram":
+        # Cyan light, scanlines, a colour fringe and an unsteady brightness: a projection, not a person.
+        shift = max(1, round(strength * 4 * width / 1280))
+        gap = max(2, round(3 * height / 720))
+        return (f"[{label}]colorchannelmixer=.15:.25:.2:0:.25:.55:.35:0:.35:.65:.85,"
+                f"drawgrid=w=iw:h={gap}:t=1:c=black@{0.25 + 0.3 * strength:.2f},rgbashift=rh=-{shift}:bh={shift},"
+                f"eq=brightness='0.04*sin(t*31)+0.08*gt(random(1),0.93)':eval=frame,"
+                f"gblur=sigma=0.6[{out}]")
+    if kind == "fog":
+        # Soft banks of mist drifting across, laid over the picture with screen.
+        drift = _number(params, "drift", 0.5)
+        return (f"nullsrc=s={width // 4}x{height // 4}:d={duration:.3f}:r=24,"
+                f"geq=lum='128+70*sin(X/9+T*{drift:.3f})*cos(Y/7-T*{drift * 0.6:.3f})+40*sin((X+Y)/13+T*{drift * 0.3:.3f})':"
+                f"cb=128:cr=128,gblur=sigma=4,scale={width}:{height},format=gbrp[{label}fog];[{label}]format=gbrp[{label}p];"
+                f"[{label}p][{label}fog]blend=all_mode=screen:all_opacity={min(1.0, strength):.3f},format=yuv420p[{out}]")
     if kind == "look":
         # An OpenColorIO view baked to a 3D LUT (cached), for FFmpeg to apply.
         from .color import bake_look

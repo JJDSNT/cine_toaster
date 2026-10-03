@@ -1,0 +1,20 @@
+schema_version = 1
+id = "liquid-splash"
+name = "Liquid splash"
+category = "liquids"
+says = "A mass of water falls and splashes: a small Mantaflow simulation, baked and rendered by Blender."
+energy = "high"
+use_when = ["Water thrown, a glass spilt, a wave hitting"]
+avoid_when = ["When Blender is not installed (refused, not faked)"]
+
+[params]
+x = 0.5
+y = 0.5
+scale = 1.0
+resolution = 40
+push = 0.0
+clarity = 0.85
+
+[render]
+engine = "blender"
+effect = "liquid-splash"

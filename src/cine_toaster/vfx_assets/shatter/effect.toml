@@ -1,0 +1,22 @@
+schema_version = 1
+id = "shatter"
+name = "Shatter"
+category = "destruction"
+says = "A word or an object breaks into shards that fly apart and fall."
+energy = "high"
+use_when = ["A title that breaks, glass, a world coming apart"]
+avoid_when = ["When Blender is not installed (refused, not faked)"]
+
+[params]
+x = 0.5
+y = 0.5
+scale = 1.0
+text = ""
+force = 2.5
+scatter = 1.5
+gravity = 0.6
+begin = 0.25
+
+[render]
+engine = "blender"
+effect = "shatter"
