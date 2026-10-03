@@ -2,7 +2,7 @@
 id: CT-0052
 title: Surround and spatial sound -- research (playback chosen by the hardware present)
 type: work
-status: ready
+status: blocked
 owner: unassigned
 created_at: 2026-10-03
 updated_at: 2026-10-03
@@ -171,3 +171,47 @@ read from GitHub; local FFmpeg checked (6.1.1: `ac3`, `eac3`, `pan`,
 - Cavern and its licence: https://github.com/VoidXH/Cavern
 - Grapes 3D Audio Control: https://grapes-3d.com
 - IAMF, an open 3D audio format: https://soundingfuture.com
+
+# Done: phase 1, a 5.1 track beside the stereo (2026-10-03)
+
+The user: "ok, advance at your best judgement" after the research; the
+question of what feeds their 5.1 is still open, so phase 1 uses the
+format every 5.1 receiver decodes, AC-3.
+
+- `surround.py`: the 5.1 (side) mix from the same pieces as the stereo,
+  routed by kind (`ROUTES`: dialogue takes to the centre, other takes
+  front, ambience front and surrounds, music front and a little surround,
+  effects front with the LFE), the LFE low-passed at 120 Hz, a limiter;
+  attached as a second track (AC-3 640 kb/s, named "5.1", not default)
+  after the stereo AAC (default, "Stereo"); loudness of each track.
+- `surround: "5.1"` on the production or a scene (`false`, `stereo`,
+  `none` mean off); `Plan.surround`, `Plan.loudness`; the version's summary
+  names the tracks and their loudness. Renditions inherit it.
+- Tests: `tests/test_surround.py` (two tracks in order and disposition;
+  dialogue in the centre, a rain bed front and back, a silent LFE; a boom
+  in the LFE; the field and its off values).
+
+Remains: phase 2 (placement from the plan), phase 3 (the control room
+picks the track by Media Capabilities; a binaural track), phase 4 (IAMF
+with a patched FFmpeg >= 7), and a sequence's own 5.1 (a sequence today
+re-mixes the scene versions' stereo).
+
+# Paused by the user (2026-10-03)
+
+"These are future improvements": phase 1 is kept (it works, tested, off by
+default); the rest waits until the open work is closed. The design worked
+out for phase 2, so it is not lost:
+
+- a shot's sound names its source: `sounds: [{id: alarm, at: 1, source:
+  SPEAKER}]` (a subject; set pieces once the blocking frame gives their
+  horizontal place);
+- the source's angle from the camera comes from the blocking frame at the
+  cue's shot (`figures[].angle`, negative = left; `behind`);
+- the 5.1 places it by pairwise amplitude panning between the two nearest
+  speakers of the ITU layout (C 0°, L/R ±30°, Ls/Rs ±110°), behind the
+  camera into the surrounds; the stereo track by a constant-power balance
+  clamped to ±30°;
+- dialogue stays in the centre by convention (a per-shot `follow` later);
+- a moving source: its start angle first, interpolation later.
+
+Unblock when the user returns to sound (also: what feeds their 5.1).

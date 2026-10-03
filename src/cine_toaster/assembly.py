@@ -128,6 +128,10 @@ class Plan:
     speech: list[tuple[float, float]] = field(default_factory=list)
     #: The format's rules the render applies (CT-0049): {aspect, captions}.
     format: dict[str, Any] = field(default_factory=dict)
+    #: Another layout mixed beside the stereo, as a second track ("5.1", CT-0052); and, once rendered,
+    #: the loudness of each track.
+    surround: str = ""
+    loudness: dict[str, float] = field(default_factory=dict)
 
     @property
     def takes(self) -> dict[str, str]:
@@ -309,6 +313,7 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         raise ValidationError(f"{scene['id']} has no shot with a take to assemble")
     form = (scene.get("style") or {}).get("format") or {}
     plan.format = {key: form[key] for key in ("aspect", "captions") if form.get(key)}
+    plan.surround = str(scene.get("surround") or "")
     if scene.get("ambience") or scene.get("music") or any(shot.get("sounds") for shot in scene["shots"]):
         from .sounds import place
 
@@ -453,6 +458,7 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
     count = [0] * total  # frames of each piece
     overlap = [0] * (total + 1)  # frames each transition takes, into segment i
     pictures, sounds = [], []
+    speaking: list[bool] = []  # whether someone speaks in each shot: its sound goes to the centre in a 5.1
     for index, segment in enumerate(plan.segments):
         if (segment.title or segment.effects) and not segment.source:
             _draw_title(root, segment, work / f"title-{index:03d}.mp4", first, fps, run_process)
@@ -544,6 +550,7 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
                     expected_seconds=span_seconds, message=f"{segment.shot}: its sound",
                     span=within(0.6 + 0.25 * index / total, 0.6 + 0.25 * (index + 1) / total))
         sounds.append((clip, max(0.0, starts[index] - before)))
+        speaking.append(bool(segment.speech or segment.speech_spans))
     picture = _join_pictures(ffmpeg, plan, pictures, count, overlap, work, fps, width, height, run_process,
                              within(0.85, 0.9))
     captions = [(starts[index] + max(0.0, a - segment.start), starts[index] + min(segment.end, b) - segment.start, text)
@@ -591,6 +598,23 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
             run_process(command, expected_seconds=expected_seconds, message=message, span=within(0.93, 1.0))
 
         plan.sound = mix(joined, plan.cues, catalog, speech, output, work / "sound", run_sound)
+    if plan.surround == "5.1":
+        from . import surround
+
+        cues = [(work / "sound" / f"sound-{index:03d}.wav", cue, laid["gain_db"])
+                for index, (cue, laid) in enumerate(zip(plan.cues, plan.sound))]
+        takes = [(clip, at, speaks) for (clip, at), speaks in zip(sounds, speaking)]
+        wide = surround.mix(takes, cues, speech, duration, work / "surround.wav",
+                            lambda command, expected_seconds=None, message="": run_process(
+                                command, expected_seconds=expected_seconds, message=message, span=within(0.97, 0.99)))
+        stereo_only = work / "stereo-only.mp4"
+        shutil.move(output, stereo_only)
+        surround.attach(stereo_only, wide, output, lambda command, message="": run_process(
+            command, message=message, span=within(0.99, 1.0)))
+        plan.loudness = {name: value for name, value in (("stereo", surround.loudness(output, 0)),
+                                                         ("5.1", surround.loudness(output, 1))) if value is not None}
+    elif plan.surround:
+        plan.notes.append(f"A {plan.surround} mix is not made yet; only 5.1 is (CT-0052).")
 
 
 def _frames_in(path: Path) -> int:

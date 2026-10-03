@@ -44,8 +44,8 @@ The order of work is the ordered plan in
 
 - `CT-0053` — upscaling to 4K: SeedVR2 on takes, 4K as a delivery
   target; awaiting the user's approval of a paid spike (`ready`)
-- `CT-0052` — surround and spatial sound: research, playback chosen by the
-  hardware present; awaiting the user's choice of deliverables (`ready`)
+- `CT-0052` — surround and spatial sound: researched; phase 1 (a 5.1 track
+  beside the stereo) done; the rest paused by the user (`blocked`)
 - `CT-0051` — joins between scenes in a sequence (`review`)
 - `CT-0050` — transitions and J/L-cuts rendered in the assembly (`review`)
 - `CT-0046` — plan step 13: the editable canvas (`done`)

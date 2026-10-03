@@ -766,7 +766,7 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
                    "destination": f"renders/assemblies/{scene_id}/{version}.mp4.speech.json"}, *renditions],
         "summary": {"segments": [{**{key: value for key, value in asdict(segment).items() if key not in ("sound", "source")},
                                   "gain_db": plan.gains.get(segment.shot, 0.0)} for segment in plan.segments],
-                    "notes": plan.notes, "voices": voices, "sound": plan.sound,
+                    "notes": plan.notes, "voices": voices, "sound": plan.sound, "loudness": plan.loudness,
                     "duration_seconds": plan.duration, "takes": plan.takes},
     }
 
@@ -785,6 +785,9 @@ def _adopted_assemble(job: dict[str, Any], placed: list[str]) -> None:
     if summary.get("sound"):
         laid = ", ".join(f"{item['id']} ({item['kind']}, {item['start']:g} s)" for item in summary["sound"])
         notes = f"Sound laid: {laid}. " + notes
+    if summary.get("loudness"):
+        tracks = " and ".join(f"{name} ({value:.1f} LUFS)" for name, value in summary["loudness"].items())
+        notes = f"Tracks: {tracks}. " + notes
     record_assembly(
         root,
         scene_id=job["params"]["scene"],

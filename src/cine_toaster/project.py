@@ -421,6 +421,13 @@ def _expand_effects(shots: list[dict[str, Any]], scene_id: str, root: Path) -> l
     return findings
 
 
+def _surround(value: Any) -> str:
+    """`surround: "5.1"` (a number in YAML too); off, false, none or stereo mean none."""
+
+    text = str(value if value is not None else "").strip().lower()
+    return "" if text in ("", "false", "no", "none", "off", "stereo", "0") else text
+
+
 def _scene_style(document: dict[str, Any], scene_id: str, root: Path,
                  project_style: Any) -> tuple[dict[str, Any] | None, list[Finding]]:
     """The styles in force, one per axis -- technique, direction, format -- each the scene's or else the
@@ -595,6 +602,7 @@ def _load_scene(
     scene_aliases: dict[str, str] | None = None,
     project_style: Any = "",
     project_deliver: Any = None,
+    project_surround: Any = None,
 ) -> dict[str, Any]:
     document = _read_yaml(path)
     scene_id = vtext(document, "scene") or _text(document.get("id"))
@@ -786,6 +794,8 @@ def _load_scene(
         "style": style,
         # The same cut in other formats, delivered with every version (CT-0049).
         "deliver": renditions,
+        # A surround mix beside the stereo, as a second track ("5.1", CT-0052).
+        "surround": _surround(document.get("surround") if document.get("surround") is not None else project_surround),
         "findings": findings,
         "decision_log": list(reversed(state.decisions)),
         "pending_shots": pending_shots,
@@ -1512,7 +1522,7 @@ def load_production(root: Path) -> dict[str, Any]:
     scenes = [
         _load_scene(path, root, declared_fields, project_look, screenplay, _shot_field_aliases(manifest),
                     _scene_field_aliases(manifest), project_style=manifest.get("style"),
-                    project_deliver=manifest.get("deliver"))
+                    project_deliver=manifest.get("deliver"), project_surround=manifest.get("surround"))
         for path in scene_files(root, manifest)
     ]
     scenes.sort(key=lambda scene: (scene["order"], scene["id"]))

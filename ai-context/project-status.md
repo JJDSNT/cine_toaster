@@ -210,7 +210,8 @@ remains:
   and formats such as viral vertical or commercial -- is named by the
   production or a scene and reaches the prompts, the brief and the checks
   (CT-0049); a format reframes and captions the cut, and a version can be
-  delivered in several formats at once (`deliver:`). A scene's version now renders its joins:
+  delivered in several formats at once (`deliver:`). Versions can carry a
+  5.1 track beside the stereo (`surround: "5.1"`, CT-0052 phase 1). A scene's version now renders its joins:
   catalog transitions (shader or FFmpeg stand-in) and J/L-cuts from the
   takes' handles (CT-0050). Scenes declare how they are entered (`enter`), and
   the sequence assembly renders it, with music and ambience over several

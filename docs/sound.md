@@ -76,6 +76,25 @@ level, then mixed under the joined cut with a limiter. Music is lowered by
 with 0.3 s ramps. The version's summary lists what was laid, at what gain,
 under which licence.
 
+## Surround (5.1)
+
+```yaml
+surround: "5.1"     # project.yaml, or a scene; off by default
+```
+
+Every version then carries two audio tracks: **stereo AAC first and
+default** (a browser, a phone, a TV's speakers play it) and **5.1 (side)
+as AC-3 at 640 kb/s**, which any 5.1 receiver decodes over HDMI/ARC or
+S/PDIF; the player picks the track its output can carry (CT-0052, the
+"master once, deliver several" model). The 5.1 is mixed from the same
+pieces as the stereo, by film conventions: a take where someone speaks to
+the centre, other takes to the front, ambience front and surrounds, music
+front with a little in the surrounds, effects front with their low end in
+the LFE (below 120 Hz). The version's summary gives both tracks'
+loudness (EBU R128; the LFE not counted). Placing a sound where its subject
+stands in the plan, a binaural track for headphones, and IAMF are the next
+phases (CT-0052).
+
 ## Over several scenes
 
 A music cue or an ambience that crosses scenes is declared on the sequence,
