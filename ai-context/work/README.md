@@ -42,6 +42,8 @@ execution history and links to those destinations.
 The order of work is the ordered plan in
 [`development/roadmap.md`](../development/roadmap.md).
 
+- `CT-0053` — upscaling to 4K: SeedVR2 on takes, 4K as a delivery
+  target; awaiting the user's approval of a paid spike (`ready`)
 - `CT-0052` — surround and spatial sound: research, playback chosen by the
   hardware present; awaiting the user's choice of deliverables (`ready`)
 - `CT-0051` — joins between scenes in a sequence (`review`)
