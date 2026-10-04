@@ -38,6 +38,7 @@ NODES = {
     "negative": "398:373",
 }
 
+#: The house negative conditioning, always sent; shown in every plan beside the production's own (docs/generation.md).
 NEGATIVE_PROMPT = (
     "pc game, console game, video game, cartoon, childish, ugly, text, subtitles, "
     "watermark, music, background music, distorted face, morphing face, extra fingers"
@@ -223,6 +224,16 @@ def _apply_control_video(workflow: dict[str, Any], strength: float = 0.7) -> Non
         workflow["398:348"]["inputs"]["samples"] = ["ic:crop", 2]
 
 
+def negative_text(avoid: tuple[str, ...] | list[str] = ()) -> str:
+    """What the workflow's negative conditioning receives: the house text, then the production's intent."""
+
+    return ", ".join([NEGATIVE_PROMPT, *[" ".join(item.split()).rstrip(".") for item in avoid if item.strip()]])
+
+
+#: How this adapter represents the production's negative guidance.
+AVOID_MECHANISM = "native: the workflow's negative conditioning (CLIP text node 398:373)"
+
+
 def build_request(
     *,
     image: Path,
@@ -235,6 +246,7 @@ def build_request(
     guides: tuple[Guide, ...] = (),
     reference_voice: Path | None = None,
     control_video: tuple[Path, float] | None = None,
+    avoid: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Assemble the graph and the files that travel with it."""
 
@@ -253,7 +265,7 @@ def build_request(
     workflow[NODES["enhance"]]["inputs"]["sampling_mode"] = "on" if enhance else "off"
     workflow[NODES["enhance"]]["inputs"]["sampling_mode.seed"] = seed % 10**9 or 1
     workflow[NODES["enhance_on"]]["inputs"]["value"] = enhance
-    workflow[NODES["negative"]]["inputs"]["text"] = NEGATIVE_PROMPT
+    workflow[NODES["negative"]]["inputs"]["text"] = negative_text(avoid)
 
     stream = random.Random(seed)
     workflow[NODES["seed_base"]]["inputs"]["noise_seed"] = stream.randrange(1, 10**15)
@@ -338,11 +350,13 @@ class LtxProvider:
         label: str = "ltx",
         enhance: bool = False,
         state_file: Path | None = None,
+        avoid: tuple[str, ...] = (),
     ) -> GenerationResult:
         if not self.endpoint_id:
             raise ProviderNotConfigured("RUNPOD_LTX_ENDPOINT_ID is not set")
 
         payload = build_request(
+            avoid=avoid,
             image=image,
             seconds=seconds,
             prompt=prompt,

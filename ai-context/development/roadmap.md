@@ -176,7 +176,7 @@ Agreed order (2026-10-04):
       will remake the sequence from scratch in Cine Toaster, keeping only the
       screenplay -- so what matters next is the path from screenplay to finished
       shots inside Cine Toaster, not matching SINGULAR;
-   2. negative guidance as a production concept (`generation.md`);
+   2. ~~negative guidance as a production concept (`generation.md`)~~ done (CT-0056);
    3. the first slice of the Producer role: a deterministic status per sequence
       (approved, awaiting generation, blocked, next decisions) from the records
       already kept -- also the first seed of Studio Analytics;

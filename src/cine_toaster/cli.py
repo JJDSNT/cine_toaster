@@ -450,6 +450,14 @@ def command_generate(args: argparse.Namespace) -> int:
         print(f"  note: {note}")
     print(f"  estimate US$ {plan.estimate_usd:.3f}; spent US$ {spend.spent():.2f} of US$ {spend.load().get('limit_usd') or 0:.2f}")
     print("\n" + plan.prompt + "\n")
+    if plan.avoid:
+        # What the generation must not do, apart from the directing words, and how the provider carries it.
+        print(f"avoid ({plan.avoid_mechanism}):")
+        for item in plan.avoid:
+            print(f"  - {item}")
+        if getattr(plan, "negative", ""):
+            print(f"  negative conditioning sent: {plan.negative}")
+        print()
     if args.dry_run:
         print("Nothing was sent (--dry-run).")
         return 0
@@ -964,6 +972,14 @@ def command_picture(args: argparse.Namespace) -> int:
         print(f"  note: {note}")
     print(f"  estimate US$ {plan.estimate_usd:.3f}; spent US$ {spend.spent():.2f} of US$ {spend.load().get('limit_usd') or 0:.2f}")
     print("\n" + plan.prompt + "\n")
+    if plan.avoid:
+        # What the generation must not do, apart from the directing words, and how the provider carries it.
+        print(f"avoid ({plan.avoid_mechanism}):")
+        for item in plan.avoid:
+            print(f"  - {item}")
+        if getattr(plan, "negative", ""):
+            print(f"  negative conditioning sent: {plan.negative}")
+        print()
     if args.dry_run:
         print("Nothing was sent (--dry-run).")
         return 0

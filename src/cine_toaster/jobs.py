@@ -1269,7 +1269,8 @@ def _run_generate(context: JobContext) -> dict[str, Any]:
     pending = _remote_record("generate_shot" if single else "generate_block", plan.public_dict(root))
     try:
         result = provider.generate(image=plan.image, output=output, seconds=plan.seconds, prompt=plan.prompt,
-                                   seed=plan.seed, guides=guides, label=what, state_file=pending)
+                                   seed=plan.seed, guides=guides, label=what, state_file=pending,
+                                   avoid=tuple(plan.avoid))
     except BaseException:
         cost = _record_spend(context, pending, hourly_rate(root, endpoint), what, plan.estimate_usd)
         if context.cancelled():

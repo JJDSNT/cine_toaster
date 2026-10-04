@@ -317,6 +317,10 @@ def scene_brief(scene: dict[str, Any], looks: dict[str, dict[str, Any]] | None =
             slots.append(Slot("ACT", description, "authored", shot_id))
         if actions:
             slots.append(Slot("ACT", " ".join(actions), "screenplay", shot_id))
+        if shot.get("avoid") or scene.get("avoid"):
+            # What must not happen, kept apart from the directing words (docs/generation.md).
+            slots.append(Slot("AVOID", "; ".join([*(scene.get("avoid") or []), *(shot.get("avoid") or [])]),
+                              "authored", shot_id))
         for item in shot.get("emotion") or []:
             who = f"{item['who']}: " if item.get("who") else ""
             reason = f" ({item['reason']})" if item.get("reason") else ""

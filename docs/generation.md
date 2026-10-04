@@ -70,30 +70,40 @@ toast budget                                         # spent so far, and the las
 
 ## Negative guidance / what must not happen
 
-**Pending capability:** generation planning should support an explicit,
-separately inspectable description of what a generation must **avoid**.
+What a generation must **avoid** is a production concept, kept apart from the
+directing words in the project, the brief, the plan and the provenance:
 
-This is intentionally defined as a production-level concept rather than a
-ComfyUI-specific `negative_prompt` field. Different models/providers may
-support native negative conditioning, encode exclusions in the main prompt, or
-require workflow-specific controls. The provider adapter should translate the
-production intent into the best mechanism it supports.
+```yaml
+# project.yaml            -- the whole film
+avoid: [text or logos on screen]
+# scene.yaml              -- this scene
+avoid: a second person in the room
+# a shot
+shots:
+  - n: 3
+    avoid: [Mara looking at the camera]
+```
 
-Possible examples include unwanted objects or people, identity/wardrobe
-changes, camera behavior that must not occur, visual artifacts, forbidden
-styles, text/logos, continuity violations, or actions that contradict the shot.
+The three are combined in that order, each phrase once. The brief shows them
+as an `AVOID` slot per shot; a dry run (`toast generate ... --dry-run`, the
+control room's **What would be sent…**) lists them with how the provider
+carries them; the job's provenance keeps the list, the provider's
+representation and the mechanism.
 
-The negative guidance should:
+Each provider says how it carries them, and never pretends:
 
-- remain separate from positive/directing instructions in project state and UI;
-- be visible in dry-run / **What would be sent…** views;
-- be preserved in job and provenance records;
-- distinguish production intent from the provider-specific representation;
-- degrade honestly when a provider has no native negative-conditioning
-  mechanism rather than pretending that support exists.
+- **LTX video** (`providers/ltx.py`): **native** -- the workflow's negative
+  conditioning receives the house text (`NEGATIVE_PROMPT`: no game look,
+  cartoon, text, subtitles, watermark, music, distorted faces...), now shown
+  in every plan, followed by the production's phrases;
+- **Qwen picture edit** (`providers/qwen_edit.py`): the endpoint has no
+  negative input, so the phrases are written into the prompt as an explicit
+  "Avoid: ..." sentence, and the plan says `in the prompt: the edit model has
+  no negative input`.
 
-Whether ComfyUI exposes this through a negative prompt, conditioning nodes or a
-model-specific workflow is an adapter concern and requires investigation.
+A ComfyUI workflow with a negative node can carry them the same way as LTX
+(`providers/comfyui.py` already finds the node titled "neg..."); a provider
+with neither mechanism must say so in its plan.
 
 ## Money
 

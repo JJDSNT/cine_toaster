@@ -52,6 +52,8 @@ class PicturePlan:
     size: tuple[int, int]
     estimate_usd: float
     notes: list[str] = field(default_factory=list)
+    avoid: list[str] = field(default_factory=list)
+    avoid_mechanism: str = ""
 
     def public_dict(self, root: Path) -> dict[str, Any]:
         return {
@@ -61,6 +63,7 @@ class PicturePlan:
                            for ref in self.references],
             "request": self.request, "prompt": self.prompt, "seed": self.seed,
             "width": self.size[0], "height": self.size[1], "estimate_usd": self.estimate_usd, "notes": self.notes,
+            "avoid": self.avoid, "avoid_mechanism": self.avoid_mechanism,
         }
 
 
@@ -224,13 +227,20 @@ def plan_picture(root: Path, production: dict[str, Any], scene_id: str, shot_id:
     if styled:
         notes.append(f"The style {style['name']} ({style['level']}) is asked of the picture; `style: false` on the "
                      "derive keeps the source's look.")
+    # What the picture must not show. The edit model takes no negative input: said in the prompt, and the plan
+    # says it is said there rather than pretending to a native mechanism (docs/generation.md).
+    from .generation import avoidance
+
+    avoid = avoidance(production, scene, [shot])
+    avoided = f"Avoid: {'; '.join(item.rstrip('.') for item in avoid)}." if avoid else ""
     return PicturePlan(
         scene=scene_id, shot=shot_id, stem=picture_stem(work_directory_for(root / scene["file"]), str(shot["number"])),
         source=source,
         references=references, request=derive["request"],
-        prompt=edit_prompt(" ".join(filter(None, [derive["request"], styled, corrections(feedback)])),
+        prompt=edit_prompt(" ".join(filter(None, [derive["request"], styled, avoided, corrections(feedback)])),
                            bool(references)),
         seed=seed, size=size_like(source), estimate_usd=estimate(rate), notes=notes,
+        avoid=avoid, avoid_mechanism="in the prompt: the edit model has no negative input" if avoid else "",
     )
 
 

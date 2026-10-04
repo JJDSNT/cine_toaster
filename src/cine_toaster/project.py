@@ -215,6 +215,8 @@ def _load_shots(
                 # The take's sound silenced in stretches, and faded from a point (CT-0054, SINGULAR's
                 # `silenciar` and `som_baixa_de`).
                 "holds": vtext(raw, "holds") or "setting",
+                # What a generation of this shot must not do (docs/generation.md: negative guidance).
+                "avoid": _avoid(field(raw, "avoid")),
                 "mute": [list(map(float, item)) for item in field(raw, "mute") or [] if isinstance(item, list) and len(item) == 2],
                 "sound_fades_at": float(field(raw, "sound_fades_at")) if field(raw, "sound_fades_at") not in (None, "") else None,
                 # Where a format's frame sits in the take (CT-0049): {x, y}, 0 to 1, centred by default.
@@ -427,6 +429,13 @@ def _expand_effects(shots: list[dict[str, Any]], scene_id: str, root: Path) -> l
             findings.append(Finding(code="effect_problem", severity="error", scene_id=scene_id, shots=(shot["id"],),
                                     message=f"{shot['id']} {problem}. It would be lost, not guessed."))
     return findings
+
+
+def _avoid(value: Any) -> list[str]:
+    """`avoid: [a sign on the wall, a second person]` or a single phrase."""
+
+    items = value if isinstance(value, list) else [value] if value else []
+    return [" ".join(str(item).split()) for item in items if str(item or "").strip()]
 
 
 def _subtitles(value: Any) -> dict[str, Any]:
@@ -811,6 +820,8 @@ def _load_scene(
         "style": style,
         # The same cut in other formats, delivered with every version (CT-0049).
         "deliver": renditions,
+        # What any generation in this scene must not do (negative guidance), beside the production's.
+        "avoid": _avoid(document.get("avoid")),
         # Subtitles in the film's language, timed to the speech (CT-0054): {burn: true|false}.
         "subtitles": _subtitles(document.get("subtitles") if document.get("subtitles") is not None else project_subtitles),
         # A surround mix beside the stereo, as a second track ("5.1", CT-0052).
@@ -1602,6 +1613,7 @@ def load_production(root: Path) -> dict[str, Any]:
         "look": project_look,
         "style": manifest.get("style"),
         "deliver": manifest.get("deliver"),
+        "avoid": _avoid(manifest.get("avoid")),
         "renders": discover_renders(root),
         "script_path": _script_path(manifest, root),
         "script_files": script_files,

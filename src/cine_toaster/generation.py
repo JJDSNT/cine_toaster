@@ -54,6 +54,10 @@ class BlockPlan:
     notes: list[str] = field(default_factory=list)
     #: The prompt by shot, then what holds across the block; joined, it is `prompt`.
     sections: list[dict[str, str]] = field(default_factory=list)
+    #: What the generation must not do (the production's intent), and how the provider represents it.
+    avoid: list[str] = field(default_factory=list)
+    negative: str = ""
+    avoid_mechanism: str = ""
 
     def public_dict(self, root: Path) -> dict[str, Any]:
         return {
@@ -62,6 +66,7 @@ class BlockPlan:
             "guides": [{"role": ref.role, "path": ref.path.relative_to(root).as_posix(), "frame": ref.frame,
                         "digest": ref.digest, "strength": ref.strength} for ref in self.guides],
             "prompt": self.prompt, "prompt_sections": self.sections, "seed": self.seed,
+            "avoid": self.avoid, "negative": self.negative, "avoid_mechanism": self.avoid_mechanism,
             "estimate_usd": self.estimate_usd, "notes": self.notes,
         }
 
@@ -91,6 +96,17 @@ def _camera(scene: dict[str, Any], shot: dict[str, Any]) -> str:
     if text and text not in ids and text != shot.get("camera"):
         return text
     return str((shot.get("move") or {}).get("prompt") or "")
+
+
+def avoidance(production: dict[str, Any], scene: dict[str, Any], shots: list[dict[str, Any]]) -> list[str]:
+    """What a generation must not do: the production's, the scene's and each shot's, in that order, once each."""
+
+    seen: list[str] = []
+    for item in [*(production.get("avoid") or []), *(scene.get("avoid") or []),
+                 *[entry for shot in shots for entry in shot.get("avoid") or []]]:
+        if item.lower() not in {existing.lower() for existing in seen}:
+            seen.append(item)
+    return seen
 
 
 def _acting(production: dict[str, Any], scene: dict[str, Any], shot: dict[str, Any]) -> list[str]:
@@ -220,7 +236,11 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
             notes.append(f"{shot_id} asks for no guide at its cut; the model finds that shot by the prompt alone.")
             continue
         guides.append(Reference(shot_id, ref, frame, _digest(ref), strength(shot_id)))
+    from .providers.ltx import AVOID_MECHANISM, negative_text
+
+    avoid = avoidance(production, scene, [shots[shot_id] for shot_id in block.shots])
     return BlockPlan(
+        avoid=avoid, negative=negative_text(avoid), avoid_mechanism=AVOID_MECHANISM,
         scene=scene_id, block=block.id, shots=block.shots, seconds=int(seconds), image=references[0],
         guides=guides, prompt=block_prompt(prompts, style), seed=seed, estimate_usd=estimate(seconds, rate), notes=notes,
         sections=[{"shot": shot_id, "text": text}
