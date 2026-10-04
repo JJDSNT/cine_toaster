@@ -1235,8 +1235,10 @@ def _record_spend(context: JobContext, record_path: Path, rate: float, what: str
     record = json.loads(record_path.read_text(encoding="utf-8")) if record_path.is_file() else {}
     cost = runpod.cost_usd(record, rate) if record else 0.0
     if record.get("id"):
+        # The endpoint and the billed seconds let FinOps share a billed hour among its jobs (CT-0061).
         spend.record(cost, what, job=context.job_id, remote=record["id"], status=record.get("status", ""),
-                     estimate_usd=estimate_usd)
+                     estimate_usd=estimate_usd, endpoint=record.get("endpoint", ""),
+                     seconds=round(runpod.job_seconds(record), 3))
     return cost
 
 

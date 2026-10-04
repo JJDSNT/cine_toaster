@@ -182,6 +182,8 @@ Agreed order (2026-10-04):
       the Sequences room;
    4. ~~FinOps steps 2-3~~ done (CT-0058): billing is per endpoint per hour, never
       per job, so costs are allocated; provenance carries the execution id.
+      Steps 4-5 done (CT-0061): `toast finops` reads the billing and allocates
+      each billed hour to its known jobs; next, estimates from the observed rate.
 2. **Next, when a real shot asks**: a finishing spike -- delivery resolution (SeedVR2
    against LTX TiledFusion, CT-0053 reframed as a capability), Refine Details --
    paid, with the user's approval of the estimate; ~~a minimal continuity ledger for

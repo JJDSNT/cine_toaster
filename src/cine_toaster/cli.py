@@ -1171,6 +1171,40 @@ def command_cast(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_finops(args: argparse.Namespace) -> int:
+    """What Runpod billed, set against the jobs Cine Toaster ran (CT-0061). Reads only."""
+
+    from datetime import UTC, datetime, timedelta
+
+    from . import spend
+    from .finops import reconcile, render_text
+    from .jobs import state_root
+    from .providers.runpod import load_credentials
+    from .providers.runpod_billing import serverless_observations
+
+    if args.env_file:
+        load_credentials(Path(args.env_file).expanduser())  # never printed
+    now = datetime.now(UTC).replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    start = now - timedelta(days=args.days)
+    billing = serverless_observations(start.isoformat().replace("+00:00", "Z"), now.isoformat().replace("+00:00", "Z"))
+    fetched_at = datetime.now(UTC).isoformat(timespec="seconds")
+    entries = spend.load()["entries"]
+    if args.project:
+        # The film's own job records (whoever ran them) join the ledger: its billed hours are the film's.
+        from .finops import film_jobs, merge
+        from .project import _read_yaml
+
+        root = Path(args.project).expanduser().resolve()
+        entries = merge(entries, film_jobs(root, _read_yaml(root / "project.yaml").get("generation_rates") or {}))
+    report = reconcile(billing, entries, fetched_at)
+    # Operational state, disposable: the provider can always be asked again.
+    cache = state_root() / "finops" / "runpod-latest.json"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(json.dumps(report, indent=2) if args.json else render_text(report))
+    return 0
+
+
 def command_costs(args: argparse.Namespace) -> int:
     """Generation time and estimated cost, from the providers' job records."""
 
@@ -1900,6 +1934,14 @@ def build_parser() -> argparse.ArgumentParser:
         action = cast_actions.add_parser(name, help=text)
         action.add_argument("project", type=Path)
         action.set_defaults(function=command_cast)
+
+    finops_parser = subparsers.add_parser(
+        "finops", help="What Runpod billed, against the jobs Cine Toaster ran: allocated, unattributed (read only)")
+    finops_parser.add_argument("--days", type=int, default=30)
+    finops_parser.add_argument("--project", help="also the jobs this film keeps beside its takes (*.job.json)")
+    finops_parser.add_argument("--env-file", help="read RUNPOD_API_KEY from this file")
+    finops_parser.add_argument("--json", action="store_true")
+    finops_parser.set_defaults(function=command_finops)
 
     costs_parser = subparsers.add_parser("costs", help="Generation time and estimated cost, from job records")
     costs_parser.add_argument("project", type=Path)

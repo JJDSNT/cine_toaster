@@ -8,6 +8,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -158,6 +159,9 @@ def run_job(
         if on_progress is not None:
             on_progress(label, dict(state))
         if status.get("status") in ("COMPLETED", *TERMINAL_FAILURES):
+            # When it ended, by this clock: what places the job in the provider's billed hour (CT-0061).
+            state["finished_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+            _write_atomically(state_file, state)
             break
         time.sleep(poll_seconds)
 

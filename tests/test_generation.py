@@ -170,6 +170,7 @@ class GenerateBlockTests(unittest.TestCase):
         self.assertEqual((provenance["seed"], provenance["shots"], provenance["guides"][1]["frame"]), (7, ["P2", "P3"], 216))
         self.assertEqual(len(provenance["guides"][0]["digest"]), 16)
         self.assertTrue((self.work / "bA-1.mp4.job.json").is_file())
+        self.assertIn("finished_at", json.loads((self.work / "bA-1.mp4.job.json").read_text()))  # CT-0061
         # The provider's own execution id, the key billing is reconciled with (CT-0058).
         self.assertEqual({key: provenance["execution"][key] for key in ("provider", "id", "execution_ms")},
                          {"provider": "runpod", "id": "remote-1", "execution_ms": 120000})

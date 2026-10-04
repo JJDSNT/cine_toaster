@@ -31,9 +31,12 @@ versions with the author's verdicts), cast, looks, locations and sounds.
 Generation parity (CT-0055, a reference only), negative guidance (CT-0056),
 the Producer status (CT-0057, `toast status`) and FinOps steps 2-3 (CT-0058)
 are done, and so is the minimal continuity ledger (CT-0059, `toast
-continuity`), meant for the remake of the sequence in Cine Toaster. Next
-recommended action: FinOps steps 4-5 (a read-only Runpod cost observation, and
-allocation of each billed hour among its jobs). Waiting for the user: Kael's
+continuity`), meant for the remake of the sequence in Cine Toaster; one
+face per person is now an error (CT-0060). FinOps steps 4-5 are done
+(CT-0061, `toast finops`): of US$ 36.44 billed in 30 days, US$ 9.79 is
+allocated to SINGULAR's job records. The assumed LTX rate is about 2.6 times
+too high. Next recommended action: use the observed rate in estimates, then
+stems for Ardour. Waiting for the user: Kael's
 voice re-check, the 4K/finishing spike's cost, what feeds the 5.1, and
 switching the working folder to ~/films/singular.
 

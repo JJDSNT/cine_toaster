@@ -122,6 +122,44 @@ recorded about US$0.58: most spend came from tools outside Cine Toaster.
 Reconciliation must expect spend that has no Cine Toaster job. October so far
 is US$0.89, all standard storage (a network volume) and no job's cost.
 
+### Implemented (CT-0061): read-only observation and allocation
+
+```text
+toast finops [--days 30] [--project <film>] [--env-file ~/confyui/.env] [--json]
+```
+
+- **Reading:** `providers/runpod_billing.py` reads `GET
+  https://api.runpod.io/v2/billing/serverless` (hourly buckets) and turns each
+  record into a provider-neutral observation `{provider, resource, start, end,
+  usd, components}`. Cloudflare refuses Python's default User-Agent (error
+  1010), so the adapter sends its own.
+- **Allocation:** `finops.reconcile` gives each known job a share of its
+  endpoint's billed hour, in proportion to its billed seconds (`allocated`).
+  The job's own seconds at the assumed rate stay beside it (`measured`), so
+  the difference shows the idle and cold-start overhead in that hour. A
+  billed hour with no known job is `unattributed`, listed, and never spread.
+  A job that cannot be placed is `unobserved`, with the reason.
+- **Known jobs:**
+  - the spend ledger, which now records `endpoint` and `seconds`;
+  - with `--project`, the job records the film keeps beside its takes,
+    archived ones included and each job counted once, whoever ran them.
+    Their time is `finished_at` (recorded since CT-0061) or else the file's
+    time, and the row says which (`at_source`).
+- The report is cached as operational state (`finops/runpod-latest.json`) and
+  can always be rebuilt from the provider.
+
+First reading, on 2026-10-04 (30 days, SINGULAR):
+- Billed: US$ 36.44.
+- Attributed to the film's 138 job records (LTX): US$ 9.79 (27%).
+- Unattributed: US$ 26.65. These are the other endpoints SINGULAR's tools used
+  without keeping job records (Krea, Qwen, Wan, lip-sync, music) and LTX
+  hours with no record.
+- Checked by hand on 2026-09-29:
+  - an LTX block measured at US$ 0.557 was billed US$ 0.217 for its whole
+    hour, so the assumed LTX rate is about 2.6 times too high;
+  - a Qwen picture measured at US$ 0.024 was billed US$ 0.050, the
+    difference being idle time and cold start.
+
 Do not infer a Runpod feature from this proposal. The adapter should expose only
 capabilities verified against the provider.
 
