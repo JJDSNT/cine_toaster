@@ -91,13 +91,18 @@ attribution and Studio Analytics.
 Success is not merely that every subsystem was invoked. The resulting sequence
 must work as cinema.
 
-## Target B — Cine Toaster self-demo / advertisement
+## Target B — Demo Reel Amiga evolving into the Demo Reel Amiga / self-demo
 
 A second validation target should prevent the product from being shaped only
 around the needs of Singular.
 
-Cine Toaster should eventually **produce its own demonstration/advertisement
-using Cine Toaster**.
+This target is **not a new production starting from zero**. The existing
+**Demo Reel Amiga** project should evolve into Cine Toaster's own
+demonstration/advertisement, produced using Cine Toaster itself.
+
+The Amiga material remains part of the creative identity of the project while
+its product purpose expands: it becomes a continuous dogfooding production that
+both showcases audiovisual work and proves how Cine Toaster produces it.
 
 The conceptual reference is the classic style of Video Toaster product
 demonstration: first establish what the system can do, then demonstrate those
@@ -117,7 +122,7 @@ Only capabilities that can actually be demonstrated should be claimed.
 ### Act II — Cine Toaster doing it
 
 The second movement reveals those capabilities through the production of the
-advertisement itself.
+Demo Reel Amiga / advertisement itself.
 
 The demonstration should expose enough of the real workflow to make the claim
 self-evident:
@@ -138,7 +143,19 @@ show how it participates in the finished advertisement
 This creates a recursive proof:
 
 > Cine Toaster is capable of producing this kind of audiovisual work, and the
-> advertisement making that claim was itself produced by Cine Toaster.
+> Demo Reel Amiga / advertisement making that claim was itself produced by
+> Cine Toaster.
+
+### Continuous dogfooding
+
+Because the Demo Reel Amiga already exists as a Cine Toaster demo project, it
+can evolve with the product rather than being treated as a one-off launch
+commercial. As important capabilities become production-ready, the team can
+decide whether they deserve to be demonstrated in the reel.
+
+This does not mean the reel must become an exhaustive feature checklist. Its
+first responsibility remains to work as an audiovisual piece; product
+capabilities should appear when they strengthen the demonstration.
 
 ### Why this is a separate validation target
 
@@ -164,7 +181,7 @@ The two targets should overlap where appropriate but need not exercise every
 capability equally.
 
 ```text
-                         Singular opening       Cine Toaster self-demo
+                         Singular opening       Demo Reel Amiga / self-demo
 Narrative continuity          primary                 secondary
 Character consistency         primary                 optional
 Abstract imagery              primary                 useful
