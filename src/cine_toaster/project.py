@@ -212,6 +212,10 @@ def _load_shots(
                 # CT-0037: shots made together in one generation share a block.
                 "block": _text(field(raw, "block")),
                 "trim": field(raw, "trim") if isinstance(field(raw, "trim"), dict) else None,
+                # The take's sound silenced in stretches, and faded from a point (CT-0054, SINGULAR's
+                # `silenciar` and `som_baixa_de`).
+                "mute": [list(map(float, item)) for item in field(raw, "mute") or [] if isinstance(item, list) and len(item) == 2],
+                "sound_fades_at": float(field(raw, "sound_fades_at")) if field(raw, "sound_fades_at") not in (None, "") else None,
                 # Where a format's frame sits in the take (CT-0049): {x, y}, 0 to 1, centred by default.
                 "reframe": field(raw, "reframe") if isinstance(field(raw, "reframe"), dict) else None,
                 "derive": _derive(field(raw, "derive")),

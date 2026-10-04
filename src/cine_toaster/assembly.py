@@ -102,6 +102,9 @@ class Segment:
     #: A format's frame in the take ({x, y}, CT-0049), and the captions spoken in it, in the take's seconds.
     reframe: dict[str, Any] | None = None
     captions: list[tuple[float, float, str]] = field(default_factory=list)
+    #: The take's sound silenced in stretches (take seconds), and faded out from a point of the shot as cut.
+    mute: list[list[float]] = field(default_factory=list)
+    sound_fades_at: float | None = None
     #: A scene version's renditions, by format (a sequence's segments): the sequence's renditions use them.
     renditions: dict[str, str] = field(default_factory=dict)
     #: The join into this shot, resolved: a transition ({id, seconds, shader | mode}) and a J/L split.
@@ -136,7 +139,8 @@ class Plan:
     @property
     def takes(self) -> dict[str, str]:
         # A title card is drawn, not chosen: it has no take to remember.
-        return {segment.shot: segment.take for segment in self.segments if segment.method != "title"}
+        return {segment.shot: segment.take for segment in self.segments
+                if segment.method != "title" and not segment.method.startswith("solid:")}
 
     @property
     def duration(self) -> float:
@@ -260,6 +264,17 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
                 _resolve_join(root, plan, cut, segment, joins)
             plan.segments.append(segment)
             continue
+        if chosen is None and shot.get("source") == "composed" and shot.get("engine") == "solid":
+            # A plain black (or white) shot: the screen held for its duration, its sounds laid over it (CT-0054).
+            length = float(shot.get("duration_seconds") or 0) or 2.0
+            cut = cuts.get(shot["id"]) or {}
+            colour = "white" if str(shot.get("kind") or "").lower() in ("white", "branco") else "black"
+            segment = Segment(shot["id"], "SOLID", "", 0.0, length, cut.get("type") or "hard", f"solid:{colour}",
+                              None, shot.get("level_db"))
+            if plan.segments:
+                _resolve_join(root, plan, cut, segment, joins)
+            plan.segments.append(segment)
+            continue
         if chosen is None:
             if shot.get("source") == "composed":
                 plan.notes.append(f"{shot['id']} is composed (a card); its card is not part of a take cut yet.")
@@ -288,6 +303,8 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         if plan.segments:
             _resolve_join(root, plan, cut, segment, joins)
         segment.reframe = shot.get("reframe")
+        segment.mute = list(shot.get("mute") or [])
+        segment.sound_fades_at = shot.get("sound_fades_at")
         wants_frame = ((scene.get("style") or {}).get("format") or {}).get("aspect") or scene.get("deliver")
         if not segment.reframe and wants_frame:
             from .formats import subject_window
@@ -460,6 +477,16 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
     pictures, sounds = [], []
     speaking: list[bool] = []  # whether someone speaks in each shot: its sound goes to the centre in a 5.1
     for index, segment in enumerate(plan.segments):
+        if segment.method.startswith("solid:") and not segment.source:
+            solid = work / f"solid-{index:03d}.mp4"
+            length = segment.end - segment.start
+            run_process(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i",
+                         f"color=c={segment.method.split(':', 1)[1]}:s={first['width'] // 2 * 2}x{first['height'] // 2 * 2}"
+                         f":r={round(fps) or FPS}:d={length:.3f}", "-f", "lavfi", "-t", f"{length:.3f}", "-i",
+                         "anullsrc=channel_layout=stereo:sample_rate=48000", "-shortest", "-c:v", "libx264",
+                         "-pix_fmt", "yuv420p", "-c:a", "aac", str(solid)],
+                        expected_seconds=length, message=f"{segment.shot}: {segment.method.split(':', 1)[1]} screen")
+            segment.source = str(solid)
         if (segment.title or segment.effects) and not segment.source:
             _draw_title(root, segment, work / f"title-{index:03d}.mp4", first, fps, run_process)
         source = Path(segment.source) if segment.source else root / segment.media
@@ -533,8 +560,15 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
                     min(SPLIT_EDGE, after) if after else 0.0)
         # A trailing L sound fades at its own end; otherwise the fade ends with the picture.
         fade_end = span_seconds if after else before + length
+        if segment.sound_fades_at is not None and before + segment.sound_fades_at < fade_end:
+            # The shot's sound goes down from a point (SINGULAR's `som_baixa_de`: when the title comes in).
+            fade_out = max(0.12, fade_end - before - segment.sound_fades_at)
         fades = ([f"afade=t=in:d={fade_in:.3f}"] if fade_in else []) + (
             [f"afade=t=out:st={fade_end - fade_out:.3f}:d={fade_out:.3f}"] if fade_out else [])
+        # Stretches of the take silenced, in the take's own seconds; the clip starts `before` ahead of the cut.
+        clip_start = segment.start - before
+        fades += [f"volume=0:enable='between(t,{a - clip_start:.3f},{b - clip_start:.3f})'" for a, b in segment.mute
+                  if b > clip_start]
         clip = work / f"sound-{index:03d}.wav"
         if has_audio:
             command = [ffmpeg, "-y", "-loglevel", "error", "-ss", f"{segment.start - before:.3f}",

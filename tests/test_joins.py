@@ -93,6 +93,28 @@ class JoinTests(unittest.TestCase):
         self.assertEqual(second.split, 1.0)
         self.assertTrue(any("runs 1.00 s across the cut, not 1.50" in note for note in plan.notes))
 
+    def test_a_takes_sound_is_silenced_in_stretches_and_fades_from_a_point(self) -> None:
+        tone = "0.5*sin(2*PI*440*t)"
+        segment = Segment("P1", "A", self.take("a.mp4", "red", tone), 0.0, 4.0, normalize=False,
+                          mute=[[1.0, 2.0]], sound_fades_at=3.0)
+        out = self.root / "cut.mp4"
+        render(self.root, Plan(scene="SC-1", segments=[segment]), out, self.root / "work", run)
+        self.assertGreater(self.mean(out, 0.2, 0.6), -30)
+        self.assertLess(self.mean(out, 1.2, 0.6), -60)       # silenced (SINGULAR's `silenciar`)
+        self.assertGreater(self.mean(out, 2.2, 0.6), -30)
+        self.assertLess(self.mean(out, 3.6, 0.35), self.mean(out, 2.2, 0.6) - 6)  # going down (`som_baixa_de`)
+
+    def test_a_black_shot_is_held_on_screen_for_its_duration(self) -> None:
+        black = Segment("P1", "SOLID", "", 0.0, 1.5, method="solid:black", normalize=False)
+        take = Segment("P2", "A", self.take("a.mp4", "red", "0"), 1.0, 3.0, normalize=False)
+        plan = Plan(scene="SC-1", segments=[black, take])
+        out = self.root / "cut.mp4"
+        render(self.root, plan, out, self.root / "work", run)
+        self.assertAlmostEqual(probe(out)["duration"], 3.5, delta=0.1)
+        self.assertLess(max(self.colour(out, 0.5)), 20)
+        self.assertGreater(self.colour(out, 2.5)[0], 200)
+        self.assertEqual(plan.takes, {"P2": "A"})
+
 
 DEMO = Path(__file__).parents[1] / "examples" / "demo-project"
 

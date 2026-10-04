@@ -33,9 +33,9 @@ from typing import Any
 from .errors import ValidationError
 
 BUILTIN = Path(__file__).with_name("vfx_assets")
-CATEGORIES = ("texture", "lens", "light", "motion", "glitch", "particles", "weather", "electricity", "destruction",
+CATEGORIES = ("frame", "texture", "lens", "light", "motion", "glitch", "particles", "weather", "electricity", "destruction",
               "liquids", "holograms", "elements")
-EFFECTS = ("grain", "vignette", "light-leak", "aberration", "glitch", "shake", "flash", "defocus", "old-film",
+EFFECTS = ("mirror", "crop", "fade-out", "grain", "vignette", "light-leak", "aberration", "glitch", "shake", "flash", "defocus", "old-film",
            "element", "sparks-burst", "disintegrate", "look", "ofx", "hologram", "fog", "rain", "snow", "lightning",
            "shatter", "melt", "liquid-splash")
 ENGINES = ("ffmpeg", "blender", "ofx")
@@ -227,6 +227,16 @@ def _chain(effect: dict[str, Any], label: str, out: str, duration: float, width:
     params, kind = effect["params"], effect["effect"]
     strength = _number(params, "strength", 0.5)
     start = _number(params, "start", 0.0)
+    if kind == "mirror":
+        return f"[{label}]hflip[{out}]"
+    if kind == "crop":
+        # A detail of the frame, enlarged to fill it: x, y, width, height as fractions of the frame.
+        x, y = _number(params, "x", 0.0), _number(params, "y", 0.0)
+        w, h = _number(params, "width", 0.5), _number(params, "height", 0.5)
+        return (f"[{label}]crop=iw*{w:.4f}:ih*{h:.4f}:iw*{x:.4f}:ih*{y:.4f},scale={width}:{height},setsar=1[{out}]")
+    if kind == "fade-out":
+        length = min(_number(params, "length", 1.0), duration)
+        return f"[{label}]fade=t=out:st={max(0.0, duration - length):.3f}:d={length:.3f}[{out}]"
     if kind == "grain":
         return f"[{label}]noise=alls={max(1, round(strength * 40))}:allf=t+u[{out}]"
     if kind == "vignette":

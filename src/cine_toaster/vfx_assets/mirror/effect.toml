@@ -1,0 +1,12 @@
+schema_version = 1
+id = "mirror"
+name = "Mirror"
+category = "frame"
+says = "The picture flipped left to right: a look or a move to the other side of the screen."
+energy = "low"
+use_when = ["A take whose screen direction is wrong for the cut, when nothing in it reads backwards"]
+avoid_when = ["Text, clocks, a face whose asymmetry the audience knows"]
+
+[render]
+engine = "ffmpeg"
+effect = "mirror"

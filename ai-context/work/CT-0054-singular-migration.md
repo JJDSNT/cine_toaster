@@ -155,6 +155,29 @@ Decided in ADR 0021; the layout below stands.
   SINGULAR's `cenario` (prompt fragments for parts of a set: CABECEIRA,
   JANELA...) stays on the scene: its generators read it.
 
+# Done: pass 2c, montage and pictures (2026-10-03)
+
+From SINGULAR's own `cena_ltx.py` (`cartela`, the clip's video and audio
+filters), each operation to a native home:
+
+- on-screen text (`texto_tela`, `corpo`, `cor_texto`, `pos`, `fade`,
+  `texto_entra`, `espacado`) -> a `title` from the catalog (`card`);
+- `escurece` -> the new VFX effect `fade-to-black`; `espelhar` -> `mirror`;
+  `recorte` (pixels of a 1280x704 take) -> `crop` (fractions) -- three
+  built-in effects added to the catalog, category `frame`;
+- `silenciar` -> `mute` (take seconds) and `som_baixa_de` ->
+  `sound_fades_at` (seconds into the shot as cut): two new core shot
+  fields the assembly applies to a take's sound (test in `test_joins`);
+- `quadro` -> `picture` (what the video model is told the starting
+  picture shows): Cine Toaster's own prompts now carry it.
+
+Kept and declared, for SINGULAR's generators: `still`, `guias`,
+`variacao`, `variacao_clipe`, `cam`, `in_frame`, `lira`, `entra_sai`,
+`so_a_luz`, `imagem_autor`, `cast_references`, `cenario`, `mundo`,
+`custo_estimado`, `fonte`; and four bespoke one-offs (`apaga_luz`,
+`sobrepor`, `montagem_pov`, `ajuste_imagem`). The comparison holds: the
+6 real findings only.
+
 # Pass 2 (next)
 
 - `cenario` and the plans (`geografia`) into locations; `referencias_3d`.

@@ -1,0 +1,15 @@
+schema_version = 1
+id = "fade-to-black"
+name = "Fade to black"
+category = "frame"
+says = "The shot goes down to black over its last seconds, picture and text together."
+energy = "low"
+use_when = ["The end of a scene or a title held to the dark"]
+avoid_when = ["A cut that should carry straight on"]
+
+[params]
+length = 1.0
+
+[render]
+engine = "ffmpeg"
+effect = "fade-out"

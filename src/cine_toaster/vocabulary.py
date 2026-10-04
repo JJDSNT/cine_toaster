@@ -151,6 +151,9 @@ CORE_SHOT_FIELDS: frozenset[str] = frozenset(
         "emotion",
         # CT-0049: where a format's frame sits in the take ({x, y}, 0 to 1).
         "reframe",
+        # CT-0054: stretches of the take's sound silenced ([[from, to]], take seconds), and where it fades out.
+        "mute",
+        "sound_fades_at",
         "duration",
         "camera",
         "camera_id",

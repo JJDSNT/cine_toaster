@@ -1,0 +1,18 @@
+schema_version = 1
+id = "crop"
+name = "Crop to a detail"
+category = "frame"
+says = "A detail of the frame enlarged to fill it: an insert cut from a wider take."
+energy = "low"
+use_when = ["An insert the take already holds (a hand, an object)"]
+avoid_when = ["When the detail is small: enlarged, it shows its softness"]
+
+[params]
+x = 0.25
+y = 0.25
+width = 0.5
+height = 0.5
+
+[render]
+engine = "ffmpeg"
+effect = "crop"

@@ -64,7 +64,9 @@ SCENE_CANONICAL = {"look", "script", "location", "cast", "voices", "refer_as", "
 #: Shot keys renamed, meaning unchanged.
 SHOT_KEYS = {"tipo": "kind", "plano": "label", "dur": "duration", "atuacao": "action", "falas": "lines",
              "fora_do_corte": "out_of_cut", "seg": "generated_seconds", "bloco": "block", "corte": "trim",
-             "nivel": "level_db", "texto_tela": "text", "quem": "in_frame"}
+             "nivel": "level_db", "quem": "in_frame",
+             # What the video model is told the starting picture shows (cena_ltx.py `prompt`: `quadro`).
+             "quadro": "picture"}
 LINE_KEYS = {"quem": "who", "como": "delivery", "voz": "voice", "fora": "off_screen", "emocao": "emotion_hint",
              "velocidade": "pace"}
 DECISION_KEYS = {"pergunta": "question", "proposta": "proposal", "resposta": "answer"}
@@ -206,6 +208,52 @@ def convert_scene(document: dict[str, Any], report: Report, scene_id: str,
     return out
 
 
+#: SINGULAR's montage fields that become a title, effects or sound fields (from cena_ltx.py: `cartela`, the clip's vf/af).
+MONTAGE = {"texto_tela", "corpo", "cor_texto", "pos", "fade", "texto_entra", "espacado", "escurece", "espelhar",
+           "recorte", "silenciar", "som_baixa_de"}
+POSITIONS = {"rodape": "bottom", "alto": "top"}
+#: The frame SINGULAR's LTX takes are made at: `recorte` is in its pixels.
+TAKE_FRAME = (1280, 704)
+
+
+def _montage(shot: dict[str, Any], report: Report, scene_id: str) -> dict[str, Any]:
+    """SINGULAR's on-screen text, picture operations and sound cuts, as a title, effects and native fields."""
+
+    out: dict[str, Any] = {}
+    where = f"{scene_id} P{shot.get('n')}"
+    effects = []
+    if shot.get("texto_tela"):
+        fade = float(shot.get("fade", 0.9))
+        colour = str(shot.get("cor_texto") or "0xE6E6E6")
+        out["title"] = {"id": "card", "text": str(shot["texto_tela"]), "size": int(shot.get("corpo", 34)),
+                        "color": "#" + colour[2:] if colour.lower().startswith("0x") else colour,
+                        "position": POSITIONS.get(str(shot.get("pos") or ""), "centre"),
+                        "fade_in": fade, "fade_out": 0.001 if shot.get("escurece") else fade,
+                        "enter_at": float(shot.get("texto_entra", 0)), "spaced": bool(shot.get("espacado", True))}
+        report.converted.append(f"{where}: on-screen text -> title card ({out['title']['text'][:30]!r})")
+    if shot.get("escurece"):
+        effects.append({"id": "fade-to-black", "length": float(shot["escurece"])})
+        report.converted.append(f"{where}: escurece {shot['escurece']} -> fade-to-black")
+    if shot.get("espelhar"):
+        effects.append({"id": "mirror"})
+        report.converted.append(f"{where}: espelhar -> mirror")
+    if shot.get("recorte"):
+        w, h, x, y = (float(value) for value in shot["recorte"])
+        width, height = TAKE_FRAME
+        effects.append({"id": "crop", "x": round(x / width, 4), "y": round(y / height, 4),
+                        "width": round(w / width, 4), "height": round(h / height, 4)})
+        report.approximated.append(f"{where}: recorte in pixels -> crop as fractions of a {width}x{height} take")
+    if effects:
+        out["effects"] = effects
+    if shot.get("silenciar"):
+        out["mute"] = [[float(a), float(b)] for a, b in shot["silenciar"]]
+        report.converted.append(f"{where}: silenciar -> mute {out['mute']}")
+    if shot.get("som_baixa_de") is not None:
+        out["sound_fades_at"] = float(shot["som_baixa_de"])
+        report.converted.append(f"{where}: som_baixa_de -> sound_fades_at {out['sound_fades_at']}")
+    return out
+
+
 def convert_shot(shot: dict[str, Any], report: Report, scene_id: str) -> dict[str, Any]:
     out: dict[str, Any] = {}
     sources = []
@@ -222,8 +270,13 @@ def convert_shot(shot: dict[str, Any], report: Report, scene_id: str) -> dict[st
         out["from"] = sources
         report.converted.append(f"{scene_id} P{shot.get('n')}: source fields -> from "
                                 + ", ".join(f"{item['relation']} {item['ref']}" for item in sources))
+    montage = _montage(shot, report, scene_id)
+    if str(shot.get("tipo") or "") == "imagem" and not shot.get("fora_do_corte"):
+        # An auxiliary picture (another shot's montage uses it); SINGULAR never cuts `imagem` shots in.
+        out["out_of_cut"] = True
+        report.converted.append(f"{scene_id} P{shot.get('n')}: an auxiliary picture -> out_of_cut")
     for key, value in shot.items():
-        if key in SOURCE_RELATIONS:
+        if key in SOURCE_RELATIONS or key in MONTAGE:
             continue
         if key == "deriva" and isinstance(value, dict):
             cast = value.get("com") or []
@@ -274,6 +327,7 @@ def convert_shot(shot: dict[str, Any], report: Report, scene_id: str) -> dict[st
                 report.read_as_legacy(f"shot.{key}")
             else:
                 report.keep(f"shot.{key}")
+    out.update(montage)
     return out
 
 

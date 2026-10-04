@@ -46,6 +46,12 @@ BREAKDOWN = """\
         plano: Tela preta.
         dur: 2
         som: [respiracao]
+        texto_tela: "04:02"
+        corpo: 20
+        cor_texto: "0x8C8F96"
+        pos: rodape
+        fade: 1.0
+        escurece: 3.0
       - n: 2
         tipo: ltx
         plano: Kael acorda.
@@ -56,6 +62,9 @@ BREAKDOWN = """\
         fala: {quem: KAEL, en: "Claire...", pt: "Claire...", emocao: sad}
         corte: {antes: 0.4, depois: 0.3}
         quadro: a man in a bed
+        silenciar: [[0.0, 1.0]]
+        som_baixa_de: 2.5
+        espelhar: true
       - n: 3
         tipo: ltx
         plano: Dela.
@@ -155,6 +164,13 @@ class MigrationTests(unittest.TestCase):
         self.assertNotIn("personagens", scene)  # moved to the cast sheet
         self.assertNotIn("voices", scene)  # the same as the sheet's: not repeated
         first, second, third, fourth, fifth = scene["shots"]
+        # On-screen text as a title from the catalog; picture operations as effects; sound cuts as native fields.
+        self.assertEqual(first["title"], {"id": "card", "text": "04:02", "size": 20, "color": "#8C8F96",
+                                          "position": "bottom", "fade_in": 1.0, "fade_out": 0.001, "enter_at": 0.0,
+                                          "spaced": True})
+        self.assertEqual(first["effects"], [{"id": "fade-to-black", "length": 3.0}])
+        self.assertEqual((second["mute"], second["sound_fades_at"], second["effects"]),
+                         ([[0.0, 1.0]], 2.5, [{"id": "mirror"}]))
         # SINGULAR's source fields as native relations, its edits as `derive`, its outside paths moved.
         self.assertEqual(third["from"], [{"ref": "2", "relation": "last_frame_of"}])
         self.assertEqual(third["derive"], {"from": "2", "with": ["KAEL"], "request": "The man becomes Kael."})
@@ -172,6 +188,7 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual((second["sound"], second["trim"], second["generated_seconds"]),
                          ("a quiet room hum", {"before": 0.4, "after": 0.3}, 4))
         self.assertEqual(second["lines"][0]["who"], "KAEL")
+        self.assertEqual(second["picture"], "a man in a bed")  # SINGULAR's `quadro`
         # Takes kept, renamed to the canonical folders; a run's scratch left behind.
         work = scene_dir / "work"
         self.assertTrue((work / "_takes" / "c02-t2.mp4").is_file())
@@ -196,7 +213,7 @@ class MigrationTests(unittest.TestCase):
         self.assertTrue((t / "looks" / "CAMARA" / "look.yaml").is_file())
         # The overview, the report, and nothing read differently than in the original.
         self.assertIn("✅ v3", (t / "README.md").read_text(encoding="utf-8"))
-        self.assertIn("quadro", (t / "MIGRATION.md").read_text(encoding="utf-8"))
+        self.assertIn("cast_references", (t / "MIGRATION.md").read_text(encoding="utf-8"))
         self.assertEqual(report.scenes[0]["versions"], 3)
         self.assertEqual([item for item in compare(self.source, t) if "findings" not in item], [])
 
