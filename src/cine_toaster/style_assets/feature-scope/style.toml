@@ -1,0 +1,37 @@
+schema_version = 1
+id = "feature-scope"
+name = "Feature film, scope (2.39:1)"
+kind = "format"
+says = "A feature for the cinema: the wide 2.39:1 frame, framed as a whole, subtitled where the language is not the audience's."
+# Names people know it by: shown, and accepted by `style:`.
+aka = ["scope", "cinemascope", "anamorphic", "longa-metragem", "feature film"]
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["theatrical feature films in the scope ratio"]
+framing = ["the frame read as a whole, edge to edge", "faces placed in the central band the scope window keeps"]
+colour = "the film's own look"
+sound = "the film's own mix; 5.1 when it is delivered to a cinema or a home theatre"
+titles = ["film-title", "card", "credits-roll"]
+# What a video model is told about the image, in words of craft.
+prompt = "cinematic widescreen composition, the subject placed in the central band of the frame"
+use_when = ["A feature or a short made for the big screen"]
+avoid_when = ["Social video, where the frame is vertical"]
+
+[camera]
+lens = "normal"
+prefer = []
+avoid = []
+
+[editing]
+shot_seconds = []
+prefer_cuts = []
+avoid_cuts = []
+prefer_transitions = []
+avoid_transitions = []
+
+[performance]
+intensity = "clear"
+max = "overwhelming"
+notes = "the film's own register"
+
+[format]
+aspect = "2.39:1"

@@ -428,6 +428,14 @@ def _expand_effects(shots: list[dict[str, Any]], scene_id: str, root: Path) -> l
     return findings
 
 
+def _subtitles(value: Any) -> dict[str, Any]:
+    """`subtitles: true` or `{burn: false}`; off by default."""
+
+    if value in (None, False, "", "false", "no", "off"):
+        return {}
+    return dict(value) if isinstance(value, dict) else {"burn": True}
+
+
 def _surround(value: Any) -> str:
     """`surround: "5.1"` (a number in YAML too); off, false, none or stereo mean none."""
 
@@ -610,6 +618,7 @@ def _load_scene(
     project_style: Any = "",
     project_deliver: Any = None,
     project_surround: Any = None,
+    project_subtitles: Any = None,
 ) -> dict[str, Any]:
     document = _read_yaml(path)
     scene_id = vtext(document, "scene") or _text(document.get("id"))
@@ -801,6 +810,8 @@ def _load_scene(
         "style": style,
         # The same cut in other formats, delivered with every version (CT-0049).
         "deliver": renditions,
+        # Subtitles in the film's language, timed to the speech (CT-0054): {burn: true|false}.
+        "subtitles": _subtitles(document.get("subtitles") if document.get("subtitles") is not None else project_subtitles),
         # A surround mix beside the stereo, as a second track ("5.1", CT-0052).
         "surround": _surround(document.get("surround") if document.get("surround") is not None else project_surround),
         "findings": findings,
@@ -1529,7 +1540,8 @@ def load_production(root: Path) -> dict[str, Any]:
     scenes = [
         _load_scene(path, root, declared_fields, project_look, screenplay, _shot_field_aliases(manifest),
                     _scene_field_aliases(manifest), project_style=manifest.get("style"),
-                    project_deliver=manifest.get("deliver"), project_surround=manifest.get("surround"))
+                    project_deliver=manifest.get("deliver"), project_surround=manifest.get("surround"),
+                    project_subtitles=manifest.get("subtitles"))
         for path in scene_files(root, manifest)
     ]
     scenes.sort(key=lambda scene: (scene["order"], scene["id"]))

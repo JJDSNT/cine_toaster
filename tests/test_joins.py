@@ -104,6 +104,19 @@ class JoinTests(unittest.TestCase):
         self.assertGreater(self.mean(out, 2.2, 0.6), -30)
         self.assertLess(self.mean(out, 3.6, 0.35), self.mean(out, 2.2, 0.6) - 6)  # going down (`som_baixa_de`)
 
+    def test_subtitles_are_written_beside_the_cut_and_burned_when_asked(self) -> None:
+        segment = Segment("P1", "A", self.take("a.mp4", "gray", "0"), 0.0, 3.0, normalize=False,
+                          subtitles=[(0.5, 2.0, "Meu nome é Líra.")])
+        for burn in (True, False):
+            plan = Plan(scene="SC-1", segments=[segment], subtitles={"burn": burn})
+            out = self.root / f"cut-{burn}.mp4"
+            render(self.root, plan, out, self.root / f"work-{burn}", run)
+            self.assertIn("Meu nome é Líra.", Path(plan.subtitle_file).read_text(encoding="utf-8"))
+        bright = lambda path: max(subprocess.run(
+            ["ffmpeg", "-loglevel", "error", "-ss", "1.0", "-i", str(path), "-frames:v", "1", "-vf",
+             "crop=iw:ih/4:0:ih*3/4,format=gray", "-f", "rawvideo", "-"], capture_output=True).stdout)
+        self.assertGreater(bright(self.root / "cut-True.mp4"), bright(self.root / "cut-False.mp4") + 60)
+
     def test_a_black_shot_is_held_on_screen_for_its_duration(self) -> None:
         black = Segment("P1", "SOLID", "", 0.0, 1.5, method="solid:black", normalize=False)
         take = Segment("P2", "A", self.take("a.mp4", "red", "0"), 1.0, 3.0, normalize=False)

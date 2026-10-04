@@ -23,6 +23,16 @@ class RuleTests(unittest.TestCase):
         # A 9:16 window of a 16:9 take, pushed to the right edge, never past it.
         self.assertEqual(reframe_filter(1280, 720, (720, 1280), x=1.0), "crop=404:720:876:0,scale=720:1280,setsar=1")
 
+    def test_subtitles_are_timed_to_each_line_as_it_is_said(self) -> None:
+        from cine_toaster.formats import subtitle_blocks
+
+        words = [(7.76, 8.24, "My"), (8.24, 8.46, "name"), (8.46, 8.64, "is"), (8.64, 8.98, "Lira.")]
+        lines = [{"en": "My name is Lira.", "text": "Meu nome é Líra."},
+                 {"en": "Claire?!", "text": "Claire?!", "mix": {"at": 4.15}}]
+        blocks = subtitle_blocks(lines, words, 0.0, 10.0, lambda name: 1.4)
+        self.assertEqual(blocks[0], (4.15, 5.85, "Claire?!"))  # laid in the mix at its time
+        self.assertEqual((blocks[1][0], round(blocks[1][1], 2), blocks[1][2]), (7.76, 9.33, "Meu nome é Líra."))
+
     def test_captions_are_short_and_break_at_pauses(self) -> None:
         words = [(0.0, 0.3, "That's"), (0.3, 0.5, "it."), (1.5, 1.8, "That's"), (1.8, 2.0, "my"), (2.0, 2.2, "own"),
                  (2.2, 2.5, "voice"), (2.5, 2.8, "again")]

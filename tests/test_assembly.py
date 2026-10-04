@@ -62,6 +62,14 @@ class SpeechCutTests(unittest.TestCase):
         self.assertFalse(_speaks({"lines": [{"who": "LIRA", "in_take": False}]}))
         self.assertTrue(_speaks({"lines": [{"who": "LIRA", "in_take": True}]}))
 
+    def test_a_take_made_from_another_keeps_its_word_timings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            (work / "c02.mp4").write_bytes(b"")
+            (work / "c02-pov.mp4").write_bytes(b"")
+            (work / "c02.words.json").write_text('[[1.0, 1.4, "My"], [1.4, 1.8, "name"]]', encoding="utf-8")
+            self.assertEqual(words_for(work / "c02-pov.mp4", "{stem}.words.json"), [(1.0, 1.4), (1.4, 1.8)])
+
     def test_word_timings_are_read_from_a_sidecar(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             take = Path(raw) / "c08.mp4"

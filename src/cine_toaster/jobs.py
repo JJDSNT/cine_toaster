@@ -746,6 +746,9 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
     start = 0.6 if voices else 0.0
     render(context.project_root, plan, output, context.staging / "work", context.run_process,
            span=(start, start + (1.0 - start) * share))
+    if plan.subtitle_file:
+        # The subtitles beside the version, burned or not (SINGULAR's practice: the clean final cut travels with them).
+        shutil.copyfile(plan.subtitle_file, context.staging / "assembly.srt")
     shutil.rmtree(context.staging / "work", ignore_errors=True)
     scene_id, version = context.params["scene"], context.params["version"]
     # A version lives with its scene, beside the breakdown that made it (ADR 0021).
@@ -768,7 +771,9 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
     return {
         "files": [{"staged": "assembly.mp4", "destination": f"{folder}/{version}.mp4"},
                   {"staged": "assembly.speech.json", "destination": f"{folder}/{version}.mp4.speech.json"},
-                  {"staged": "assembly.scene.yaml", "destination": f"{folder}/{version}.scene.yaml"}, *renditions],
+                  {"staged": "assembly.scene.yaml", "destination": f"{folder}/{version}.scene.yaml"},
+                  *([{"staged": "assembly.srt", "destination": f"{folder}/{version}.srt"}]
+                    if (context.staging / "assembly.srt").is_file() else []), *renditions],
         "summary": {"segments": [{**{key: value for key, value in asdict(segment).items() if key not in ("sound", "source")},
                                   "gain_db": plan.gains.get(segment.shot, 0.0)} for segment in plan.segments],
                     "notes": plan.notes, "voices": voices, "sound": plan.sound, "loudness": plan.loudness,

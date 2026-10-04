@@ -105,6 +105,8 @@ class Segment:
     #: The take's sound silenced in stretches (take seconds), and faded out from a point of the shot as cut.
     mute: list[list[float]] = field(default_factory=list)
     sound_fades_at: float | None = None
+    #: Subtitles of the lines said in the take, in the take's seconds (CT-0054).
+    subtitles: list[tuple[float, float, str]] = field(default_factory=list)
     #: A scene version's renditions, by format (a sequence's segments): the sequence's renditions use them.
     renditions: dict[str, str] = field(default_factory=dict)
     #: The join into this shot, resolved: a transition ({id, seconds, shader | mode}) and a J/L split.
@@ -135,6 +137,9 @@ class Plan:
     #: the loudness of each track.
     surround: str = ""
     loudness: dict[str, float] = field(default_factory=dict)
+    #: Subtitles in the film's language (CT-0054): {burn: bool}; once rendered, the .srt written beside.
+    subtitles: dict[str, Any] = field(default_factory=dict)
+    subtitle_file: str = ""
 
     @property
     def takes(self) -> dict[str, str]:
@@ -170,11 +175,27 @@ def probe(path: Path) -> dict[str, Any]:
     }
 
 
+def sidecar_for(media: Path, pattern: str) -> Path | None:
+    """A take's word timings: its own, else -- for a take made from another, `c02-pov` from `c02` -- the
+    original's, whose timeline it keeps (SINGULAR's POV montage, CT-0054)."""
+
+    sidecar = media.parent / pattern.format(stem=media.stem, name=media.name)
+    if sidecar.is_file():
+        return sidecar
+    stem = media.stem
+    while "-" in stem:
+        stem = stem.rsplit("-", 1)[0]
+        original = media.parent / pattern.format(stem=stem, name=f"{stem}{media.suffix}")
+        if original.is_file():
+            return original
+    return None
+
+
 def words_for(media: Path, pattern: str) -> list[tuple[float, float]]:
     """Word timings beside a take, as (start, end) seconds; empty when there are none."""
 
-    sidecar = media.parent / pattern.format(stem=media.stem, name=media.name)
-    if not sidecar.is_file():
+    sidecar = sidecar_for(media, pattern)
+    if sidecar is None:
         return []
     try:
         data = json.loads(sidecar.read_text(encoding="utf-8"))
@@ -304,6 +325,13 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
             _resolve_join(root, plan, cut, segment, joins)
         segment.reframe = shot.get("reframe")
         segment.mute = list(shot.get("mute") or [])
+        if scene.get("subtitles"):
+            from .formats import spoken_words, subtitle_blocks
+
+            said = [line for line in shot.get("lines") or [] if line.get("in_take", True)]
+            segment.subtitles = subtitle_blocks(said, spoken_words(path, words_sidecar), start, end,
+                                                lambda name: probe(root / Path(scene["file"]).parent / name)["duration"]
+                                                if name and (root / Path(scene["file"]).parent / name).is_file() else 1.4)
         segment.sound_fades_at = shot.get("sound_fades_at")
         wants_frame = ((scene.get("style") or {}).get("format") or {}).get("aspect") or scene.get("deliver")
         if not segment.reframe and wants_frame:
@@ -331,6 +359,7 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
     form = (scene.get("style") or {}).get("format") or {}
     plan.format = {key: form[key] for key in ("aspect", "captions") if form.get(key)}
     plan.surround = str(scene.get("surround") or "")
+    plan.subtitles = dict(scene.get("subtitles") or {})
     if scene.get("ambience") or scene.get("music") or any(shot.get("sounds") for shot in scene["shots"]):
         from .sounds import place
 
@@ -590,14 +619,24 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
     captions = [(starts[index] + max(0.0, a - segment.start), starts[index] + min(segment.end, b) - segment.start, text)
                 for index, segment in enumerate(plan.segments) for a, b, text in segment.captions
                 if b > segment.start and a < segment.end] if plan.format.get("captions") else []
-    if captions:
+    titles = [(starts[index] + max(0.0, a - segment.start), starts[index] + min(segment.end, b) - segment.start, text)
+              for index, segment in enumerate(plan.segments) for a, b, text in segment.subtitles
+              if b > segment.start and a < segment.end]
+    if titles:
+        from .formats import write_srt
+
+        plan.subtitle_file = str(write_srt(titles, work / "subtitles.srt"))
+    burned = captions + (titles if titles and plan.subtitles.get("burn", True) else [])
+    if burned:
         from .formats import subtitles_filter, write_ass
 
-        ass = write_ass(captions, (width, height), work / "captions.ass")
+        film = not captions  # a film's subtitles alone: smaller and lower than a format's captions
+        ass = write_ass(burned, (width, height), work / "captions.ass",
+                        scale=0.056 if film else 0.075, margin_ratio=0.05 if film else None)
         captioned = work / "picture-captioned.mp4"
         run_process([ffmpeg, "-y", "-loglevel", "error", "-i", str(picture), "-vf", subtitles_filter(ass),
                      "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", str(captioned)],
-                    message=f"Burning {len(captions)} captions", span=within(0.9, 0.91))
+                    message=f"Burning {len(burned)} captions", span=within(0.9, 0.91))
         picture = captioned
     mixed = work / "sound.wav"
     inputs = [part for clip, _ in sounds for part in ("-i", str(clip))]

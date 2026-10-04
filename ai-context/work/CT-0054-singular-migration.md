@@ -178,6 +178,43 @@ Kept and declared, for SINGULAR's generators: `still`, `guias`,
 `sobrepor`, `montagem_pov`, `ajuste_imagem`). The comparison holds: the
 6 real findings only.
 
+# Done: validation by assembling 3-01 against SINGULAR's approved v12 (2026-10-04)
+
+The migrated 3-01 assembled by Cine Toaster (CPU, ~95 s a run) compared
+frame by frame with SINGULAR's v12. Each difference became a fix:
+
+- **Black shots were dropped** ("composed, not part of a take cut yet"):
+  Cine Toaster now holds a `black`/`white` shot (engine `solid`) on screen
+  for its duration, its sounds laid over it.
+- **Auxiliary pictures** (`imagem` shots, e.g. 3-01 P2c: Claire in Líra's
+  place for the POV overlay) were reported as takeless: the migration marks
+  them `out_of_cut`, as SINGULAR always treated them.
+- **The frame**: SINGULAR crops every take to 1280x536. A built-in format
+  style `feature-scope` (2.39:1; aka scope, cinemascope, longa-metragem)
+  and the migration sets the production to it: 3-01 comes out 1280x536.
+- **Subtitles**: SINGULAR burns Portuguese lines under the English speech
+  while the author reviews, the clean cut travelling with an .srt. Native
+  now: `subtitles: {burn: true}` (production or scene); each line timed by
+  SINGULAR's method (as many of the take's words as the line has, +0.35 s;
+  a line laid in the mix at its time); `vN.srt` beside every version;
+  burned when asked, smaller and lower than a format's captions.
+- **P2's POV montage** (focus coming and going, Claire fading into Líra;
+  SINGULAR's own `pov_foco.py`): its result is in the work folder as the
+  POV take; the migration selects it, as a decision of its own with the
+  reason, reversible. And SINGULAR keeps such a shot's opening (`corte`:
+  ini_min 0 for `montagem_pov`): the migration writes `trim.in: 0`.
+- **A take made from another** (`c02-pov` from `c02`) uses the original's
+  word timings when it has none of its own (`assembly.sidecar_for`), for
+  the trim and the subtitles.
+- SINGULAR's word sidecars (`[start, end, word]` triples) are read.
+
+Result: the same 25 shots in the same order, lengths equal to the
+hundredth except frame rounding (SINGULAR rounds each piece up a frame),
+88.35 s against v12's 88.66 s; the same frame, the same subtitles at the
+same moments, the same POV opening. Tests: subtitles (timing, the .srt,
+burning), black shots, derived word timings, the migration's POV take,
+trim and production format.
+
 # Pass 2 (next)
 
 - `cenario` and the plans (`geografia`) into locations; `referencias_3d`.

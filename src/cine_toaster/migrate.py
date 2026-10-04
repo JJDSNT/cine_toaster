@@ -328,6 +328,11 @@ def convert_shot(shot: dict[str, Any], report: Report, scene_id: str) -> dict[st
             else:
                 report.keep(f"shot.{key}")
     out.update(montage)
+    if shot.get("montagem_pov"):
+        # SINGULAR keeps a POV montage's opening (cena_ltx.py `corte`: ini_min = 0 for montagem_pov): the effect
+        # starts at the first frame. An explicit cut-in at 0 says the same here.
+        out["trim"] = {**(out.get("trim") or {}), "in": 0.0}
+        report.converted.append(f"{scene_id} P{shot.get('n')}: montagem_pov -> trim.in 0 (the montage's opening kept)")
     return out
 
 
@@ -528,6 +533,29 @@ def _locations(source: Path, target: Path, documents: list[tuple[str, dict[str, 
     return where
 
 
+def _pov_takes(target: Path, documents: list[tuple[str, dict[str, Any]]], report: Report) -> None:
+    """A shot SINGULAR cuts through its POV montage (`montagem_pov`: pov_foco.py's focus and overlay) uses that
+    montage's result, already in its work folder as the POV take: the cut is SINGULAR's, decided as such."""
+
+    from .commands import select_take
+    from .project import load_scene
+    from .state import Actor
+
+    for scene_id, document in documents:
+        wanted = [str(shot.get("n")) for shot in document.get("planos") or [] if shot.get("montagem_pov")]
+        if not wanted:
+            continue
+        scene = load_scene(target, scene_id)
+        for shot in scene["shots"]:
+            if str(shot.get("number")) in wanted and any(take["id"] == "POV" for take in shot.get("takes") or []):
+                select_take(target, scene_id=scene_id, shot_id=shot["id"], take_id="POV",
+                            actor=Actor(id="singular-migration", kind="system"),
+                            rationale="SINGULAR cuts this shot through its POV montage (pov_foco.py); its result is "
+                                      "the POV take.")
+                report.converted.append(f"{scene_id} {shot['id']}: montagem_pov -> the POV take selected "
+                                        "(SINGULAR's montage result)")
+
+
 def _identities(folder: Path) -> dict[str, str]:
     """Each cast sheet's voice identity, by member key."""
 
@@ -716,6 +744,8 @@ def migrate(source: Path, target: Path, *, replace: bool = False, proposals: Pat
                 _copy(path, target / "sequences" / "_reviews" / path.name, report)
 
     # The production manifest.
+    report.converted.append("production: format feature-scope (2.39:1, SINGULAR's 1280x536) and burned subtitles "
+                            "(Portuguese lines timed to the English speech, an .srt beside every version)")
     kept_shot_fields = {key for key in report.kept if key.startswith("shot.")}
     declared = manifest.get("shot_fields") or {}
     shot_fields = {}
@@ -732,6 +762,10 @@ def migrate(source: Path, target: Path, *, replace: bool = False, proposals: Pat
         "production": {"phase": (manifest.get("producao") or {}).get("fase") or "production",
                        "active_scene": (manifest.get("producao") or {}).get("cena_ativa") or ""},
         "sequences": sequences,
+        # SINGULAR's montage crops every take to 1280x536 (cena_ltx.py: W, H) and burns Portuguese subtitles
+        # timed to the English speech while the author reviews: the same, natively.
+        "style": {"format": "feature-scope"},
+        "subtitles": {"burn": True},
         "shot_fields": shot_fields,
     }
     (target / "project.yaml").write_text(
@@ -764,6 +798,7 @@ def migrate(source: Path, target: Path, *, replace: bool = False, proposals: Pat
 
             index_sequence(target, item["id"])
 
+    _pov_takes(target, documents, report)
     _plan_names(target, report)
     _write_report(target, report, cast_ids)
     from .versions import write_overview
@@ -837,6 +872,9 @@ def compare(source: Path, target: Path) -> list[str]:
         for shot_id, shot in shots_a.items():
             other = shots_b[shot_id]
             for key in ("duration_seconds", "label", "source", "engine", "out_of_cut"):
+                if key == "out_of_cut" and str(shot.get("kind") or "").lower() in ("imagem", "image") \
+                        and not shot.get(key) and other.get(key):
+                    continue  # an auxiliary picture, now said to be out of the cut, as SINGULAR always treated it
                 if shot.get(key) != other.get(key):
                     differences.append(f"{scene_id} {shot_id}: {key} {shot.get(key)!r} -> {other.get(key)!r}")
             if len(shot.get("lines") or []) != len(other.get("lines") or []):

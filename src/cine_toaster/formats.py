@@ -74,9 +74,11 @@ def reframe_filter(width: int, height: int, target: tuple[int, int], x: float = 
 def spoken_words(media: Path, pattern: str) -> list[tuple[float, float, str]]:
     """The words of a take's sidecar with their text, when it has text: (start, end, word)."""
 
-    sidecar = media.parent / pattern.format(stem=media.stem, name=media.name)
+    from .assembly import sidecar_for
+
+    sidecar = sidecar_for(media, pattern)
     try:
-        data = json.loads(sidecar.read_text(encoding="utf-8"))
+        data = json.loads(sidecar.read_text(encoding="utf-8")) if sidecar else []
     except (OSError, ValueError):
         return []
     words = []
@@ -84,6 +86,8 @@ def spoken_words(media: Path, pattern: str) -> list[tuple[float, float, str]]:
         if isinstance(item, dict) and "start" in item and "end" in item and str(item.get("word") or item.get("text")
                                                                                   or "").strip():
             words.append((float(item["start"]), float(item["end"]), str(item.get("word") or item["text"]).strip()))
+        elif isinstance(item, (list, tuple)) and len(item) >= 3 and str(item[2]).strip():
+            words.append((float(item[0]), float(item[1]), str(item[2]).strip()))  # SINGULAR: [start, end, word]
     return sorted(words)
 
 
@@ -118,12 +122,16 @@ def _ass_time(seconds: float) -> str:
     return f"{int(hours)}:{int(minutes):02d}:{rest:05.2f}"
 
 
-def write_ass(captions: list[tuple[float, float, str]], size: tuple[int, int], path: Path) -> Path:
-    """Captions as an ASS file: bold, outlined, in the lower third, sized to the frame."""
+def write_ass(captions: list[tuple[float, float, str]], size: tuple[int, int], path: Path, *,
+              scale: float = 0.075, margin_ratio: float | None = None) -> Path:
+    """Captions as an ASS file: bold, outlined, in the lower third, sized to the frame.
+
+    Subtitles of a film are smaller and lower (`scale` 0.056, SINGULAR's 30 px on 536).
+    """
 
     width, height = size
-    font = max(18, round(min(width, height) * 0.075))
-    margin = round(height * (0.2 if height > width else 0.08))
+    font = max(14, round(min(width, height) * scale))
+    margin = round(height * (margin_ratio if margin_ratio is not None else (0.2 if height > width else 0.08)))
     lines = [
         "[Script Info]", "ScriptType: v4.00+", f"PlayResX: {width}", f"PlayResY: {height}", "",
         "[V4+ Styles]",
@@ -230,3 +238,57 @@ def subject_window(scene: dict[str, Any], shot: dict[str, Any]) -> tuple[dict[st
     if max(xs) - min(xs) > 0.3:
         note += f"; {label} moves across the frame, more than a narrow window follows -- set `reframe` by hand"
     return {"x": round(x, 3), "y": round(y, 3), "subject": chosen, "from": "plan"}, note
+
+
+# --- subtitles ------------------------------------------------------------------------
+
+#: How long a subtitle stays after its line's last word (SINGULAR: 0.35 s).
+SUBTITLE_TAIL = 0.35
+
+
+def _normal(text: str) -> list[str]:
+    import re
+
+    return re.sub(r"[^a-z ]", "", str(text).lower()).split()
+
+
+def subtitle_blocks(lines: list[dict[str, Any]], words: list[tuple[float, float, str]], start: float, end: float,
+                    media_seconds: Any = None) -> list[tuple[float, float, str]]:
+    """Each line's subtitle in the take's seconds, timed to when it is actually said (SINGULAR's method).
+
+    The words of the take are taken in order, as many for each line as it has
+    spoken words; a line the take does not hold (no words left) spans the
+    shot. A line laid in the mix at a time (`mix: {at|em: …}`) is timed there.
+    The subtitle's text is the line in the film's language (`text`).
+    """
+
+    blocks: list[tuple[float, float, str]] = []
+    cursor = 0
+    for line in lines:
+        text = str(line.get("text") or "").strip()
+        mix = line.get("mix") or {}
+        at = mix.get("at", mix.get("em")) if isinstance(mix, dict) else None
+        if at is not None:
+            length = media_seconds(mix.get("file") or mix.get("arquivo")) if media_seconds else 1.4
+            if text:
+                blocks.append((float(at), float(at) + (length or 1.4) + 0.3, text))
+            continue
+        count = len(_normal(line.get("en") or text))
+        chunk = words[cursor:cursor + count] if words else []
+        cursor += count
+        a, b = (chunk[0][0], chunk[-1][1]) if chunk else (start + 0.2, max(start + 1.2, end - 0.3))
+        a, b = max(start, a), min(end, b + SUBTITLE_TAIL)
+        if text and a < end:
+            blocks.append((a, b, text))
+    return sorted((round(a, 3), round(b, 3), text) for a, b, text in blocks)
+
+
+def write_srt(blocks: list[tuple[float, float, str]], path: Path) -> Path:
+    def stamp(seconds: float) -> str:
+        hours, rest = divmod(max(0.0, seconds), 3600)
+        minutes, rest = divmod(rest, 60)
+        return f"{int(hours):02d}:{int(minutes):02d}:{rest:06.3f}".replace(".", ",")
+
+    path.write_text("".join(f"{index}\n{stamp(a)} --> {stamp(b)}\n{text}\n\n"
+                            for index, (a, b, text) in enumerate(blocks, 1)), encoding="utf-8")
+    return path

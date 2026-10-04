@@ -65,6 +65,7 @@ BREAKDOWN = """\
         silenciar: [[0.0, 1.0]]
         som_baixa_de: 2.5
         espelhar: true
+        montagem_pov: true
       - n: 3
         tipo: ltx
         plano: Dela.
@@ -115,6 +116,7 @@ class MigrationTests(unittest.TestCase):
         write(s / "cenas" / "9-01" / "ltx" / "decupagem.yaml", BREAKDOWN)
         work = s / "cenas" / "9-01" / "ltx" / "trabalho"
         write(work / "c02.mp4", b"take")
+        write(work / "c02-pov.mp4", b"the take through SINGULAR's POV montage")
         write(work / "c02.palavras.json", "[]")
         write(work / "_tomadas" / "c02-t2.mp4", b"another take")
         write(work / "_descartados" / "c02-errado.mp4", b"rejected")
@@ -171,6 +173,10 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(first["effects"], [{"id": "fade-to-black", "length": 3.0}])
         self.assertEqual((second["mute"], second["sound_fades_at"], second["effects"]),
                          ([[0.0, 1.0]], 2.5, [{"id": "mirror"}]))
+        self.assertEqual(second["trim"], {"before": 0.4, "after": 0.3, "in": 0.0})  # the POV montage's opening kept
+        # The production: SINGULAR's scope frame and its subtitles, natively.
+        project = yaml.safe_load((t / "project.yaml").read_text(encoding="utf-8"))
+        self.assertEqual((project["style"], project["subtitles"]), ({"format": "feature-scope"}, {"burn": True}))
         # SINGULAR's source fields as native relations, its edits as `derive`, its outside paths moved.
         self.assertEqual(third["from"], [{"ref": "2", "relation": "last_frame_of"}])
         self.assertEqual(third["derive"], {"from": "2", "with": ["KAEL"], "request": "The man becomes Kael."})
@@ -185,8 +191,7 @@ class MigrationTests(unittest.TestCase):
                          ("O quarto", "Um quarto pequeno, luz fria.", ["9-01"]))
         self.assertEqual(location["references"], [{"path": "blockout/A.png", "kind": "blockout"}])
         self.assertEqual((first["kind"], first["label"], first["sounds"]), ("black", "Tela preta.", ["breath"]))
-        self.assertEqual((second["sound"], second["trim"], second["generated_seconds"]),
-                         ("a quiet room hum", {"before": 0.4, "after": 0.3}, 4))
+        self.assertEqual((second["sound"], second["generated_seconds"]), ("a quiet room hum", 4))
         self.assertEqual(second["lines"][0]["who"], "KAEL")
         self.assertEqual(second["picture"], "a man in a bed")  # SINGULAR's `quadro`
         # Takes kept, renamed to the canonical folders; a run's scratch left behind.
@@ -201,11 +206,15 @@ class MigrationTests(unittest.TestCase):
         from cine_toaster.project import load_scene
 
         loaded = load_scene(t, "9-01")
+        # SINGULAR cuts shot 2 through its POV montage: that take is selected, as a decision of the migration.
+        self.assertEqual(next(shot for shot in loaded["shots"] if shot["id"] == "P2")["selected_take"], "POV")
         verdicts = {item["id"]: item["verdict"] for item in loaded["assemblies"]}
         self.assertEqual(verdicts, {"v1": "rejected", "v2": "not_sent", "v3": "approved"})
         index = (scene_dir / "versions" / "VERSIONS.md").read_text(encoding="utf-8")
         self.assertIn("Approved: **v3**", index)
-        self.assertEqual(len((scene_dir / "history.jsonl").read_text(encoding="utf-8").splitlines()), 3)
+        history = (scene_dir / "history.jsonl").read_text(encoding="utf-8").splitlines()
+        self.assertEqual(len(history), 4)  # three versions imported, and the POV take chosen
+        self.assertIn("POV montage", history[-1])
         # The cast sheet, gathered from the scene.
         sheet = yaml.safe_load((t / "cast" / "kael" / "character.yaml").read_text(encoding="utf-8"))
         self.assertEqual(sheet["voice"]["identity"], "a low, controlled male voice")
