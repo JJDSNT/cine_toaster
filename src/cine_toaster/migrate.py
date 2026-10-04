@@ -68,7 +68,9 @@ SHOT_KEYS = {"tipo": "kind", "plano": "label", "dur": "duration", "atuacao": "ac
              # What the video model is told the starting picture shows (cena_ltx.py `prompt`: `quadro`).
              "quadro": "picture"}
 LINE_KEYS = {"quem": "who", "como": "delivery", "voz": "voice", "fora": "off_screen", "emocao": "emotion_hint",
-             "velocidade": "pace"}
+             "velocidade": "pace", "montagem": "mix"}
+#: A voice laid in the montage (`falas: [{montagem: {arquivo, em}}]`): its file and its time in the shot.
+MIX_KEYS = {"arquivo": "file", "em": "at"}
 DECISION_KEYS = {"pergunta": "question", "proposta": "proposal", "resposta": "answer"}
 GEOGRAPHY_KEYS = {"sala": "room", "pessoas": "subjects", "altura_olhos": "eye_height", "altura": "height",
                   "mira": "target", "lente": "lens_mm", "eixo": "axis", "objetos": "objects"}
@@ -153,7 +155,10 @@ def _rewrite_paths(value: Any, prefixes: list[tuple[str, str]]) -> Any:
 
 
 def _rename(document: dict[str, Any], mapping: dict[str, str]) -> dict[str, Any]:
-    return {mapping.get(key, key): value for key, value in document.items()}
+    renamed = {mapping.get(key, key): value for key, value in document.items()}
+    if mapping is LINE_KEYS and isinstance(renamed.get("mix"), dict):
+        renamed["mix"] = _rename(renamed["mix"], MIX_KEYS)
+    return renamed
 
 
 def convert_scene(document: dict[str, Any], report: Report, scene_id: str,

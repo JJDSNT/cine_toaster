@@ -815,6 +815,17 @@ def command_sound(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_transcribe(args: argparse.Namespace) -> int:
+    """Word timings for a scene's speaking takes that have none (CT-0054)."""
+
+    job = _foreground_job("transcribe", Path(args.project), {"scene": args.scene, "language": args.language}, None)
+    if job is None:
+        return 1
+    for item in job["result"]["summary"]["transcribed"]:
+        print(f"  {item['shot']}: {item['take']}")
+    return 0
+
+
 def command_migrate(args: argparse.Namespace) -> int:
     """Migrate a production made outside Cine Toaster into its own format (CT-0054)."""
 
@@ -1942,6 +1953,13 @@ def build_parser() -> argparse.ArgumentParser:
         item = vfx_sub.add_parser(name, help=text)
         item.add_argument("project", type=Path)
     vfx_parser.set_defaults(function=command_vfx)
+
+    transcribe_parser = subparsers.add_parser(
+        "transcribe", help="Word timings for a scene's speaking takes that have none, so trims and subtitles follow the speech")
+    transcribe_parser.add_argument("project", type=Path)
+    transcribe_parser.add_argument("scene")
+    transcribe_parser.add_argument("--language", default="en", help="the language spoken in the takes")
+    transcribe_parser.set_defaults(function=command_transcribe)
 
     migrate_parser = subparsers.add_parser("migrate", help="Migrate a production made outside Cine Toaster (CT-0054)")
     migrate_sub = migrate_parser.add_subparsers(dest="migrate_kind", required=True)

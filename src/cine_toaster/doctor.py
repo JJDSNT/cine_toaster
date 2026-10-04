@@ -370,18 +370,24 @@ def _sound_sources() -> Capability:
 
 
 def _whisper() -> Capability:
+    from .voice import voice_python
+
     path = _binary("whisper-cli") or _binary("whisper-cpp") or _binary("main")
-    ok = bool(path) or _module("faster_whisper")
+    voice = voice_python()
+    in_voice = bool(voice and list(voice.parent.parent.glob("lib/python*/site-packages/faster_whisper")))
+    ok = bool(path) or _module("faster_whisper") or in_voice
+    path = path or (f"faster-whisper in {voice.parent.parent}" if in_voice else "")
     return Capability(
         name="Transcription",
-        what_it_enables="subtitles, and reading source footage that arrives without a script",
+        what_it_enables="word timings for takes that have none (`toast transcribe`): trims and subtitles follow the "
+                        "speech; and reading source footage that arrives without a script",
         required=False,
         status=OK if ok else MISSING,
         detail=path,
         remedy=""
         if ok
         else "pip install faster-whisper   (or build whisper.cpp)",
-        wired=False,
+        wired=True,
     )
 
 

@@ -215,6 +215,45 @@ same moments, the same POV opening. Tests: subtitles (timing, the .srt,
 burning), black shots, derived word timings, the migration's POV take,
 trim and production format.
 
+# Done: every scene assembled against SINGULAR's latest cut (2026-10-04)
+
+| scene | Cine Toaster | SINGULAR | |
+|---|---|---|---|
+| 1-01 | 74.9 s | 75.1 s | equal; the narration was missing -- fixed |
+| 1-02 | 222.0 s | 222.7 s | equal |
+| 1-02A | 36.8 s | 85.3 s | SINGULAR's state, not a loss (below) |
+| 1-02B | 67.5 s | 67.6 s | equal |
+| 1-02C | 115.8 s | 116.1 s | equal |
+| 1-03 | 86.4 s | 86.6 s | equal |
+| 1-04 | 55.5 s | 55.6 s | equal |
+| 3-01 | 88.4 s | 88.7 s | equal (frame by frame, above) |
+| 3-02 | -- | -- | not produced in SINGULAR either |
+
+Fixed on the way:
+
+- **Narration** (`falas: [{montagem: {arquivo, em}}]`, SINGULAR's
+  voice-over): a line with `mix: {file, at}` is not said in the take (the
+  reader no longer looks for its words); the assembly lays its file at its
+  time, brought to speech level, counted as speech (music ducks under it,
+  the 5.1 puts it in the centre); its subtitle at its time, on a take, a
+  card or a black shot. The migration writes `mix: {file, at}`.
+- **Reused clips**: a shot with no take of its own and `from: {ref: "1-02
+  c03", relation: reuses}` takes that clip from the other scene's work.
+- **Reframe notes** summarised in one line per scene.
+
+**1-02A**: its breakdown was rewritten after its last cut (its header:
+"imagens-mestre em duas etapas, lição de 19/09"); 16 of its shots were
+never generated since -- SINGULAR has no clip for them either (the last
+cut's pieces in `partes/` are cropped, mixed intermediates, not takes).
+Cine Toaster reports them as without a take: the truth. The last cut is in
+the scene's versions.
+
+**Word timings missing in SINGULAR** for the newer clips of 1-02C (8
+shots) and 1-03 (10): both tools cut those shots by duration (the lengths
+agree), but subtitles of those lines span their whole shot. Next: a job
+that transcribes the takes that have no word timings (faster-whisper, in
+the voice environment), so trims and subtitles follow the speech.
+
 # Pass 2 (next)
 
 - `cenario` and the plans (`geografia`) into locations; `referencias_3d`.

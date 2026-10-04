@@ -107,6 +107,8 @@ class Segment:
     sound_fades_at: float | None = None
     #: Subtitles of the lines said in the take, in the take's seconds (CT-0054).
     subtitles: list[tuple[float, float, str]] = field(default_factory=list)
+    #: Voices laid in the montage from their own files (a narration): (seconds into the shot's take, file).
+    voice_over: list[tuple[float, str]] = field(default_factory=list)
     #: A scene version's renditions, by format (a sequence's segments): the sequence's renditions use them.
     renditions: dict[str, str] = field(default_factory=dict)
     #: The join into this shot, resolved: a transition ({id, seconds, shader | mode}) and a J/L split.
@@ -267,6 +269,7 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
     plan = Plan(scene=scene["id"])
     cuts = {cut["to"]: cut for cut in scene.get("cuts") or []}
     joins: dict[str, Any] = {}  # the transition catalog and the GL check, read once if a cut needs them
+    framed: list[str] = []  # reframed on whom, from the plan: one note for the scene
     for shot in scene["shots"]:
         if shot.get("out_of_cut"):
             continue
@@ -274,6 +277,8 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         chosen = next((take for take in takes if take.get("selected")), None)
         if chosen is None:
             chosen = next((take for take in takes if take["id"] == "CUT"), None)
+        if chosen is None:
+            chosen = _reused(root, scene, shot, plan)
         title = shot.get("title") if isinstance(shot.get("title"), dict) and not shot["title"].get("unknown") else None
         if chosen is None and title:
             # A card: the title drawn over its background, as long as the shot plays.
@@ -281,6 +286,8 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
             cut = cuts.get(shot["id"]) or {}
             segment = Segment(shot["id"], "TITLE", "", 0.0, length, cut.get("type") or "hard", "title",
                               None, shot.get("level_db"), title=title, effects=list(shot.get("effects") or []))
+            segment.voice_over = _voices_of(root, scene, shot)
+            segment.subtitles = _card_subtitles(root, scene, shot, length)
             if plan.segments:
                 _resolve_join(root, plan, cut, segment, joins)
             plan.segments.append(segment)
@@ -292,6 +299,8 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
             colour = "white" if str(shot.get("kind") or "").lower() in ("white", "branco") else "black"
             segment = Segment(shot["id"], "SOLID", "", 0.0, length, cut.get("type") or "hard", f"solid:{colour}",
                               None, shot.get("level_db"))
+            segment.voice_over = _voices_of(root, scene, shot)
+            segment.subtitles = _card_subtitles(root, scene, shot, length)
             if plan.segments:
                 _resolve_join(root, plan, cut, segment, joins)
             plan.segments.append(segment)
@@ -325,10 +334,16 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
             _resolve_join(root, plan, cut, segment, joins)
         segment.reframe = shot.get("reframe")
         segment.mute = list(shot.get("mute") or [])
+        scene_dir = root / Path(scene["file"]).parent
+        segment.voice_over = [(float(line["mix"].get("at", line["mix"].get("em")) or 0.0),
+                               str(scene_dir / (line["mix"].get("file") or line["mix"].get("arquivo"))))
+                              for line in shot.get("lines") or []
+                              if isinstance(line.get("mix"), dict) and (line["mix"].get("file") or line["mix"].get("arquivo"))]
         if scene.get("subtitles"):
             from .formats import spoken_words, subtitle_blocks
 
-            said = [line for line in shot.get("lines") or [] if line.get("in_take", True)]
+            # Every line has its subtitle: those said in the take by their words, a narration at its time.
+            said = [line for line in shot.get("lines") or [] if line.get("in_take", True) or line.get("mix")]
             segment.subtitles = subtitle_blocks(said, spoken_words(path, words_sidecar), start, end,
                                                 lambda name: probe(root / Path(scene["file"]).parent / name)["duration"]
                                                 if name and (root / Path(scene["file"]).parent / name).is_file() else 1.4)
@@ -339,7 +354,7 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
 
             segment.reframe, note = subject_window(scene, shot)
             if note:
-                plan.notes.append(note + ".")
+                framed.append(note)
         # Timed whenever a version wants them: the scene's format, or a format it is delivered in.
         if (((scene.get("style") or {}).get("format") or {}).get("captions")
                 or any(item.get("captions") for item in scene.get("deliver") or [])):
@@ -356,6 +371,10 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         plan.segments.append(segment)
     if not plan.segments:
         raise ValidationError(f"{scene['id']} has no shot with a take to assemble")
+    if framed:
+        plain = [note.replace(" is reframed on ", ": ").replace(", from the plan", "") for note in framed if ";" not in note]
+        plan.notes.append("Reframed on each shot's subject, from the plan -- " + ", ".join(plain) + ".")
+        plan.notes += [note + "." for note in framed if ";" in note]
     form = (scene.get("style") or {}).get("format") or {}
     plan.format = {key: form[key] for key in ("aspect", "captions") if form.get(key)}
     plan.surround = str(scene.get("surround") or "")
@@ -366,6 +385,51 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         plan.cues, notes = place(scene, plan.segments)
         plan.notes.extend(notes)
     return plan
+
+
+def _card_subtitles(root: Path, scene: dict[str, Any], shot: dict[str, Any], length: float) -> list[tuple[float, float, str]]:
+    """A card or a black shot has no take: only a narration laid over it is subtitled, at its time."""
+
+    if not scene.get("subtitles"):
+        return []
+    from .formats import subtitle_blocks
+
+    folder = root / Path(scene["file"]).parent
+    narration = [line for line in shot.get("lines") or [] if isinstance(line.get("mix"), dict)]
+    return subtitle_blocks(narration, [], 0.0, length,
+                           lambda name: probe(folder / name)["duration"] if name and (folder / name).is_file() else 1.4)
+
+
+def _voices_of(root: Path, scene: dict[str, Any], shot: dict[str, Any]) -> list[tuple[float, str]]:
+    scene_dir = root / Path(scene["file"]).parent
+    return [(float(line["mix"].get("at", line["mix"].get("em")) or 0.0),
+             str(scene_dir / (line["mix"].get("file") or line["mix"].get("arquivo"))))
+            for line in shot.get("lines") or []
+            if isinstance(line.get("mix"), dict) and (line["mix"].get("file") or line["mix"].get("arquivo"))]
+
+
+def _reused(root: Path, scene: dict[str, Any], shot: dict[str, Any], plan: Plan) -> dict[str, Any] | None:
+    """A shot that reuses another scene's clip (`from: {ref: "1-02 c03", relation: reuses}`) takes that clip."""
+
+    for item in shot.get("from") or []:
+        if str(item.get("relation") or "") not in ("reuses", "reusa"):
+            continue
+        parts = str(item.get("ref") or "").split()
+        if len(parts) != 2:
+            continue
+        other_id, clip = parts[0].split("/")[0], parts[1]
+        from .project import load_production, scene_files
+        from .takes import work_directory_for
+
+        for path in scene_files(root):
+            text = path.read_text(encoding="utf-8")
+            if re.search(rf"^(scene|cena):\s*['\"]?{re.escape(other_id)}['\"]?\s*$", text, re.M):
+                media = work_directory_for(path) / f"{clip}.mp4"
+                if media.is_file():
+                    plan.notes.append(f"{shot['id']} reuses {other_id}'s clip {clip}.")
+                    return {"id": f"REUSE-{other_id}-{clip}".upper(), "media": media.relative_to(root).as_posix()}
+        plan.notes.append(f"{shot['id']} reuses {item.get('ref')}, which is not there.")
+    return None
 
 
 def _resolve_join(root: Path, plan: Plan, cut: dict[str, Any], segment: Segment, joins: dict[str, Any]) -> None:
@@ -614,6 +678,26 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
                     span=within(0.6 + 0.25 * index / total, 0.6 + 0.25 * (index + 1) / total))
         sounds.append((clip, max(0.0, starts[index] - before)))
         speaking.append(bool(segment.speech or segment.speech_spans))
+    # Voices laid in the montage (a narration): each at its time in its shot, brought to speech level.
+    voiced: list[tuple[float, float]] = []
+    for index, segment in enumerate(plan.segments):
+        for number, (at, file) in enumerate(segment.voice_over):
+            path = Path(file)
+            if not path.is_file():
+                plan.notes.append(f"{segment.shot}: the voice {path.name} is not there; it is not heard.")
+                continue
+            when = starts[index] + at - segment.start
+            if when >= duration:
+                continue
+            seconds = probe(path)["duration"]
+            gain = loudness_gain(path, Segment(segment.shot, "", "", 0.0, seconds, speech=(0.0, seconds)))
+            clip = work / f"voice-{index:03d}-{number}.wav"
+            run_process([ffmpeg, "-y", "-loglevel", "error", "-i", str(path), "-af",
+                         f"volume={gain}dB,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo",
+                         "-ar", "48000", "-ac", "2", str(clip)], message=f"{segment.shot}: its voice-over")
+            sounds.append((clip, max(0.0, when)))
+            speaking.append(True)
+            voiced.append((round(when, 3), round(when + seconds, 3)))
     picture = _join_pictures(ffmpeg, plan, pictures, count, overlap, work, fps, width, height, run_process,
                              within(0.85, 0.9))
     captions = [(starts[index] + max(0.0, a - segment.start), starts[index] + min(segment.end, b) - segment.start, text)
@@ -661,7 +745,8 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
         elif segment.speech:
             speech.append((starts[index] + max(0.0, segment.speech[0] - segment.start),
                            starts[index] + min(segment.end, segment.speech[1]) - segment.start))
-    plan.speech = [(round(a, 3), round(b, 3)) for a, b in speech]
+    speech += voiced
+    plan.speech = sorted((round(a, 3), round(b, 3)) for a, b in speech)
     if plan.cues:
         from .sounds import list_sounds, mix
 

@@ -310,9 +310,9 @@ def _lines(raw: dict[str, Any]) -> list[dict[str, Any]]:
                 "delivery": vtext(item, "delivery"),
                 "voice": vtext(item, "voice"),
                 "mix": mix if isinstance(mix, dict) else {},
-                # A line marked for the mix only (`mix: true`) is added in the
-                # montage: nobody says it in the take itself.
-                "in_take": mix is not True,
+                # A line marked for the mix only (`mix: true`), or laid in the montage from its own file
+                # (`mix: {file, at}`, SINGULAR's voice-over), is not said in the take itself.
+                "in_take": not (mix is True or (isinstance(mix, dict) and (mix.get("file") or mix.get("arquivo")))),
             }
         )
     return lines

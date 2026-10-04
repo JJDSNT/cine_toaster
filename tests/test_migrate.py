@@ -59,7 +59,9 @@ BREAKDOWN = """\
         seg: 4
         atuacao: he opens his eyes
         som: a quiet room hum
-        fala: {quem: KAEL, en: "Claire...", pt: "Claire...", emocao: sad}
+        falas:
+          - {quem: KAEL, en: "Claire...", pt: "Claire...", emocao: sad}
+          - {quem: NARRADOR, en: "Long ago.", pt: "Há muito tempo.", montagem: {arquivo: trabalho/vozes/vo-01.wav, em: 1.8}}
         corte: {antes: 0.4, depois: 0.3}
         quadro: a man in a bed
         silenciar: [[0.0, 1.0]]
@@ -193,6 +195,8 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual((first["kind"], first["label"], first["sounds"]), ("black", "Tela preta.", ["breath"]))
         self.assertEqual((second["sound"], second["generated_seconds"]), ("a quiet room hum", 4))
         self.assertEqual(second["lines"][0]["who"], "KAEL")
+        # A voice laid in the montage: its file and its time, natively; not said in the take.
+        self.assertEqual(second["lines"][1]["mix"], {"file": "work/vozes/vo-01.wav", "at": 1.8})
         self.assertEqual(second["picture"], "a man in a bed")  # SINGULAR's `quadro`
         # Takes kept, renamed to the canonical folders; a run's scratch left behind.
         work = scene_dir / "work"

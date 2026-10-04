@@ -117,6 +117,19 @@ class JoinTests(unittest.TestCase):
              "crop=iw:ih/4:0:ih*3/4,format=gray", "-f", "rawvideo", "-"], capture_output=True).stdout)
         self.assertGreater(bright(self.root / "cut-True.mp4"), bright(self.root / "cut-False.mp4") + 60)
 
+    def test_a_narration_is_laid_at_its_time_at_speech_level(self) -> None:
+        voice = self.root / "vo-01.wav"
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i",
+                        "aevalsrc='0.05*sin(2*PI*220*t)':s=48000:d=1", str(voice)], check=True)
+        black = Segment("P1", "SOLID", "", 0.0, 3.0, method="solid:black", normalize=False,
+                        voice_over=[(1.5, str(voice))])
+        plan = Plan(scene="SC-1", segments=[black])
+        out = self.root / "cut.mp4"
+        render(self.root, plan, out, self.root / "work", run)
+        self.assertLess(self.mean(out, 0.2, 1.0), -60)
+        self.assertGreater(self.mean(out, 1.6, 0.8), -35)  # brought up to speech level, at its time
+        self.assertEqual(plan.speech, [(1.5, 2.5)])        # music would duck under it
+
     def test_a_black_shot_is_held_on_screen_for_its_duration(self) -> None:
         black = Segment("P1", "SOLID", "", 0.0, 1.5, method="solid:black", normalize=False)
         take = Segment("P2", "A", self.take("a.mp4", "red", "0"), 1.0, 3.0, normalize=False)

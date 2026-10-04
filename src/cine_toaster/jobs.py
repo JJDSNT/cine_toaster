@@ -816,6 +816,67 @@ def _adopted_assemble(job: dict[str, Any], placed: list[str]) -> None:
 register(JobKind("assemble", _validate_assemble, _run_assemble, _adopted_assemble))
 
 
+def _untimed(root: Path, scene: dict[str, Any], pattern: str) -> list[tuple[str, Path, Path]]:
+    """(shot, take, the sidecar to write) for each speaking shot's takes that have no word timings."""
+
+    from .assembly import _speaks, sidecar_for
+
+    found = []
+    for shot in scene["shots"]:
+        if shot.get("out_of_cut") or not _speaks(shot):
+            continue
+        for take in shot.get("takes") or []:
+            if not take.get("media") or not str(take["media"]).endswith((".mp4", ".mov", ".webm")):
+                continue
+            media = root / take["media"]
+            if media.is_file() and sidecar_for(media, pattern) is None:
+                found.append((shot["id"], media, media.parent / pattern.format(stem=media.stem, name=media.name)))
+    return found
+
+
+def _validate_transcribe(root: Path, params: dict[str, Any]) -> dict[str, Any]:
+    from .project import load_production
+    from .voice import voice_python
+
+    if voice_python() is None:
+        raise ValidationError("Transcribing needs the voice environment (make install-voice)")
+    production = load_production(root)
+    scene_id = str(params.get("scene", "")).strip()
+    scene = next((item for item in production["scenes"] if item["id"] == scene_id), None)
+    if scene is None:
+        raise ValidationError(f"No scene {scene_id!r}")
+    pattern = production.get("words_sidecar") or "{stem}.words.json"
+    if not _untimed(root, scene, pattern):
+        raise ValidationError(f"Every speaking take of {scene_id} already has its word timings")
+    return {"scene": scene_id, "language": str(params.get("language") or "en")}
+
+
+def _run_transcribe(context: JobContext) -> dict[str, Any]:
+    """Word timings for the takes that have none, so trims and subtitles follow the speech (CT-0054)."""
+
+    from .project import load_production
+    from .voice import voice_python
+
+    root = context.project_root
+    production = load_production(root)
+    scene = next(item for item in production["scenes"] if item["id"] == context.params["scene"])
+    pattern = production.get("words_sidecar") or "{stem}.words.json"
+    todo = _untimed(root, scene, pattern)
+    takes = [{"media": str(media), "out": str(context.staging / f"words-{index:03d}.json")}
+             for index, (_, media, _) in enumerate(todo)]
+    spec = context.staging / "spec.json"
+    spec.write_text(json.dumps({"takes": takes, "language": context.params.get("language") or "en"}), encoding="utf-8")
+    context.run_process([str(voice_python()), str(Path(__file__).with_name("words_worker.py")), str(spec)],
+                        expected_seconds=len(takes) * 6.0, message=f"Transcribing {len(takes)} takes")
+    files = [{"staged": f"words-{index:03d}.json", "destination": sidecar.relative_to(root).as_posix()}
+             for index, (_, _, sidecar) in enumerate(todo)]
+    return {"files": files, "summary": {"scene": scene["id"], "transcribed": [
+        {"shot": shot, "take": media.name} for shot, media, _ in todo]}}
+
+
+register(JobKind("transcribe", _validate_transcribe, _run_transcribe))
+
+
 def _block_context(root: Path, scene_id: str, block_id: str):
     from .blocks import scene_blocks
     from .project import load_scene
