@@ -354,6 +354,124 @@ cost ledgers.
 The Finance console must always show currency, period, source/status and data
 freshness for financial values.
 
+## Compute economics and adaptive capacity
+
+FinOps must optimise **total compute economics**, not minimise idle time in
+isolation. An aggressively small worker pool or idle timeout can cost more
+through repeated cold starts, model loading, transfers, retries and production
+delay.
+
+A useful decision model considers:
+
+```text
+total economic cost =
+    execution compute
+  + warm idle
+  + cold start / provisioning
+  + model and asset loading / transfer
+  + retries / failures
+  + production delay
+```
+
+The last term may not appear on a provider invoice, but it matters to production
+economics and should be reported separately rather than silently converted into
+a fictitious provider charge.
+
+### Capacity Optimizer
+
+Introduce a deterministic **Capacity Optimizer** below the agent layer. It
+executes auditable scaling policy; it is not itself an LLM agent.
+
+It should eventually use observed provider/workload telemetry such as cold-start
+latency, model-load time, job duration, arrival rate, warm-idle rate, failure
+rate and known queued/planned work.
+
+The FinOps Agent can recommend or select an authorised policy. The Capacity
+Optimizer applies it.
+
+```text
+Production plan / job queue
+            |
+            v
+       FinOps Agent
+  economic analysis/policy
+            |
+            v
+     Capacity Optimizer
+   deterministic control
+            |
+            v
+     Runpod / providers
+            |
+      telemetry + billing
+            |
+            v
+ reconciliation / learning
+            +-----------------> FinOps Agent
+```
+
+### Economic idle timeout
+
+Idle timeout should be based on break-even economics where sufficient data
+exists, not a fixed assumption that idle is waste.
+
+The system should estimate whether the expected cost of keeping capacity warm
+for a period is lower than the expected cost and delay of terminating it and
+later paying for another cold start.
+
+Profiles should be learned separately where economics differ by provider,
+resource/GPU, model/workflow and capability.
+
+### Production-aware pre-warming
+
+Cine Toaster has information an infrastructure autoscaler may not have: future
+work already implied by the production state. An approved sequence containing
+many shots can justify pre-warming capacity before all jobs have entered the
+provider queue.
+
+Likewise, as a batch approaches completion the optimizer can drain burst
+workers gradually rather than collapsing the whole pool and immediately paying
+another cold start.
+
+A possible pattern is:
+
+```text
+known batch -> pre-warm -> baseline + burst workers
+                         -> drain burst capacity
+                         -> retain economical warm baseline
+                         -> cooldown/shutdown
+```
+
+### Policy modes
+
+High-level modes may provide understandable intent while adaptive logic chooses
+actual parameters:
+
+- **Economy** -- favour lower infrastructure spend and tolerate more startup
+  latency;
+- **Balanced** -- optimise observed total cost against production delay;
+- **Production** -- favour continuity of an active production session and use
+  pre-warming/burst capacity more readily.
+
+Modes must not hide the resulting budget implications.
+
+### Compute-efficiency analytics
+
+The Finance Console should expose, where measurable:
+
+- useful execution compute;
+- useful versus excess warm idle;
+- cold-start count, latency and estimated/provider cost;
+- model/asset loading time;
+- retries/failures;
+- production wait attributable to capacity;
+- baseline and burst worker utilisation;
+- current versus simulated/recommended policy cost;
+- estimated savings and assumptions.
+
+This permits the system to detect a policy that appears cheap by idle-time
+metrics while being more expensive end to end.
+
 ## Agents and FinOps
 
 **Producer / Production Manager** uses FinOps to understand production budget,
@@ -365,9 +483,24 @@ track development infrastructure spend and identify cost regressions.
 **Meta-agent / Workforce Architect** may use cost as one signal when evaluating
 workforce structure, but must not optimise agents solely for cheapness.
 
-A future **FinOps specialist agent** should be created only if cost governance
-becomes complex enough to justify a durable role. Until then this is a
-capability shared by Producer, Studio Engineering and workforce analytics.
+**FinOps Agent** is a proposed durable workforce role. It owns economic
+analysis and governance across provider reconciliation, budgets, forecasts,
+cost allocation, anomaly detection, provider/model/workflow comparisons and
+compute-capacity economics.
+
+It should answer questions such as whether a lower idle timeout actually saves
+money after cold starts and production delay, or which provider/workflow has
+the best cost per approved output rather than merely the cheapest attempt.
+
+The FinOps Agent may recommend capacity policy and authorised budget actions,
+but it should **not micromanage workers directly**. Deterministic worker
+scaling, warm pools, cooldown and pre-warming belong to the Capacity Optimizer.
+
+**Producer / Production Manager** remains responsible for production
+priorities/budget trade-offs; **Studio Engineering Agent** for technical
+architecture and operations; **FinOps Agent** for economic efficiency; and
+**Meta-agent / Workforce Architect** for whether the digital workforce itself
+has the right structure.
 
 ## Security and permissions
 
@@ -405,7 +538,9 @@ provider integration is stale or partial.
 6. Expose cost status/source and unattributed spend through API/CLI.
 7. Add the dedicated FinOps / Finance Console and Digital Workforce cost lens.
 8. Add estimates/budgets only after actual billing reconciliation is reliable.
-9. Add future providers behind the same cost adapter boundary.
+9. Instrument cold starts, warm idle, model loading and production wait; add the deterministic Capacity Optimizer.
+10. Activate the FinOps Agent on top of reconciled cost and compute-economics telemetry.
+11. Add future providers behind the same cost adapter boundary.
 
 ## Definition of done for a provider FinOps integration
 
@@ -435,4 +570,6 @@ GPU-rate x runtime. It is complete when it can:
   or exported FinOps records?
 - How should shared GPU/Pod idle time be allocated, if at all?
 - Which costs belong to a film production versus Studio Engineering?
-- When does cost governance justify a dedicated FinOps agent?
+- Which decisions may the FinOps Agent apply automatically versus only recommend?
+- How should production-delay cost be represented without pretending it is a provider charge?
+- What confidence/sample threshold is required before adaptive capacity changes a policy?
