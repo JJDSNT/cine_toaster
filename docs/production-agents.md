@@ -120,10 +120,10 @@ A useful Producer answer should eventually resemble:
 > for continuity and 1 awaiting VFX. These are the blockers and the next
 > decisions required.
 
-## Meta-agent / Production Coordinator
+## Production Coordinator
 
-A **meta-agent is a possible orchestration layer**, not a super-director and
-not a new source of truth.
+The **Production Coordinator** is the production-level orchestrator. It is not
+the meta-agent, not a super-director and not a new source of truth.
 
 Its purpose is to understand a production request, identify which specialist
 roles and capabilities are relevant, gather their findings, expose conflicts,
@@ -156,7 +156,7 @@ Human: "Prepare the Boreal arrival sequence for generation."
                      review decision
 ```
 
-The meta-agent may:
+The Production Coordinator may:
 
 - decompose a high-level production goal into role-specific questions/tasks;
 - ask only the specialists needed for the current decision;
@@ -167,7 +167,7 @@ The meta-agent may:
 - resume workflows from durable project/job state;
 - report what requires human approval next.
 
-The meta-agent should **not**:
+The Production Coordinator should **not**:
 
 - become the owner of project state;
 - bypass human gates;
@@ -203,6 +203,160 @@ review:
 The exact schema is illustrative. It should not be added to Project Core until
 a real production workflow requires it.
 
+## Meta-agent / Workforce Architect
+
+The **Meta-agent** operates one level above production orchestration. Its
+subject is the **digital workforce itself**.
+
+Its defining capability is that it may **design and create agents** when the
+current workforce lacks a reusable competence. It may also propose changes to,
+specialisation/merging of, evaluation of, or retirement of existing agents.
+
+This is not equivalent to granting arbitrary authority. Creating an agent and
+granting it powers are separate operations. New access to project writes,
+external systems, spending, publication, deployment or other consequential
+capabilities must follow explicit permission and human-gate policy.
+
+The Meta-agent should use workforce evidence rather than agent proliferation.
+For example, repeated lighting-continuity failures might justify proposing a
+specialist only after showing that the competence cannot be handled cleanly by
+an existing role.
+
+A lifecycle may be:
+
+```text
+need observed -> agent proposed -> human review where required
+      -> created -> evaluating -> active
+      -> improve / specialise / merge / retire
+```
+
+An agent definition should be inspectable and versioned: role, mission,
+responsibilities, non-responsibilities, required context, capabilities/tools,
+permissions, model/provider policy, budgets, human gates and evaluation
+criteria.
+
+The Meta-agent must not silently expand its own authority, erase evaluation
+history, or turn every transient task into a permanent agent.
+
+## Cine Toaster Studio Engineering Agent
+
+The **Studio Engineering Agent** owns the evolution and operational health of
+Cine Toaster itself. Technology scouting is one responsibility, not its whole
+identity.
+
+Its domain spans:
+
+- SDLC: requirements, issues/specifications, implementation coordination,
+  review, testing and release;
+- DevOps: CI/CD, environments, dependencies, deployment/infrastructure and
+  operational failures;
+- architecture and technical debt;
+- capability gaps discovered by real productions such as Singular;
+- technology radar: models, ComfyUI workflows/nodes, Blender, FFmpeg, Ardour,
+  compositing/VFX, generative techniques and relevant standards;
+- licences, hardware requirements, provider cost and deprecation risk;
+- regression and integration health.
+
+External novelty is valuable only after mapping it to Cine Toaster's stable
+capability model. A useful finding is not merely "a new model exists", but
+whether it fills, improves, duplicates or obsoletes a capability, what adapter
+boundary it belongs behind, and what evidence is needed before adoption.
+
+A typical loop is:
+
+```text
+production need / external change
+            |
+            v
+ research -> impact/capability analysis -> issue/spec
+            |
+            v
+ implement -> test -> review -> integrate -> release -> monitor
+```
+
+The Studio Engineering Agent may coordinate coding agents and specialised
+engineering agents, but consequential repository/release/deployment permissions
+remain governed by workforce policy.
+
+## Digital Workforce Console
+
+The UI should eventually include a **Digital Workforce** area: not merely an
+agent settings screen, but the operational and "HR" view of the entire digital
+workforce across film production and studio engineering.
+
+It should make the workforce inspectable at three levels:
+
+**People/roles:** active, idle, evaluating, proposed and retired agents; role,
+skills/capabilities, model/provider, permissions, toolbelt, version and owner.
+
+**Work:** current tasks, queues, dependencies, decisions, conflicts, human
+gates, failures and recent activity.
+
+**Analytics:** cost, tokens, GPU/runtime consumption, latency, utilisation,
+task completion, approval/rejection, human intervention, retries/rework,
+quality/evaluation scores and savings/avoided work where those can be measured
+honestly.
+
+Useful views include:
+
+- workforce roster and lifecycle;
+- per-agent detail and history;
+- skill/capability matrix and gaps;
+- cost by agent, production, sequence, scene, shot and engineering activity;
+- task/dependency activity;
+- agent-to-agent handoffs and conflicts;
+- evaluation/quality trends;
+- proposed hires, role changes, merges and retirements from the Meta-agent;
+- Studio Engineering technology/capability radar.
+
+Analytics must distinguish measured values from estimates. "Quality" must never
+be a decorative universal percentage: each role needs explicit evaluation
+criteria, and artistic judgment may remain human rather than reducible to a
+score.
+
+The Console is a view/control surface over runtime/workforce records; it must
+not become a second authoritative project database.
+
+## Workforce architecture
+
+```text
+                              HUMAN
+                                |
+                         human gates/policy
+                                |
+                         META-AGENT
+                      Workforce Architect
+                   create / evaluate / evolve
+                                |
+              +-----------------+------------------+
+              |                                    |
+       FILM PRODUCTION                      STUDIO ENGINEERING
+              |                                    |
+ Production Coordinator                 Studio Engineering Agent
+              |                                    |
+ Director / DoP / Editor                SDLC / DevOps / Radar
+ Continuity / Design                    coding/testing/release agents
+ Sound / VFX / Finishing
+ Producer
+              |                                    |
+              +-----------------+------------------+
+                                |
+                    DIGITAL WORKFORCE CONSOLE
+                  roster / work / quality / cost
+                                |
+                    Application API / Runtime
+                                |
+                      capability adapters
+                                |
+ Blender | ComfyUI/LTX | FFmpeg | Ardour | GitHub/CI | future systems
+```
+
+Production Coordinator answers **who needs to work on this production goal**.
+The Meta-agent answers **whether the workforce itself has the right agents,
+skills, permissions and structure**. The Studio Engineering Agent answers
+**how Cine Toaster itself should be researched, built, tested, operated and
+evolved**.
+
 ## Relationship to tools
 
 ```text
@@ -230,17 +384,30 @@ This is not a commitment to implement all roles immediately.
    that downstream roles can consume.
 3. **Producer / Production Manager** -- makes a feature-length production
    operationally observable.
-4. **Production Coordinator (meta-agent)** -- initially thin: route work,
+4. **Production Coordinator** -- initially thin: route work,
    collect findings, expose conflicts and human gates.
 5. **DoP and Editor** -- deepen planning and feedback/retake loops.
 6. **Production Design, Sound, VFX and Finishing** -- grow as their underlying
    artifact/capability adapters mature.
+7. **Digital Workforce Console** -- expose roster, work, gates, evaluation and
+   cost from real runtime telemetry.
+8. **Studio Engineering Agent** -- connect capability discovery to the actual
+   SDLC/DevOps loop.
+9. **Meta-agent / Workforce Architect** -- enable evidence-based creation and
+   evolution of agents only after agent definitions, permissions, telemetry and
+   evaluation are inspectable.
 
 The implementation order should continue to follow Cine Toaster's existing
 rule: **Singular exposes the production wall; Cine Toaster takes ownership of
 the reusable mechanism needed to cross it.**
 
-## Definition of done for a production agent
+## Definition of done for a workforce agent
+
+The following baseline applies to production and engineering agents. Additional
+criteria apply to agents with workforce-management or repository/deployment
+authority.
+
+
 
 A role should not be considered integrated merely because an LLM prompt with
 that role name exists. It is integrated when it can:
@@ -263,5 +430,10 @@ that role name exists. It is integrated when it can:
 - Which decisions require Director approval versus a general human gate?
 - Should agent conflicts be persisted as review objects?
 - Which roles need long-lived sessions and which should be stateless calls?
-- How should cost/time budgets influence the Producer and meta-agent?
+- How should cost/time budgets influence the Producer and Production Coordinator?
 - At what point should the coordinator schedule parallel work automatically?
+- What is the canonical, versioned agent-definition format?
+- Which permissions can the Meta-agent grant automatically, and which always require a human gate?
+- Which evaluation metrics are meaningful for each role rather than vanity metrics?
+- How should workforce telemetry and cost history be persisted without competing with project state?
+- When does a recurring capability gap justify creating an agent instead of extending an existing one?
