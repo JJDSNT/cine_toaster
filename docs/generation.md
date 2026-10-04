@@ -68,6 +68,33 @@ toast budget                                         # spent so far, and the las
   then how it sounds in this scene (`voice_state`). Setting, light and
   voices are held across the cuts.
 
+## Negative guidance / what must not happen
+
+**Pending capability:** generation planning should support an explicit,
+separately inspectable description of what a generation must **avoid**.
+
+This is intentionally defined as a production-level concept rather than a
+ComfyUI-specific `negative_prompt` field. Different models/providers may
+support native negative conditioning, encode exclusions in the main prompt, or
+require workflow-specific controls. The provider adapter should translate the
+production intent into the best mechanism it supports.
+
+Possible examples include unwanted objects or people, identity/wardrobe
+changes, camera behavior that must not occur, visual artifacts, forbidden
+styles, text/logos, continuity violations, or actions that contradict the shot.
+
+The negative guidance should:
+
+- remain separate from positive/directing instructions in project state and UI;
+- be visible in dry-run / **What would be sent…** views;
+- be preserved in job and provenance records;
+- distinguish production intent from the provider-specific representation;
+- degrade honestly when a provider has no native negative-conditioning
+  mechanism rather than pretending that support exists.
+
+Whether ComfyUI exposes this through a negative prompt, conditioning nodes or a
+model-specific workflow is an adapter concern and requires investigation.
+
 ## Money
 
 - Nothing is generated while no budget is set.
