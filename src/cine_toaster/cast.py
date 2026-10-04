@@ -257,10 +257,20 @@ def check_cast(scenes: list[dict[str, Any]], cast: dict[str, Member]) -> dict[st
             member = names.get(cast_key(name))
             if member is None or member.voice is None or not member.voice.describe():
                 continue
-            out.append(_finding("voice_identity_restated", "advice", scene_id,
-                f"This scene describes {member.label}'s voice itself (\"{str(text)[:80]}\"). The sheet owns the "
-                f"voice's identity (\"{member.voice.describe()}\"); keep only how it sounds now in voice_state."))
+            if _plain(text) == _plain(member.voice.describe()) or _plain(text) == _plain(member.voice.identity):
+                out.append(_finding("voice_identity_restated", "advice", scene_id,
+                    f"This scene repeats {member.label}'s voice as the sheet has it. The sheet owns the voice's "
+                    f"identity; the scene can drop it, and keep only how it sounds now in voice_state."))
+            else:
+                # The scene's description wins in the prompt (CT-0055): it is another voice, not a state (CT-0062).
+                out.append(_finding("voice_identity_conflict", "error", scene_id,
+                    f"This scene gives {member.label} another voice (\"{str(text)[:90]}\") than the sheet's "
+                    f"(\"{member.voice.describe()[:90]}\"). One person has one voice: keep the identity on the sheet "
+                    f"and put how it sounds here -- tired, hoarse, a whisper -- in voice_state."))
+        out.extend(_unanchored_voices(scene, cast, names))
     for scene_id, found in _identity_splits(scenes, cast, names).items():
+        findings[scene_id].extend(found)
+    for scene_id, found in _voice_splits(scenes, names).items():
         findings[scene_id].extend(found)
     for key, seen in labels.items():
         # Drift is one person named differently from scene to scene. A pose or a mark in the plan's label
@@ -276,6 +286,73 @@ def check_cast(scenes: list[dict[str, Any]], cast: dict[str, Member]) -> dict[st
                 findings[scene_id].append(_finding("cast_label_drift", "advice", scene_id,
                     f"{cast[key].label} is labelled differently across scenes: {where}."))
     return findings
+
+
+def _plain(text: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).strip()
+
+
+def _spoken(scene: dict[str, Any], names: dict[str, Member]) -> dict[str, list[tuple[str, dict[str, Any]]]]:
+    """Each cast member's lines in the scene's cut, with the shot that holds them."""
+
+    out: dict[str, list[tuple[str, dict[str, Any]]]] = {}
+    for shot in scene["shots"]:
+        if shot.get("out_of_cut"):
+            continue
+        for line in shot.get("lines") or []:
+            key = cast_key(line.get("who"))
+            if key in names:
+                out.setdefault(names[key].id, []).append((shot["id"], {**line, "_source": shot.get("source")}))
+    return out
+
+
+def _unanchored_voices(scene: dict[str, Any], cast: dict[str, Member], names: dict[str, Member]) -> list[Finding]:
+    """Generated speech with nothing to hold the voice: no recording on the sheet, no named voice (CT-0062).
+
+    A video model invents a voice in every generation; a description narrows it,
+    it does not fix it. A recording lets the cut convert every line to the same
+    voice (`toast revoice`); a provider's named voice is the same in every call.
+    Without either, each clip is another person speaking.
+    """
+
+    out = []
+    for member_id, lines in sorted(_spoken(scene, names).items()):
+        member = cast[member_id]
+        if "voice" not in member.authoritative_for or (member.voice and member.voice.references):
+            continue
+        loose = sorted({shot for shot, line in lines if not line.get("voice") and (
+            line["_source"] == "generated" or (line.get("mix") or {}).get("file"))})
+        if loose:
+            out.append(_finding("cast_voice_reference_missing", "error", scene["id"],
+                f"{member.label} speaks {len(loose)} shot(s) here in a generated voice, and the sheet has no "
+                f"recording of it: every generation invents the voice again, and nothing can bring the lines back "
+                f"to one. Give the sheet a recording (voice.references), so the cut can convert them "
+                f"(toast revoice).", tuple(loose)))
+    return out
+
+
+def _voice_splits(scenes: list[dict[str, Any]], names: dict[str, Member]) -> dict[str, list[Finding]]:
+    """One character, more than one named provider voice (CT-0062): the voice's version of two faces."""
+
+    used: dict[str, dict[str, list[str]]] = {}
+    for scene in scenes:
+        for member_id, lines in _spoken(scene, names).items():
+            for _, line in lines:
+                if line.get("voice"):
+                    used.setdefault(member_id, {}).setdefault(str(line["voice"]), [])
+                    if scene["id"] not in used[member_id][str(line["voice"])]:
+                        used[member_id][str(line["voice"])].append(scene["id"])
+    out: dict[str, list[Finding]] = {}
+    for member_id, voices in used.items():
+        if len(voices) < 2:
+            continue
+        member = next(item for item in names.values() if item.id == member_id)
+        where = "; ".join(f"{voice} in {', '.join(scene_ids)}" for voice, scene_ids in voices.items())
+        for scene_id in sorted({scene_id for scene_ids in voices.values() for scene_id in scene_ids}):
+            out.setdefault(scene_id, []).append(_finding("cast_voice_split", "error", scene_id,
+                f"{member.label} speaks in {len(voices)} voices ({where}). One person has one voice: choose it "
+                f"on the sheet and use it everywhere."))
+    return out
 
 
 def _same_picture(first: Reference, second: Reference) -> bool:

@@ -10,4 +10,7 @@ voice:
   identity: a low, dry female voice in her forties, unhurried
   accent: soft Scottish
   language: en-GB
+  # The recording every generated line of hers is converted to (CT-0062). A fixture: synthesized offline
+  # with Piper's en_US-ljspeech-medium (LJSpeech, public domain), so its accent is not her Scottish one.
+  references: [reference/voice.wav]
 continuity: The headphones stay on her neck from SC-030 on.

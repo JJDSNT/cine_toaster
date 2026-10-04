@@ -125,10 +125,35 @@ class CheckTests(unittest.TestCase):
         })
         self.assertNotIn("cast_label_drift", codes(loaded["scenes"][0]))
 
-    def test_a_scene_that_restates_the_voice_is_advised(self) -> None:
+    def test_a_scene_that_gives_another_voice_is_an_error(self) -> None:
         scene = SCENE.format(id="S1", who="KAEL", label="Kael") + "vozes: {KAEL: a weak hoarse voice}\n"
         loaded = production({"kael": KAEL}, {"010": scene}, "scene_fields:\n  vozes: {maps_to: voices}\n")
+        found = [item for item in loaded["scenes"][0]["findings"] if item["code"] == "voice_identity_conflict"]
+        self.assertEqual([item["severity"] for item in found], ["error"])
+
+    def test_a_scene_that_only_repeats_the_voice_is_advised(self) -> None:
+        scene = (SCENE.format(id="S1", who="KAEL", label="Kael")
+                 + "vozes: {KAEL: 'a low controlled male voice, slight European accent'}\n")
+        loaded = production({"kael": KAEL}, {"010": scene}, "scene_fields:\n  vozes: {maps_to: voices}\n")
         self.assertIn("voice_identity_restated", codes(loaded["scenes"][0]))
+        self.assertNotIn("voice_identity_conflict", codes(loaded["scenes"][0]))
+
+    def test_generated_speech_without_a_recording_has_no_voice_to_hold(self) -> None:
+        scene = SCENE.format(id="S1", who="KAEL", label="Kael") + "    lines: [{who: KAEL, text: Claire}]\n"
+        found = [item for item in production({"kael": KAEL}, {"010": scene})["scenes"][0]["findings"]
+                 if item["code"] == "cast_voice_reference_missing"]
+        self.assertEqual((found[0]["severity"], found[0]["shots"]), ("error", ["P1"]))
+        recorded = KAEL.replace("accent: slight European}", "accent: slight European, references: [kael.wav]}")
+        self.assertNotIn("cast_voice_reference_missing",
+                         codes(production({"kael": recorded}, {"010": scene})["scenes"][0]))
+
+    def test_one_person_in_two_named_voices_is_an_error(self) -> None:
+        first = SCENE.format(id="S1", who="KAEL", label="Kael") + "    lines: [{who: KAEL, text: a, voice: Deep_Man}]\n"
+        second = SCENE.format(id="S2", who="KAEL", label="Kael") + "    lines: [{who: KAEL, text: b, voice: Calm_Man}]\n"
+        loaded = production({"kael": KAEL}, {"010": first, "020": second})
+        for scene in loaded["scenes"]:
+            self.assertIn("cast_voice_split", codes(scene))
+            self.assertNotIn("cast_voice_reference_missing", codes(scene))  # a named voice holds it
 
     def test_a_character_answers_to_all_their_names(self) -> None:
         sheet = KAEL.replace("id: KAEL", "id: KAEL\nnames: [KAEL VANCE]")

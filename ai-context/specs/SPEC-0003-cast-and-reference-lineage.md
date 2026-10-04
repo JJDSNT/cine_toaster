@@ -230,3 +230,18 @@ every scene showing that variant reports `cast_identity_split` (error).
 SINGULAR showed why this check is needed. Its Kael has three master faces
 (`kael`, `kael_genebra`, `kael_boreal`) and its Claire has two. These are
 issues, not variations.
+
+# Amendment: one voice per person, held by a recording (2026-10-04, CT-0062)
+
+A description narrows a generated voice; it does not fix it. A video model
+invents the voice again in every generation. Three errors:
+
+- `cast_voice_reference_missing`: a character's lines are generated (in a
+  generated take, or mixed from a file) with no recording on the sheet
+  (`voice.references`) and no named provider voice on the line, so nothing can
+  bring them back to one voice (`toast revoice`).
+- `voice_identity_conflict`: a scene's `voices:` gives a character another
+  voice than the sheet's. The scene's text wins in the prompt (CT-0055), so it
+  is another voice, not a state; the state belongs in `voice_state`. A scene
+  that only repeats the sheet stays `voice_identity_restated` (advice).
+- `cast_voice_split`: one character's lines name more than one provider voice.

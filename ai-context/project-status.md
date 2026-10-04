@@ -32,12 +32,14 @@ Generation parity (CT-0055, a reference only), negative guidance (CT-0056),
 the Producer status (CT-0057, `toast status`) and FinOps steps 2-3 (CT-0058)
 are done, and so is the minimal continuity ledger (CT-0059, `toast
 continuity`), meant for the remake of the sequence in Cine Toaster; one
-face per person is now an error (CT-0060). FinOps steps 4-5 are done
+face per person is now an error (CT-0060), and so is one voice per person
+(CT-0062): SINGULAR's characters speak in generated voices with no recording
+to hold them. FinOps steps 4-5 are done
 (CT-0061, `toast finops`): of US$ 36.44 billed in 30 days, US$ 9.79 is
 allocated to SINGULAR's job records. The effective LTX rate is US$ 1.92/h
 against US$ 1.75/h assumed, so estimates run about 10% low. Next recommended
-action: stems for Ardour. Waiting for the user: Kael's
-voice re-check, the 4K/finishing spike's cost, what feeds the 5.1, and
+action: stems for Ardour. Waiting for the user: the
+4K/finishing spike's cost, what feeds the 5.1, and
 switching the working folder to ~/films/singular.
 
 Earlier: the first canonical production write is delivered. Cine Toaster is
