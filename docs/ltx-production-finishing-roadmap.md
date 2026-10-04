@@ -138,6 +138,36 @@ Investigation:
 - [ ] test interoperability with FFmpeg, Blender and future compositing/color tools
 - [ ] keep SDR source and HDR derivative separately reviewable
 
+### [ ] Restore
+
+**Production operation:** restore degraded or archival footage as a clean,
+colour, higher-resolution derivative while retaining the source unchanged.
+
+Candidate implementation:
+
+- LTX-2.5 22B IC-LoRA Restore
+- ComfyUI-LTXVideo tiled V2V workflow
+- optional Refine Details second pass for the full restoration ladder
+
+Expected use: degraded/archive source -> Restore -> review -> optional Refine
+Details -> delivery-resolution finishing. This is a restoration operation, not a
+general enhancer: upstream explicitly treats already-clean footage as out of
+scope. Colour inferred from monochrome material is generative and must be
+represented as such in provenance/review.
+
+Reference:
+https://huggingface.co/Lightricks/LTX-2.5-22b-IC-LoRA-Restore
+
+Investigation:
+- [ ] reproduce the recommended tiled ComfyUI restoration workflow
+- [ ] test film scans, tape/broadcast damage, low-bitrate material, flicker, dirt and scratches
+- [ ] test long-clip window chaining and colour consistency
+- [ ] document required preprocessing, including deinterlacing where applicable
+- [ ] measure restoration drift in faces, text, logos, geometry and historically relevant details
+- [ ] test optional reference-image guidance for details/colours not recoverable from the source
+- [ ] validate the recommended Restore -> Refine Details -> 4K ladder
+- [ ] retain source, prompt/reference material, model/workflow version and output provenance
+
 ## Possible finishing flow
 
 ```text
@@ -210,6 +240,8 @@ A capability moves out of this pending list only when Cine Toaster can:
   https://huggingface.co/Lightricks/LTX-2.5-22b-IC-LoRA-Alpha-Gen
 - Lightricks LTX-2.5 Refine-Details:
   https://huggingface.co/Lightricks/LTX-2.5-22b-IC-LoRA-Refine-Details
+- Lightricks LTX-2.5 Restore:
+  https://huggingface.co/Lightricks/LTX-2.5-22b-IC-LoRA-Restore
 - ComfyUI-LTXVideo SDR-to-HDR workflow:
   https://github.com/Lightricks/ComfyUI-LTXVideo/blob/master/example_workflows/2.5/HDR_workflows/LTX-2.5_ICLoRA_SDR_to_HDR_Distilled.json
 - ComfyUI-LTXVideo Native 4K/8K TiledFusion workflow:
