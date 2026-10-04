@@ -91,7 +91,8 @@ class Member:
             "authoritative_for": self.authoritative_for,
             "references": [ref.public_dict() for ref in self.references],
             "variants": {name: {"description": value["description"],
-                                "references": [ref.public_dict() for ref in value["references"]]}
+                                "references": [ref.public_dict() for ref in value["references"]],
+                                "face_changes": value.get("face_changes", "")}
                          for name, value in self.variants.items()},
             "voice": self.voice.public_dict() if self.voice else None,
             "directory": self.directory, "problems": self.problems, "names": self.names,
@@ -148,6 +149,8 @@ def load_cast(root: Path, manifest: dict[str, Any]) -> dict[str, Member]:
             variants[str(name)] = {
                 "description": str(value.get("description") or ""),
                 "references": _references(value.get("references"), base, root, problems, f"variant {name}"),
+                # Why this variant's face is not the character's master face (age, years in stasis): CT-0060.
+                "face_changes": str(value.get("face_changes") or "").strip(),
             }
         voice_raw = raw.get("voice")
         voice = None
@@ -257,6 +260,8 @@ def check_cast(scenes: list[dict[str, Any]], cast: dict[str, Member]) -> dict[st
             out.append(_finding("voice_identity_restated", "advice", scene_id,
                 f"This scene describes {member.label}'s voice itself (\"{str(text)[:80]}\"). The sheet owns the "
                 f"voice's identity (\"{member.voice.describe()}\"); keep only how it sounds now in voice_state."))
+    for scene_id, found in _identity_splits(scenes, cast, names).items():
+        findings[scene_id].extend(found)
     for key, seen in labels.items():
         # Drift is one person named differently from scene to scene. A pose or a mark in the plan's label
         # ("Kael (sentado)", "Líra L1") is not a name, and several people of a group in one scene are not drift.
@@ -271,6 +276,53 @@ def check_cast(scenes: list[dict[str, Any]], cast: dict[str, Member]) -> dict[st
                 findings[scene_id].append(_finding("cast_label_drift", "advice", scene_id,
                     f"{cast[key].label} is labelled differently across scenes: {where}."))
     return findings
+
+
+def _same_picture(first: Reference, second: Reference) -> bool:
+    if first.digest and second.digest:
+        return first.digest == second.digest
+    return first.path == second.path
+
+
+def _identity_splits(scenes: list[dict[str, Any]], cast: dict[str, Member],
+                     names: dict[str, Member]) -> dict[str, list[Finding]]:
+    """One character, more than one face: a variant changes how someone looks, not who they are (CT-0060).
+
+    The character's face is the sheet's own master, or else its first variant's.
+    A variant whose master face is another picture must say why (`face_changes`);
+    until it does, every scene that shows it is told.
+    """
+
+    out: dict[str, list[Finding]] = {}
+    for member in cast.values():
+        if "face" not in member.authoritative_for:
+            continue
+        own = member.master("face")
+        masters = {name: next((ref for ref in value["references"] if ref.kind == "face" and ref.role == "master"),
+                              None) for name, value in member.variants.items()}
+        primary_name, primary = ("", own) if own is not None else next(
+            ((name, ref) for name, ref in masters.items() if ref is not None), ("", None))
+        if primary is None:
+            continue
+        others = {name: ref for name, ref in masters.items()
+                  if ref is not None and not _same_picture(ref, primary)}
+        faces = 1 + len({ref.digest or ref.path for ref in others.values()})
+        for scene in scenes:
+            for name, variant in (scene.get("cast") or {}).items():
+                key = cast_key(name)
+                if key not in names or names[key].id != member.id or str(variant) not in others:
+                    continue
+                if member.variants[str(variant)].get("face_changes"):
+                    continue
+                reference = others[str(variant)]
+                against = f"{primary_name} ({primary.path})" if primary_name else f"the sheet's master ({primary.path})"
+                out.setdefault(scene["id"], []).append(_finding(
+                    "cast_identity_split", "error", scene["id"],
+                    f"{member.label} has {faces} master faces. Here the variant {variant} uses {reference.path}, "
+                    f"another face than {against}. A variant changes how someone looks -- wardrobe, hair, an "
+                    f"injury -- not who they are: make its picture from the master face, or say why the face "
+                    f"changes (face_changes: <reason> on the variant)."))
+    return out
 
 
 def voice_for(member: Member | None, state: str = "") -> str:

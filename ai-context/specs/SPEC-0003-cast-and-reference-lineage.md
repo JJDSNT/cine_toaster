@@ -219,3 +219,14 @@ All of these arrive with the generation adapter.
 - Per-scene overrides of a sheet, such as a costume that changes in one act.
   The need is real and the model is not yet clear; specifying it now would
   describe an imagined production.
+
+# Amendment: one face per person unless the sheet says why (2026-10-04, CT-0060)
+
+A variant changes how someone looks (wardrobe, hair, an injury, the state they
+are in), not who they are. When a variant's master face is a different picture
+from the character's own master (or, without one, the first variant's), the
+variant must give the reason: `face_changes: years in stasis`. Until it does,
+every scene showing that variant reports `cast_identity_split` (error).
+SINGULAR showed why this check is needed. Its Kael has three master faces
+(`kael`, `kael_genebra`, `kael_boreal`) and its Claire has two. These are
+issues, not variations.

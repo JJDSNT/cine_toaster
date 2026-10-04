@@ -23,6 +23,7 @@ CHECK_CODES = frozenset(
         "cast_variant_unknown",
         "cast_reference_missing",
         "cast_label_drift",
+        "cast_identity_split",
         "voice_identity_restated",
         "block_not_contiguous",
         "continuation_unchained",

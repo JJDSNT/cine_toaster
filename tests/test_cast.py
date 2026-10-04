@@ -89,6 +89,26 @@ class CheckTests(unittest.TestCase):
         loaded = production({"kael": KAEL}, {"010": scene})
         self.assertIn("cast_variant_unknown", codes(loaded["scenes"][0]))
 
+    def test_a_variant_with_another_face_is_another_person_until_it_says_why(self) -> None:
+        scene = SCENE.format(id="S1", who="KAEL", label="Kael") + "cast: {KAEL: boreal}\n"
+        loaded = production({"kael": KAEL}, {"010": scene})
+        found = [item for item in loaded["scenes"][0]["findings"] if item["code"] == "cast_identity_split"]
+        self.assertEqual(len(found), 1)
+        self.assertIn("2 master faces", found[0]["message"])
+        self.assertIn("face_changes", found[0]["message"])
+
+    def test_a_declared_reason_accepts_the_new_face(self) -> None:
+        sheet = KAEL.replace("description: after the stasis,", "description: after the stasis, face_changes: years in stasis,")
+        scene = SCENE.format(id="S1", who="KAEL", label="Kael") + "cast: {KAEL: boreal}\n"
+        loaded = production({"kael": sheet}, {"010": scene})
+        self.assertNotIn("cast_identity_split", codes(loaded["scenes"][0]))
+        self.assertEqual(loaded["cast"]["KAEL"]["variants"]["boreal"]["face_changes"], "years in stasis")
+
+    def test_a_variant_on_the_same_master_face_is_the_same_person(self) -> None:
+        sheet = KAEL.replace("boreal.png", "face.png")
+        scene = SCENE.format(id="S1", who="KAEL", label="Kael") + "cast: {KAEL: boreal}\n"
+        self.assertNotIn("cast_identity_split", codes(production({"kael": sheet}, {"010": scene})["scenes"][0]))
+
     def test_the_same_person_labelled_differently_is_noticed(self) -> None:
         loaded = production({"kael": KAEL}, {
             "010": SCENE.format(id="S1", who="KAEL", label="Kael"),
