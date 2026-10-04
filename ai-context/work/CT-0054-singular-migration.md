@@ -2,7 +2,7 @@
 id: CT-0054
 title: Migrating SINGULAR to ~/films/singular in Cine Toaster's native format
 type: work
-status: doing
+status: review
 owner: unassigned
 created_at: 2026-10-03
 updated_at: 2026-10-03
@@ -269,6 +269,27 @@ it had the words): 1-02C 115.8 -> 110.6 s, 1-03 86.4 -> 71.8 s. SINGULAR
 cut them by their declared durations only because the timings were
 missing. So the migration does not transcribe; the author runs it when
 they choose, and the subtitles of those shots span the shot until then.
+
+# Done: the migration into ~/films/singular (2026-10-04)
+
+`toast migrate singular ~/confyui/singular ~/films/singular --proposals
+~/confyui/propostas`: 4,448 files, 4.7 GB, 75 s; the source verified
+untouched; git started (the text; media ignored); `compare` identical but
+for the 6 real findings (4 `cast_reference_missing`: Narrador, Enfermeira,
+Diretor have no face; 2 `voice_identity_restated`: a voice's state mixed
+into its identity in 1-03 and 3-01). Repeatable with `--replace` until
+work starts there; the switch of working folder is the author's.
+
+# Open, before the new folder becomes the working folder
+
+- **Generation parity**: SINGULAR generates through its own tools --
+  Krea still from `still`, Qwen face edit with the sheets, LTX with
+  `guias`, seeds from `variacao`/`variacao_clipe`, blocks sliced by
+  content. Cine Toaster generates through `derive`, blocks and guides at
+  cuts. Compare, for the same shots, what each would send (dry runs, no
+  cost) before generating anything new from the new folder.
+- The author's decisions: transcribing 1-02C/1-03 (changes their editing),
+  the voice states, the missing faces.
 
 # Pass 2 (next)
 

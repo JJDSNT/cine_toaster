@@ -24,9 +24,13 @@ backlog (`development/roadmap.md` § Backlog). Five records stay open on
 purpose (CT-0020, CT-0028, CT-0041 future; CT-0052 paused by the user;
 CT-0053 awaiting approval).
 
-Next recommended action: validate on SINGULAR end to end with what was
-built since CT-0035 -- sound and music, joins, styles, emotions, formats
-and renditions -- on a scratch copy (backlog "Next" item 1). Waiting for
+SINGULAR is migrated into ~/films/singular in Cine Toaster's own format
+(CT-0054, ADR 0021): every scene assembles like SINGULAR's latest cut
+(3-01 frame by frame against the approved v12), with its history (33
+versions with the author's verdicts), cast, looks, locations and sounds.
+Next recommended action: generation parity -- compare, for the same shots,
+what SINGULAR's tools and Cine Toaster would send to the models (dry runs)
+before the new folder becomes the working folder. Waiting for
 the user: Kael's voice re-check, the 4K spike's cost, what feeds the 5.1.
 
 Earlier: the first canonical production write is delivered. Cine Toaster is
