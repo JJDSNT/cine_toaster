@@ -1,0 +1,324 @@
+# FinOps and provider cost integration
+
+Status: **architectural proposal / pending implementation**
+
+Cine Toaster should treat cost as production telemetry. The goal is not to
+rebuild the billing consoles of Runpod or future providers, but to combine
+Cine Toaster's knowledge of **what production work was requested** with the
+provider's authoritative knowledge of **what infrastructure/account usage was
+billed**.
+
+This document proposes a provider-neutral FinOps layer that uses native
+provider cost/billing data whenever it is available.
+
+## Principle: reconcile, do not duplicate
+
+Cine Toaster knows semantic attribution:
+
+- production, sequence, scene and shot;
+- take / generation / derived artifact;
+- agent and task that requested the work;
+- capability and provider adapter;
+- job timestamps, parameters and execution identifiers.
+
+A provider such as Runpod knows infrastructure/account billing:
+
+- resource/product used;
+- provider execution/resource identifiers;
+- runtime/usage;
+- provider prices and billed amounts;
+- account/project/billing-period totals;
+- credits/discounts where exposed.
+
+Neither side alone is sufficient. FinOps should correlate the two.
+
+```text
+Cine Toaster job/provenance             Provider billing/cost centre
+production / shot / take                authoritative billed usage
+agent / task / capability               resource / runtime / price
+provider execution ID  <------------->  provider execution ID
+             \                           /
+              \                         /
+               +---- Cost Reconciliation
+                          |
+                    Cost Ledger
+                          |
+                Digital Workforce Console
+                Producer / Studio Engineering
+```
+
+## Provider cost adapters
+
+Introduce a provider-neutral **Cost Provider Adapter** (name provisional).
+Runpod is the first candidate, not a special case in Project Core.
+
+An adapter may expose only what the upstream provider actually supports:
+
+- current/recent usage;
+- itemised costs;
+- billing-period totals;
+- resource/execution metadata;
+- pricing/rate information;
+- account credits/balance/budget information;
+- native project/tag/label/cost-allocation dimensions;
+- export/report links or identifiers.
+
+Future adapters may cover other GPU/model/cloud providers without changing the
+production cost model.
+
+Provider APIs and native cost centres should be preferred over scraping UI.
+If a provider exposes useful billing data only through exports or reports, the
+adapter may ingest those explicitly. Browser automation should not become a
+billing dependency.
+
+## Runpod integration investigation
+
+Runpod should be investigated as the first implementation because Cine Toaster
+already intends to use remote ComfyUI/GPU execution there.
+
+Before implementation, verify the current Runpod API/console capabilities and
+document which are available to the account/product being used:
+
+- [ ] usage/billing API or supported billing export;
+- [ ] itemisation granularity for Pods, Serverless and other products;
+- [ ] stable execution/resource IDs suitable for reconciliation;
+- [ ] timestamps and runtime/usage units;
+- [ ] price/rate and final billed-cost fields;
+- [ ] credits, discounts and balance data;
+- [ ] native projects/tags/labels or equivalent cost-allocation metadata;
+- [ ] billing period/timezone/currency semantics;
+- [ ] API retention/history limits;
+- [ ] rate limits and permissions required for read-only FinOps access.
+
+Do not infer a Runpod feature from this proposal. The adapter should expose only
+capabilities verified against the provider.
+
+## Cost ledger
+
+Cine Toaster should keep a rebuildable FinOps ledger/cache derived from its own
+job/provenance records plus provider observations. It must not pretend an
+estimate is a bill.
+
+A cost record should be able to distinguish:
+
+- **estimated** -- predicted before execution;
+- **metered** -- measured usage multiplied by a known rate;
+- **provider-reported** -- amount returned by provider billing data;
+- **reconciled** -- Cine Toaster work correlated with provider-reported cost;
+- **unattributed** -- provider cost that cannot yet be mapped to Cine Toaster;
+- **external/untracked** -- Cine Toaster knows the work occurred but lacks
+  provider billing visibility.
+
+Illustrative record:
+
+```yaml
+cost:
+  status: reconciled
+  amount: 0.84
+  currency: USD
+  provider: runpod
+  provider_resource_id: ...
+  provider_execution_id: ...
+  production: singular
+  sequence: boreal-arrival
+  scene: SC-120
+  shot: P07
+  take: T03
+  agent: generation
+  capability: video-generation
+  job_id: ...
+  started_at: ...
+  ended_at: ...
+  source: provider-reported
+```
+
+The schema is illustrative and should not enter Project Core unchanged before
+real provider data has been examined.
+
+## Allocation dimensions
+
+When evidence permits, costs should roll up across both production and digital
+workforce dimensions:
+
+```text
+account
+├── production
+│   ├── sequence
+│   │   ├── scene
+│   │   │   └── shot / take / derivative
+│   └── delivery / shared work
+└── studio engineering
+    ├── development
+    ├── tests / benchmarks
+    └── research / evaluation
+```
+
+And independently:
+
+```text
+provider -> capability -> agent -> task/job
+```
+
+This enables questions such as:
+
+- How much has Singular cost?
+- What is the cost of the Boreal sequence?
+- How much GPU spend was rejected versus approved?
+- Which capability/model/provider is driving cost?
+- How much does the digital workforce cost by role?
+- How much spend belongs to production versus Cine Toaster development?
+- What provider charges remain unattributed?
+
+Shared infrastructure must not be assigned to a shot through invented
+precision. Keep it shared/unallocated or use an explicit documented allocation
+rule.
+
+## Native provider cost-centre integration
+
+Where a provider offers its own cost-centre/project/tagging facilities, Cine
+Toaster should use them where practical rather than merely reading totals after
+the fact.
+
+The ideal integration is bidirectional at the metadata level:
+
+1. Cine Toaster creates/schedules a job with stable production/workforce
+   correlation identifiers where the provider permits metadata/tags;
+2. the provider meters and bills execution using its native infrastructure;
+3. Cine Toaster reads supported billing/cost-centre data;
+4. reconciliation maps provider charges back to the originating job;
+5. the Digital Workforce Console exposes provider-authoritative cost beside
+   Cine Toaster production context.
+
+Cine Toaster must not attempt to modify provider invoices or replace their
+billing records.
+
+## Estimates and budgets
+
+Before execution, an adapter may estimate cost from expected duration,
+resolution, model, GPU/rate and known provider pricing. The estimate should
+carry its assumptions.
+
+Budgets can exist at multiple scopes:
+
+- project/production;
+- sequence/scene/shot;
+- agent/workforce;
+- capability/provider/model;
+- Studio Engineering research/benchmark activity.
+
+Possible policy actions:
+
+```text
+under budget       -> proceed under normal policy
+near threshold     -> warn / request cheaper alternative
+over soft budget   -> require explicit approval
+over hard budget   -> do not schedule without authorised override
+```
+
+A budget is a production policy, not a guarantee that provider billing will
+stop. Native provider spending limits/alerts should be used when available and
+remain the stronger account-level guardrail.
+
+## Digital Workforce Console
+
+FinOps should be a first-class analytics area of the Digital Workforce Console,
+not a separate accounting application.
+
+Useful views:
+
+- current spend and billing-period spend;
+- provider-reported versus estimated/reconciled totals;
+- cost by production/sequence/scene/shot/take;
+- cost by agent, capability, model/provider and tool;
+- approved versus rejected/unused generation spend;
+- production versus Studio Engineering spend;
+- trend and forecast;
+- budget consumption and alerts;
+- unattributed provider charges;
+- links/references back to the provider's native cost/billing view where
+  possible.
+
+The console must always show currency, period and cost status/source.
+
+## Agents and FinOps
+
+**Producer / Production Manager** uses FinOps to understand production budget,
+expensive blockers and the cost impact of retakes.
+
+**Studio Engineering Agent** uses it to benchmark providers/models/workflows,
+track development infrastructure spend and identify cost regressions.
+
+**Meta-agent / Workforce Architect** may use cost as one signal when evaluating
+workforce structure, but must not optimise agents solely for cheapness.
+
+A future **FinOps specialist agent** should be created only if cost governance
+becomes complex enough to justify a durable role. Until then this is a
+capability shared by Producer, Studio Engineering and workforce analytics.
+
+## Security and permissions
+
+Billing integrations should default to the least privilege possible:
+
+- read-only billing/usage credentials where providers support them;
+- secrets outside project files and provenance;
+- no payment-method or invoice mutation capability for ordinary agents;
+- explicit human approval for changes to provider spending limits or account
+  configuration;
+- audit consequential budget-policy changes.
+
+## Reconciliation health
+
+FinOps quality itself needs observability. Track:
+
+- percentage of provider spend reconciled;
+- unattributed amount;
+- jobs with estimates but no provider observation;
+- provider observations with no Cine Toaster job;
+- estimate error versus reconciled cost;
+- age of last successful billing sync.
+
+A production dashboard should never claim complete cost visibility when the
+provider integration is stale or partial.
+
+## Implementation path
+
+1. Define provider-neutral cost observation and attribution concepts.
+2. Inspect current Runpod billing/cost-centre/API capabilities with real
+   account data and document supported fields.
+3. Ensure remote execution records stable provider IDs in job provenance.
+4. Implement read-only Runpod cost observation.
+5. Reconcile provider observations with Cine Toaster jobs.
+6. Expose cost status/source and unattributed spend through API/CLI.
+7. Add Digital Workforce Console FinOps views.
+8. Add estimates/budgets only after actual billing reconciliation is reliable.
+9. Add future providers behind the same cost adapter boundary.
+
+## Definition of done for a provider FinOps integration
+
+An integration is not complete merely because Cine Toaster can calculate
+GPU-rate x runtime. It is complete when it can:
+
+1. identify the upstream source and freshness of cost data;
+2. preserve provider execution/resource identifiers;
+3. distinguish estimates, metered and provider-reported values;
+4. reconcile supported provider charges to Cine Toaster jobs where possible;
+5. expose unattributed costs honestly;
+6. roll reconciled cost up through production and workforce dimensions;
+7. avoid storing billing credentials in production projects;
+8. survive missing/stale provider billing APIs without fabricating certainty;
+9. test reconciliation and currency/period handling; and
+10. provide a path back to the provider's native billing/cost-centre evidence
+    where the provider exposes one.
+
+## Open questions
+
+- Which Runpod products expose sufficiently granular billing data today?
+- Can Cine Toaster attach correlation metadata/tags to every relevant Runpod
+  execution type?
+- What provider-side spending controls can be referenced or managed safely?
+- What retention period should Cine Toaster keep for cost observations?
+- Should cost history live in runtime telemetry, a rebuildable analytics store,
+  or exported FinOps records?
+- How should shared GPU/Pod idle time be allocated, if at all?
+- Which costs belong to a film production versus Studio Engineering?
+- When does cost governance justify a dedicated FinOps agent?
