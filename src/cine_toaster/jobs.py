@@ -667,7 +667,8 @@ def _validate_assemble(root: Path, params: dict[str, Any]) -> dict[str, Any]:
     version = str(params.get("version") or "").strip() or _next_version(root, scene_id)
     if any(item["id"] == version for item in scene.get("assemblies") or []):
         raise ValidationError(f"{scene_id} already has a version {version!r}")
-    return {"scene": scene_id, "version": version, "summary": str(params.get("summary") or "")}
+    return {"scene": scene_id, "version": version, "summary": str(params.get("summary") or ""),
+            "stems": bool(params.get("stems"))}
 
 
 def _voices_for_cut(context: JobContext, production: dict[str, Any], scene_id: str, plan) -> dict[str, Any]:
@@ -742,6 +743,7 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
     output = context.staging / "assembly.mp4"
     # The same cut in every format it is delivered in (CT-0049): planned once, rendered per format.
     deliveries = [(item, copy.deepcopy(plan)) for item in scene.get("deliver") or []]
+    plan.stems = bool(context.params.get("stems"))  # the main cut only: a format's stems are the same sound
     share = 1.0 / (1 + len(deliveries))
     start = 0.6 if voices else 0.0
     render(context.project_root, plan, output, context.staging / "work", context.run_process,
@@ -749,6 +751,11 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
     if plan.subtitle_file:
         # The subtitles beside the version, burned or not (SINGULAR's practice: the clean final cut travels with them).
         shutil.copyfile(plan.subtitle_file, context.staging / "assembly.srt")
+    stems = []
+    if plan.stems_folder:
+        staged = context.staging / "stems"
+        shutil.move(plan.stems_folder, staged)
+        stems = sorted(path.name for path in staged.iterdir())
     shutil.rmtree(context.staging / "work", ignore_errors=True)
     scene_id, version = context.params["scene"], context.params["version"]
     # A version lives with its scene, beside the breakdown that made it (ADR 0021).
@@ -773,7 +780,9 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
                   {"staged": "assembly.speech.json", "destination": f"{folder}/{version}.mp4.speech.json"},
                   {"staged": "assembly.scene.yaml", "destination": f"{folder}/{version}.scene.yaml"},
                   *([{"staged": "assembly.srt", "destination": f"{folder}/{version}.srt"}]
-                    if (context.staging / "assembly.srt").is_file() else []), *renditions],
+                    if (context.staging / "assembly.srt").is_file() else []), *renditions,
+                  # The sound in its parts, beside the version, for a DAW (CT-0063).
+                  *[{"staged": f"stems/{name}", "destination": f"{folder}/{version}.stems/{name}"} for name in stems]],
         "summary": {"segments": [{**{key: value for key, value in asdict(segment).items() if key not in ("sound", "source")},
                                   "gain_db": plan.gains.get(segment.shot, 0.0)} for segment in plan.segments],
                     "notes": plan.notes, "voices": voices, "sound": plan.sound, "loudness": plan.loudness,

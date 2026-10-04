@@ -187,8 +187,8 @@ Agreed order (2026-10-04):
 2. **Next, when a real shot asks**: a finishing spike -- delivery resolution (SeedVR2
    against LTX TiledFusion, CT-0053 reframed as a capability), Refine Details --
    paid, with the user's approval of the estimate; ~~a minimal continuity ledger for
-   SINGULAR~~ done (CT-0059); stems for
-   Ardour.
+   SINGULAR~~ done (CT-0059); ~~stems for
+   Ardour~~ done (CT-0063).
 3. **Later**: Layout-to-Render (after the user revisits the rule that the 3D board
    never controls the model); the animated and the music-driven demos; the
    Workforce, FinOps and Analytics consoles -- never before the data behind them is

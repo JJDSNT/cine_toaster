@@ -194,7 +194,10 @@ class LookTests(unittest.TestCase):
 class ReelIntegrityTests(unittest.TestCase):
     def test_the_reel_is_clean(self) -> None:
         production = _reel()
-        self.assertEqual([f for s in production["scenes"] for f in s["findings"]], [])
+        # In the repository its narration is declared, not yet spoken (`toast voice` / make build makes it).
+        findings = [f for s in production["scenes"] for f in s["findings"]
+                    if not (f["code"] == "line_audio_missing" and f["severity"] == "advice")]
+        self.assertEqual(findings, [])
 
     def test_no_two_adjacent_shots_share_a_transition(self) -> None:
         """A rule the look states, checked against the reel that states it."""

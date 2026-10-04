@@ -37,8 +37,10 @@ face per person is now an error (CT-0060), and so is one voice per person
 to hold them. FinOps steps 4-5 are done
 (CT-0061, `toast finops`): of US$ 36.44 billed in 30 days, US$ 9.79 is
 allocated to SINGULAR's job records. The effective LTX rate is US$ 1.92/h
-against US$ 1.75/h assumed, so estimates run about 10% low. Next recommended
-action: stems for Ardour. Waiting for the user: the
+against US$ 1.75/h assumed, so estimates run about 10% low. Stems for a DAW are done
+(CT-0063, `toast assemble --stems`). On the way, a migration defect: 3-01's
+"Claire?!" was not heard; it is fixed, and a missing line audio is now an
+error. Waiting for the user: the
 4K/finishing spike's cost, what feeds the 5.1, and
 switching the working folder to ~/films/singular.
 

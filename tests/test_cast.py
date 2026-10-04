@@ -147,6 +147,17 @@ class CheckTests(unittest.TestCase):
         self.assertNotIn("cast_voice_reference_missing",
                          codes(production({"kael": recorded}, {"010": scene})["scenes"][0]))
 
+    def test_a_line_whose_audio_file_is_missing_is_an_error(self) -> None:
+        scene = (SCENE.format(id="S1", who="KAEL", label="Kael")
+                 + "    lines: [{who: KAEL, text: Claire, voice: Deep_Man, mix: {file: voices/claire.wav, at: 0.5}}]\n")
+        found = [item for item in production({"kael": KAEL}, {"010": scene})["scenes"][0]["findings"]
+                 if item["code"] == "line_audio_missing"]
+        self.assertEqual((found[0]["severity"], found[0]["shots"]), ("error", ["P1"]))
+        spoken_here = scene.replace("voice: Deep_Man", "voice: piper/en_US-ljspeech-medium")
+        found = [item for item in production({"kael": KAEL}, {"010": spoken_here})["scenes"][0]["findings"]
+                 if item["code"] == "line_audio_missing"]
+        self.assertEqual(found[0]["severity"], "advice")  # Cine Toaster speaks it: not made yet, not lost
+
     def test_one_person_in_two_named_voices_is_an_error(self) -> None:
         first = SCENE.format(id="S1", who="KAEL", label="Kael") + "    lines: [{who: KAEL, text: a, voice: Deep_Man}]\n"
         second = SCENE.format(id="S2", who="KAEL", label="Kael") + "    lines: [{who: KAEL, text: b, voice: Calm_Man}]\n"

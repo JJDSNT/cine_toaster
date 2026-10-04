@@ -39,6 +39,7 @@ CHECK_CODES = frozenset(
         "framed_subject_missing",
         "jump_cut_undeclared",
         "line_drift",
+        "line_audio_missing",
         "line_unscripted",
         "move_crosses_axis",
         "move_kind_mismatch",

@@ -153,11 +153,39 @@ toast sound import film ~/confyui/singular/sons --prefix singular-
 SINGULAR's 53 sounds become catalog items pointing at its files, with their
 licences and statuses; nothing in SINGULAR is written.
 
+## Stems, for a final mix in a DAW
+
+Cine Toaster lays the sound; a sound editor finishes it in a DAW such as
+Ardour. Cine Toaster does not become a DAW. With `--stems`, a version also
+carries its sound in parts, the film-mix way:
+
+```bash
+toast assemble <project> 3-01 --stems   # versions/v13.mp4 and versions/v13.stems/
+```
+
+| stem | what it holds |
+| --- | --- |
+| `dialogue` | the takes' sound while someone speaks, and the voice-overs |
+| `room` | the takes' own sound when no one speaks |
+| `effects` | the catalog's effects and Foley on shots |
+| `ambience` | the catalog's beds |
+| `music` | the catalog's music |
+
+- **Format:** each stem is a stereo 48 kHz 24-bit WAV, the whole length of the
+  cut, starting at zero. It has the version's own gains, fades, J/L handles
+  and ducking. A stem with nothing in it is not written.
+- **Summed:** laid together at unity, the stems are the version's stereo mix
+  before its final limiter. The test checks this by loudness and envelope.
+- **`stems.json`** lists them, with how to import them in Ardour:
+  - Session > Import, "as new tracks", "at session start", one track per file;
+  - the version's `.mp4` as the session video.
+- **Not exported yet:** the 5.1 is mixed from the same parts, but it is not
+  exported as stems.
+
 ## Not yet
 
 - Generated music and effects from a model (Stable Audio Open, MMAudio
   from the picture), as a provider under the budget ceiling.
 - A J/L split edit carrying sound across a cut.
-- Stems (dialogue, effects, music) as separate files for a final mix.
 - An imported library's category is a guess from the file name and its
   use; correct it in the item's `sound.toml`.

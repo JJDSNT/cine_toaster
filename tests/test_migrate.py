@@ -62,6 +62,7 @@ BREAKDOWN = """\
         falas:
           - {quem: KAEL, en: "Claire...", pt: "Claire...", emocao: sad}
           - {quem: NARRADOR, en: "Long ago.", pt: "Há muito tempo.", montagem: {arquivo: trabalho/vozes/vo-01.wav, em: 1.8}}
+          - {quem: KAEL, en: "Claire?!", pt: "Claire?!", montagem: {arquivo: teste/vozes/kael-a.wav, em: 0.2}}
         corte: {antes: 0.4, depois: 0.3}
         quadro: a man in a bed
         silenciar: [[0.0, 1.0]]
@@ -124,6 +125,7 @@ class MigrationTests(unittest.TestCase):
         write(work / "_descartados" / "c02-errado.mp4", b"rejected")
         write(work / "partes" / "junto.mp4", b"scratch")
         write(work / "clipes.log", "scratch")
+        write(s / "cenas" / "9-01" / "ltx" / "teste" / "vozes" / "kael-a.wav", b"a line recorded apart, in the tests")
         versions = s / "cenas" / "9-01" / "ltx" / "versoes"
         for number in (1, 2, 3):
             write(versions / f"cena-9-01-ltx-v{number}.mp4", f"cut {number}".encode())
@@ -197,6 +199,8 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(second["lines"][0]["who"], "KAEL")
         # A voice laid in the montage: its file and its time, natively; not said in the take.
         self.assertEqual(second["lines"][1]["mix"], {"file": "work/vozes/vo-01.wav", "at": 1.8})
+        # A line laid from the scene's tests folder follows it into the archive (CT-0063).
+        self.assertEqual(second["lines"][2]["mix"], {"file": "archive/tests/vozes/kael-a.wav", "at": 0.2})
         self.assertEqual(second["picture"], "a man in a bed")  # SINGULAR's `quadro`
         # Takes kept, renamed to the canonical folders; a run's scratch left behind.
         work = scene_dir / "work"

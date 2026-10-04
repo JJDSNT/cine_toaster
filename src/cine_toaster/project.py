@@ -745,6 +745,27 @@ def _load_scene(
                          f"A generation makes one continuous run of shots; the shots between would be cut out of it."),
             ).public_dict())
 
+    # A line laid from a file (a narration, a line recorded apart) whose file is not there is not heard (CT-0063).
+    for shot in shots:
+        for line in shot.get("lines") or []:
+            mix = line.get("mix") if isinstance(line.get("mix"), dict) else {}
+            name = mix.get("file") or mix.get("arquivo")
+            # Beside the scene (the assembly reads it there) or from the production (the reel's `toast voice`).
+            if not name or shot.get("out_of_cut") or (directory / str(name)).is_file() or (root / str(name)).is_file():
+                continue
+            who = line.get("who") or "a line"
+            if str(line.get("voice") or "").startswith("piper/"):
+                # Cine Toaster speaks it itself: not lost, only not made yet.
+                findings.append(Finding(
+                    code="line_audio_missing", severity="advice", scene_id=scene_id, shots=(shot["id"],),
+                    message=f"{shot['id']}: {who}'s line is not spoken yet ({name}); toast voice makes it.",
+                ).public_dict())
+            else:
+                findings.append(Finding(
+                    code="line_audio_missing", severity="error", scene_id=scene_id, shots=(shot["id"],),
+                    message=f"{shot['id']}: {who}'s audio {name} is not there, so the cut does not hear it.",
+                ).public_dict())
+
     decisions = [
         {
             "question": vtext(item, "question"),

@@ -139,6 +139,9 @@ class Plan:
     #: the loudness of each track.
     surround: str = ""
     loudness: dict[str, float] = field(default_factory=dict)
+    #: Write the sound's parts beside the version, for a final mix in a DAW (CT-0063); once rendered, where.
+    stems: bool = False
+    stems_folder: str = ""
     #: Subtitles in the film's language (CT-0054): {burn: bool}; once rendered, the .srt written beside.
     subtitles: dict[str, Any] = field(default_factory=dict)
     subtitle_file: str = ""
@@ -756,12 +759,20 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
             run_process(command, expected_seconds=expected_seconds, message=message, span=within(0.93, 1.0))
 
         plan.sound = mix(joined, plan.cues, catalog, speech, output, work / "sound", run_sound)
+    cues = [(work / "sound" / f"sound-{index:03d}.wav", cue, laid["gain_db"])
+            for index, (cue, laid) in enumerate(zip(plan.cues, plan.sound))]
+    takes = [(clip, at, speaks) for (clip, at), speaks in zip(sounds, speaking)]
+    if plan.stems:
+        from . import stems
+
+        folder = work / "stems"
+        stems.write(takes, cues, speech, duration, folder,
+                    lambda command, expected_seconds=None, message="": run_process(
+                        command, expected_seconds=expected_seconds, message=message, span=within(0.96, 0.97)))
+        plan.stems_folder = str(folder)
     if plan.surround == "5.1":
         from . import surround
 
-        cues = [(work / "sound" / f"sound-{index:03d}.wav", cue, laid["gain_db"])
-                for index, (cue, laid) in enumerate(zip(plan.cues, plan.sound))]
-        takes = [(clip, at, speaks) for (clip, at), speaks in zip(sounds, speaking)]
         wide = surround.mix(takes, cues, speech, duration, work / "surround.wav",
                             lambda command, expected_seconds=None, message="": run_process(
                                 command, expected_seconds=expected_seconds, message=message, span=within(0.97, 0.99)))

@@ -696,6 +696,7 @@ def migrate(source: Path, target: Path, *, replace: bool = False, proposals: Pat
         nested = chosen != folder
         # Paths the breakdown names: its own work folder, and (from a variant) the scene's other work folder.
         prefixes = [("../trabalho/", "archive/main/work/"), ("trabalho/", "work/")] if nested else [("trabalho/", "work/")]
+        prefixes.append(("teste/", "archive/tests/"))  # the scene's tests folder, archived below
         converted = _rewrite_paths(convert_scene(document, report, scene_id, identities), prefixes)
         if scene_id in locations:
             converted = {**{key: value for key, value in converted.items() if key != "shots"},
@@ -891,7 +892,8 @@ def compare(source: Path, target: Path) -> list[str]:
             if len(shot.get("lines") or []) != len(other.get("lines") or []):
                 differences.append(f"{scene_id} {shot_id}: lines {len(shot.get('lines') or [])} -> {len(other.get('lines') or [])}")
             # The same sources, where the migration moved them; `ref: false` was never one.
-            moved = [("../trabalho/", "archive/main/work/"), ("trabalho/", "work/"), ("propostas/", "../../story/proposals/"),
+            moved = [("../trabalho/", "archive/main/work/"), ("trabalho/", "work/"), ("teste/", "archive/tests/"),
+                     ("propostas/", "../../story/proposals/"),
                      ("../../../cenarios/", "../../locations/"), ("../../cenarios/", "../../locations/")]
             refs_a = sorted(re.sub(r"^([^/\s]+)/[^\s]+\s+", r"\1 ", _moved(str(item.get("ref")), moved))
                             if item.get("relation") == "reusa" else _moved(str(item.get("ref")), moved)

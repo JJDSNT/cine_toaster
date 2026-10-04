@@ -317,9 +317,10 @@ def build(root: Path, manager=None):
                                 for key in ("id", "kind", "state", "message")})
 
     @server.tool(annotations=working)
-    def assemble_scene(scene: str, version: str = "", summary: str = "") -> dict[str, Any]:
-        """Assemble a new version of a scene from its chosen takes (a job; follow it with wait_for_job)."""
-        return submit("assemble", {"scene": scene, "version": version, "summary": summary})
+    def assemble_scene(scene: str, version: str = "", summary: str = "", stems: bool = False) -> dict[str, Any]:
+        """Assemble a new version of a scene from its chosen takes (a job; follow it with wait_for_job).
+        With stems, the sound is also written in its parts (dialogue, room, effects, ambience, music) for a DAW."""
+        return submit("assemble", {"scene": scene, "version": version, "summary": summary, "stems": stems})
 
     @server.tool(annotations=working)
     def slice_block(scene: str, block: str, clip: str = "") -> dict[str, Any]:
