@@ -250,3 +250,26 @@ class MigrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TranscribeTests(unittest.TestCase):
+    def test_only_speaking_takes_without_word_timings_are_transcribed(self) -> None:
+        from cine_toaster.jobs import _untimed
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            work = root / "scenes" / "s" / "work"
+            write(work / "c01.mp4", b"x")
+            write(work / "c02.mp4", b"x")
+            write(work / "c02.words.json", "[]")
+            write(work / "c02-pov.mp4", b"x")  # made from c02: its timings are c02's
+            write(work / "c03.mp4", b"x")
+            take = lambda name: {"id": name, "media": f"scenes/s/work/{name}.mp4"}
+            scene = {"shots": [
+                {"id": "P1", "lines": [{"text": "Olá", "in_take": True}], "takes": [take("c01")]},
+                {"id": "P2", "lines": [{"text": "Oi", "in_take": True}], "takes": [take("c02"), take("c02-pov")]},
+                {"id": "P3", "lines": [], "takes": [take("c03")]},  # silent: nothing to transcribe
+            ]}
+            found = _untimed(root, scene, "{stem}.words.json")
+            self.assertEqual([(shot, media.name, sidecar.name) for shot, media, sidecar in found],
+                             [("P1", "c01.mp4", "c01.words.json")])

@@ -31,7 +31,7 @@ class McpTests(unittest.TestCase):
         self.root = base / "film"
         shutil.copytree(DEMO, self.root)
         self.manager = JobManager(store=JobStore(base / "state" / "jobs.sqlite"))
-        self.addCleanup(self.manager.shutdown, wait=False)
+        self.addCleanup(self.manager.shutdown, wait=True)  # its threads finish before the folder goes
         from cine_toaster.mcp_server import build
 
         self.server = build(self.root, self.manager)

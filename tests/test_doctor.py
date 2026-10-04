@@ -49,15 +49,15 @@ class StudioToolchainTests(unittest.TestCase):
 
     def test_a_tool_nothing_calls_yet_is_marked_as_such(self) -> None:
         by_name = {item.name: item for item in doctor.examine()}
-        for name in ("SoX", "Transcription"):
+        for name in ("SoX",):
             self.assertIn(name, by_name)
             self.assertFalse(by_name[name].wired, name)
             self.assertFalse(by_name[name].required, name)
 
     def test_what_is_in_use_is_marked_as_in_use(self) -> None:
         by_name = {item.name: item for item in doctor.examine()}
-        # Blender draws the 3D titles (CT-0031).
-        for name in ("FFmpeg", "Piper narration", "Media libraries", "ModernGL", "Blender"):
+        # Blender draws the 3D titles (CT-0031); transcription writes word timings (`toast transcribe`, CT-0054).
+        for name in ("FFmpeg", "Piper narration", "Media libraries", "ModernGL", "Blender", "Transcription"):
             self.assertTrue(by_name[name].wired, name)
 
     def test_the_report_separates_the_two(self) -> None:

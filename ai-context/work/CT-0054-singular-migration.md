@@ -254,6 +254,22 @@ agree), but subtitles of those lines span their whole shot. Next: a job
 that transcribes the takes that have no word timings (faster-whisper, in
 the voice environment), so trims and subtitles follow the speech.
 
+# Done: `toast transcribe` (2026-10-04)
+
+A `transcribe` job (`words_worker.py`, faster-whisper small on the CPU in
+the voice environment): the speaking shots' takes without word timings
+(their own or their original's) are transcribed and their sidecars written
+in the production's form; `toast doctor` now reports transcription as used
+(it looked in the wrong environment). On the scratch copy: 1-02C (8 takes)
+and 1-03 (10) in about 3 minutes each.
+
+**A creative effect, the author's to decide**: with word timings, speaking
+shots are cut around the speech (Cine Toaster's rule, SINGULAR's too when
+it had the words): 1-02C 115.8 -> 110.6 s, 1-03 86.4 -> 71.8 s. SINGULAR
+cut them by their declared durations only because the timings were
+missing. So the migration does not transcribe; the author runs it when
+they choose, and the subtitles of those shots span the shot until then.
+
 # Pass 2 (next)
 
 - `cenario` and the plans (`geografia`) into locations; `referencias_3d`.
