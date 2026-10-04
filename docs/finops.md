@@ -219,26 +219,140 @@ A budget is a production policy, not a guarantee that provider billing will
 stop. Native provider spending limits/alerts should be used when available and
 remain the stronger account-level guardrail.
 
-## Digital Workforce Console
+## FinOps / Finance Console
 
-FinOps should be a first-class analytics area of the Digital Workforce Console,
-not a separate accounting application.
+Cine Toaster should have a dedicated **FinOps / Finance** workspace. The
+Digital Workforce Console still exposes cost in the context of evaluating the
+workforce; the FinOps Console owns the financial perspective across production,
+Studio Engineering and infrastructure/providers.
 
-Useful views:
+The two surfaces should deep-link to each other. A cost on an agent can open
+its financial breakdown; a charge can lead back to the responsible job, agent,
+shot, take or engineering task.
 
-- current spend and billing-period spend;
-- provider-reported versus estimated/reconciled totals;
-- cost by production/sequence/scene/shot/take;
-- cost by agent, capability, model/provider and tool;
-- approved versus rejected/unused generation spend;
+### Overview
+
+The landing view should answer quickly:
+
+- current period spend and budget consumption;
 - production versus Studio Engineering spend;
-- trend and forecast;
-- budget consumption and alerts;
-- unattributed provider charges;
-- links/references back to the provider's native cost/billing view where
-  possible.
+- provider-reported, reconciled and unattributed totals;
+- recent cost trend and forecast;
+- active budget warnings;
+- freshness/coverage of provider reconciliation.
 
-The console must always show currency, period and cost status/source.
+Illustrative layout:
+
+```text
+FINOPS / FINANCE
+────────────────────────────────────────────────────
+Spend this month       $286.40     Budget used   43%
+Production             $218.70     Engineering   $67.70
+Reconciled             $282.19     Unattributed   $4.21
+
+Productions             Providers             Workforce
+Singular  $204.32       Runpod  $181.20        Generation $91.32
+  Boreal   $38.14       ...                    Continuity  $ 3.17
+    SC-120 $16.72                              ...
+      P07  $ 3.84
+```
+
+Values are illustrative, not target costs.
+
+### Production economics
+
+The console should drill down through:
+
+```text
+production -> sequence -> scene -> shot -> take / derivative -> job
+```
+
+Where data permits, derive meaningful production metrics such as:
+
+- average cost per generated take;
+- cost per approved take;
+- generated/rejected/approved spend;
+- retake cost;
+- VFX/finishing cost;
+- cost per finished minute;
+- remaining budget and projected completion cost.
+
+A metric such as cost per finished minute must identify its scope and maturity;
+it is misleading early in production if very little footage has reached final
+approval.
+
+### Providers and reconciliation
+
+A dedicated provider view should complement, not replace, the provider's native
+cost centre:
+
+```text
+RUNPOD
+Provider reported        $181.20
+Reconciled               $176.99
+Unattributed               $4.21
+Coverage                    97.7%
+Last successful sync       4 min ago
+
+[Provider billing/cost centre]   [Investigate unattributed]
+```
+
+It should expose provider/product/resource breakdowns when supported, sync
+health, reconciliation coverage and unmatched charges. A direct reference/link
+to native billing evidence should be retained where possible.
+
+### Budgets and policies
+
+The Finance workspace should manage Cine Toaster budget policy at scopes such
+as production, sequence, Studio Engineering, provider, capability or agent.
+
+Illustrative policies:
+
+```text
+Singular GPU budget             $2,000
+Boreal sequence                   $120
+Technology R&D / month            $100
+Warning threshold                   80%
+Human approval above             $20/job
+```
+
+These policies govern Cine Toaster scheduling/approval behaviour. Provider-side
+spending controls remain separate and should be used as stronger account-level
+guardrails when available.
+
+### Forecast
+
+Forecasting should combine completed/reconciled work with the known production
+plan and clearly state assumptions. It should support questions such as:
+
+- At the current approved-shot cost, what is the projected cost to finish the
+  production?
+- What changes if a sequence needs one additional take per shot?
+- Which provider/model/capability is driving the forecast?
+- How much budget remains for production versus Studio Engineering?
+
+Forecast values must always be labelled as estimates and remain distinct from
+provider-reported spend.
+
+### Efficiency and comparison
+
+When samples are comparable, the Finance workspace can compare models,
+providers and workflows by both cost and outcome: cost per attempt, approval
+rate, cost per approved output, runtime and rework. It should not rank a cheaper
+provider as "better" without accounting for quality/acceptance and workload
+differences.
+
+### Digital Workforce integration
+
+The Digital Workforce Console keeps a compact financial lens: cost by agent,
+role, task, capability and workforce lifecycle. Detailed budgets,
+reconciliation, provider spend and forecasting live in FinOps / Finance.
+
+Both surfaces read the same FinOps records; they must not maintain independent
+cost ledgers.
+
+The Finance console must always show currency, period, source/status and data
+freshness for financial values.
 
 ## Agents and FinOps
 
@@ -289,7 +403,7 @@ provider integration is stale or partial.
 4. Implement read-only Runpod cost observation.
 5. Reconcile provider observations with Cine Toaster jobs.
 6. Expose cost status/source and unattributed spend through API/CLI.
-7. Add Digital Workforce Console FinOps views.
+7. Add the dedicated FinOps / Finance Console and Digital Workforce cost lens.
 8. Add estimates/budgets only after actual billing reconciliation is reliable.
 9. Add future providers behind the same cost adapter boundary.
 
