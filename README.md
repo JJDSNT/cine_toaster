@@ -102,6 +102,7 @@ you want what it enables, and `toast doctor` always reports which are present.
 | **SoX** | normalise, trim and shape a take's audio, which FFmpeg does clumsily | `apt install sox` · `brew install sox` |
 | **ModernGL** | run a transition's own GLSL shader instead of the FFmpeg stand-in it declares | `uv sync --extra gpu` |
 | **Blender** | 3D titles, set previsualisation, compositing passes | [blender.org](https://www.blender.org/download/) |
+| **Ardour** | soundtrack editing, sound design, automation, stem mixing and final film mix against picture | [ardour.org](https://ardour.org/) |
 | **faster-whisper** / whisper.cpp | subtitles, and reading source footage that arrives with no script | `pip install faster-whisper` |
 
 `toast doctor` lists these in a separate block marked *"Cine Toaster does not
