@@ -377,6 +377,22 @@ function renderCast() {
   root.append(grid);
 }
 
+function renderStanding(report) {
+  const box = el("div", "standing");
+  const t = report.totals;
+  box.append(el("p", "muted",
+    `${t.in_cut} shots in the cut: ${t.chosen} chosen, ${t.one_take} on their only take, ` +
+    `${t.awaiting_choice} waiting for a choice, ${t.awaiting_generation} awaiting generation, ${t.composed} composed. ` +
+    `${t.approved_scenes} of ${report.scenes.length} scenes approved.`));
+  const next = el("ul", "standing-next");
+  for (const row of report.scenes) {
+    for (const blocker of row.blockers) next.append(el("li", "finding error", `${row.id}: blocked — ${blocker}`));
+    for (const item of row.next) next.append(el("li", "", `${row.id}: ${item}`));
+  }
+  if (next.childElementCount) box.append(el("small", "eyebrow", "Next decisions"), next);
+  return box;
+}
+
 function renderSequences() {
   if (!state.production) return renderUnstructured();
   const root = byId("workspace");
@@ -405,6 +421,14 @@ function renderSequences() {
       metric(String(sequence.open_findings), "Continuity notes"),
     );
     panel.append(facts);
+
+    const standing = el("div", "sequence-standing");
+    panel.append(standing);
+    // Where it stands (CT-0057): the Producer's report, read from the records -- nothing decided for you.
+    api(`/api/status?sequence=${encodeURIComponent(sequence.id)}`, { optional: true }).then((status) => {
+      const report = status?.sequences?.[0];
+      if (report) standing.replaceChildren(renderStanding(report));
+    });
 
     panel.append(renderSequenceVersions(sequence));
 

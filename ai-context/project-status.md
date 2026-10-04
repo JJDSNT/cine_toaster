@@ -28,10 +28,12 @@ SINGULAR is migrated into ~/films/singular in Cine Toaster's own format
 (CT-0054, ADR 0021): every scene assembles like SINGULAR's latest cut
 (3-01 frame by frame against the approved v12), with its history (33
 versions with the author's verdicts), cast, looks, locations and sounds.
-Next recommended action: generation parity -- compare, for the same shots,
-what SINGULAR's tools and Cine Toaster would send to the models (dry runs)
-before the new folder becomes the working folder. Waiting for
-the user: Kael's voice re-check, the 4K spike's cost, what feeds the 5.1.
+Generation parity (CT-0055, a reference only), negative guidance (CT-0056)
+and the Producer status (CT-0057, `toast status`) are done. Next recommended
+action: FinOps steps 2-3 -- what Runpod's billing really exposes (read-only),
+and every job recording the provider's execution id. Waiting for the user:
+Kael's voice re-check, the 4K spike's cost, what feeds the 5.1, and
+switching the working folder to ~/films/singular.
 
 Earlier: the first canonical production write is delivered. Cine Toaster is
 no longer a read-only prototype: a human or an agent can compare registered

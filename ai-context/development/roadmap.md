@@ -177,9 +177,9 @@ Agreed order (2026-10-04):
       screenplay -- so what matters next is the path from screenplay to finished
       shots inside Cine Toaster, not matching SINGULAR;
    2. ~~negative guidance as a production concept (`generation.md`)~~ done (CT-0056);
-   3. the first slice of the Producer role: a deterministic status per sequence
-      (approved, awaiting generation, blocked, next decisions) from the records
-      already kept -- also the first seed of Studio Analytics;
+   3. ~~the first slice of the Producer role: a deterministic status per sequence~~
+      done (CT-0057): `toast status`, `/api/status`, MCP `production_status`,
+      the Sequences room;
    4. FinOps steps 2-3: what Runpod's billing really exposes (read-only), and every
       job recording the provider's execution id.
 2. **Next, when a real shot asks**: a finishing spike -- delivery resolution (SeedVR2

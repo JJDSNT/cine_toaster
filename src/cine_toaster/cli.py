@@ -823,6 +823,16 @@ def command_sound(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_status(args: argparse.Namespace) -> int:
+    """Where the production stands, sequence by sequence: the Producer's report (docs/production-agents.md)."""
+
+    from .producer import production_status, render_text
+
+    status = production_status(load_production(Path(args.project).expanduser().resolve()), args.sequence or "")
+    print(json.dumps(status, indent=2, ensure_ascii=False) if args.json else render_text(status))
+    return 0
+
+
 def command_transcribe(args: argparse.Namespace) -> int:
     """Word timings for a scene's speaking takes that have none (CT-0054)."""
 
@@ -1969,6 +1979,13 @@ def build_parser() -> argparse.ArgumentParser:
         item = vfx_sub.add_parser(name, help=text)
         item.add_argument("project", type=Path)
     vfx_parser.set_defaults(function=command_vfx)
+
+    status_parser = subparsers.add_parser(
+        "status", help="Where the production stands: shots with a take or awaiting one, versions, blockers, next decisions")
+    status_parser.add_argument("project", type=Path)
+    status_parser.add_argument("--sequence", help="one sequence only")
+    status_parser.add_argument("--json", action="store_true")
+    status_parser.set_defaults(function=command_status)
 
     transcribe_parser = subparsers.add_parser(
         "transcribe", help="Word timings for a scene's speaking takes that have none, so trims and subtitles follow the speech")

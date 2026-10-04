@@ -304,6 +304,12 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
                                                              "avoid_when", "params", "engine", "effect", "origin")},
                               "unavailable": engine_missing(item["engine"])} for item in list_titles(self.project_root)])
             return
+        if parsed.path == "/api/status":
+            # Where the production stands (the Producer's report): read from the records, nothing decided.
+            from .producer import production_status
+
+            self._send_json(production_status(load_production(self.project_root), query.get("sequence", [""])[0]))
+            return
         if parsed.path == "/api/styles":
             # The style catalog (CT-0049): direction, animation techniques, formats.
             from .styles import list_styles

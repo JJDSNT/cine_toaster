@@ -181,6 +181,14 @@ def build(root: Path, manager=None):
                 "elements": list_elements(runtime.root)}
 
     @server.tool(annotations=reading)
+    def production_status(sequence: str = "") -> dict[str, Any]:
+        """Where the production stands, by sequence and scene: shots with a take, waiting for a choice or for
+        generation; the latest version and its verdict; blockers; the decisions that come next."""
+        from .producer import production_status as status
+
+        return status(runtime.production(), sequence)
+
+    @server.tool(annotations=reading)
     def list_styles() -> list[dict[str, Any]]:
         """The style catalog -- direction, animation techniques, formats (viral vertical, commercial, trailer...).
         A production names one with `style:` in project.yaml, a scene may name another. Choosing it is the
