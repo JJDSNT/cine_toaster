@@ -34,9 +34,9 @@ are done, and so is the minimal continuity ledger (CT-0059, `toast
 continuity`), meant for the remake of the sequence in Cine Toaster; one
 face per person is now an error (CT-0060). FinOps steps 4-5 are done
 (CT-0061, `toast finops`): of US$ 36.44 billed in 30 days, US$ 9.79 is
-allocated to SINGULAR's job records. The assumed LTX rate is about 2.6 times
-too high. Next recommended action: use the observed rate in estimates, then
-stems for Ardour. Waiting for the user: Kael's
+allocated to SINGULAR's job records. The effective LTX rate is US$ 1.92/h
+against US$ 1.75/h assumed, so estimates run about 10% low. Next recommended
+action: stems for Ardour. Waiting for the user: Kael's
 voice re-check, the 4K/finishing spike's cost, what feeds the 5.1, and
 switching the working folder to ~/films/singular.
 

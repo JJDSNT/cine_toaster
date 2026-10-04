@@ -154,11 +154,14 @@ First reading, on 2026-10-04 (30 days, SINGULAR):
 - Unattributed: US$ 26.65. These are the other endpoints SINGULAR's tools used
   without keeping job records (Krea, Qwen, Wan, lip-sync, music) and LTX
   hours with no record.
-- Checked by hand on 2026-09-29:
-  - an LTX block measured at US$ 0.557 was billed US$ 0.217 for its whole
-    hour, so the assumed LTX rate is about 2.6 times too high;
-  - a Qwen picture measured at US$ 0.024 was billed US$ 0.050, the
-    difference being idle time and cold start.
+- Over the 138 LTX jobs: 5.11 h of job time cost US$ 9.79 billed, an
+  effective US$ 1.92/h against the assumed US$ 1.75/h. Estimates run about
+  10% low; the gap is idle tail and cold starts.
+- One job alone misleads. On 2026-09-29 an LTX block measured at US$ 0.557 was
+  billed US$ 0.217 for its whole hour. Its `delayTime` included time waiting
+  in the queue with no worker running, which Runpod does not bill. So
+  `delayTime + executionTime` overstates a single job when the queue is long.
+  The rate should be read over many hours, never from one job.
 
 Do not infer a Runpod feature from this proposal. The adapter should expose only
 capabilities verified against the provider.

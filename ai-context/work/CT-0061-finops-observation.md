@@ -58,15 +58,22 @@ provider-authoritative cost is an allocation.
 - Live read-only run, 30 days:
   - billed US$ 36.44; attributed US$ 9.79 (27%) to SINGULAR's 138 job
     records; unattributed US$ 26.65;
-  - checked by hand: an LTX block measured at US$ 0.557 was billed US$ 0.217,
-    so the assumed LTX rate is about 2.6 times too high.
+  - over the 138 LTX jobs, the effective rate is US$ 1.92/h against the
+    assumed US$ 1.75/h, so estimates run about 10% low.
+  - Correction: a first reading of one job (US$ 0.557 measured, US$ 0.217
+    billed) suggested the rate was 2.6 times too high. It was wrong. That
+    job's `delayTime` included unbilled queue time.
 - Full suite before commit.
 
 # Remains
 
-- **Correct the assumed LTX rate.** Use the observed rate (billed GPU per
-  billed second, over enough hours) rather than the guessed one, so budget
-  checks stop overcharging. The budget ceiling stays.
+- **The assumed LTX rate is about 10% low** (US$ 1.92/h observed against
+  US$ 1.75/h assumed). A production can declare the observed one
+  (`generation_rates`); adopting it automatically waits until more than one
+  production's evidence exists.
+- **Queue time in `delayTime`** is not billed and overstates a single job.
+  Splitting cold start from queue would need the worker's start time, which
+  the job status does not give.
 - **The other endpoints** (Krea, Qwen, Wan, lip-sync, music) have no job
   records in SINGULAR. Their spend stays unattributed: it predates Cine
   Toaster.
