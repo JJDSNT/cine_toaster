@@ -58,10 +58,10 @@ breaks and can be declared by hand.
 
 - `tests/test_continuity_ledger.py`: 10 tests, including a production copy
   whose declared continuation breaks. `tests/test_mcp.py` checks the tools.
-- On the scratch SINGULAR copy, one real question appears. Kael is `kael` in
-  1-02 and `kael_genebra` in 1-02A, in the same room, with no join declared.
-  The two variants describe different faces (green eyes and a scar, against
-  tired grey-green eyes and a narrow face). That is for the author.
+- Run on the scratch SINGULAR copy as a smoke test only. What SINGULAR has
+  produced so far is not a reference for correctness: the sequence will be
+  remade in Cine Toaster from the screenplay. A finding there (Kael's variant
+  between 1-02 and 1-02A) is not a question for the author.
 
 # Remains
 
