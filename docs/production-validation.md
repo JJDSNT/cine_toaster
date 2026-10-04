@@ -1,73 +1,35 @@
-# Production validation targets
+# Production validation and demo productions
 
 Status: **product validation strategy**
 
-Cine Toaster should be validated by producing real audiovisual work with the
-same system it intends to offer. Individual capability demos are useful, but
-they are not sufficient evidence that the studio works as an integrated
-production environment.
+Cine Toaster is validated in two different ways that must not be conflated:
 
-Two complementary validation targets are defined here.
+1. by using it on **real productions**, where artistic needs come first; and
+2. by maintaining **demo productions**, deliberately designed to exercise,
+   explain or regress different classes of capability.
 
-## Target A — Singular: Prologue to Title
+A real production does not become a demo merely because Cine Toaster learns
+from it.
 
-The primary narrative vertical slice is the opening of **Singular**, from the
-prologue through the appearance of the film title.
+## Real production validation — Singular
 
-This supersedes the Boreal Station sequence as the primary Singular validation
-target. The Boreal Station remains a useful later benchmark, especially for
-spatial continuity, 3D blocking and layout-guided generation.
+**Singular is a real feature-film production, not a Cine Toaster demo.**
 
-### Why this sequence
+Its needs are allowed to expose production walls and drive reusable Cine
+Toaster capabilities, but the film must never be forced to exercise a feature
+merely so the software can demonstrate it.
 
-The opening deliberately stresses different forms of filmmaking in one
-continuous production:
+The first major end-to-end validation milestone is **Prologue to Title**. This
+supersedes the Boreal Station sequence as the initial Singular validation
+boundary. Boreal remains a useful later production benchmark for spatial
+continuity, 3D blocking and layout-guided generation.
 
-- conceptual/abstract audiovisual language in the prologue;
-- transition from abstraction into narrative;
-- character and environment continuity;
-- hospital-room and corridor staging;
-- ATLAS drones and world-building;
-- exterior/city cinematography;
-- camera/blocking/previsualisation decisions;
-- generative character performance rather than Blender-controlled final
-  character animation;
-- sound, music, edit, VFX/finishing and title design.
+The opening stresses conceptual imagery, transition into narrative, character
+and environment continuity, hospital and corridor staging, ATLAS drones,
+exterior/city cinematography, camera/blocking/previs, generative performance,
+sound, music, edit, VFX/finishing and title design.
 
-The current narrative validation span is:
-
-```text
-Prologue
-  patterns -> prediction -> learning -> creation
-  -> AGI / Metropolis
-  -> sentience / Maria
-  -> singularity / black
-        |
-        v
-Claire / hospital
-        |
-        v
-corridor / ATLAS
-        |
-        v
-hospital exit / Kael
-        |
-        v
-Geneva / drones / panorama
-        |
-        v
-SINGULAR title
-```
-
-The exact screenplay remains production content outside the generic Cine
-Toaster architecture. This document records the validation boundary, not a
-hard-coded product workflow.
-
-### What it should prove
-
-The target is complete when this sequence can travel coherently through the
-production system rather than being assembled through undocumented parallel
-processes:
+A successful run should travel coherently through:
 
 ```text
 screenplay
@@ -84,144 +46,137 @@ screenplay
  -> delivery
 ```
 
-The same run should provide enough operational evidence to exercise job
-provenance, Digital Workforce decisions/handoffs, provider execution, FinOps
-attribution and Studio Analytics.
+The same production should provide operational evidence for provenance,
+Digital Workforce handoffs, provider execution, FinOps and Studio Analytics.
+Success is not that every subsystem was invoked: the resulting sequence must
+work as cinema.
 
-Success is not merely that every subsystem was invoked. The resulting sequence
-must work as cinema.
+## Demo production portfolio
 
-## Target B — Demo Reel Amiga evolving into the Demo Reel Amiga / self-demo
+Cine Toaster maintains four complementary demo productions. They are not four
+versions of the same sample film; each has a distinct validation responsibility.
 
-A second validation target should prevent the product from being shaped only
-around the needs of Singular.
+### Demo 1 — The Last Signal
 
-This target is **not a new production starting from zero**. The existing
-**Demo Reel Amiga** project should evolve into Cine Toaster's own
-demonstration/advertisement, produced using Cine Toaster itself.
+**Role: technical/control demo and regression fixture.**
 
-The Amiga material remains part of the creative identity of the project while
-its product purpose expands: it becomes a continuous dogfooding production that
-both showcases audiovisual work and proves how Cine Toaster produces it.
+The existing `examples/demo-project` remains intentionally small and
+controlled. It exercises the native project structure, screenplay, scenes and
+shots, real take files, rejected alternatives, measured geography, line of
+action, checks, comparison and selection.
 
-The conceptual reference is the classic style of Video Toaster product
-demonstration: first establish what the system can do, then demonstrate those
-capabilities in actual use. The goal is not to reproduce a historical video
-shot-for-shot, but to adopt that two-act communication structure.
+Its value is repeatability. It should remain cheap enough to use while
+developing the runtime and schemas rather than growing into a showcase
+production.
 
-### Act I — What Cine Toaster can do
+### Demo 2 — Amiga Demo Reel / Cine Toaster Self-Demo
 
-The first movement presents the product proposition and major production
-capabilities. Depending on the maturity of the product at production time this
-may include screenplay intelligence, directing/shot planning, storyboard and
-3D previs, generative production, takes and continuity, editing, VFX/titles,
-sound, finishing, Digital Workforce, FinOps and Studio Analytics.
+**Role: product showcase, commercial communication and continuous dogfooding.**
 
-Only capabilities that can actually be demonstrated should be claimed.
+The existing Amiga Demo Reel evolves rather than being replaced by a new
+advertisement. Its Amiga heritage remains part of its creative identity and
+connects Cine Toaster to the historical Video Toaster idea of demonstrating a
+production system through audiovisual work.
 
-### Act II — Cine Toaster doing it
-
-The second movement reveals those capabilities through the production of the
-Demo Reel Amiga / advertisement itself.
-
-The demonstration should expose enough of the real workflow to make the claim
-self-evident:
+The reel adopts a two-movement communication structure:
 
 ```text
-describe capability
-       |
-       v
-show Cine Toaster using capability
-       |
-       v
-show resulting audiovisual artifact
-       |
-       v
-show how it participates in the finished advertisement
+Act I: establish what Cine Toaster can do
+                  |
+                  v
+Act II: show Cine Toaster doing it while producing the demo itself
 ```
 
-This creates a recursive proof:
+As capabilities mature, they may be incorporated when they strengthen the
+piece. The reel must not become an exhaustive feature checklist.
 
-> Cine Toaster is capable of producing this kind of audiovisual work, and the
-> Demo Reel Amiga / advertisement making that claim was itself produced by
-> Cine Toaster.
+### Demo 3 — Animated Short
 
-### Continuous dogfooding
+**Role: animation and stylised-character production.**
 
-Because the Demo Reel Amiga already exists as a Cine Toaster demo project, it
-can evolve with the product rather than being treated as a one-off launch
-commercial. As important capabilities become production-ready, the team can
-decide whether they deserve to be demonstrated in the reel.
+This demo should prove that Project Core is not implicitly restricted to
+live-action/generative-film assumptions. It should exercise concepts such as
+character and style bibles, model sheets or equivalent references, poses,
+expressions, backgrounds/layout, recurring character consistency, voice,
+lip-sync and generative or hybrid animated performance.
 
-This does not mean the reel must become an exhaustive feature checklist. Its
-first responsibility remains to work as an audiovisual piece; product
-capabilities should appear when they strengthen the demonstration.
+The purpose is not to mandate a particular animation technique or engine. It is
+to ensure Cine Toaster can represent and manage animation as a genuine
+production modality.
 
-### Why this is a separate validation target
+### Demo 4 — Music / Visual Piece
 
-Singular stresses **long-form narrative filmmaking, continuity and cinematic
-quality**.
+**Role: music-driven and non-dialogue-led audiovisual production.**
 
-The self-demo stresses a different profile:
+A short visual/music piece should stress timing and rhythm rather than making
+screenplay dialogue the dominant organising principle. It can exercise beat
+and musical structure, audiovisual synchronisation, rhythmic editing,
+expressive camera work, transitions, VFX, motion graphics, sound/music
+workflow and experimental generative imagery.
 
-- short-form/commercial communication;
-- product storytelling;
-- interface/product capture;
-- graphics, titles and motion design;
-- fast editorial rhythm;
-- deliberate demonstration of capabilities;
-- potentially different generation, sound and finishing patterns.
+This demo is especially useful for discovering assumptions that every
+production naturally follows `screenplay -> scene -> shot`. Music-driven work
+may instead require relationships such as
+`music -> time/beat -> segment -> shot/visual event`.
 
-Together they reduce the risk that Cine Toaster becomes a bespoke Singular
-production pipeline disguised as a general product.
-
-## Validation matrix
-
-The two targets should overlap where appropriate but need not exercise every
-capability equally.
+## Coverage model
 
 ```text
-                         Singular opening       Demo Reel Amiga / self-demo
-Narrative continuity          primary                 secondary
-Character consistency         primary                 optional
-Abstract imagery              primary                 useful
-3D previs / blocking          primary                 demonstrable
-Generation / takes            primary                 primary
-VFX / titles                  primary                 primary
-Sound / music                 primary                 primary
-Product/UI storytelling       low                     primary
-Digital Workforce             observed                demonstrated
-FinOps                        observed                demonstrable
-Studio Analytics              observed                demonstrable
-Long-form readiness           proxy                   low
-Short-form/commercial         low                     primary
+REAL PRODUCTION
+  Singular
+    -> feature-film reality
+    -> artistic and narrative requirements
+    -> long-form continuity
+    -> production walls discovered in practice
+
+DEMO PRODUCTIONS
+  The Last Signal
+    -> engineering / regression / controlled production state
+
+  Amiga Demo Reel
+    -> product / commercial / UI / dogfooding
+
+  Animated Short
+    -> animation / stylisation / recurring animated characters
+
+  Music / Visual Piece
+    -> rhythm / music / VFX / non-narrative audiovisual structure
 ```
+
+Capabilities such as vertical delivery, localisation, subtitles,
+accessibility, HDR, multiple masters and alternative aspect ratios should not
+automatically create additional demo projects. Where practical, they should be
+tested as variants or deliveries of these productions.
+
+Documentary/factual production remains a currently uncovered modality. It
+introduces additional concerns such as research, evidence, archival material,
+rights and factual provenance and does not require a dedicated demo until that
+scope becomes a real product need.
 
 ## Product principle
 
-These targets are **reference productions, not special cases in code**.
+Real productions and demos are **evidence sources, not special cases in code**.
 
-No Project Core concept should depend on Singular, on the self-demo, or on a
-specific provider/model. When either target exposes a missing capability, the
-solution should be expressed as a reusable production concept when justified.
+No Project Core concept should depend on Singular, The Last Signal, the Amiga
+Demo Reel, the Animated Short, the Music / Visual Piece, or a specific
+provider/model. When one of them exposes a missing capability, the solution
+should be expressed as a reusable production concept when justified.
 
-A capability should not be added merely to satisfy a checklist. The validation
-productions exist to discover real production walls and to test whether Cine
-Toaster can solve them coherently.
+The distinction is intentional:
+
+> Singular does not exist to demonstrate Cine Toaster. Cine Toaster exists to
+> help produce Singular and other audiovisual work. Demo productions exist to
+> exercise and demonstrate Cine Toaster.
 
 ## Evidence of progress
 
-Progress should increasingly be reported in terms of production evidence:
+Across both real and demo productions, useful evidence includes end-to-end
+coverage, undocumented workarounds, durable decisions and human gates, takes
+and approval outcomes, continuity/rework, execution time, provider/resource
+profile, reconciled cost, compute efficiency and capability
+adoption/effectiveness in Studio Analytics.
 
-- how much of each target can pass end to end;
-- where manual or undocumented workarounds remain;
-- which human gates and agent decisions are durable;
-- how many attempts/takes are required;
-- continuity and approval outcomes;
-- execution time and bottlenecks;
-- provider/resource profile;
-- reconciled cost and compute efficiency;
-- capability adoption/effectiveness visible in Studio Analytics.
-
-This makes the validation productions shared benchmarks for Production,
-Digital Workforce, Studio Engineering, FinOps and Studio Analytics.
+Interpret that evidence according to the production's purpose. A technical
+fixture optimises for repeatability; a showcase must communicate; an animation
+demo must prove its modality; a music piece must work audiovisually; and a real
+film must first work as a film.
