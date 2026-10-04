@@ -27,7 +27,9 @@ class CatalogTests(unittest.TestCase):
         titles = {item["id"] for item in list_titles()}
         for item in styles:
             with self.subTest(item["id"]):
-                self.assertTrue(item["prompt"] and item["says"])
+                self.assertTrue(item["says"])
+                # Direction and technique change what is rendered; a format may only change the delivery.
+                self.assertTrue(item["prompt"] or item["axis"] == "format", item["id"])
                 self.assertLessEqual(set(item["camera"]["prefer"] + item["camera"]["avoid"]), moves)
                 self.assertLessEqual(set(item["editing"]["prefer_transitions"] + item["editing"]["avoid_transitions"]),
                                      transitions)

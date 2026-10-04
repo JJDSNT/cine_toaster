@@ -111,9 +111,11 @@ def _voice(production: dict[str, Any], scene: dict[str, Any], who: str) -> tuple
                    if key in {cast_key(n) for n in [m["id"], m["label"], *m.get("names", [])]}), None)
     refer = {cast_key(k): str(v) for k, v in (scene.get("refer_as") or {}).items()}.get(key) or who.title()
     state = {cast_key(k): str(v) for k, v in (scene.get("voice_state") or {}).items()}.get(key, "")
-    identity = ((member or {}).get("voice") or {}).get("described", "")
+    # The nearest wins, as for looks and styles: a voice the scene restates is the voice in this scene
+    # (the check still asks the author to keep only the state there); else the sheet's identity.
+    identity = {cast_key(k): str(v) for k, v in (scene.get("voices") or {}).items()}.get(key, "")
     if not identity:
-        identity = {cast_key(k): str(v) for k, v in (scene.get("voices") or {}).items()}.get(key, "")
+        identity = ((member or {}).get("voice") or {}).get("described", "")
     voice = f"{identity}; now {state}" if identity and state else (identity or state)
     return refer, " ".join(voice.split())
 
@@ -198,7 +200,8 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
             lines.append(Line(refer, line.get("en") or line.get("text") or "", manner, voice))
         sound = shot.get("sound")
         prompts.append(ShotPrompt(picture, _camera(scene, shot), shot.get("description") or "", lines,
-                                  sound if isinstance(sound, str) else "", _acting(production, scene, shot)))
+                                  sound if isinstance(sound, str) else "", _acting(production, scene, shot),
+                                  str(shot.get("holds") or "setting")))
     # The style in force reaches the model in words of craft, never a name (CT-0049).
     style = (scene.get("style") or {}).get("prompt", "")
     frames = requested_cuts(block.durations, FPS)

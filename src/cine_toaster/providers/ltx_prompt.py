@@ -32,6 +32,18 @@ class ShotPrompt:
     sound: str = ""
     #: How the people in it feel, as behaviour to act (the emotion catalog, CT-0048).
     acting: list[str] = field(default_factory=list)
+    #: What holds still in a single shot (`holds`): the setting, all but the light, or the setting with
+    #: people free to enter or leave (SINGULAR's `so_a_luz` and `entra_sai`).
+    holds: str = "setting"
+
+
+#: A single shot's sentence on what stays as in the first frame, by `holds` (SINGULAR's rules of 17/09).
+HOLDS = {
+    "setting": "The setting stays exactly as in the first frame and nobody else enters the frame.",
+    "light": "The camera, the framing and every object stay exactly as in the first frame, only the light "
+             "changes, and nobody else enters the frame.",
+    "open": "The setting stays exactly as in the first frame.",
+}
 
 
 def _sentence(text: str) -> str:
@@ -74,6 +86,9 @@ def block_prompt_sections(shots: list[ShotPrompt], style: str = "") -> list[str]
         camera = shot.camera.rstrip(".")
         if index == 0:
             parts += [_sentence(shot.picture), _sentence(f"Camera: {camera}") if camera else ""]
+            if len(shots) == 1:
+                # A single shot says what holds right after the camera, before the action (SINGULAR's order).
+                parts.append(HOLDS.get(shot.holds, HOLDS["setting"]))
         else:
             opening = "A hard cut transitions to a new shot" + (f", {camera}" if camera else "")
             parts.append(f"{opening}: {_lower_first(shot.picture)}." if shot.picture else f"{opening}.")
@@ -85,10 +100,10 @@ def block_prompt_sections(shots: list[ShotPrompt], style: str = "") -> list[str]
         sections.append(" ".join(" ".join(part for part in parts if part).split()))
     constant = "The setting, the light and the voices stay the same across the cuts, and nobody else enters the frame."
     if len(shots) == 1:
-        constant = "The setting stays exactly as in the first frame and nobody else enters the frame."
+        constant = ""  # said after the camera
     # One sound for the block: it is one continuous room.
     sound = next((shot.sound for shot in shots if shot.sound), "quiet room")
-    closing = [constant + ("" if spoken else " Nobody speaks."),
+    closing = [(constant + ("" if spoken else " Nobody speaks.")).strip(),
                *([f"Style: {style.rstrip('.')}."] if style else []),
                f"Sound: {sound}{', continuing across the cuts' if len(shots) > 1 else ''}. No music."]
     sections.append(" ".join(" ".join(closing).split()))

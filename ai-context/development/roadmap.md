@@ -163,6 +163,36 @@ records stay open on purpose: `CT-0020`, `CT-0028`, `CT-0041` (future, not
 started), `CT-0052` (paused by the user after phase 1), `CT-0053` (awaiting
 the user's approval).
 
+### The documents of 2026-10-04 and their priority
+
+The user added `docs/production-validation.md`, `docs/ltx-production-finishing-roadmap.md`,
+`docs/production-agents.md`, `docs/finops.md`, `docs/studio-analytics.md`,
+`docs/deployment-topology.md` and a negative-guidance section in `docs/generation.md`.
+Agreed order (2026-10-04):
+
+1. **Now**, serving SINGULAR's first milestone, "Prologue to Title" (1-01 to 1-04,
+   `production-validation.md`), no paid generation:
+   1. ~~generation parity on 1-01...1-04~~ done as a reference (CT-0055): the user
+      will remake the sequence from scratch in Cine Toaster, keeping only the
+      screenplay -- so what matters next is the path from screenplay to finished
+      shots inside Cine Toaster, not matching SINGULAR;
+   2. negative guidance as a production concept (`generation.md`);
+   3. the first slice of the Producer role: a deterministic status per sequence
+      (approved, awaiting generation, blocked, next decisions) from the records
+      already kept -- also the first seed of Studio Analytics;
+   4. FinOps steps 2-3: what Runpod's billing really exposes (read-only), and every
+      job recording the provider's execution id.
+2. **Next, when a real shot asks**: a finishing spike -- delivery resolution (SeedVR2
+   against LTX TiledFusion, CT-0053 reframed as a capability), Refine Details --
+   paid, with the user's approval of the estimate; a minimal continuity ledger for
+   SINGULAR (the Script Supervisor role, first in `production-agents.md`); stems for
+   Ardour.
+3. **Later**: Layout-to-Render (after the user revisits the rule that the 3D board
+   never controls the model); the animated and the music-driven demos; the
+   Workforce, FinOps and Analytics consoles -- never before the data behind them is
+   reliable; Studio Engineering and the Meta-agent; HDR, Restore; deployment
+   experiments.
+
 ### Waiting for the user
 
 - Re-check Kael's converted voice (`CT-0040`).

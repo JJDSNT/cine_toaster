@@ -215,7 +215,7 @@ def convert_scene(document: dict[str, Any], report: Report, scene_id: str,
 
 #: SINGULAR's montage fields that become a title, effects or sound fields (from cena_ltx.py: `cartela`, the clip's vf/af).
 MONTAGE = {"texto_tela", "corpo", "cor_texto", "pos", "fade", "texto_entra", "espacado", "escurece", "espelhar",
-           "recorte", "silenciar", "som_baixa_de"}
+           "recorte", "silenciar", "som_baixa_de", "so_a_luz", "entra_sai"}
 POSITIONS = {"rodape": "bottom", "alto": "top"}
 #: The frame SINGULAR's LTX takes are made at: `recorte` is in its pixels.
 TAKE_FRAME = (1280, 704)
@@ -333,6 +333,12 @@ def convert_shot(shot: dict[str, Any], report: Report, scene_id: str) -> dict[st
             else:
                 report.keep(f"shot.{key}")
     out.update(montage)
+    if shot.get("so_a_luz"):
+        out["holds"] = "light"  # SINGULAR: only the light changes
+        report.converted.append(f"{scene_id} P{shot.get('n')}: so_a_luz -> holds: light")
+    elif shot.get("entra_sai"):
+        out["holds"] = "open"  # SINGULAR: someone enters or leaves on purpose
+        report.converted.append(f"{scene_id} P{shot.get('n')}: entra_sai -> holds: open")
     if shot.get("montagem_pov"):
         # SINGULAR keeps a POV montage's opening (cena_ltx.py `corte`: ini_min = 0 for montagem_pov): the effect
         # starts at the first frame. An explicit cut-in at 0 says the same here.

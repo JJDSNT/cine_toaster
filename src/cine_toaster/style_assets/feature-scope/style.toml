@@ -12,7 +12,8 @@ colour = "the film's own look"
 sound = "the film's own mix; 5.1 when it is delivered to a cinema or a home theatre"
 titles = ["film-title", "card", "credits-roll"]
 # What a video model is told about the image, in words of craft.
-prompt = "cinematic widescreen composition, the subject placed in the central band of the frame"
+# A delivery format: it changes how the cut is framed, not what the model renders.
+prompt = ""
 use_when = ["A feature or a short made for the big screen"]
 avoid_when = ["Social video, where the frame is vertical"]
 

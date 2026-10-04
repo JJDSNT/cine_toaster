@@ -214,6 +214,7 @@ def _load_shots(
                 "trim": field(raw, "trim") if isinstance(field(raw, "trim"), dict) else None,
                 # The take's sound silenced in stretches, and faded from a point (CT-0054, SINGULAR's
                 # `silenciar` and `som_baixa_de`).
+                "holds": vtext(raw, "holds") or "setting",
                 "mute": [list(map(float, item)) for item in field(raw, "mute") or [] if isinstance(item, list) and len(item) == 2],
                 "sound_fades_at": float(field(raw, "sound_fades_at")) if field(raw, "sound_fades_at") not in (None, "") else None,
                 # Where a format's frame sits in the take (CT-0049): {x, y}, 0 to 1, centred by default.

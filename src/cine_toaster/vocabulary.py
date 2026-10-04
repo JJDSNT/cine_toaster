@@ -154,6 +154,9 @@ CORE_SHOT_FIELDS: frozenset[str] = frozenset(
         # CT-0054: stretches of the take's sound silenced ([[from, to]], take seconds), and where it fades out.
         "mute",
         "sound_fades_at",
+        # What holds still in a single generated shot: setting (default), light (only the light changes),
+        # open (people may enter or leave).
+        "holds",
         "duration",
         "camera",
         "camera_id",

@@ -118,6 +118,57 @@ def _approved(root: Path, scene: dict[str, Any], shot: dict[str, Any]) -> Path |
     return None
 
 
+def _declared_start(work: Path, root: Path, scene: dict[str, Any], shot: dict[str, Any]) -> Path | None:
+    for item in shot.get("from") or []:
+        if not isinstance(item, dict):
+            continue
+        relation, ref = str(item.get("relation") or ""), str(item.get("ref") or "")
+        if relation in ("last_frame_of", "usa_ultimo_de"):
+            return last_frame(work, root, scene, ref)
+        if relation in ("file", "usa_arquivo"):
+            path = (root / scene["file"]).parent / ref
+            if path.is_file():
+                return path.resolve()
+        if relation in ("picture_of", "usa", "usa_de"):
+            for stem in _picture_stems(ref):
+                for suffix in (".png", ".jpg", ".jpeg", ".webp"):
+                    if (work / f"{stem}{suffix}").is_file():
+                        return work / f"{stem}{suffix}"
+    return None
+
+
+def last_frame(work: Path, root: Path, scene: dict[str, Any], ref: str) -> Path | None:
+    """The last frame of a shot's clip: kept beside it when the production made it (`p01-ultimo.png`),
+    else drawn into the operational cache (disposable) from its clip."""
+
+    import shutil
+    import subprocess
+
+    from .takes import shot_key
+
+    source = next((item for item in scene["shots"] if shot_key(item.get("number")) == shot_key(ref)), None)
+    if source is None:
+        return None
+    takes = [take for take in source.get("takes") or [] if take.get("media")]
+    take = next((t for t in takes if t.get("selected")), None) or next((t for t in takes if t["id"] == "CUT"), None)
+    clip = root / take["media"] if take else None
+    for stem in _picture_stems(ref):
+        kept = work / f"{stem}-ultimo.png"
+        if kept.is_file() and (clip is None or kept.stat().st_mtime >= clip.stat().st_mtime):
+            return kept
+    if clip is None or not clip.is_file() or not shutil.which("ffmpeg"):
+        return None
+    from .jobs import state_root
+
+    frame = state_root() / "last-frames" / f"{scene['id']}-{shot_key(ref)}-{int(clip.stat().st_mtime)}.png"
+    if not frame.is_file():
+        frame.parent.mkdir(parents=True, exist_ok=True)
+        # Decode the whole tail: a single-frame seek lands frames before the end (SINGULAR, 18/09).
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-sseof", "-1", "-i", str(clip), "-an",
+                        "-fps_mode", "passthrough", "-update", "1", str(frame)], check=False, timeout=120)
+    return frame if frame.is_file() else None
+
+
 def reference_picture(work: Path, root: Path, scene: dict[str, Any], shot: dict[str, Any]) -> Path | None:
     """The picture a shot's slice should look like.
 
@@ -135,6 +186,11 @@ def reference_picture(work: Path, root: Path, scene: dict[str, Any], shot: dict[
         path = root / shot["still"]
         if path.is_file():
             return path
+    # A first frame the breakdown declares wins over any picture of the shot's own (SINGULAR's `origem`:
+    # the last frame of another shot, a file, another shot's picture).
+    declared = _declared_start(work, root, scene, shot)
+    if declared is not None:
+        return declared
     names = [str(shot.get("number") or "")]
     for item in shot.get("from") or []:
         if isinstance(item, dict) and item.get("ref"):
