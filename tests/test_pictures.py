@@ -142,6 +142,7 @@ class PictureTests(unittest.TestCase):
         self.assertEqual((record["kind"], record["seed"], record["references"][0]["member"]), ("picture-derivation", 4, "MARA"))
         self.assertEqual(record["source"]["path"], "scenes/030-echo-chamber/blockout/cam-a.png")
         self.assertGreater(record["edge_score"], 17)  # a flat grey edit of a flat grey source
+        self.assertEqual((record["execution"]["id"], record["execution"]["delay_ms"]), ("edit-1", 1000))
         sent = fake.calls[0][1]["input"]
         self.assertEqual(sorted(key for key in sent if key.startswith("image_base64")), ["image_base64", "image_base64_2"])
         self.assertAlmostEqual(spend.spent(), 31 * 1.58 / 3600, places=4)

@@ -90,6 +90,38 @@ document which are available to the account/product being used:
 - [ ] API retention/history limits;
 - [ ] rate limits and permissions required for read-only FinOps access.
 
+### Verified on 2026-10-04 (CT-0058, read-only, this account)
+
+Read through the Runpod v2 REST billing surface (the Runpod MCP tools
+`list-billing`, `list-serverless-billing`, `list-endpoints`):
+
+- **Billing API**: yes, read-only, aggregated by time bucket (`hour`, `day`,
+  `week`, `month`, `year`; RFC 3339 UTC boundaries).
+- **Granularity**: serverless spend is itemised **per endpoint per bucket**,
+  split into `gpuAmount`, `diskAmount`, `cpuAmount`, `feeAmount`. The account
+  total adds pods, storage (standard and high-performance), public endpoints
+  and clusters. **No per-job line exists.**
+- **IDs**: billing carries the endpoint id (`serverlessId`) only. The job id,
+  `workerId`, `delayTime` and `executionTime` (milliseconds) come from the job's
+  own `/run` and `/status` responses. Cine Toaster already keeps those beside
+  each take (`<take>.job.json`) and in the spend ledger (`remote`).
+- **Units and rates**: amounts only, with no usage seconds and no price per
+  hour in the billing records. The currency field is absent (the console uses
+  USD).
+- **Not verified**: credits, discounts and balance; native tags or labels (none
+  appear in the records); retention beyond the 30 days read; rate limits.
+
+Consequence for reconciliation: a job's provider-authoritative cost can only be
+**allocated**, not read. The billed amount of an endpoint for one hour is shared
+among the Cine Toaster jobs that ran on it in that hour, in proportion to their
+`delayTime + executionTime`. The remainder (idle workers inside
+`idleTimeout`, cold starts not seen by a job, disk) stays **unattributed**
+and is reported as such, never spread silently. On this account, September
+billed US$36.44 serverless over 8 endpoints, while the Cine Toaster ledger
+recorded about US$0.58: most spend came from tools outside Cine Toaster.
+Reconciliation must expect spend that has no Cine Toaster job. October so far
+is US$0.89, all standard storage (a network volume) and no job's cost.
+
 Do not infer a Runpod feature from this proposal. The adapter should expose only
 capabilities verified against the provider.
 

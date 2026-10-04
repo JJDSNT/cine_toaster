@@ -180,8 +180,8 @@ Agreed order (2026-10-04):
    3. ~~the first slice of the Producer role: a deterministic status per sequence~~
       done (CT-0057): `toast status`, `/api/status`, MCP `production_status`,
       the Sequences room;
-   4. FinOps steps 2-3: what Runpod's billing really exposes (read-only), and every
-      job recording the provider's execution id.
+   4. ~~FinOps steps 2-3~~ done (CT-0058): billing is per endpoint per hour, never
+      per job, so costs are allocated; provenance carries the execution id.
 2. **Next, when a real shot asks**: a finishing spike -- delivery resolution (SeedVR2
    against LTX TiledFusion, CT-0053 reframed as a capability), Refine Details --
    paid, with the user's approval of the estimate; a minimal continuity ledger for

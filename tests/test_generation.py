@@ -170,6 +170,9 @@ class GenerateBlockTests(unittest.TestCase):
         self.assertEqual((provenance["seed"], provenance["shots"], provenance["guides"][1]["frame"]), (7, ["P2", "P3"], 216))
         self.assertEqual(len(provenance["guides"][0]["digest"]), 16)
         self.assertTrue((self.work / "bA-1.mp4.job.json").is_file())
+        # The provider's own execution id, the key billing is reconciled with (CT-0058).
+        self.assertEqual({key: provenance["execution"][key] for key in ("provider", "id", "execution_ms")},
+                         {"provider": "runpod", "id": "remote-1", "execution_ms": 120000})
         sent = fake.calls[0][1]["input"]
         self.assertEqual([image["name"] for image in sent["images"]], ["frame.png", "guide0.png", "guide1.png"])
         # What the platform billed is in the ledger.

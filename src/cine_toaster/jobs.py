@@ -1211,6 +1211,21 @@ def _settle_remote(pending: Path, staged: Path | None) -> None:
         pending.unlink(missing_ok=True)
 
 
+def _execution(record_path: Path) -> dict[str, Any]:
+    """Who ran the paid work, as the provider names it: the key FinOps reconciles billing with (CT-0058).
+
+    Runpod bills per endpoint and hour, never per job; the job id, worker and
+    milliseconds are what lets a billed hour be shared among the jobs in it.
+    """
+
+    record = json.loads(record_path.read_text(encoding="utf-8") or "{}") if record_path.is_file() else {}
+    if not record.get("id"):
+        return {}
+    return {"provider": "runpod", "endpoint": record.get("endpoint", ""), "id": record["id"],
+            "worker": record.get("workerId", ""), "status": record.get("status", ""),
+            "delay_ms": record.get("delayTime", 0), "execution_ms": record.get("executionTime", 0)}
+
+
 def _record_spend(context: JobContext, record_path: Path, rate: float, what: str, estimate_usd: float) -> float:
     """What the platform billed is spent whatever the outcome; returns it."""
 
@@ -1284,7 +1299,7 @@ def _run_generate(context: JobContext) -> dict[str, Any]:
         "shots": plan.shots,
         "provider": result.provider, "model": result.model, "seed": plan.seed, "seconds": plan.seconds,
         **plan.public_dict(root), "settings": result.provenance,
-        "cost_usd": round(cost, 4), "job_id": context.job_id,
+        "cost_usd": round(cost, 4), "job_id": context.job_id, "execution": _execution(record_path),
     }
     (context.staging / f"{name}.provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
     destination = (home / name).relative_to(root).as_posix()
@@ -1446,7 +1461,8 @@ def _run_picture(context: JobContext) -> dict[str, Any]:
     score = edge_score(output, plan.source)
     provenance = {"kind": "picture-derivation", **plan.public_dict(root), "settings": settings,
                   "feedback": context.params.get("feedback"),
-                  "edge_score": score, "cost_usd": round(cost, 4), "job_id": context.job_id}
+                  "edge_score": score, "cost_usd": round(cost, 4), "job_id": context.job_id,
+                  "execution": _execution(record_path)}
     (context.staging / f"{name}.provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
     destination = (work / name).relative_to(root).as_posix()
     files = [{"staged": name, "destination": destination},
