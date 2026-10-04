@@ -54,6 +54,8 @@ class PicturePlan:
     notes: list[str] = field(default_factory=list)
     avoid: list[str] = field(default_factory=list)
     avoid_mechanism: str = ""
+    #: What holds when the shot begins (the continuity ledger, CT-0059): shown to the author, not sent.
+    continuity: list[str] = field(default_factory=list)
 
     def public_dict(self, root: Path) -> dict[str, Any]:
         return {
@@ -63,7 +65,7 @@ class PicturePlan:
                            for ref in self.references],
             "request": self.request, "prompt": self.prompt, "seed": self.seed,
             "width": self.size[0], "height": self.size[1], "estimate_usd": self.estimate_usd, "notes": self.notes,
-            "avoid": self.avoid, "avoid_mechanism": self.avoid_mechanism,
+            "avoid": self.avoid, "avoid_mechanism": self.avoid_mechanism, "continuity": self.continuity,
         }
 
 
@@ -233,7 +235,11 @@ def plan_picture(root: Path, production: dict[str, Any], scene_id: str, shot_id:
 
     avoid = avoidance(production, scene, [shot])
     avoided = f"Avoid: {'; '.join(item.rstrip('.') for item in avoid)}." if avoid else ""
+    from .continuity import describe, state_at
+
+    continuity = describe(state_at(production, scene_id, shot_id), scene_id)
     return PicturePlan(
+        continuity=continuity,
         scene=scene_id, shot=shot_id, stem=picture_stem(work_directory_for(root / scene["file"]), str(shot["number"])),
         source=source,
         references=references, request=derive["request"],

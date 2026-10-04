@@ -62,6 +62,7 @@ class McpTests(unittest.TestCase):
             self.assertNotIn(forbidden, names)
         reads = {tool.name for tool in anyio.run(self.server.list_tools) if tool.annotations.read_only_hint}
         self.assertIn("plan_generation", reads)
+        self.assertTrue({"production_status", "continuity_ledger"} <= reads)
         self.assertNotIn("generate", reads)
 
     def test_it_reads_the_film(self) -> None:

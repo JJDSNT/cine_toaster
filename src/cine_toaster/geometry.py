@@ -13,6 +13,9 @@ from .errors import ValidationError
 CHECK_CODES = frozenset(
     {
         "axis_break",
+        "continuity_break",
+        "continuity_problem",
+        "continuity_unconfirmed",
         "axis_subject_missing",
         "camera_outside_room",
         "chain_pose_mismatch",

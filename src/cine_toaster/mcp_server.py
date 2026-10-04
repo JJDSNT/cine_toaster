@@ -181,6 +181,19 @@ def build(root: Path, manager=None):
                 "elements": list_elements(runtime.root)}
 
     @server.tool(annotations=reading)
+    def continuity_ledger(scene: str = "", shot: str = "") -> dict[str, Any]:
+        """The continuity ledger: what holds from scene to scene (cast variant, declared facts such as wardrobe,
+        props, time, weather), and its breaks. With a scene (and a shot), what holds there."""
+        from .continuity import ledger, state_at
+
+        production = runtime.production()
+        if scene:
+            return state_at(production, scene, shot)
+        report = ledger(production)
+        return {"scenes": report["scenes"],
+                "findings": {key: [item.public_dict() for item in value] for key, value in report["findings"].items()}}
+
+    @server.tool(annotations=reading)
     def production_status(sequence: str = "") -> dict[str, Any]:
         """Where the production stands, by sequence and scene: shots with a take, waiting for a choice or for
         generation; the latest version and its verdict; blockers; the decisions that come next."""

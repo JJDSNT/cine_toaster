@@ -30,9 +30,10 @@ SINGULAR is migrated into ~/films/singular in Cine Toaster's own format
 versions with the author's verdicts), cast, looks, locations and sounds.
 Generation parity (CT-0055, a reference only), negative guidance (CT-0056),
 the Producer status (CT-0057, `toast status`) and FinOps steps 2-3 (CT-0058)
-are done: the "Now" queue is empty. Next recommended action: the minimal
-continuity ledger (the Script Supervisor role), which needs no paid
-generation. Then FinOps steps 4-5 (a read-only Runpod cost observation, and
+are done, and so is the minimal continuity ledger (CT-0059, `toast
+continuity`). It asks the author one real question about SINGULAR: is 1-02A
+continuous with 1-02, where Kael's variant changes? Next recommended
+action: FinOps steps 4-5 (a read-only Runpod cost observation, and
 allocation of each billed hour among its jobs). Waiting for the user: Kael's
 voice re-check, the 4K/finishing spike's cost, what feeds the 5.1, and
 switching the working folder to ~/films/singular.

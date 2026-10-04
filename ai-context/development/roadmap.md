@@ -184,8 +184,8 @@ Agreed order (2026-10-04):
       per job, so costs are allocated; provenance carries the execution id.
 2. **Next, when a real shot asks**: a finishing spike -- delivery resolution (SeedVR2
    against LTX TiledFusion, CT-0053 reframed as a capability), Refine Details --
-   paid, with the user's approval of the estimate; a minimal continuity ledger for
-   SINGULAR (the Script Supervisor role, first in `production-agents.md`); stems for
+   paid, with the user's approval of the estimate; ~~a minimal continuity ledger for
+   SINGULAR~~ done (CT-0059); stems for
    Ardour.
 3. **Later**: Layout-to-Render (after the user revisits the rule that the 3D board
    never controls the model); the animated and the music-driven demos; the

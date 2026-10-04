@@ -304,6 +304,20 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
                                                              "avoid_when", "params", "engine", "effect", "origin")},
                               "unavailable": engine_missing(item["engine"])} for item in list_titles(self.project_root)])
             return
+        if parsed.path == "/api/continuity":
+            # The continuity ledger (CT-0059); with ?scene= (and &shot=), what holds there.
+            from .continuity import ledger, state_at
+
+            production = load_production(self.project_root)
+            scene_id = query.get("scene", [""])[0]
+            if scene_id:
+                self._send_json(state_at(production, scene_id, query.get("shot", [""])[0]))
+            else:
+                report = ledger(production)
+                self._send_json({"scenes": report["scenes"],
+                                 "findings": {key: [item.public_dict() for item in value]
+                                              for key, value in report["findings"].items()}})
+            return
         if parsed.path == "/api/status":
             # Where the production stands (the Producer's report): read from the records, nothing decided.
             from .producer import production_status

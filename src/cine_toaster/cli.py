@@ -458,6 +458,12 @@ def command_generate(args: argparse.Namespace) -> int:
         if getattr(plan, "negative", ""):
             print(f"  negative conditioning sent: {plan.negative}")
         print()
+    if getattr(plan, "continuity", None):
+        # What the ledger says holds here (CT-0059): for the author to check against the prompt; not sent.
+        print("continuity in force:")
+        for line in plan.continuity:
+            print(f"  {line}")
+        print()
     if args.dry_run:
         print("Nothing was sent (--dry-run).")
         return 0
@@ -823,6 +829,29 @@ def command_sound(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_continuity(args: argparse.Namespace) -> int:
+    """The continuity ledger (CT-0059): what holds from scene to scene, or at one shot."""
+
+    from .continuity import describe, ledger, render_text, state_at
+
+    production = load_production(Path(args.project).expanduser().resolve())
+    if args.scene:
+        state = state_at(production, args.scene, args.shot or "")
+        if args.json:
+            print(json.dumps(state, indent=2, ensure_ascii=False))
+        else:
+            print("\n".join(describe(state, args.scene)) or "Nothing declared holds here.")
+        return 0
+    report = ledger(production)
+    if args.json:
+        print(json.dumps({"scenes": report["scenes"],
+                          "findings": {key: [item.public_dict() for item in value]
+                                       for key, value in report["findings"].items()}}, indent=2, ensure_ascii=False))
+    else:
+        print(render_text(report))
+    return 0
+
+
 def command_status(args: argparse.Namespace) -> int:
     """Where the production stands, sequence by sequence: the Producer's report (docs/production-agents.md)."""
 
@@ -989,6 +1018,12 @@ def command_picture(args: argparse.Namespace) -> int:
             print(f"  - {item}")
         if getattr(plan, "negative", ""):
             print(f"  negative conditioning sent: {plan.negative}")
+        print()
+    if getattr(plan, "continuity", None):
+        # What the ledger says holds here (CT-0059): for the author to check against the prompt; not sent.
+        print("continuity in force:")
+        for line in plan.continuity:
+            print(f"  {line}")
         print()
     if args.dry_run:
         print("Nothing was sent (--dry-run).")
@@ -1979,6 +2014,14 @@ def build_parser() -> argparse.ArgumentParser:
         item = vfx_sub.add_parser(name, help=text)
         item.add_argument("project", type=Path)
     vfx_parser.set_defaults(function=command_vfx)
+
+    continuity_parser = subparsers.add_parser(
+        "continuity", help="The continuity ledger: what holds from scene to scene (wardrobe, props, time), and its breaks")
+    continuity_parser.add_argument("project", type=Path)
+    continuity_parser.add_argument("--scene", help="what holds in this scene")
+    continuity_parser.add_argument("--shot", help="... at this shot, after the scene's declared changes")
+    continuity_parser.add_argument("--json", action="store_true")
+    continuity_parser.set_defaults(function=command_continuity)
 
     status_parser = subparsers.add_parser(
         "status", help="Where the production stands: shots with a take or awaiting one, versions, blockers, next decisions")

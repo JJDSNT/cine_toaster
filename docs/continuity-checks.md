@@ -152,7 +152,56 @@ The Cut room shows every join: the two shots, the cut, what the outgoing shot
 leaves framed and what the incoming one finds, the line on each side, and what
 is wrong with it.
 
-## What is deliberately not checked
+## What holds from scene to scene: the ledger
+
+The checks above read one scene. The continuity ledger (CT-0059, the Script
+Supervisor's first slice in `production-agents.md`) reads the film in order
+and carries forward what each scene leaves behind:
+
+- **Cast variants**: which cast variant (look) each character has, from the scene's `cast:`.
+- **Declared facts**: wardrobe, injuries, what someone carries, the state of a
+  prop or a set.
+- **Time and weather**: these are compared only with the previous scene.
+
+```yaml
+continuity:
+  continues: true          # no gap in story time since the previous scene
+  time: night
+  facts:
+    KAEL: {jacket: none, carries: laptop}
+    window: closed         # one state: `subject: value`
+  changes:                 # during this scene, from a shot on
+    - at: P7
+      KAEL: {carries: nothing}
+  exceptions:              # a break the author accepts, and why
+    - {subject: KAEL, attribute: variant, reason: the dream begins here}
+```
+
+A fact stays in force until a scene declares otherwise, so the ledger can say
+what holds at any shot, and where each fact was set:
+
+```text
+toast continuity <project> [--scene S [--shot P]] [--json]
+```
+
+The video and picture plans show the same lines (`continuity in force`) in a
+dry run, beside the prompt. They are for the author to check, and are not sent
+to the model.
+
+What it reports:
+
+- **`continuity_break`** (warning): the scene declares `continues: true`, but a
+  fact differs from the previous scene. The change was not declared there, and
+  no exception accepts it. The author said no time passed, so this is a
+  contradiction, not a guess.
+- **`continuity_unconfirmed`** (advice): nothing is declared, the scene follows
+  the previous one in the same place, and something differs. This is an
+  inference, and the finding says so. It asks a question rather than accusing,
+  and declaring `continues` either way answers it for good.
+- **`continuity_problem`** (error): the block cannot be read.
+
+After `continues: false`, a change is simply recorded.
+
 
 **The axis is never inferred.** It is only checked when the author declares
 `[geometry.axis]`. Two characters in a room do not always define the line, and a

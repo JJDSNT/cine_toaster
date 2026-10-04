@@ -12,6 +12,7 @@ from .movement import check_movement, shot_motions
 from . import screenplay as script_model
 from .blocks import scene_blocks
 from .cast import appearances as cast_appearances, check_cast, load_cast
+from .continuity import ledger as continuity_ledger, parse as parse_continuity
 from .cuts import scene_cuts
 from .looks import load_looks, resolve as resolve_look
 from .state import SceneState, load_scene_state
@@ -826,6 +827,8 @@ def _load_scene(
         "subtitles": _subtitles(document.get("subtitles") if document.get("subtitles") is not None else project_subtitles),
         # A surround mix beside the stereo, as a second track ("5.1", CT-0052).
         "surround": _surround(document.get("surround") if document.get("surround") is not None else project_surround),
+        # What holds from scene to scene (the continuity ledger, CT-0059).
+        "continuity": parse_continuity(document.get("continuity"), [shot["id"] for shot in shots]),
         "findings": findings,
         "decision_log": list(reversed(state.decisions)),
         "pending_shots": pending_shots,
@@ -1565,6 +1568,9 @@ def load_production(root: Path) -> dict[str, Any]:
     for scene_id, found in check_cast(scenes, cast).items():
         scene = next(item for item in scenes if item["id"] == scene_id)
         scene["findings"].extend(finding.public_dict() for finding in found)
+    for scene_id, found in continuity_ledger({"scenes": scenes})["findings"].items():
+        next(item for item in scenes if item["id"] == scene_id)["findings"].extend(
+            finding.public_dict() for finding in found)
 
     sequences = _load_sequences(manifest, scenes, manifest_path)
     for sequence in sequences:

@@ -58,6 +58,8 @@ class BlockPlan:
     avoid: list[str] = field(default_factory=list)
     negative: str = ""
     avoid_mechanism: str = ""
+    #: What holds when the shot begins (the continuity ledger, CT-0059): shown to the author, not sent.
+    continuity: list[str] = field(default_factory=list)
 
     def public_dict(self, root: Path) -> dict[str, Any]:
         return {
@@ -66,7 +68,7 @@ class BlockPlan:
             "guides": [{"role": ref.role, "path": ref.path.relative_to(root).as_posix(), "frame": ref.frame,
                         "digest": ref.digest, "strength": ref.strength} for ref in self.guides],
             "prompt": self.prompt, "prompt_sections": self.sections, "seed": self.seed,
-            "avoid": self.avoid, "negative": self.negative, "avoid_mechanism": self.avoid_mechanism,
+            "avoid": self.avoid, "negative": self.negative, "avoid_mechanism": self.avoid_mechanism, "continuity": self.continuity,
             "estimate_usd": self.estimate_usd, "notes": self.notes,
         }
 
@@ -239,7 +241,11 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
     from .providers.ltx import AVOID_MECHANISM, negative_text
 
     avoid = avoidance(production, scene, [shots[shot_id] for shot_id in block.shots])
+    from .continuity import describe, state_at
+
+    continuity = describe(state_at(production, scene_id, block.shots[0]), scene_id)
     return BlockPlan(
+        continuity=continuity,
         avoid=avoid, negative=negative_text(avoid), avoid_mechanism=AVOID_MECHANISM,
         scene=scene_id, block=block.id, shots=block.shots, seconds=int(seconds), image=references[0],
         guides=guides, prompt=block_prompt(prompts, style), seed=seed, estimate_usd=estimate(seconds, rate), notes=notes,
