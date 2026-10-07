@@ -5,7 +5,7 @@ type: roadmap
 status: active
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-09-29
+updated_at: 2026-10-07
 tags:
   - development
   - roadmap
@@ -221,6 +221,11 @@ Agreed order (2026-10-04):
    through a command; a per-shot brief override.
 6. **Cast lineage** (`CT-0015`): `cast_reference_unused` and
    `_superseded`; master references attached to video generation.
+7. **Blender MCP / DCC-MCP investigation** (`CT-0064`): compare an established
+   Blender-specific MCP, DCC-MCP and the existing deterministic Blender/USD
+   path. Run the inspect -> modify -> preview -> read-back -> deterministic
+   regeneration spike before deciding adopt / narrow-adopt / wrap / defer /
+   reject. This is an explicit next investigation, not a passive backlog note.
 
 ### Later
 
