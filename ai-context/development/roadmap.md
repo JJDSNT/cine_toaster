@@ -227,6 +227,17 @@ Agreed order (2026-10-04):
    regeneration spike before deciding adopt / narrow-adopt / wrap / defer /
    reject. This is an explicit next investigation, not a passive backlog note.
 
+### Active investigation — integrated editing and production architecture (CT-0065)
+
+- [ ] **Audit current editing capabilities** against code: implemented / partial / missing / unknown; identify canonical edit state, timebase, versioning, trim, preview and render contracts.
+- [ ] **Select one representative fixture** with J/L cut, transition, sound stems and an alternative generated take.
+- [ ] **Prototype an editable React timeline** using existing Core commands, with agent proposal/approval and undo; do not create competing edit state.
+- [ ] **Run interoperability and engine spikes**: OpenTimelineIO round-trip/reconform and FFmpeg vs MLT vs GES comparison, with measurable acceptance criteria.
+- [ ] **Evaluate production-wide finishing**: OpenColorIO/ACES, OpenEXR, OFX-host boundary, loudness, delivery profiles and dependency-aware regeneration.
+- [ ] Record findings and decisions in [CT-0065](../work/CT-0065-integrated-editing-and-production-architecture.md); convert validated choices into ADRs and implementation tasks.
+
+This is an active research track, **not** a decision to replace the existing media engine.
+
 ### Later
 
 - Sound: generated sound and music, stems, spatial phases 2-4 (`CT-0048`,
