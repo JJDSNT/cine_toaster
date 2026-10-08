@@ -263,6 +263,14 @@ Track scope and acceptance criteria in [CT-0066](../work/CT-0066-three-workspace
 - [ ] Compare Focus and Review/Expert layout variants using take selection, failed generation and agent approval tasks.
 - [ ] Extend the matrix to Screenplay & Storyboard and Editing & Post-production, and record user-test findings before approving a layout.
 
+### Research — Production Awareness and human situation awareness (CT-0070)
+
+- [x] Map situation awareness, ecological interface design, distributed cognition, attention management and human–AI interaction to Cine Toaster's existing Producer, continuity, FinOps and assistant capabilities ([CT-0070](../work/CT-0070-production-awareness-research.md)).
+- [ ] Verify primary research references and actual Core status, dependency and approval data contracts.
+- [ ] Prototype explainable **state + consequence + action** awareness items using existing records, without a new source of truth.
+- [ ] Compare status-only versus contextual-awareness layouts for stale-take, continuity, failed-job and agent-approval scenarios.
+- [ ] Validate with users before introducing UI components, priority rules or architecture decisions.
+
 ### Later
 
 - Sound: generated sound and music, stems, spatial phases 2-4 (`CT-0048`,
