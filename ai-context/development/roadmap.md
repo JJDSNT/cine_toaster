@@ -248,6 +248,14 @@ This is an active research track, **not** a decision to replace the existing med
 
 Track scope and acceptance criteria in [CT-0066](../work/CT-0066-three-workspace-ux-vision.md). This is a UX investigation, not a commitment to rebuild the existing interface.
 
+### UX follow-up — wireframe validation and human information needs (CT-0067, CT-0068)
+
+- [ ] Preserve the initial three-workspace wireframe as a **non-validated design study** ([CT-0067](../work/CT-0067-three-workspace-wireframe-study.md)); do not treat the three-column layout as approved.
+- [ ] Research situation awareness, cognitive load, progressive disclosure, visual hierarchy and accessible interaction ([CT-0068](../work/CT-0068-human-centered-information-visibility.md)).
+- [ ] Produce a task → decision → required information → Core source matrix, starting with Production.
+- [ ] Compare focused, balanced and advanced-density layouts on laptop and large displays, with user tasks and workload measures.
+- [ ] Update the wireframes, record accepted UX decisions and create implementation work only after validation.
+
 ### Later
 
 - Sound: generated sound and music, stems, spatial phases 2-4 (`CT-0048`,
