@@ -80,3 +80,9 @@ This is a conceptual model, not a claim that the actual Singular project current
 No new generic inheritance engine without evidence. No implicit cross-set geometry or camera transfer. No assumption that a visual moodboard feature already exists. No automatic regeneration or reinterpretation of previous media. Preserve existing location IDs and backlot pin semantics unless a migration is explicitly designed.
 
 Related: CT-0071, CT-0072, CT-0073, SPEC-0010, docs/locations.md.
+
+## Production evidence and UX priority (2026-10-08)
+
+Singular's hospital room and corridor were spatially inconsistent until the hospital was modeled as one integrated Blender environment. Therefore flat location grouping is useful for navigation but insufficient to guarantee spatial coherence. Investigate a shared spatial reference with identifiable room/corridor regions and verified connections, while preserving scene-specific cinematic decisions. Blender should inform previs and storyboard, not control generative character animation. A full Geneva model is not required to validate the hospital case.
+
+This remains a UX-led investigation: the filmmaker should navigate hospital, environments, scenes and shots, see what is spatially verified, and understand creative decisions without dealing with Blender internals by default. No new Core schema or engine choice is approved.
