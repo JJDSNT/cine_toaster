@@ -271,6 +271,13 @@ Track scope and acceptance criteria in [CT-0066](../work/CT-0066-three-workspace
 - [ ] Compare status-only versus contextual-awareness layouts for stale-take, continuity, failed-job and agent-approval scenarios.
 - [ ] Validate with users before introducing UI components, priority rules or architecture decisions.
 
+### Cross-workspace cognitive UX study (CT-0071)
+
+- [x] Map narrative, operational, temporal and cross-workspace cognitive demands to the existing screenplay, storyboard, Producer, editor commands and assistant ([CT-0071](../work/CT-0071-cross-workspace-cognitive-model.md)).
+- [ ] Audit actual editing/timeline UI and persistent navigation state; inventory canonical script → board → take → assembly links.
+- [ ] Complete information-priority matrices for Screenplay/Storyboard and Editing/Post.
+- [ ] Test context-preserving cross-workspace navigation and focused versus detailed layouts with users before approving wireframes.
+
 ### Later
 
 - Sound: generated sound and music, stems, spatial phases 2-4 (`CT-0048`,
