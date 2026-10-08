@@ -256,6 +256,13 @@ Track scope and acceptance criteria in [CT-0066](../work/CT-0066-three-workspace
 - [ ] Compare focused, balanced and advanced-density layouts on laptop and large displays, with user tasks and workload measures.
 - [ ] Update the wireframes, record accepted UX decisions and create implementation work only after validation.
 
+### Research in progress — Production information priorities (CT-0069)
+
+- [x] Create an initial Production task → information → display-priority matrix, with preliminary React code audit ([CT-0069](../work/CT-0069-production-information-priority-matrix.md)).
+- [ ] Audit control-room server pages, status APIs, FinOps and actual take-comparison flows; verify cross-room context preservation.
+- [ ] Compare Focus and Review/Expert layout variants using take selection, failed generation and agent approval tasks.
+- [ ] Extend the matrix to Screenplay & Storyboard and Editing & Post-production, and record user-test findings before approving a layout.
+
 ### Later
 
 - Sound: generated sound and music, stems, spatial phases 2-4 (`CT-0048`,
