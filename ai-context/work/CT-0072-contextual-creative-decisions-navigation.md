@@ -74,3 +74,7 @@ This is not a mandate for a new graph database or a new source of truth.
 Do not conflate three workspaces with three context levels. Do not convert every resource into a permanent sidebar item. Do not force all creative decisions into a rigid inheritance hierarchy. Do not claim a dependency without traceable Core evidence. Preserve author control and explicit exceptions.
 
 Related: CT-0066, CT-0067, CT-0068, CT-0069, CT-0070, CT-0071, and `docs/research/moodboard-visual-style-investigation.md`.
+
+## UX-first spatial-context validation (2026-10-08)
+
+UX across Writing/Storyboard, Production and Editing remains the primary research scope. Singular's room and corridor had a real spatial mismatch; modeling the entire hospital in Blender solved it. This makes spatial reference an important **input to contextual UX**, not a replacement for UX research. The UI should expose shared place identity, verified 3D connections, scene-local creative choices, and navigation between related scenes, while keeping DCC implementation details optional. Simple place grouping is not proof of geometric continuity. See CT-0074 and CT-0075; no Core or UI implementation is approved yet.
