@@ -1,510 +1,184 @@
 # Cine Toaster
 
-**An open production environment for AI filmmaking.**
+**An open, AI-powered filmmaking studio.**
 
-Cine Toaster aims to provide an integrated workspace for creating AI-assisted films, from screenplay and visual development to shot generation, review, editing, and delivery.
+**From creative vision to final cut.** Cine Toaster is an open production environment for filmmakers to develop, direct, produce, review, and finish cinematic works using generative AI, traditional filmmaking tools, and collaborative agents — while retaining creative control.
 
-Inspired by the pioneering spirit of the **Amiga Video Toaster**, the project brings together modern generative tools, production automation, visual decision-making, and traditional filmmaking workflows into a single open environment.
+Inspired by the pioneering **Amiga Video Toaster**, Cine Toaster brings the instruments of filmmaking into a connected environment. It is not a single video generator, a frontend for one AI provider, or an attempt to replace every professional tool. It is the place where the **film, its creative intent, its production history, and its decisions stay together** as the tools around them change.
 
-## Install and run
+> **Project status:** Active, early-stage development. The Project Core, CLI, browser-based production/review capabilities, take decisions, continuity checks, and selected media workflows are executable today. The broader creative studio, visual exploration experience, agent collaboration, and end-to-end integrations are being developed or researched. [See the development status](#what-works-today).
 
-Requires **Python 3.12+** and nothing else to read a production, decide
-between takes and check continuity. Everything that makes pixels or sound is an
-optional layer you add when you need it — see
-[Toward a complete studio](#toward-a-complete-studio).
+## The filmmaking experience
+
+A film is not just a collection of prompts or rendered clips. It has a screenplay, a cast, places, a visual language, emotional and narrative intentions, and hundreds of decisions that must remain coherent across shots, scenes, sequences, and revisions.
+
+Cine Toaster is designed around that reality:
+
+1. **Develop the film.** Work with screenplays, characters, locations, references, production assets, and the creative intentions behind them.
+2. **Explore its visual language.** Compare approaches to composition, lighting, texture, palette, atmosphere, and style before committing the production to a direction.
+3. **Plan the scenes.** Break down the screenplay, explore blocking and camera choices, and compare storyboard imagery with spatial previsualization where useful.
+4. **Create alternatives.** Use appropriate models, workflows, tools, and infrastructure to produce image masters, shots, sound, and other assets.
+5. **Direct through review.** Compare takes, identify failures or discoveries, select results, request revisions, and preserve the reasoning behind each choice.
+6. **Maintain continuity.** Track what must remain consistent across characters, environments, story, visual identity, and successive stages of production.
+7. **Assemble and finish.** Bring approved material through editing, visual effects, audio, grading, and delivery using integrated production tools.
+
+This is a **target experience**, not a claim that every stage already has a finished interface or automated implementation.
+
+## Creative direction belongs to the filmmaker
+
+Generative models can produce striking images, but an impressive image is not necessarily the right image for a film.
+
+Cine Toaster treats **creative intent, visual identity, and human decisions** as production concerns rather than incidental prompt text. A filmmaker may establish an authorial language for a project, vary the mood of individual scenes, compare different models and workflows, and deliberately depart from an established look when the story requires it.
+
+A candidate image raises more than one question:
+
+- Is it technically and visually usable?
+- Does it serve the cinematic intention of this shot?
+- Does it fit the film's established visual identity?
+- If it does not fit, is it a failed attempt, a justified exception, or an interesting new direction worth exploring?
+
+Those answers should not collapse into an automatic accept/reject score. The filmmaker may approve a result, regenerate it, retain it as a reference, allow an intentional exception, or investigate a new candidate visual identity without silently rewriting the film's existing decisions.
+
+**Visual Lab** is the current research direction for testing visual choices across representative scenes and environments before promoting them into a production-wide visual baseline. Its precise UX and position in the application are **not yet decided**. The intent is to make visual discovery and approval practical, traceable, and reversible — not to impose one model, one aesthetic, or one workflow on every film.
+
+See [Visual Lab research](ai-context/work/CT-0077-visual-lab-core-gap-and-ux-research.md) and [model-dependent mood research](ai-context/work/CT-0076-model-dependent-mood-and-visual-identity.md).
+
+## One film, many production methods
+
+Cine Toaster is designed for a **variable pipeline**. Different scenes and productions may need different techniques, models, and levels of spatial control.
+
+- **Screenwriting and planning:** screenplay context, breakdown, characters, locations, scenes, shots, and editorial intent.
+- **Storyboards and previs:** reference images, camera and blocking plans, and optional 3D environments to check spatial coherence before generation.
+- **Image and video generation:** interchangeable local or remote models, workflows, and GPU providers, with multiple candidates and recorded provenance.
+- **Visual effects and motion graphics:** reusable catalogs, compositing, titles, typography, and transitions.
+- **Editing and finishing:** reviewable cuts, audio, grading, subtitles, and delivery through established media tools.
+- **Production operations:** jobs, approvals, cost visibility, repeatability, and recovery.
+
+**Blender** can help establish geometry, staging, camera positions, and visual references without requiring character performance to be animated in Blender. **Unreal Engine** and other DCC or real-time tools remain possible avenues of investigation, not mandatory dependencies. **ComfyUI** is an important generation integration direction, not the definition of the product. **FFmpeg**, **Ardour**, and future editorial/compositing integrations serve their own parts of the process.
+
+The guiding principle is simple: **use the right instrument for the cinematic task, and keep the film independent of the instrument.**
+
+## A connected, human-directed workspace
+
+The intended interface follows the filmmaker's tasks and decisions, rather than exposing the production as a directory browser or forcing every activity into a node graph.
+
+A user should be able to move naturally between a film, sequence, scene, shot, character, location, creative reference, generated candidate, approval, and resulting cut. Creative choices should be visual where possible: comparisons, contact sheets, contextual previews, blocking views, and before/after evaluations.
+
+Spatial continuity and cinematic continuity are related but different. A hospital may be one connected physical environment while its room, corridor, and exterior support distinct scene moods and camera decisions. Cine Toaster is investigating how to represent these relationships without confusing the physical place with the dramatic situation or duplicating production state.
+
+Agents are intended to collaborate on research, planning, production, review, and operations through the same application boundaries used by people. They may propose actions or execute authorized workflows, but **artistic authority and approval remain with the filmmaker**. The multiagent experience and its UX are evolving; they are not presented here as completed features.
+
+## Why we are building it
+
+Cine Toaster is being developed alongside **Singular**, a feature film made with generative models. A feature exposes problems that short prompt-to-video demonstrations can hide: a character must remain recognizable, a location must remain spatially coherent, a shot must cut with its neighbors, and a creative decision made weeks earlier must still be understandable.
+
+The project has already learned from real production constraints: measured sets, camera positions, alternatives to a take, rejection reasons, assembled versions, and durable decisions. Those lessons inform reusable capabilities rather than film-specific assumptions.
+
+**Singular is a production and validation case, not a bundled demo or a boundary on what Cine Toaster can create.** Its working files live outside the application repository. The same Cine Toaster mechanisms must serve other films and production styles.
+
+## Architecture: the film owns its state
+
+Cine Toaster is **local-first, open, and provider-independent**. The project files are the authoritative record of the production. A browser, CLI, agent, or external service must not become a competing source of truth.
+
+```text
+Filmmaker / Browser UI / CLI / External API / Agents
+                         |
+                  Application API
+            commands | queries | events
+                         |
+                Application Runtime
+         projects | jobs | processes | agents
+                         |
+                    Project Core
+     scenes | shots | takes | assets | decisions | gates
+                         |
+                       Adapters
+       generation | orchestration | media | protocols
+                         |
+      ComfyUI | FFmpeg | AI providers | other tools
+```
+
+The Core owns production concepts and shared domain commands; adapters connect replaceable tools. Human-authored production files and runtime-owned decisions have distinct ownership. Derived indexes and caches must be rebuildable. Background jobs and agent sessions are operational state, not an alternative authority for the film.
+
+Projects are portable filesystem-based productions, typically with YAML for structured creative and production data, Fountain for screenplay text, and ordinary media files for assets and takes. There is no mandatory import step for a native production. Project-specific creative values remain with the project, not in global application defaults.
+
+Read the [architecture](ai-context/architecture.md), [architectural decisions](docs/architecture/), and [production-specific tooling principles](docs/production-tooling.md).
+
+## What works today
+
+The repository already contains executable foundations. Among the implemented capabilities are:
+
+- A Python-based headless runtime and the **`toast` CLI**.
+- External filesystem productions, project loading, indexing, search, and browser-based production views.
+- Two independent example productions: **The Last Signal** and **Amiga Demo Reel**.
+- Shot/take discovery, side-by-side comparison, selection, revision-aware writes, decision history, and assembled-version review.
+- Scene geometry, blocking views, screenplay coverage, camera movement/cut checks, and continuity findings.
+- Production knowledge and provider observations recorded with evidence and enforcement status.
+- Selected media workflows including FFmpeg-based assembly, transitions, and audio-related tooling.
+- Additional operational and production commands developed through the *Singular* validation work.
+
+These are **foundations, not a finished end-to-end filmmaking studio**. The existence of a research document, architectural adapter, command, or prototype does not imply that a complete interactive workflow is available.
+
+### Under development or investigation
+
+Work continues on the richer creative UX, visual-identity exploration, screenplay editing and interchange, model-aware generation experiences, reusable spatial environments, agent collaboration, production orchestration, broader VFX and finishing integrations, and remote compute workflows.
+
+For the current implementation and priorities, consult [project status](ai-context/project-status.md) and the [development roadmap](ai-context/development/roadmap.md). These records are more detailed and are the appropriate place to verify individual feature maturity.
+
+## Get started
+
+**Requirements:** Python 3.12+ for the core installation. Additional tools are optional and depend on the workflows you want to run.
 
 ```bash
 git clone https://github.com/JJDSNT/cine_toaster.git
 cd cine_toaster
 make setup
+make demo
+make serve
 ```
 
-`make setup` creates the environment, installs Cine Toaster, and finishes by
-telling you what works on your machine and what to type for what does not:
+`make setup` installs the application and reports available capabilities. `make demo` creates example productions outside the source checkout, and `make serve` opens the browser-based control room.
 
-```
-  ok      Python 3.12+           everything  (running 3.12.3)
-  ok      PyYAML                 reading a production
-  ok      Transition catalog     choosing an edit from a shared vocabulary  (4 built-in)
-  ok      Demo productions       seeing a production without having one
-  ok      Media libraries        drawing cards, grading, focus, relight
-  ok      FFmpeg                 encoding a render, mixing audio
+Useful commands:
 
-Ready, with everything installed.
-```
+| Command | Purpose |
+| --- | --- |
+| `make setup` | Set up and inspect local capabilities |
+| `make demo` | Create the example productions |
+| `make serve` | Open the production control room |
+| `make check` | Run production continuity/schema checks |
+| `make build` | Build the Amiga reel demonstration |
+| `make test` | Run the test suite |
+| `make ui` | Build the production canvas (Node 20+ required) |
+| `toast doctor` | Inspect installed and missing capabilities |
+| `toast --help` | Explore the CLI |
 
-Then create the two demo productions and open one:
+For the canvas setup, see [docs/canvas.md](docs/canvas.md). Media, GPU, audio, and model dependencies are not all bundled; install only those needed for your chosen workflow.
 
-```bash
-make demo      # both productions in ~/cine-toaster-demos, then checks them
-make serve     # the control room, on the reel
-```
+### Example productions
 
-A production is never created inside the checkout. `make demo DEMOS=~/somewhere`
-puts them wherever you want.
+**Amiga Demo Reel** demonstrates the project's Video Toaster heritage with cards, transitions, a coherent look, and offline rendering.
 
-| Command | What it does |
-|---|---|
-| `make setup` | install, then report what works |
-| `make demo` | create both demo productions and check them |
-| `make build` | speak the reel's narration and render it to an mp4 |
-| `make serve` | open the control room |
-| `make check` | continuity and schema findings |
-| `make test` | the full suite |
-| `make ui` | build the production canvas at `/canvas/` (needs Node 20+; see [docs/canvas.md](docs/canvas.md)) |
-| `toast doctor` | what works here, and how to fix what does not |
+**The Last Signal** demonstrates a dramatic production with scene geometry, shots, takes, review, and continuity checks.
 
-### Build the reel
+These are independently identified productions, not *Singular*. Other demo concepts may be planned without being shipped yet.
 
-```bash
-make build
-```
+## Principles
 
-This speaks the narration with an offline voice, draws each card from the look,
-cuts them together on the transitions the production chose, mixes the audio, and
-writes an mp4 into the production's `renders/`. It costs nothing and sends
-nothing anywhere.
+1. **The filmmaker directs.** AI can assist, suggest, and execute, but human creative judgment remains authoritative.
+2. **The film outlives its tools.** Projects and decisions must remain accessible when providers or interfaces change.
+3. **Creative decisions are durable.** Keep alternatives, rationale, provenance, and the ability to reconsider.
+4. **Visual coherence is intentional.** Preserve identity across the production while allowing deliberate artistic exceptions.
+5. **No single mandatory pipeline.** Models, DCC tools, media engines, and orchestration frameworks are replaceable resources.
+6. **Use established tools well.** Integrate strong filmmaking software instead of rebuilding every instrument.
+7. **Describe maturity accurately.** Distinguish working software, prototypes, plans, and open research.
 
-## The two demo productions
+## Origins and inspiration
 
-**Amiga Demo Reel** — Cine Toaster is named after NewTek's Video Toaster, whose
-demo reel was a slideshow carried by its transitions. This is that: four cards,
-four transitions, one look, including a transition the production owns itself.
-It needs no API key.
+The original **NewTek Video Toaster** helped make sophisticated video production accessible on the Amiga. Cine Toaster takes inspiration from that spirit: bringing powerful tools together in a creative workspace rather than requiring filmmakers to assemble disconnected systems by hand.
 
-**The Last Signal** — a dramatic short with measured scene geometry, a declared
-line of action, several takes per shot, and the continuity findings that come
-out of them. It is the production the review and continuity rooms were built
-against.
+The project also learns from open filmmaking and generative-production initiatives, including [OpenMontage](https://github.com/calesthio/OpenMontage), [AI Video Production Editor](https://github.com/LudwigKienle/ai-video-production-editor), [Kupkaprod](https://github.com/vladimirvalcourt/kupkaprod-cinema-pipeline), [Calliope](https://github.com/benjiyaya/Calliope), and [AIMovieStudio](https://github.com/Heroesjouney/AIMovieStudiov2).
 
-Neither is a fixture for the other. They are independent projects with their own
-identity, which is also what proves two productions can be open at once.
+---
 
-## Toward a complete studio
-
-Cine Toaster is meant to grow into a full production environment, and the way it
-grows is by adopting the tools that already do each job well rather than
-reimplementing them. Nothing below is bundled: each is a layer you install when
-you want what it enables, and `toast doctor` always reports which are present.
-
-**In use today**
-
-| Tool | What it does here | Install |
-|---|---|---|
-| **FFmpeg / FFprobe** | encode a render, mix audio, verify the result is what it claims | `apt install ffmpeg` · `brew install ffmpeg` |
-| **Pillow · NumPy · OpenCV** | draw cards, grade, focus, relight | `uv sync --extra media` |
-| **Piper** | narration, offline and free, no account | `uv sync --extra audio` |
-
-**Next, and why**
-
-| Tool | What it will enable | Install |
-|---|---|---|
-| **SoX** | normalise, trim and shape a take's audio, which FFmpeg does clumsily | `apt install sox` · `brew install sox` |
-| **ModernGL** | run a transition's own GLSL shader instead of the FFmpeg stand-in it declares | `uv sync --extra gpu` |
-| **Blender** | 3D titles, set previsualisation, compositing passes | [blender.org](https://www.blender.org/download/) |
-| **Ardour** | soundtrack editing, sound design, automation, stem mixing and final film mix against picture | [ardour.org](https://ardour.org/) |
-| **faster-whisper** / whisper.cpp | subtitles, and reading source footage that arrives with no script | `pip install faster-whisper` |
-
-`toast doctor` lists these in a separate block marked *"Cine Toaster does not
-call these yet"*. A capability reported as working when nothing calls it would
-be a lie told by the one command whose whole job is to tell the truth.
-
-The principle is the one in [Goals](#goals): integrate established tools rather
-than rebuild them. A studio is not one program; it is a room where the right
-instruments are within reach and something keeps track of what was decided.
-
-## Why this exists
-
-Cine Toaster is being built to finish a specific film: **Singular**, a feature
-adaptation of a novel, produced with generative models.
-
-That is not a footnote. It is the method. Every capability here was added
-because Singular hit a wall without it, and nothing was added in anticipation of
-a wall that has not been hit yet.
-
-It is also why the shape of this tool is unusual. Most open tooling for
-generative video turns a brief into a short piece: research, script, assets,
-render, done. A feature is the opposite problem. The screenplay already exists.
-The cast already has faces that must not drift across three hundred shots. The
-room a scene happens in must be the same room from every angle, an hour of
-footage apart. Shots arrive as several plausible takes and someone has to choose
-between them, remember why, and still be able to change their mind next week.
-
-So the concepts that got built first are the ones a feature cannot do without:
-
-- **takes and selection**, because generation is probabilistic and collapsing
-  alternatives early loses both the comparison and the reason for the choice;
-- **scene geometry and continuity checks**, because the failures that cost most
-  are coherent shots that do not cut together, and they are checkable from the
-  staging plan before anything is generated;
-- **sequences**, because "is this part done?" is asked about a run of scenes,
-  never about the whole film;
-- **decisions as durable records**, because on a production this long, the
-  reason a take was rejected outlives everyone's memory of it.
-
-Several of these were not designed. Singular had already invented them by hand —
-measured room dimensions and named camera positions in a scene file, rejection
-reasons encoded in filenames, consecutive scenes assembled into one reviewable
-video. Cine Toaster's job was to notice and take ownership.
-
-**Singular is not in this repository.** A production is an external project that
-Cine Toaster opens, reads, and writes decisions into; it never lives inside the
-application. The two demo productions shipped in `examples/` are the only
-project-shaped directories here. Nothing about the tool is specific to Singular,
-and the day it only works for Singular is the day it has failed.
-
-## Goals
-
-- Manage films as projects composed of scripts, characters, locations, scenes, shots, and assets.
-- Support AI-assisted screenplay analysis, directing, storyboarding, and shot planning.
-- Provide visual tools for camera composition, blocking, and previs.
-- Provide visual browsing, comparison, and preview tools for artistic decisions.
-- Support typography, titles, credits, subtitles, and other text elements with real-time visual previews.
-- Integrate **ComfyUI** workflows and local or remote GPU infrastructure.
-- Generate and manage multiple takes for each shot.
-- Support side-by-side comparison and selection of generated alternatives.
-- Support AI-assisted review, continuity checking, retakes, and re-generation.
-- Provide human-in-the-loop approval checkpoints throughout the production pipeline.
-- Support persistent and resumable production workflows.
-- Provide GUI, CLI, API, and agent access to the same project state.
-- Keep projects open, portable, and accessible outside the GUI.
-- Integrate existing tools such as **FFmpeg**, **MLT/Kdenlive**, and other filmmaking software where appropriate.
-- Remain independent of any specific AI model, provider, or generation backend.
-
-## Architecture
-
-Cine Toaster is built around a shared **Project Core**. The GUI, CLI, API, and
-production agents use the same application commands and canonical project
-state. Long-lived jobs, project registration, resources, and agent sessions
-belong to a headless Application Runtime rather than the visible UI.
-
-~~~
- GUI │ CLI │ API │ Production Agents
-              │
-       Application API
- commands │ queries │ subscriptions
-              │
-      Application Runtime
- projects │ jobs │ processes │ agent runtime
-              │
-         Project Core
- scenes │ shots │ takes │ decisions │ human gates
-              │
-           Adapters
- agents │ orchestration │ generation │ media │ UI protocols
-              │
- Claude/Codex │ ComfyUI │ FFmpeg │ future systems
-~~~
-
-Projects are intended to remain filesystem-based and human-readable whenever possible. Databases may be used for indexing or caching, but should not become the exclusive source of project state.
-
-Generation and production services are exposed through distinct replaceable
-adapter categories, allowing models, providers, GPU infrastructure, and
-external filmmaking tools to evolve independently from the Core.
-
-The current headless runtime and CLI are implemented in Python. React/Vite and
-Tauri were strong incremental UI and desktop-shell candidates (Tauri was since cancelled, ADR 0019); they are not a
-reason to duplicate or rewrite Project Core behavior. See
-[`ai-context/architecture.md`](ai-context/architecture.md) and the accepted
-decisions in [`docs/architecture/`](docs/architecture/).
-
-The Application Layer now includes an initial in-memory Project Manager. It can
-register multiple arbitrary local projects from unrelated paths, preserves
-manifest identity across moves, and rejects two open locations claiming the same
-project ID. Persisted recent projects, UI switching, jobs, and remote source
-synchronization remain future work.
-
-## Project Model
-
-A Cine Toaster project is a self-contained, filesystem-based production.
-
-~~~
-project/
-├── project.yaml              # authored: identity, paths, sequences
-├── story/
-│   └── screenplay.fountain
-├── scenes/
-│   └── 030-scene-name/
-│       ├── scene.yaml        # authored: direction, geography, shots
-│       ├── state.json        # runtime-owned: selections, decisions, versions
-│       └── work/             # the takes, as files
-│           ├── c01.mp4               in the assembled cut
-│           ├── c01-longer-hold.mp4   another candidate
-│           ├── _takes/               takes kept for comparison
-│           └── _rejected/            rejected, with the reason in the name
-├── assets/
-├── typography/
-├── subtitles/
-├── workflows/
-├── renders/
-└── edit/
-~~~
-
-Human-readable project files describe the production state, while media and generated artifacts remain ordinary files.
-
-Productions may also keep their own scripts, LUTs, masks, curves, shaders, and
-other film-specific tools. Cine Toaster provides reusable mechanisms, while the
-production keeps its creative values explicit; project-derived values do not
-become application defaults. Project code is never discovered or executed
-implicitly. See [Production-specific tooling](docs/production-tooling.md) for
-the ownership test and examples from both demo productions.
-
-There is **one format and no import step**. The production's own breakdown is
-the scene file; Cine Toaster reads it where it lies. YAML rather than TOML
-because a breakdown is deeply nested and carries prose, which TOML punishes
-([ADR 0010](docs/architecture/0010-one-native-format.md)).
-
-Cine Toaster never rewrites a file a human authored. Comments, section headers
-and long direction notes survive every write, because committed decisions go to
-a separate runtime-owned `state.json` beside the breakdown
-([ADR 0006](docs/architecture/0006-authored-and-runtime-files.md)).
-
-**Takes are not declared — they are files.** The runtime reads the work
-directory: the clip in the cut, the alternatives, and the rejected ones with
-their reason in the filename. A list of takes in a manifest would be a second
-copy of something the filesystem already says, and second copies drift.
-
-The filesystem is the canonical source of truth. GUI, CLI, API, and agents operate on this same state. Databases may be used for indexes and caches, but must be rebuildable from the project itself.
-
-This keeps projects portable, versionable, scriptable, and independent of the GUI.
-
-## Choosing Between Alternatives
-
-Generation is probabilistic, so a shot arrives as several plausible takes.
-Collapsing them immediately loses both the comparison and the reason for the
-choice.
-
-A shot registers its alternatives; each stays available, including the rejected
-ones and why they were rejected. The comparison room puts two of them side by
-side with synchronised playback, and selecting one records who chose it, when,
-and why. Choosing does not discard anything.
-
-## Continuity Before Generation
-
-A scene may declare its measured geometry: the room, where each subject stands,
-the fixed named camera positions, and the line of action. Shots reference a
-camera by id rather than describing a new viewpoint.
-
-From that, `toast check` reports the failures that survive shot-by-shot review
-and only appear once the scene is cut — a camera across the line, a character
-filmed from above in one shot and below in the next, a camera outside the
-declared room. The interface draws the same data as a plan of the set.
-
-The axis is never inferred and heights are never assumed. See
-[`docs/continuity-checks.md`](docs/continuity-checks.md).
-
-## Accumulated Knowledge
-
-A production learns expensive things: which instructions a model obeys, which it
-inverts, which mistake cost five discarded versions and on what date it was
-measured. That knowledge normally lives in a document nobody reads at the moment
-it matters.
-
-Cine Toaster stores it as data instead.
-
-A **practice** is a rule the production learned, with its status
-(`measured`, `suspected`, `convention`, `refuted`), the date, the evidence, what
-it cost — and `enforced_by`, the checks that now enforce it automatically. A
-**provider profile** is what a specific generator does and does not obey, claim
-by claim, each with its own measurement date and workaround.
-
-The field that makes this more than a folder of notes is `enforced_by`. It is
-validated against the real check registry, so the tool can report its own
-coverage honestly:
-
-```
-PRACTICES  5/6 enforced by a check (83%)
-  ...
-  Still depends on a person remembering:
-    one-master-image-per-position
-```
-
-A rule with no check behind it is not hidden — it is listed, by name, as
-something a human still has to remember. Refuting a fact is a first-class act:
-mark it `refuted` and it stops being enforced without being deleted, because
-having once believed it is worth keeping.
-
-Findings stop being bare verdicts. `toast why eyeline_mismatch` prints the rule,
-what it cost the last time it was missed, and the evidence, and the interface
-shows the same text under the finding.
-
-Judgement stays out of this. When to use a long lens, what a director's style
-means, "less is more" — none of that is checkable, and it belongs in the skills
-a person or an agent reads, not in a ledger.
-
-## Sequences
-
-A sequence is an ordered run of scenes assembled and reviewed as one thing — the
-level at which a production says "this part works now". Sequences aggregate
-progress and open decisions from their scenes and can point at their assembled
-render, which the interface plays beside the count of undecided shots.
-
-## Visual Decision-Making
-
-Cine Toaster is intended to make artistic choices visual whenever possible.
-
-Instead of relying only on textual selectors and configuration panels, the interface should allow alternatives to be previewed and compared directly in the context of the film.
-
-This includes:
-
-- characters and casting references;
-- locations and production design;
-- costumes and visual assets;
-- storyboards and shot alternatives;
-- camera composition and lenses;
-- generated takes;
-- lighting and look variations;
-- fonts and typography;
-- titles and credits;
-- subtitle styles and positioning;
-- LUTs and other visual treatments.
-
-Fonts, titles, and subtitles should be previewable directly over actual frames or shots, allowing typography, size, spacing, placement, styling, and animation to be evaluated in context.
-
-Generated alternatives should support contact sheets, side-by-side comparison, A/B review, and direct selection wherever appropriate.
-
-Transition banks should preview both live GLSL effects and WebM references,
-with semantic guidance that filmmakers and AI agents can use when choosing
-editorial punctuation.
-
-AI may propose or generate alternatives, but the filmmaker remains responsible for the artistic choice.
-
-## Current Scope
-
-The initial scope is the **production layer**, not the development of new generative models or a replacement for a mature non-linear editor.
-
-The first milestones focus on:
-
-- the filesystem-based Project Core;
-- GUI, CLI, API, and agent access to the same project state;
-- screenplay, character, location, scene, shot, and asset management;
-- visual browsing, preview, comparison, and selection tools;
-- typography, titles, subtitles, and related visual elements;
-- ComfyUI integration, including remote GPU execution;
-- persistent job orchestration and resumable automation;
-- storyboard and shot generation;
-- multiple takes, review, selection, and retakes;
-- AI-assisted continuity and production review;
-- human-in-the-loop checkpoints.
-
-Professional timeline editing, advanced compositing, audio mixing, color grading, and final delivery should initially rely on integration with established tools such as **FFmpeg** and **MLT/Kdenlive** rather than being reimplemented inside Cine Toaster.
-
-Cine Toaster should nevertheless manage the production decisions and assets involved in these stages and provide previews and comparison tools where they improve the filmmaking workflow.
-
-The scope may expand as real production requirements emerge.
-
-## CLI
-
-The Cine Toaster command-line interface is:
-
-~~~
-toast
-~~~
-
-Commands available today:
-
-~~~
-toast doctor                                     # what works here
-toast demo --list
-toast demo ~/productions/the-last-signal
-toast serve ~/productions/the-last-signal        # the control room
-toast index ~/productions/the-last-signal
-toast find  ~/productions/the-last-signal "continuity"
-
-toast shots ~/productions/the-last-signal --scene SC-030
-toast take select ~/productions/the-last-signal SC-030 SH-030-01 T02 \
-      --rationale "Dread beats volume."
-toast take clear  ~/productions/the-last-signal SC-030 SH-030-01
-toast check  ~/productions/the-last-signal       # continuity, exits 1 on error
-toast why    eyeline_mismatch                    # the rule behind a finding
-toast knowledge ~/productions/the-last-signal    # practices, profiles, coverage
-toast events ~/productions/the-last-signal
-~~~
-
-Every mutation runs through one application command, whichever interface calls
-it. `take select` takes `--expect-revision` to fail instead of overwriting a
-newer decision, and exits `3` on a domain error with a stable error code on
-stderr. A decision made in the terminal appears immediately in an open browser.
-
-`toast demo DESTINATION` creates The Last Signal by default. Demo templates are
-independent productions with stable project IDs; list them with `toast demo
---list` and select another with `--template`.
-
-Runtime productions belong outside the Cine Toaster source checkout. The demo
-command refuses an in-repository destination by default. The
-`--allow-inside-repository` override exists only for intentional fixture
-development; conventional local directories such as `/projects/` and
-`/local-projects/` are ignored as an additional safeguard.
-
-The vocabulary still to come, from the same project core:
-
-~~~
-toast scene show 4
-toast shot generate 4.3
-toast storyboard approve 4.3
-toast render
-~~~
-
-The CLI, GUI, API, and agents are intended to expose the same underlying project operations.
-
-## Status
-
-Early development.
-
-The initial focus is the Project Core, production workflow, visual decision tools, ComfyUI integration, automation, and human-in-the-loop review.
-
-## Development Status
-
-The current codebase implements the first executable milestone: a read-only
-**Production Control Room**. It
-opens an external project and makes its creative and operational state
-navigable: production phases, scene progress, workflow gates, iterations,
-decisions, blockers, shots, and work waiting for human review.
-
-The file library remains available for search and preview, but it is a support
-tool rather than the primary interface. Cine Toaster navigation follows the
-film's production logic instead of mirroring its directory tree.
-
-Development commands:
-
-~~~bash
-uv run toast demo ~/cine-toaster-projects/the-last-signal
-uv run toast serve ~/cine-toaster-projects/the-last-signal
-~~~
-
-The demo command creates a separate English-language production from a
-versioned template. The repository currently includes The Last Signal and
-Amiga Demo Reel, providing independent projects for multi-project development.
-The control room listens on `http://127.0.0.1:8787` by default. See
-[`docs/milestone-01-production-control-room.md`](docs/milestone-01-production-control-room.md)
-for the scope and project format.
-
-The next milestone is the first canonical write: selecting a take through one
-shared domain command, with atomic filesystem persistence, revision conflicts,
-decision history, CLI/HTTP parity, and UI support. See
-[`docs/milestone-02-canonical-take-selection.md`](docs/milestone-02-canonical-take-selection.md).
-
-Current status, active work, next actions, risks, and validation are tracked in
-[`ai-context/project-status.md`](ai-context/project-status.md). The
-`ai-context/` directory is development memory for building Cine Toaster; it is
-separate from the runtime context and skills used by production agents to make
-films.
-
-The **Transitions** room provides an application-level effect bank with live
-GLSL previews, WebM references, provenance, and AI-facing editorial guidance.
-See [`docs/transition-library.md`](docs/transition-library.md) for its open
-manifest and extension path.
-
-## Inspiration
-
-Cine Toaster is inspired by the **Amiga Video Toaster** and by modern open-source AI filmmaking projects exploring generative production, visual directing, workflow orchestration, and automated film pipelines.
-
-https://github.com/calesthio/OpenMontage
-
-https://github.com/LudwigKienle/ai-video-production-editor
-
-https://github.com/vladimirvalcourt/kupkaprod-cinema-pipeline
-
-https://github.com/benjiyaya/Calliope
-
-https://github.com/Heroesjouney/AIMovieStudiov2
+**Cine Toaster is a work in progress — an open filmmaking environment being shaped by the demands of making films, not just generating clips.**
