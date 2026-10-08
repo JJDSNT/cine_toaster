@@ -312,3 +312,10 @@ Track scope and acceptance criteria in [CT-0066](../work/CT-0066-three-workspace
   UI (`CT-0020`); Arcads first-hand (`CT-0024`); a finer liquid simulation
   and a running nerfstudio (`CT-0047`); MLT/Kdenlive exchange; detached
   workers; frame-accurate comparison.
+
+### Compound location consumer audit (CT-0075)
+
+- [x] Trace single-location scene resolution, location appearances, plate checks, `/api/locations`, and current set override semantics ([CT-0075](../work/CT-0075-location-consumer-and-continuity-audit.md)).
+- [ ] Inspect storyboard/render consumer paths and cross-scene editing continuity for compound-place requirements.
+- [ ] Compare optional place grouping versus explicit parent-child place/set model with a Singular hospital fixture.
+- [ ] Validate contextual navigation and only then propose a backward-compatible schema/ADR.
