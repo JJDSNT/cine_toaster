@@ -319,3 +319,11 @@ Track scope and acceptance criteria in [CT-0066](../work/CT-0066-three-workspace
 - [ ] Inspect storyboard/render consumer paths and cross-scene editing continuity for compound-place requirements.
 - [ ] Compare optional place grouping versus explicit parent-child place/set model with a Singular hospital fixture.
 - [ ] Validate contextual navigation and only then propose a backward-compatible schema/ADR.
+
+### Model-dependent mood and master-image consistency (CT-0076)
+
+- [x] Record qualitative Singular Codex-vs-Qwen master-image texture/mood observation and UX-first research questions ([CT-0076](../work/CT-0076-model-dependent-mood-and-visual-identity.md)).
+- [ ] Audit current look/style, image-reference, provider-capability, provenance and human-approval contracts before schema changes.
+- [ ] Run controlled multi-sample comparison on one hospital shot, logging conditioning differences, settings, output, mood and continuity review.
+- [ ] Prototype UX comparison from visual intent to candidate masters to approved master and downstream shots, including aesthetic drift review.
+- [ ] Research Blender and planned Unreal roles as alternative/complementary spatial inputs, without imposing one fixed tool chain.
