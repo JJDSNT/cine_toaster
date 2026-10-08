@@ -278,6 +278,14 @@ Track scope and acceptance criteria in [CT-0066](../work/CT-0066-three-workspace
 - [ ] Complete information-priority matrices for Screenplay/Storyboard and Editing/Post.
 - [ ] Test context-preserving cross-workspace navigation and focused versus detailed layouts with users before approving wireframes.
 
+### Contextual creative decisions and navigation (CT-0072)
+
+- [x] Audit existing sidebar, style cascading, location overrides, shot emotions and moodboard research; capture findings and navigation alternatives ([CT-0072](../work/CT-0072-contextual-creative-decisions-navigation.md)).
+- [ ] Inventory cast/look/style/location/continuity resolver fields and existing UI deep links; document source, scope, overrides and provenance.
+- [ ] Build decision → origin → scope → override → affected references matrix, distinguishing actual dependencies from unknown ones.
+- [ ] Prototype current feature menu plus inspector against a compact workspace menu with contextual creative relations.
+- [ ] Validate on film-wide style, local location override, character performance and editing trace-back tasks before changing the sidebar.
+
 ### Later
 
 - Sound: generated sound and music, stems, spatial phases 2-4 (`CT-0048`,
