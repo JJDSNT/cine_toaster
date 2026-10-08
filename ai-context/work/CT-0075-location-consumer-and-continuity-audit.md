@@ -52,3 +52,7 @@ A stronger parent-child model is justified only if verified requirements demand 
 - Audit scene-to-scene continuity and editing references; establish where spatial passage might be declared without inventing it.
 - Prototype grouping-only vs explicit place entity, test against an actual Singular project fixture.
 - Update SPEC-0010 and APIs only after a chosen compatibility design.
+
+## Correction from Singular production evidence (2026-10-08)
+
+The hospital room and corridor were spatially inconsistent until an integrated hospital was modeled in Blender. Flat grouping can aid browsing but cannot validate geometric connections. Research a shared spatial model, identified environments and verifiable links in addition to existing single-set consumers. Keep the UX question central: navigate from scene to place, adjacent environments and boards; distinguish proven spatial continuity from assumed proximity. Blender is a spatial/previs reference, not a requirement to animate characters or to model all Geneva. No schema change decided.
