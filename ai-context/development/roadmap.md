@@ -327,3 +327,10 @@ Track scope and acceptance criteria in [CT-0066](../work/CT-0066-three-workspace
 - [ ] Run controlled multi-sample comparison on one hospital shot, logging conditioning differences, settings, output, mood and continuity review.
 - [ ] Prototype UX comparison from visual intent to candidate masters to approved master and downstream shots, including aesthetic drift review.
 - [ ] Research Blender and planned Unreal roles as alternative/complementary spatial inputs, without imposing one fixed tool chain.
+
+### Visual Lab UX and Core fit (CT-0077)
+
+- [x] Inspect look/style resolution, per-shot picture approval, decision journal and image derivation tests; record UX-first gaps ([CT-0077](../work/CT-0077-visual-lab-core-gap-and-ux-research.md)).
+- [ ] Prototype representative-location visual experiments and model comparison with complete provenance.
+- [ ] Determine how a film-wide visual baseline, exceptions and revisions fit existing Core contracts without a parallel truth model.
+- [ ] Validate Visual Lab placement in navigation and downstream change-impact visibility before a UI or schema ADR.
