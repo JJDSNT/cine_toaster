@@ -286,6 +286,13 @@ Track scope and acceptance criteria in [CT-0066](../work/CT-0066-three-workspace
 - [ ] Prototype current feature menu plus inspector against a compact workspace menu with contextual creative relations.
 - [ ] Validate on film-wide style, local location override, character performance and editing trace-back tasks before changing the sidebar.
 
+### Creative context Core inventory (CT-0073)
+
+- [x] Audit Core resolvers for cast, looks, styles, locations, continuity and cuts, and document a proposed read-only contextual projection ([CT-0073](../work/CT-0073-creative-context-core-inventory.md)).
+- [ ] Trace API/client payloads and exact scene/shot binding semantics; verify editing assembly references and cross-room selection persistence.
+- [ ] Compare existing feature menu + inspector with hybrid workspace/context navigation in a focused prototype.
+- [ ] Validate decisions, provenance and local exceptions with users before an implementation ADR.
+
 ### Later
 
 - Sound: generated sound and music, stems, spatial phases 2-4 (`CT-0048`,
