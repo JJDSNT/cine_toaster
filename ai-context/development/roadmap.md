@@ -238,6 +238,16 @@ Agreed order (2026-10-04):
 
 This is an active research track, **not** a decision to replace the existing media engine.
 
+### Active UX investigation — three workspaces (CT-0066)
+
+- [ ] Audit current React routes, canvas, screenplay editor and control-room journeys against the three-workspace concept.
+- [ ] Define shared navigation and persistent project / sequence / scene / shot / take context.
+- [ ] Prototype Screenplay & Storyboard, Production, and Editing & Post-production layouts, including shot view versus node view.
+- [ ] Validate screenplay-to-cut, edit-to-regeneration, agent-approval and delivery journeys with existing Core data.
+- [ ] Record usability, accessibility and layout findings and convert approved designs into implementation tasks and ADRs.
+
+Track scope and acceptance criteria in [CT-0066](../work/CT-0066-three-workspace-ux-vision.md). This is a UX investigation, not a commitment to rebuild the existing interface.
+
 ### Later
 
 - Sound: generated sound and music, stems, spatial phases 2-4 (`CT-0048`,
