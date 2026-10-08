@@ -53,3 +53,37 @@ These are **proposed test conditions**, not claims of existing approved assets. 
 ## Research acceptance criteria
 
 Prototype with a new production and an established production; validate exploration, approval, exception and revision tasks. Test with and without 3D references and with at least two image models. Preserve stable navigation and progressive disclosure. Document findings before implementation or an ADR.
+
+## Core Visual Lab decision question — image fit versus discovery (2026-10-08)
+
+For every candidate master image, ask:
+
+> Does this image serve the shot's cinematic intention **and** fit the production's currently approved visual identity? If not, is it an execution failure, an intentional local exception, or evidence worth exploring as a new candidate identity?
+
+Do not collapse **technical/image quality**, **shot suitability**, and **visual-identity fit** into a single accept/reject verdict. Assess separately, with explicit rationale and comparison against the actual baseline version and representative approved images.
+
+### Suggested evaluation-to-decision flow
+
+1. **Assessment (advisory)**: compare composition, narrative content, geometry, character identity, texture, lighting, palette, atmosphere/mood and continuity. Mark unknowns and uncertainty; model-based aesthetic judgments are fallible.
+2. **Human decision (authoritative)**:
+   - Approve for intended shot and current identity, if all required gates pass.
+   - Reject/regenerate because it fails the task.
+   - Keep as an **exploratory reference**, without silently promoting it into the production baseline.
+   - Approve as an **intentional scene/sequence exception**, documenting scope and reason.
+   - **Fork a candidate visual identity** from the image, then test it against multiple representative locations and moods before proposing promotion.
+3. **Promotion of a candidate identity**: explicitly compare with current baseline, review effects on already approved master images, video, VFX and grade, and approve a new version with provenance. Do not overwrite prior baseline or automatically invalidate earlier work.
+
+### UX implications
+
+Show the candidate image beside baseline exemplars and the intended shot brief. Present separate assessments for image quality, shot fitness and visual fit, followed by **distinct actions**. A visually divergent but compelling image should be easy to save as a new direction, not mislabeled as unusable. The user must be able to navigate from the image to its generating model/workflow, references, evaluation, decision and downstream dependents. Avoid hardcoded numeric mood scores or automated artistic rejection.
+
+### Core design caution
+
+Current per-shot `approve_picture` gates are not equivalent to production-wide baseline approval. Research how existing `looks`, `styles`, references, `SceneState` decisions and journals can support **versioned baseline proposals and scope-specific exceptions** without a second source of truth. Treat candidate identity, promoted identity and local exception as distinct states. No schema/API change is authorized yet.
+
+### Acceptance tests to design
+
+- A high-quality but stylistically divergent hospital image is retained and used to propose a candidate identity, without changing approved film identity.
+- A divergent image is approved for a dream sequence as an explicit exception, with a visible reason and scope.
+- A candidate identity succeeds in Claire's room but fails on snowy Boreal exterior; the user can refine or abandon it.
+- Replacing the film baseline exposes known affected artifacts and unknown dependencies, never fabricated counts.
