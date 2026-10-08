@@ -334,3 +334,6 @@ Track scope and acceptance criteria in [CT-0066](../work/CT-0066-three-workspace
 - [ ] Prototype representative-location visual experiments and model comparison with complete provenance.
 - [ ] Determine how a film-wide visual baseline, exceptions and revisions fit existing Core contracts without a parallel truth model.
 - [ ] Validate Visual Lab placement in navigation and downstream change-impact visibility before a UI or schema ADR.
+
+- [ ] Visual Lab: prototype separate quality / shot suitability / visual-identity fit assessments and human decisions (approve, regenerate, retain as exploration, scoped exception, fork candidate identity).
+- [ ] Visual Lab: test candidate identity across representative locations before promotion; version approved baselines and assess known/unknown downstream impact.
