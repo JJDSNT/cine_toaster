@@ -126,7 +126,7 @@ matte (§3 filter, colour); they are not repeated here.
 | Op | In | Out | Parameters |
 |---|---|---|---|
 | `merge.over` | `front` picture, `back` picture, optional `matte` | picture | `mix` (0..1) |
-| `merge.porter_duff` | two pictures | picture | `op`: over, under, in, out, atop, xor |
+| `merge.porter_duff` | two pictures | picture | `how`: over, under, in, out, atop, xor |
 | `merge.blend` | two pictures | picture | `mode`: screen, add, multiply, overlay, difference, lighten, darken; `mix` |
 | `merge.mix` | two pictures, a `matte` or a `curve` | picture | -- (a dissolve is `merge.mix` with a curve) |
 | `merge.channels` | up to four signals or mattes | picture | which input fills red, green, blue, alpha (found missing by Appendix B: chromatic aberration) |

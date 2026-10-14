@@ -91,7 +91,7 @@ OPS: dict[str, Op] = {
                         {"how": "enum:union|intersect|subtract|multiply"}),
     # -- merge
     "merge.over": Op({"front": P(*PIC), "back": P(*PIC), "matte": P(*MAT, required=False)}, params={"mix": "number"}),
-    "merge.porter_duff": Op({"a": P(*PIC), "b": P(*PIC)}, params={"op": "enum:over|under|in|out|atop|xor"}),
+    "merge.porter_duff": Op({"a": P(*PIC), "b": P(*PIC)}, params={"how": "enum:over|under|in|out|atop|xor"}),
     "merge.blend": Op({"a": P(*PIC), "b": P(*PIC)},
                       params={"mode": "enum:screen|add|multiply|overlay|difference|lighten|darken", "mix": "number"}),
     "merge.mix": Op({"a": P(*PIC), "b": P(*PIC), "by": P("matte", "curve")}),
@@ -168,7 +168,7 @@ KEY_NEEDS = {"luminance": ("low", "high"), "luma": ("low", "high"), "colour": ("
 REQUIRED_PARAMS: dict[str, tuple[str, ...]] = {
     "signal.channel": ("channel",), "signal.read": ("file", "kind"), "signal.estimate": ("kind", "model"),
     "matte.shape": ("shape",), "matte.combine": ("how",), "matte.label": ("labels",),
-    "merge.porter_duff": ("op",), "merge.blend": ("mode",),
+    "merge.porter_duff": ("how",), "merge.blend": ("mode",),
     "warp.procedural": ("kind",), "warp.corner_pin": ("corners|track",),
     "colour.lut": ("file|look",), "colour.posterise": ("levels",), "colour.solarise": ("threshold",),
     "filter.morphology": ("operation", "radius"), "filter.blur": ("radius",),
