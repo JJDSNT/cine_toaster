@@ -41,6 +41,8 @@ CHECK_CODES = frozenset(
         "composite_type_mismatch",
         "composite_unknown_op",
         "composite_unknown_param",
+        "layers_and_composite",
+        "layers_invalid",
         "continuation_unchained",
         "cut_type_unknown",
         "cut_screen_flip",

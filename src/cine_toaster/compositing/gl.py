@@ -25,7 +25,7 @@ import numpy as np
 from ..errors import ValidationError
 from .reference import LINEAR, REC709, Clip, _Held, curve_factory, read
 from .schema import validate
-from .semantics import blur_kernel, threshold_spread
+from .semantics import CHROMA_FLOOR, blur_kernel, pixels, threshold_spread
 from .semantics import default as semantic_default
 
 IMPLEMENTED = {
@@ -34,8 +34,9 @@ IMPLEMENTED = {
     "matte.from_signal", "matte.threshold", "matte.combine", "matte.key",
     "merge.over", "merge.mix", "merge.blend", "merge.porter_duff",
     "warp.transform", "warp.corner_pin", "warp.surface",
+    "matte.shape",
     "colour.grade", "colour.invert",
-    "filter.blur",
+    "filter.blur", "filter.morphology",
     "curve.progress", "curve.keys", "curve.map", "curve.combine", "curve.noise", "curve.beats",
     "opaque.gl",
 }
@@ -111,10 +112,17 @@ _SHADERS = {
                       if (how == 0) m = max(x, y); else if (how == 1) m = min(x, y);
                       else if (how == 2) m = clamp(x - y, 0.0, 1.0); else m = x * y;
                       result = vec4(m, 0.0, 0.0, 1.0); }""",
-    "key": """uniform sampler2D a; uniform float low; uniform float high; uniform int inv; uniform int encoded;
-        void main() { vec3 s = straight(texture(a, uv)); if (encoded == 1) s = encode(s);
-                      float k = clamp((dot(s, REC709) - low) / max(high - low, 1e-9), 0.0, 1.0);
-                      result = vec4(inv == 1 ? 1.0 - k : k, 0.0, 0.0, 1.0); }""",
+    "key": """uniform sampler2D a; uniform sampler2D plate; uniform float low; uniform float high; uniform int inv;
+        uniform int encoded; uniform int method; uniform vec3 colour; uniform float tolerance; uniform float spread;
+        uniform float floor_; vec3 chroma(vec3 c) { return c / (c.r + c.g + c.b + floor_); }
+        void main() { vec3 s = straight(texture(a, uv)); float k;
+          if (method == 0) { if (encoded == 1) s = encode(s);
+                             k = clamp((dot(s, REC709) - low) / max(high - low, 1e-9), 0.0, 1.0); }
+          else { vec3 e = encode(s); float d;
+                 if (method == 1) d = length(chroma(e) - chroma(encode(colour)));
+                 else { vec3 q = abs(e - encode(straight(texture(plate, uv)))); d = max(q.r, max(q.g, q.b)); }
+                 k = clamp((d - tolerance) / spread, 0.0, 1.0); }
+          result = vec4(inv == 1 ? 1.0 - k : k, 0.0, 0.0, 1.0); }""",
     "over": """uniform sampler2D front; uniform sampler2D back; uniform sampler2D matte; uniform int has_matte;
         uniform float mixing;
         void main() { vec4 f = texture(front, uv); if (has_matte == 1) f *= texture(matte, uv).r; f *= mixing;
@@ -147,6 +155,11 @@ _SHADERS = {
     "invert": """uniform sampler2D a; uniform int is_matte;
         void main() { vec4 p = texture(a, uv);
           result = is_matte == 1 ? vec4(1.0 - p.r, 0.0, 0.0, 1.0) : vec4(p.a - p.rgb, p.a); }""",
+    "morphology": """uniform sampler2D a; uniform vec2 texel; uniform int reach; uniform int grow;
+        void main() { float m = grow == 1 ? 0.0 : 1.0;
+          for (int y = -reach; y <= reach; y++) for (int x = -reach; x <= reach; x++) {
+            float v = texture(a, uv + texel * vec2(float(x), float(y))).r; m = grow == 1 ? max(m, v) : min(m, v); }
+          result = vec4(m, 0.0, 0.0, 1.0); }""",
     "blur": """uniform sampler2D a; uniform vec2 step_; uniform float sigma; uniform int half_;
         void main() { vec4 total = vec4(0.0); float weight = 0.0;
           for (int i = -half_; i <= half_; i++) { float w = exp(-0.5 * float(i * i) / (sigma * sigma));
@@ -193,6 +206,7 @@ class GLRenderer:
         self.mesh_program = self.context.program(vertex_shader=_MESH_VERTEX, fragment_shader=_MESH_FRAGMENT)
         self.opaque: dict[str, Any] = {}
         self.pool: dict[tuple, list] = {}
+        self.shapes: dict[str, np.ndarray] = {}  # shapes drawn by the shared rasteriser, by what they are
 
     @property
     def name(self) -> str:
@@ -359,10 +373,18 @@ class GLRenderer:
             return self.draw("combine", size, 1, {"a": self._matte(value(node["a"]), size),
                                                   "b": self._matte(value(node["b"]), size)}, how=how)
         if op == "matte.key":
-            if node["by"] not in ("luminance", "luma"):
-                raise ValidationError(f"The GL renderer does not key by {node['by']} yet")
-            return self.draw("key", size, 1, {"a": value(node["picture"])}, low=float(p("low")), high=float(p("high")),
-                             inv=int(bool(node.get("invert"))), encoded=int(node["by"] == "luma"))
+            by = node["by"]
+            textures = {"a": value(node["picture"])}
+            if by == "difference":
+                textures["plate"] = value(node["reference"])
+            if by in ("luminance", "luma"):
+                return self.draw("key", size, 1, textures, low=float(p("low")), high=float(p("high")),
+                                 inv=int(bool(node.get("invert"))), encoded=int(by == "luma"), method=0)
+            colour = tuple(float(c) for c in (list(p("colour") or [0, 0, 0]) + [0, 0, 0])[:3])
+            return self.draw("key", size, 1, textures, inv=int(bool(node.get("invert"))),
+                             method=1 if by == "colour" else 2, colour=colour, tolerance=float(p("tolerance")),
+                             floor_=CHROMA_FLOOR,
+                             spread=threshold_spread(p("softness", 0.0)))
         if op == "merge.over":
             textures = {"front": value(node["front"]), "back": value(node["back"])}
             if node.get("matte"):
@@ -413,7 +435,7 @@ class GLRenderer:
             return self.draw("invert", size, source.components, {"a": source}, is_matte=int(source.components == 1))
         if op == "filter.blur":
             source = value(node["in"])
-            radius = float(p("radius", 0.0))
+            radius = pixels(p("radius", 0.0), height)
             if radius <= 0:
                 return self._identity(source, size)
             sigma, half = blur_kernel(radius)
@@ -423,6 +445,25 @@ class GLRenderer:
                              half_=half)
             across.release()
             return down
+        if op == "matte.shape":
+            # Drawn by the rasteriser the reference uses (one drawing of a shape), once per shape and size, and
+            # uploaded: a garbage matte or a window does not change from frame to frame unless its size does.
+            from .reference import _shape
+
+            scale = float(p("size", 1.0))
+            key = repr((node.get("shape"), node.get("points"), node.get("feather"), scale, size))
+            if key not in self.shapes:
+                if len(self.shapes) > 32:
+                    self.shapes.clear()
+                self.shapes[key] = _shape(node, size, scale)
+            return self.upload(self.shapes[key])
+        if op == "filter.morphology":
+            source = value(node["in"])
+            reach = max(0, int(round(pixels(p("radius", 1.0), height))))
+            if reach == 0:
+                return self._identity(source, size)
+            return self.draw("morphology", size, 1, {"a": source}, texel=(1.0 / width, 1.0 / height), reach=reach,
+                             grow=int(node["operation"] == "dilate"))
         raise ValidationError(f"The GL renderer does not implement {op}")
 
     def _identity(self, source, size):

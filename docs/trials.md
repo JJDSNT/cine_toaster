@@ -8,6 +8,9 @@ work records named here hold the detail.
 
 | Date | Piece | Length | File | Published |
 |---|---|---|---|---|
+| 2026-10-14 | Window: layers, a matte in the frame | 4 s | `trials/window-layers-v1.mp4` | not yet |
+| 2026-10-14 | Inset: layers, the ADO move | 4 s | `trials/inset-layers-v3.mp4` | not yet |
+| 2026-10-14 | Orbit v6, the plume on every beat | 41 s | `trials/music-piece-v6-plume.mp4` | not yet |
 | 2026-10-14 | Heat v5, the warp wipe in GL | 42 s | `trials/organic-trial-v5.mp4` | not yet |
 | 2026-10-14 | Heat v4, the warp wipe (a ball) | 42 s | `trials/organic-trial-v4.mp4` | not yet |
 | 2026-10-14 | Heat v3, a displace wipe | 42 s | `trials/organic-trial-v3.mp4` | not yet |
@@ -20,6 +23,24 @@ work records named here hold the detail.
 
 `trials/` is `~/cine-toaster-references/trials/` on the machine they were made
 on. A link is added when a piece is published.
+
+## 2026-10-14 · Window and Inset: layers (C4)
+
+Two shots written as layers (CT-0075), compiled into the graph and drawn by
+GL. *Inset* v3: the launch flies into the top-right corner over the Earth,
+turning in perspective, holds with a border and a shadow, and flies out,
+eased. *Window* v1: Orion's cabin during Artemis II (NASA, from Wikimedia
+Commons), a fixed camera; its forward windows show the Earth from orbit
+through polygon mattes.
+
+- Tool: all of it from the breakdown -- footage fetched, layers compiled,
+  GL. By hand: the window polygons, read off a frame with a grid.
+
+## 2026-10-14 · Orbit v6: the plume on every beat (C3)
+
+The plume's scale pulse with a fast rise and a Bézier return (CT-0074): its
+peaks on the nine beat frames of the shot; nine of nine beats stand out from
+their neighbours in the file (v5: eight).
 
 ## 2026-10-14 · Heat v5: the same warp wipe, drawn in GL
 

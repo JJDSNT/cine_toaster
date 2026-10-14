@@ -44,6 +44,20 @@ class DecisionTests(unittest.TestCase):
         text = (SOURCE / "compositing" / "reference.py").read_text()
         self.assertIsNone(re.search(r'node\.get\("(attack|decay)",\s*[0-9]', text))
 
+    def test_a_length_in_pixels_means_the_same_at_every_size(self) -> None:
+        """Lengths are pixels at 720 lines, scaled to the frame (CT-0075): a still or a preview drawn small looks
+        like the cut drawn large."""
+
+        edge = {"ports": {"a": "picture"}, "nodes": {"out": {"op": "filter.blur", "in": "a", "radius": 24}},
+                "output": "out"}
+        profiles = []
+        for width, height in ((128, 72), (512, 288)):
+            picture = np.zeros((height, width, 4), np.float32)
+            picture[:, : width // 2] = 1.0
+            row = reference.evaluate(edge, {"a": picture}, frames=1, size=(width, height), fps=12)[0, height // 2, :, 0]
+            profiles.append(np.interp(np.linspace(0, 1, 64), np.linspace(0, 1, width), row))
+        self.assertLess(float(np.abs(profiles[0] - profiles[1]).max()), 0.05)
+
     def test_the_reference_reads_a_default_from_semantics(self) -> None:
         options = {"frames": 1, "size": (64, 36), "fps": 12}
         before = reference.evaluate(SURFACE, {"a": picture()}, **options)

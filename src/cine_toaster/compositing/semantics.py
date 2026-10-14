@@ -38,8 +38,22 @@ DEFAULTS: dict[str, dict[str, Any]] = {
 #: The named eases (SPEC-0012 §6); any other ease is a cubic Bezier given as [x1, y1, x2, y2].
 EASE_NAMES = ("linear", "in", "out", "in-out", "hold")
 
+#: Added to a colour's sum before its proportions are taken, for a colour key: near black they are noise.
+CHROMA_FLOOR = 0.05
+
 #: The smallest spread a threshold's edge has: a hard edge is still one level wide, never a division by zero.
 SOFTNESS_FLOOR = 0.002
+
+
+#: Lengths given in pixels (a blur's or a border's radius, a text's size) are pixels of a frame this many lines
+#: high, scaled to the frame being drawn: a composite looks the same at 180 lines as at 1080 (CT-0075).
+REFERENCE_LINES = 720
+
+
+def pixels(value: Any, height: int) -> float:
+    """A length an author gave in pixels at `REFERENCE_LINES`, in pixels of a frame ``height`` lines high."""
+
+    return float(value) * height / REFERENCE_LINES
 
 
 def default(op: str, key: str, fallback: Any = None) -> Any:

@@ -106,5 +106,26 @@ class FootageTests(unittest.TestCase):
                                str(self.root / take["media"])], capture_output=True, text=True).stdout.strip()
         self.assertEqual(size, "64,36")
 
+class UserAgentTests(unittest.TestCase):
+    def test_a_remote_fetch_says_who_is_asking_and_nothing_personal(self) -> None:
+        """Wikimedia refuses an anonymous fetch (CT-0075); the tool names itself, never its user."""
+
+        from cine_toaster import footage
+
+        with tempfile.TemporaryDirectory() as raw, mock.patch("subprocess.run") as run:
+            run.return_value = subprocess.CompletedProcess([], 1, "", "refused")
+            with self.assertRaises(Exception):
+                footage.cut("https://upload.wikimedia.org/x.webm", 1.0, 2.0, Path(raw) / "x.mp4")
+            command = run.call_args[0][0]
+            self.assertIn("-user_agent", command)
+            agent = command[command.index("-user_agent") + 1]
+            self.assertTrue(agent.startswith("CineToaster/"))
+            self.assertNotIn("@", agent)
+            run.reset_mock()
+            with self.assertRaises(Exception):
+                footage.cut("file:///tmp/x.webm", 1.0, 2.0, Path(raw) / "y.mp4")
+            self.assertNotIn("-user_agent", run.call_args[0][0])
+
+
 if __name__ == "__main__":
     unittest.main()

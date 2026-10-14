@@ -226,6 +226,8 @@ def _load_shots(
                 "beats": field(raw, "beats"),
                 # The shot's picture as a composite of SPEC-0012 (a graph), when it is not the take alone.
                 "composite": field(raw, "composite") if isinstance(field(raw, "composite"), dict) else None,
+                # The shot's picture as layers (C4): compiled into its composite when the scene loads.
+                "layers": field(raw, "layers"),
                 # The stretch of a public file this shot's picture is (CT-0066).
                 "footage": _footage(field(raw, "footage")),
                 "derive": _derive(field(raw, "derive")),
@@ -445,6 +447,32 @@ def _expand_effects(shots: list[dict[str, Any]], scene_id: str, root: Path) -> l
         for problem in problems:
             findings.append(Finding(code="effect_problem", severity="error", scene_id=scene_id, shots=(shot["id"],),
                                     message=f"{shot['id']} {problem}. It would be lost, not guessed."))
+    return findings
+
+
+def _expand_layers(shots: list[dict[str, Any]], scene_id: str) -> list[Finding]:
+    """`layers: [...]` become the shot's composite, a SPEC-0012 graph (C4, CT-0075): one way of drawing."""
+
+    if not any(shot.get("layers") is not None for shot in shots):
+        return []
+    from .compositing.layers import compile_layers
+
+    findings = []
+    for shot in shots:
+        if shot.get("layers") is None:
+            continue
+        if shot.get("composite"):
+            findings.append(Finding(code="layers_and_composite", severity="error", scene_id=scene_id,
+                                    shots=(shot["id"],),
+                                    message=f"{shot['id']} gives both `layers` and a `composite`; one picture is "
+                                            f"written one way."))
+            continue
+        graph, problems = compile_layers(shot["layers"])
+        for problem in problems:
+            findings.append(Finding(code="layers_invalid", severity="error", scene_id=scene_id, shots=(shot["id"],),
+                                    message=f"{shot['id']}: {problem}."))
+        if graph is not None:
+            shot["composite"] = graph
     return findings
 
 
@@ -692,6 +720,7 @@ def _load_scene(
     move_findings = _expand_camera_moves(shots, scene_id, root)
     move_findings.extend(_expand_titles(shots, scene_id, root))
     move_findings.extend(_expand_effects(shots, scene_id, root))
+    move_findings.extend(_expand_layers(shots, scene_id))
     sound_beds, sound_findings = _expand_sounds(shots, document, scene_id, root)
     if any(shot.get("beats") is not None for shot in shots):
         from .beats import lay_out

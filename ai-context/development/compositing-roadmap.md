@@ -193,6 +193,13 @@ its shot, drawn by GL in agreement with the reference.
 
 ### C4. Layers: the ADO move and the keyers
 
+In progress (`CT-0075`): layers as a record compiled into the graph; colour
+and difference keys in both renderers; lengths in pixels at 720 lines; GL
+draws layered shots (28 ops). On real footage: the ADO move (SC-030 v3) and
+a window replaced (SC-040 v1). Left: a person on a light background keyed on
+real footage, waiting for a clip and licence the user accepts.
+
+
 - What: a shot holds layers, each a source with a warp (place, size, rotation
   in three axes with perspective), a matte and a merge mode, animated (C3).
   Keyers as matte generators: luma, colour, difference. Borders and a drop
@@ -364,6 +371,13 @@ prescribed here.
   the same graph -- seek the inputs' decoding to the instant minus the window
   `node_windows` says each node needs, or keep checkpoints -- never a second
   renderer.
+- Layer modes **multiply, darken, overlay**: `merge.blend` blends by values
+  only, so a transparent part of a layer darkens what is below. Blend only
+  where the front covers (the front's alpha weighting the blend), in both
+  renderers, then open the modes (CT-0075).
+- **Spill suppression** for a green screen: the key removes the screen but
+  not the green it throws on the subject. A `colour` operation that pulls the
+  key's hue toward neutral where the matte is partial, in both renderers.
 - (high) A still of a shot **cut from a take** is the take's frame; `toast still`
   refuses it today: read the take at the cut's instant through the same
   conform and display rules.

@@ -124,6 +124,17 @@ the NumPy reference first (§7).
 Grow, shrink, feather and invert are `filter` and `colour` operations on a
 matte (§3 filter, colour); they are not repeated here.
 
+**Keys** (CT-0075) measure in the display encoding, where equal steps look
+equal, and give 1 where the picture is kept: `luma`/`luminance` map the
+brightness from `low` to `high`; `colour` measures how far a pixel's
+**chromaticity** (its colour's proportions, brightness divided out, with a
+small floor so near-black stays) is from the key colour's, so a screen in
+shadow keys like the lit screen, and a background with no colour (white,
+grey) is keyed by luma instead; `difference` takes the largest channel
+difference from the `reference` picture (a clean plate). For colour and
+difference the matte rises from 0 at `tolerance` to 1 past it by
+`softness` (with the threshold's floor).
+
 ## merge
 
 | Op | In | Out | Parameters |
@@ -165,11 +176,16 @@ or procedural warp says `edge: extend` (the border repeated) or `edge: mirror`
 
 | Op | In | Out | Parameters |
 |---|---|---|---|
-| `filter.blur` | picture or matte | same | `radius`, `kind` (gaussian, box, directional, defocus) |
+| `filter.blur` | picture or matte | same | `radius` (pixels at 720 lines, below), `kind` (gaussian, box, directional, defocus) |
 | `filter.sharpen` | picture | picture | `amount` |
 | `filter.glow` | picture | picture | `threshold`, `radius`, `intensity` |
 | `filter.edges` | picture | picture or matte | `kind` |
-| `filter.morphology` | matte | matte | `operation` (erode, dilate), `radius` |
+| `filter.morphology` | matte | matte | `operation` (erode, dilate), `radius` (pixels at 720 lines) |
+
+**Lengths in pixels** -- a blur's, a glow's, a grow's radius, a grain's size,
+a text's size -- are pixels of a frame 720 lines high, scaled to the frame
+drawn (CT-0075): a composite looks the same in a 180-line preview or still as
+in the 1080-line cut. A shape's `feather` is a fraction of the frame.
 | `filter.noise` | picture | picture | `amount`, `size`, `seed` (grain) |
 
 ## time
@@ -259,6 +275,43 @@ A node is `{op, <ports>: <node or node.port>, <parameters>}`. `output` names
 the node whose picture is the shot's. A node may be given a `renderer` to
 pin it; otherwise the planner (or, before C9, the single renderer running the
 graph) chooses.
+
+**Layers** (C4, CT-0075) are another way of writing the same thing, as a
+filmmaker thinks of it: pictures stacked, the first at the back, each placed,
+cut down, bordered, shadowed and merged, any of it over time. They are
+compiled when the scene loads into a graph of the ops above (nothing else
+draws them), checked like any composite, and a shot gives `layers` or a
+`composite`, not both (`layers_and_composite`; a layer that cannot be
+compiled is `layers_invalid`).
+
+```yaml
+- n: 1
+  layers:
+    - source: CUT                              # a take of the shot, or a file
+    - source: plates/launch.mp4
+      start: 1.0                               # seconds into the source
+      place:                                   # warp.transform: translate, scale, rotate, pivot, perspective
+        scale: 0.4
+        translate: {keys: [{t: 0, value: [0.6, -0.5], ease: out}, [1.2, [0.27, -0.24]]]}
+        rotate: [0, -8, 0]
+        perspective: 35
+      key: {by: colour, colour: "#1fb34a", tolerance: 0.08, softness: 0.05}   # in the source's frame
+      garbage: {shape: rectangle, points: [[0.1, 0], [0.9, 1]]}             # in the source's frame
+      matte: {shape: polygon, points: [...]}   # in the frame: where the layer shows
+      border: {width: 3, colour: "#f2ead9"}    # around it, after it is placed
+      shadow: {offset: [0.012, 0.018], blur: 14, opacity: 0.55}
+      mode: over                               # over, screen, add, lighten, difference
+      opacity: {beats: {low: 0.8, high: 1.0}}  # any number: a value, {keys: [...]} or {beats: {...}}
+```
+
+Order within a layer: the key and garbage shape cut the source down in its
+own frame; the layer is placed; its border is drawn around its placed edge
+(the same width whatever its size); a matte in the frame limits where it
+shows; its shadow is cast below it, in the frame; then it meets what is below
+by its mode and opacity. Colours are as seen (`#rrggbb`, or display-encoded
+0..1); positions are fractions of the frame; lengths are pixels at 720 lines.
+Multiply, darken and overlay are not layer modes yet: `merge.blend` blends by
+values only, so a transparent part of the layer would darken what is below.
 
 A join's recipe is a catalog item whose graph has the ports `from` and `to`
 (pictures) and the curve `progress`; the join fills them:

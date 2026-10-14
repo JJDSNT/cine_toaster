@@ -44,6 +44,9 @@ is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
 CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
 
+- `CT-0075` — C4: layers compiled into the graph, colour and difference
+  keys, one unit for lengths; the ADO move and a window on real footage
+  (`doing`: a keyed person on real footage waits for a clip)
 - `CT-0074` — C3: parameters over time; eases one vocabulary, a beat's
   instant apart from the reaction, the plume on every beat (`done`)
 - `CT-0073` — surfaces from Blender: an external UV mesh for `warp.surface`,

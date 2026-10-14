@@ -90,6 +90,14 @@ def stretch_path(url: str, start: float, seconds: float, height: int = 0) -> Pat
     return cache_directory() / f"{name}-{start:g}-{seconds:g}{f'-{height}p' if height else ''}.mp4"
 
 
+def user_agent() -> str:
+    """Who is asking, as archives ask a tool to say (Wikimedia refuses an anonymous one); no personal detail."""
+
+    from . import __version__
+
+    return f"CineToaster/{__version__} (footage fetch; https://github.com/JJDSNT/cine_toaster)"
+
+
 def cut(url: str, start: float, seconds: float, destination: Path, height: int = 0) -> Path:
     """The stretch as its own clip, read straight from where the file is.
 
@@ -108,7 +116,9 @@ def cut(url: str, start: float, seconds: float, destination: Path, height: int =
     partial = destination.with_name(destination.stem + ".part.mp4")
     try:
         completed = subprocess.run(
-            [ffmpeg, "-y", "-loglevel", "error", "-ss", f"{start:.3f}", "-t", f"{seconds:.3f}", "-i", address(url),
+            [ffmpeg, "-y", "-loglevel", "error",
+             *(["-user_agent", user_agent()] if url.startswith(("http://", "https://")) else []),
+             "-ss", f"{start:.3f}", "-t", f"{seconds:.3f}", "-i", address(url),
              "-map", "0:v:0", "-map", "0:a:0?", *(["-vf", f"scale=-2:{height}"] if height else []),
              "-c:v", "libx264", "-preset", "medium", "-crf", "16",
              "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", str(partial)],

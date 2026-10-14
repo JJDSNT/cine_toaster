@@ -86,7 +86,7 @@ class ColourAndFilterTests(unittest.TestCase):
 
     def test_a_matte_grows_and_shrinks(self) -> None:
         square = box(28, 14, 36, 22)
-        grown = one({"m": {"op": "filter.morphology", "in": "a", "operation": "dilate", "radius": 2},
+        grown = one({"m": {"op": "filter.morphology", "in": "a", "operation": "dilate", "radius": 40},  # 2 px at 36 lines
                      "out": {"op": "merge.over", "front": "white", "back": "black", "matte": "m"}},
                     {"a": "picture", "white": "picture", "black": "picture"},
                     a=square, white=solid(1, 1, 1), black=solid(0, 0, 0))[0, ..., 0]

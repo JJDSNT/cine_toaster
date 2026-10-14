@@ -31,7 +31,7 @@ import numpy as np
 
 from ..errors import ValidationError
 from .schema import validate
-from .semantics import blur_kernel, threshold_spread
+from .semantics import CHROMA_FLOOR, blur_kernel, pixels, threshold_spread
 from .semantics import default as semantic_default
 
 #: The default spaces, converted by the exact sRGB transfer function; any other goes through OCIO.
@@ -375,6 +375,13 @@ def _picture(value: Any) -> np.ndarray:
     if isinstance(value, np.ndarray) and value.ndim == 2:
         return np.stack([value, value, value, np.ones_like(value)], axis=-1)
     return value
+
+
+def _chroma(rgb: np.ndarray) -> np.ndarray:
+    """A display-encoded colour's proportions, its brightness divided out: a screen in shadow is the same colour.
+    Near black the proportions are noise, so a small offset (`semantics.CHROMA_FLOOR`) pulls them to grey."""
+
+    return rgb / (rgb.sum(axis=-1, keepdims=True) + CHROMA_FLOOR)
 
 
 def _blur(image: np.ndarray, radius: float) -> np.ndarray:
@@ -811,7 +818,22 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
                 low, high = float(param("low")), float(param("high"))
                 key = np.clip((signal - low) / ((high - low) or 1e-9), 0, 1)
             else:
-                raise ValidationError(f"The reference does not yet key by {by}")
+                # Distances in the display encoding, where equal steps look equal (CT-0075): a colour key by
+                # chromaticity, ignoring brightness (a shadow on the screen still keys); a difference key by the
+                # largest channel against a clean plate. 0 at `tolerance`, 1 past it by the softness's spread.
+                shown_here = convert(straight, working, ENCODED)
+                if by == "colour":
+                    target = convert(np.asarray(param("colour"), dtype=np.float32)[:3].reshape(1, 1, 3), working,
+                                     ENCODED)
+                    distance = np.linalg.norm(_chroma(shown_here) - _chroma(target), axis=-1)
+                else:
+                    plate = _picture(value(node["reference"], frame))
+                    plate_alpha = plate[..., 3:4]
+                    plate = np.divide(plate[..., :3], plate_alpha, out=np.zeros_like(plate[..., :3]),
+                                      where=plate_alpha > 1e-6)
+                    distance = np.abs(shown_here - convert(plate, working, ENCODED)).max(axis=-1)
+                spread = threshold_spread(param("softness", 0.0))
+                key = np.clip((distance - float(param("tolerance"))) / spread, 0, 1)
             return (1.0 - key if node.get("invert") else key).astype(np.float32)
         if op == "merge.over":
             front, back = _picture(value(node["front"], frame)), _picture(value(node["back"], frame))
@@ -914,7 +936,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             out[..., :3] = alpha - given[..., :3]  # 1 - colour, kept premultiplied
             return out
         if op == "filter.blur":
-            return _blur(value(node["in"], frame), float(param("radius", 0.0)))
+            return _blur(value(node["in"], frame), pixels(param("radius", 0.0), height))
         return more(name, node, op, frame, seconds, param, value)
 
     def more(name: str, node: dict[str, Any], op: str, frame: int, seconds: float, param, value) -> Any:
@@ -947,7 +969,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             text = str(param("text", ""))
             reveal = param("reveal", 1.0)
             shown = text[: int(round(len(text) * float(np.clip(reveal, 0, 1))))] if reveal is not None else text
-            size_px = max(4, int(float(param("size", 40)) * height / 720 * 4))
+            size_px = max(4, int(pixels(param("size", 40), height) * 4))
             position = np.broadcast_to(np.asarray(param("position", [0.5, 0.5]), dtype=np.float32), (2,))
             coverage = _text_coverage(text, shown, font_file({"font": node.get("font") or ""}, root), size_px,
                                       (float(position[0]), float(position[1])), width, height)
@@ -1047,12 +1069,12 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             return rebuilt(np.clip(rgb @ matrix.T.astype(np.float32), 0, None), alpha)
         if op == "filter.sharpen":
             picture = _picture(value(node["in"], frame))
-            return np.clip(picture + float(param("amount", 0.5)) * (picture - _blur(picture, 2.0)), 0, None)
+            return np.clip(picture + float(param("amount", 0.5)) * (picture - _blur(picture, pixels(2.0, height))), 0, None)
         if op == "filter.glow":
             picture = _picture(value(node["in"], frame))
             rgb, alpha = straight(picture)
             bright = np.clip(rgb @ np.asarray(REC709, dtype=np.float32) - float(param("threshold", 0.8)), 0, None)
-            halo = _blur(picture[..., :3] * (bright > 0)[..., None], float(param("radius", 8.0)))
+            halo = _blur(picture[..., :3] * (bright > 0)[..., None], pixels(param("radius", 8.0), height))
             out = picture.copy()
             out[..., :3] += halo * float(param("intensity", 1.0))
             return out
@@ -1063,7 +1085,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             return np.clip(np.hypot(gx, gy) * 4, 0, 1).astype(np.float32)
         if op == "filter.morphology":
             matte = _matte(value(node["in"], frame))
-            radius = max(0, int(round(float(param("radius", 1.0)))))
+            radius = max(0, int(round(pixels(param("radius", 1.0), height))))
             padded = np.pad(matte, radius, mode="edge")
             stack = [padded[dy:dy + height, dx:dx + width] for dy in range(2 * radius + 1)
                      for dx in range(2 * radius + 1)]
@@ -1072,7 +1094,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
         if op == "filter.noise":
             picture = _picture(value(node["in"], frame))
             grain = np.random.default_rng([int(param("seed", 0) or 0), frame]).normal(0, 1, (height, width))
-            grain = _blur(grain.astype(np.float32), max(float(param("size", 1.0)) - 1.0, 0.0))
+            grain = _blur(grain.astype(np.float32), max(pixels(param("size", 1.0), height) - 1.0, 0.0))
             out = picture.copy()
             out[..., :3] = np.clip(picture[..., :3] + grain[..., None] * float(param("amount", 0.1)) * 0.1
                                    * picture[..., 3:4], 0, None)
