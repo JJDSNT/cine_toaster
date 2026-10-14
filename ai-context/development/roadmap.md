@@ -226,22 +226,100 @@ Agreed order (2026-10-04):
 
 Its own line of work (the user, 2026-10-13): capabilities the demos need,
 which become part of Cine Toaster. It has no specific relation to SINGULAR
-and does not follow that line's priorities. The map and the order are in
-`CT-0064`; agreed on 2026-10-14:
+and does not follow that line's priorities. The history and the evidence are
+in `CT-0064`. The user's rule (2026-10-14): every gap found is attacked, one
+point at a time, in this order. Each point gets its own work record when it
+starts and is struck here when it is done.
 
-1. ~~the reel on the assembly path~~ done (`CT-0065`);
-2. ~~footage declared in the breakdown and fetched~~ done (`CT-0066`);
-3. a first music piece and an organic trial exist, made partly by hand
-   (outside the repository); what they showed is in `CT-0064`;
-4. beats as a record of the project, and a production's frame declared;
-5. a matte and an overlay in the transition contract (moved up by the user's
-   wish for organic transitions);
-6. layers, a keyer, and ADO-style moves within a shot;
-7. a measurement of video and streams: live transmission is not the purpose,
-   and it is not ruled out;
-8. Toaster-style shaders (`CT-0028`) and a review of the catalog's;
-9. the music piece finished, then the reel: a narrated first act, the piece
-   as its second -- nothing of the previous reel kept.
+Done: the reel on the assembly path, stills as takes, narration beside the
+scene (`CT-0065`); footage declared and fetched (`CT-0066`); the music search
+that hid Freesound's tracks; a first music piece and an organic trial, made
+partly by hand, outside the repository.
+
+**D1. Beats are a record.**
+- What: `toast sound beats <project> <sound>` detects a track's tempo and
+  beats (librosa, in the voice interpreter, as a worker) and keeps them
+  beside the sound. A scene that has music may give a shot's length and a
+  join's place in beats (`duration: 8 beats`, or a join `on: 16`).
+- Check: a join that is not on a beat of the scene's music, when the scene
+  says it is cut to the music.
+- Done when: the music piece is assembled from beats written in its
+  breakdown, with no script outside the tool, and comes out the same length.
+- Closes: "beats are not in the tool"; "a shortened transition moves later
+  joins off the beat" (placing joins by beat makes each independent).
+
+**D2. A production says its frame.**
+- What: size and rate declared once in `project.yaml`; every version is
+  made in it, whatever its first take is. Footage is fetched to fit when no
+  height is given.
+- Done when: a scene opening on a 4K take and one opening on a card give
+  versions of the same declared size.
+
+**D3. A transition can take a matte and an overlay.**
+- What: the transition contract gains two inputs: a matte (a still or a
+  moving picture whose brightness decides where and when the incoming
+  picture appears) and an overlay with alpha that rides the join. Both
+  renderers (shader, FFmpeg stand-in), the browser preview, the catalog
+  manifest, and `luma` and `displacement` back in the catalog.
+- The matte may be a file, or **an effect of the VFX catalog rendered for the
+  length of the join** (the user's idea, 2026-10-14): fog, smoke, fire,
+  liquid, sparks, lightning shaping the join and, as the overlay, seen on it.
+- A specification first: it changes a contract three renderers share.
+- Done when: two playing pictures are joined through a moving matte from
+  the catalog, the same in the preview and in the version.
+- Closes: organic wipes; a graphic riding the join.
+
+**D4. Layers: a picture over another, moved while it plays.**
+- What: a shot may hold more than one picture. A layer has a source, a place,
+  a size, a rotation in three axes with perspective, and keyframes with an
+  eased path between them: the ADO's move, held as long as wanted, not only
+  across a join. Then borders, a drop shadow, trails.
+- A keyer on a layer: by luminance or colour, the key travelling with the
+  picture as it moves.
+- A specification first: what is over what, and why, is a Project Core
+  concept.
+- Done when: a playing picture is flown into a corner over another, held,
+  and flown out; and a person is keyed over a background.
+
+**D5. Measure video and streams.** A spike that answers, by running:
+- how many pictures can be composed at once, at what size and rate;
+- whether a transition, an effect and a layer run in real time on this
+  machine's GPU (today a join is rendered through pipes, offline);
+- whether a stream (camera, screen, RTSP, HLS, NDI) can be a source, and with
+  what delay;
+- whether anything can be switched while it plays.
+Live transmission is not what Cine Toaster is for, and nothing prevents
+supporting it: this point measures; what to build follows from the numbers.
+
+**D6. The catalogs brought up to the pieces.**
+- Transitions: a sheet for each positional and organic shader worth using
+  (6 of 117 have one; `undulating-burn-out` is not what its name says);
+  Toaster-style shaders written from observation (`CT-0028`).
+- Titles: a horizontal crawl, a drop shadow, colours taken from the
+  production's look.
+- Effects: posterise, solarise, colour cycling.
+
+**D7. Loose ends in what exists.**
+- `toast check` reports a first shot's `transition` that nothing renders.
+- `toast footage fetch` as a job (progress, cancel); a changed declaration
+  replaces the take it made.
+- `toast build`: removed, or made the assembly of a whole production.
+- `rig`, `remotion`, `hyperframes`: a renderer each, or out of the
+  vocabulary; `toast doctor` reports what is kept.
+
+**D8. The music piece, finished.** With D1-D4 and D6: joins written in
+beats, organic joins through mattes, a picture flown over another; better
+pictures than the Mars square. In the repository as the fourth demo
+(`docs/production-validation.md`), its footage fetched, not checked in.
+
+**D9. The reel, written from scratch.** A short narrated first act (two
+voices) and the music piece as its second. Nothing of the previous reel is
+kept; `examples/amiga-demo-reel` is a placeholder until this replaces it. The
+script goes to the user before it is built.
+
+Order: D1 and D2 are small and unblock D8. D3 is next because the user asked
+for organic joins; D4 follows it. D5 can run beside any of them. D6 and D7
+are taken in the gaps.
 
 ### Later
 

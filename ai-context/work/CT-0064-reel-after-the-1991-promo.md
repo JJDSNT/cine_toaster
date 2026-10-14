@@ -202,6 +202,10 @@ Done:
   (Freesound's): it returned nothing for "synthwave", now five tracks;
 - a first music piece and an organic trial, made by hand where noted below.
 
+The point-by-point plan, with what each point is done by, is in
+`development/roadmap.md` ("The demos line", D1-D9); the list below is its
+summary.
+
 To do, in the agreed order:
 
 1. **Beats as a record**: detect a track's beats (librosa is in
@@ -212,6 +216,8 @@ To do, in the agreed order:
 3. **A matte and an overlay in the transition contract** (moved up: the user
    asked for organic transitions): a join shaped by a moving matte, a
    graphic riding it; `luma` and `displacement` back in the catalog.
+   The matte may be an effect of the VFX catalog (fog, fire, smoke, liquid)
+   rendered for the join: the user's idea, 2026-10-14.
 4. **Layers and ADO-style moves**: a playing picture sized, placed, rotated
    in perspective on keyframes over another, held; borders, drop shadow,
    trails; a keyer (luminance, colour) with its key travelling with it.
