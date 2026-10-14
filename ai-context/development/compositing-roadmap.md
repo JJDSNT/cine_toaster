@@ -90,11 +90,14 @@ advance.
 
 ### C1. The primitives specified (SPEC-0012)
 
+- Accept ADR 0022 -- done (2026-10-14, consolidated and accepted).
 - What: each primitive's parameters, units and identity; the composite record
   as a **typed graph** (picture, matte, signal, sound, track, curve, metadata
   on its edges; wrong connections refused); the **colour contract** (working
   space scene-linear through OCIO, premultiplied or straight alpha at each
-  edge, precision and HDR, luma's weights for the working space); **node
+  edge, precision and HDR, luma's weights and transform named by the
+  operation -- Rec.709 linear by default -- and luminance told apart from
+  luma); **node
   identity** (a hash of operation, parameters, renderer version, inputs) and
   what is cached, what is promoted to a record, what is not deterministic;
   formats for tracks and curves apart from what makes them; how a renderer
@@ -102,7 +105,9 @@ advance.
   results handed over.
 - Kept distinct: the compositing graph is a record a shot holds, not the
   production canvas nor the orchestration graph (CT-0023).
-- Accept ADR 0022 first (the user).
+- Representative graphs written out for the existing operations (every
+  transition family, a VFX element, a title, the music piece's joins), to show
+  they can be expressed before anything is built (the review's last advice).
 - Done when: the specification is accepted, and every existing transition,
   VFX item and title can be written as a recipe of its primitives on paper.
 
@@ -121,8 +126,12 @@ advance.
   within a tolerance, at several sizes, rates, bit depths and with straight
   and premultiplied alpha.
 - A cache by node identity, with selective invalidation.
+- A graph is run **whole by one renderer** here; splitting it across several
+  is C9. Every later step that asks two renderers to agree (C5's GL and FFmpeg)
+  asks it of single-renderer runs, checked by this suite, and does not depend
+  on C9.
 - Limits: frame-by-frame FFmpeg is slow for long composites; acceptable for
-  the reference, addressed in C9.
+  the reference; the GL renderer of C5 and C9b is the fast path.
 
 ### C3. Animate: parameters over time
 
@@ -142,13 +151,19 @@ advance.
   flown out with eased keyframes; a person shot on a light background is keyed
   over another picture; the user's "window replaced by a landscape" is made
   with a matte (fixed camera; a moving one needs C7).
+- Room left for **2.5D** (ADR 0022 §8): a layer's warp in perspective and a
+  depth signal per layer are in the record from here, so layers can later sit
+  in a space with a virtual camera, parallax and occlusion without a Blender
+  scene. Not built here; not precluded.
 
 ### C5. Transitions as recipes, and the warp wipe
 
 - What: the transition catalog filed by family (dissolve, wipe -- geometric,
   luma, custom --, warp, warp wipe, move); a join may warp each picture as it
   is revealed (the **warp wipe** the user asked for); mattes generated from a
-  generator or a VFX recipe, cached; shaders that read moving textures.
+  generator or a VFX recipe, cached; shaders that read moving textures. The
+  **GL renderer of the graph** starts here, for the recipes transitions need,
+  each run whole on GL and whole on FFmpeg and compared by the C2 suite.
 - Done when: a warp wipe -- the outgoing picture bending along a map while the
   incoming one is revealed through a luma matte -- runs the same in the
   preview, on GL and in FFmpeg; no transition reimplements luma or a merge.

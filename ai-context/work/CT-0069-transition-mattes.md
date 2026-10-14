@@ -46,7 +46,8 @@ the organic trial: what matters is matte support and layers (2026-10-14).
   and clips updated every frame) and previews a `matte` item with a sample
   matte of soft blobs; checked in headless Chromium: the three items draw, no
   shader error.
-- **ADR 0022 (proposed)**, from the user's direction: luma, matte, warp and
+- **ADR 0022**, from the user's direction, amended twice and accepted
+  (2026-10-14), consolidated into one text: luma, matte, warp and
   wipe are compositing primitives shared by every renderer, not effects; the
   catalogs are to be built on them. `luma` and `matte-wipe` are filed as
   wipes and `displacement` as a warp accordingly (it had been filed beside
