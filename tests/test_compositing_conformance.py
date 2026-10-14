@@ -1,9 +1,10 @@
 """Conformance (ADR 0022 §7): a renderer is checked against the NumPy reference, never the reverse.
 
-The first case: the `luma` join as the FFmpeg matte renderer draws it in an assembly, against the
-`luma-wipe` example graph evaluated by the reference. Measured on 2026-10-14: the share revealed agrees
-within 1 %; pixels more than 0.1 apart stay under 4 %, all at the edge, where FFmpeg works in 8-bit
-4:2:0 with a harder threshold than the reference's (SPEC-0011's softness floor).
+The first case: the `luma` join as an assembly makes it without a shader, against the `luma-wipe`
+example graph evaluated by the reference. Measured on 2026-10-14 when FFmpeg filters drew it: the share
+revealed agreed within 1 %, pixels more than 0.1 apart under 4 %, all at the edge. Since CT-0071 the
+assembly draws it as a graph too; the test now holds the version's encoding (8-bit 4:2:0) to the same
+bounds.
 """
 
 from __future__ import annotations

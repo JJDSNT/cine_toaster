@@ -130,7 +130,8 @@ def _drop_pages(array: np.ndarray, frame: int) -> None:
 
 
 def read(path: Path, frames: int, size: tuple[int, int], fps: float, *, start: float = 0.0,
-         colorspace: str = ENCODED, alpha: str = "straight", working: str = LINEAR) -> Clip:
+         colorspace: str = ENCODED, alpha: str = "straight", working: str = LINEAR,
+         stretch_to: float | None = None, hold: bool = True) -> Clip:
     """A clip or a still, `frames` long, in the working space and premultiplied when used (SPEC-0012 §2)."""
 
     import tempfile
@@ -138,9 +139,16 @@ def read(path: Path, frames: int, size: tuple[int, int], fps: float, *, start: f
     width, height = size
     still = Path(path).suffix.lower() in (".png", ".jpg", ".jpeg", ".webp", ".exr", ".tif", ".tiff")
     source = ["-loop", "1", "-framerate", f"{fps:g}"] if still else ["-ss", f"{start:.4f}"]
+    retime = ""
+    if stretch_to and not still:
+        # A clip played over another length: its whole run fitted to `stretch_to` seconds (a matte to its join).
+        length = _duration(path) - start
+        if length > 0:
+            retime = f"setpts=(PTS-STARTPTS)*{stretch_to / length:.6f},"
     process = subprocess.Popen(
         [_ffmpeg(), "-loglevel", "error", *source, "-i", str(path), "-frames:v", str(frames),
-         "-vf", f"fps={fps:g},scale={width}:{height}:flags=bicubic", "-f", "rawvideo", "-pix_fmt", "rgba64le", "-"],
+         "-vf", f"{retime}fps={fps:g},scale={width}:{height}:flags=bicubic", "-f", "rawvideo", "-pix_fmt",
+         "rgba64le", "-"],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     handle = tempfile.NamedTemporaryFile(prefix="clip-", suffix=".raw", delete=False)
     stored = np.lib.format.open_memmap(handle.name, mode="w+", dtype="<u2", shape=(frames, height, width, 4))
@@ -161,9 +169,21 @@ def read(path: Path, frames: int, size: tuple[int, int], fps: float, *, start: f
     process.wait(timeout=60)
     if count == 0:
         raise ValidationError(f"Reading {Path(path).name} gave no frames: {error[-300:]}")
-    for index in range(count, frames):  # a clip shorter than the extent holds its last frame
-        stored[index] = stored[count - 1]
+    for index in range(count, frames):  # a clip shorter than the extent holds its last frame, or ends
+        stored[index] = stored[count - 1] if hold else 0
     return Clip(stored, colorspace, alpha, working)
+
+
+def _duration(path: Path) -> float:
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        return 0.0
+    completed = subprocess.run([ffprobe, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
+                                str(path)], capture_output=True, text=True, timeout=60)
+    try:
+        return float(completed.stdout.strip())
+    except ValueError:
+        return 0.0
 
 
 def write(pictures: Any, destination: Path, fps: float, *, working: str = LINEAR,

@@ -240,37 +240,42 @@ class GLRenderer:
 
         def each():
             for frame in range(frames):
-                made: dict[str, Any] = {}
-                seconds = (frame + 0.5) / fps
+                # Standalone contexts share one "current" slot (shader_render's joins make their own): claim ours.
+                with self.context:
+                    yield frame_of(frame)
 
-                def param(node: dict[str, Any], key: str, default: Any = None) -> Any:
-                    given = node.get(key, default)
-                    if isinstance(given, dict) and "curve" in given:
-                        return curve(given["curve"])(seconds)
-                    return given
+        def frame_of(frame: int) -> np.ndarray:
+            made: dict[str, Any] = {}
+            seconds = (frame + 0.5) / fps
 
-                def value(reference: str):
-                    if reference in made:
-                        return made[reference]
-                    if reference in clips:
-                        made[reference] = self.upload(clips[reference][frame])
-                        return made[reference]
-                    if reference in curves or nodes.get(reference, {}).get("op", "").startswith("curve."):
-                        return float(np.asarray(curve(reference)(seconds)).reshape(-1)[0])
-                    base, _, output = reference.partition(".")
-                    if output:
-                        value(base)
-                        return made[reference]
-                    made[reference] = self._compute(reference, nodes[reference], value, param, size, aspect,
-                                                    root, frames, fps, working, clips, frame, made)
+            def param(node: dict[str, Any], key: str, default: Any = None) -> Any:
+                given = node.get(key, default)
+                if isinstance(given, dict) and "curve" in given:
+                    return curve(given["curve"])(seconds)
+                return given
+
+            def value(reference: str):
+                if reference in made:
                     return made[reference]
+                if reference in clips:
+                    made[reference] = self.upload(clips[reference][frame])
+                    return made[reference]
+                if reference in curves or nodes.get(reference, {}).get("op", "").startswith("curve."):
+                    return float(np.asarray(curve(reference)(seconds)).reshape(-1)[0])
+                base, _, output = reference.partition(".")
+                if output:
+                    value(base)
+                    return made[reference]
+                made[reference] = self._compute(reference, nodes[reference], value, param, size, aspect,
+                                                root, frames, fps, working, clips, frame, made)
+                return made[reference]
 
-                result = value(graph["output"])
-                picture = self.download(result, 4) if result.components == 4 else _grey(self.download(result, 1))
-                for texture in made.values():
-                    if hasattr(texture, "release"):
-                        texture.release()
-                yield picture
+            result = value(graph["output"])
+            picture = self.download(result, 4) if result.components == 4 else _grey(self.download(result, 1))
+            for texture in made.values():
+                if hasattr(texture, "release"):
+                    texture.release()
+            return picture
 
         return each() if stream else np.stack(list(each()))
 

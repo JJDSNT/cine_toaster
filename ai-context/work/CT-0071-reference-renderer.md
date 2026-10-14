@@ -2,7 +2,7 @@
 id: CT-0071
 title: C2 -- the NumPy reference, the record, and FFmpeg checked against it
 type: work
-status: doing
+status: done
 owner: unassigned
 created_at: 2026-10-14
 updated_at: 2026-10-14
@@ -56,7 +56,7 @@ renderer in use never becomes the definition of correct.
 
 - The reference evaluates every op of SPEC-0012 except the two that are
   recorded, never computed by it (`signal.estimate`, `generate.render`), and
-  opaque nodes: 61 ops. New: noise and text generators; signals read from
+  opaque nodes: 53 of the 55 (counted wrongly as 61 at the time). New: noise and text generators; signals read from
   EXR, NumPy or image files; depth aligned (least squares, or by hand) and
   merged by depth per pixel; labels; warps in perspective (a 3D turn as a
   homography), corner pins (by corners or a track), displacement, ripple,
@@ -178,6 +178,37 @@ programs; now it is a primitive.
   1080p float pass: 1.5 ms on llvmpipe, 5.4 ms on the GPU; reading it back:
   8 and 18 ms. llvmpipe is the faster here.
 
+# Done (one luma)
+
+- **Matte joins and overlays are graphs**: `mattes.py` keeps only the checks a
+  version reports (retimed, not starting black, not ending white; an overlay
+  without transparency, one shorter than its join) and builds the graphs
+  (`recipe`, `overlay_recipe`); the assembly draws them like any recipe, with
+  GL when it covers them. The FFmpeg filters it used (`alphamerge`, `geq`,
+  `overlay`) are gone: luma is computed in one place per renderer, the C2
+  done-when.
+- `reference.read` can fit a clip to a length (`stretch_to`, a matte to its
+  join) and let it end transparent (`hold=False`, an overlay shorter than its
+  join).
+- The GL renderer claims its context for each frame: a shader join's own
+  context had left another current ("cannot create texture").
+
+# Decided
+
+- **GL, not FFmpeg, is the fast renderer of the graph.** The roadmap foresaw
+  FFmpeg as the first production renderer; measured, GL draws a graph about 27
+  times faster than the reference even in software (llvmpipe), with the same
+  geometry, and FFmpeg's compositing filters cannot meet the colour contract
+  (8 or 16 bits with gamma, `overlay` without float). FFmpeg stays for reading,
+  writing and the effects and titles not yet re-expressed.
+- **Effects and titles move to the graph in C6**, where the catalogs are
+  re-expressed as recipes; C2's own part -- joins and composites through the
+  graph, luma in one place -- is done.
+
+- `toast doctor` reports the compositing renderers: the reference's ops, GL's
+  ops and the device GL runs on (llvmpipe here; a GPU through D3D12 is
+  reachable and measured slower).
+
 # To do
 
 - `matte.key` by colour and by difference, `signal.channel` hue and
@@ -225,4 +256,5 @@ programs; now it is a primitive.
   know files by content; the cache's hits and misses; every runnable example.
 - Full suite: 665 tests pass (2026-10-14, at b87342d); 679 after the second
   slice; 688 after composite shots and memory; 691 after recipes and the warp
-  wipe; 697 after warp.surface and the warp wipes; 700 after the GL renderer.
+  wipe; 697 after warp.surface and the warp wipes; 700 after the GL renderer
+  and after one luma (the doctor tests pass with the new capability).

@@ -128,10 +128,13 @@ cache, small, and enlarged.
   pictures; a moving matte's texture is rewritten every frame with the frame
   for that progress. The host also provides `getMatte(vec2 uv)` for `matte`
   items, so a `matte` kind needs no shader of its own.
-- **FFmpeg stand-in**: the incoming picture takes the matte as its alpha
-  (`alphamerge`) over the outgoing one; a still matte is turned into a moving
-  one by a threshold ramp; the overlay by `overlay` or `blend`. This is the
-  path the prototype took.
+- **As a graph** (since CT-0071, ADR 0022): a matte join is a SPEC-0012
+  graph -- the matte's luma made a matte, a threshold for a still one, a
+  completion ramp for a moving one, `to` over `from` through it -- and an
+  overlay is a merge; both are drawn by the shared renderers (GL when it
+  covers them, else the NumPy reference), so luma is computed in one place.
+  The FFmpeg filters the prototype and the first implementation used
+  (`alphamerge`, `geq`, `overlay`) are gone.
 - **Preview** (the Transitions room): binds the inputs as textures; a moving
   matte as a `<video>` texture.
 

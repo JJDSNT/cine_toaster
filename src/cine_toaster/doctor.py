@@ -226,6 +226,34 @@ def _moderngl() -> Capability:
     )
 
 
+def _compositing() -> Capability:
+    """The renderers of SPEC-0012 graphs (ADR 0022 §5): the reference, and GL with the device it runs on."""
+
+    from .compositing.reference import IMPLEMENTED as REFERENCE_OPS
+    from .compositing.schema import OPS
+    from .shader_render import gl_unavailable_reason
+
+    parts = [f"reference (NumPy, exact): {len(REFERENCE_OPS)} of {len(OPS)} ops"]
+    reason = gl_unavailable_reason()
+    if reason is None:
+        from .compositing.gl import IMPLEMENTED as GL_OPS, renderer_for
+
+        renderer = renderer_for({"nodes": {}})
+        device = renderer.name if renderer else "no context"
+        parts.append(f"GL on {device}: {len(GL_OPS)} ops")
+        if "llvmpipe" in device:
+            parts.append("a GPU may be reachable with GALLIUM_DRIVER=d3d12 on WSL (measured slower here)")
+    return Capability(
+        name="Compositing",
+        what_it_enables="composites and recipe joins drawn from their graphs: GL when it covers every op, "
+                        "else the reference",
+        required=False,
+        status=OK,
+        detail="; ".join(parts),
+        remedy="" if reason is None else f"for the fast renderer: {reason}",
+    )
+
+
 def _canvas() -> Capability:
     built = (Path(__file__).with_name("web_assets") / "app" / "index.html").is_file()
     node = _binary("npm")
@@ -431,6 +459,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _sox,
     _blender,
     _moderngl,
+    _compositing,
     _whisper,
 )
 

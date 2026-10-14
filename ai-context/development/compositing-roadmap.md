@@ -117,11 +117,15 @@ Done (`CT-0070`): `ai-context/specs/SPEC-0012-compositing-graph.md`, accepted
 
 ### C2. The reference renderer and the record
 
-In progress (`CT-0071`): the reference evaluates 62 ops with node identity,
-a cache and bounded memory; composites and recipe joins are assembled; a GL
-renderer of the same graphs, checked against the reference, draws them about
-27 times faster when it covers their ops. Left: FFmpeg as a renderer for what
-it does correctly, and moving `mattes.py` and the VFX keying onto the graph.
+Done (`CT-0071`), for its own part: the NumPy reference evaluates 53 of the
+55 ops of SPEC-0012 (the other two are recorded, never computed by it), with
+node identity, a cache and memory bounded by the graph, not the length; shot
+composites and recipe joins are assembled; matte joins and overlays are
+graphs too, so luma is computed in one place; a GL renderer of the same
+graphs (26 ops), checked against the reference, draws them about 27 times
+faster when it covers them; `toast doctor` reports both. Decided on the way:
+GL, not FFmpeg, is the fast renderer, and effects and titles move to the
+graph in C6.
 
 - What: the **NumPy reference** of each primitive in the `compositing` package
   (float, linear, premultiplied, OCIO; FFmpeg only to read and write files);

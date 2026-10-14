@@ -1015,9 +1015,10 @@ def _reframe(root: Path, plan: Plan, first: dict[str, Any], work: Path, run_proc
 
 
 def _graph_join(outgoing: Path, incoming: Path, outgoing_frames: int, frames: int, transition: dict[str, Any],
-                destination: Path, *, fps: float, width: int, height: int) -> Path:
-    """A join drawn from its recipe's graph by the reference: the last frames of one picture, the first of the
-    next, and the recipe's own pictures, both pictures playing through it."""
+                destination: Path, *, fps: float, width: int, height: int,
+                extra: dict[str, Any] | None = None) -> Path:
+    """A join drawn from its recipe's graph -- GL when it covers the graph, else the reference: the last frames of
+    one picture, the first of the next, and the recipe's own pictures, both pictures playing through it."""
 
     from .compositing import reference
 
@@ -1028,6 +1029,7 @@ def _graph_join(outgoing: Path, incoming: Path, outgoing_frames: int, frames: in
     }
     for name, path in (transition.get("inputs") or {}).items():
         inputs[name] = reference.read(Path(path), frames, size, fps)
+    inputs.update(extra or {})
     from .compositing.gl import renderer_for
 
     pictures, _, _ = reference.render(transition["graph"], inputs, frames=frames, size=size, fps=fps,
@@ -1035,6 +1037,27 @@ def _graph_join(outgoing: Path, incoming: Path, outgoing_frames: int, frames: in
     silent = destination.with_suffix(".picture.mp4")
     reference.write(pictures, silent, fps)
     silent.replace(destination)
+    return destination
+
+
+def _lay_overlay(clip: Path, overlay: Path, destination: Path, blend: str, frames: int, fps: float,
+                 size: tuple[int, int], notes: list[str], label: str) -> Path:
+    """An overlay with alpha over a drawn join, as a graph (ADR 0022): over, or a screen or add blend."""
+
+    from .compositing import reference
+    from .compositing.gl import renderer_for
+    from .mattes import overlay_notes, overlay_recipe
+
+    said, usable = overlay_notes(overlay, frames / fps, fps, label)
+    notes.extend(said)
+    if not usable:
+        return clip
+    graph = overlay_recipe(blend)
+    # At its own rate from the join's start; one shorter than the join ends there, transparent after.
+    inputs = {"joined": reference.read(clip, frames, size, fps),
+              "overlay": reference.read(overlay, frames, size, fps, alpha="straight", hold=False)}
+    pictures, _, _ = reference.render(graph, inputs, frames=frames, size=size, fps=fps, renderer=renderer_for(graph))
+    reference.write(pictures, destination, fps)
     return destination
 
 
@@ -1064,12 +1087,16 @@ def _join_pictures(ffmpeg: str, plan: Plan, pictures: list[Path], count: list[in
                 _graph_join(picture, pictures[index + 1], count[index], frames, transition, clip, fps=fps,
                             width=width, height=height)
             elif transition.get("matte"):
-                from .mattes import join as matte_join
+                from .compositing.reference import read
+                from .mattes import is_moving, matte_notes, recipe
 
-                matte_join(ffmpeg, picture, pictures[index + 1], count[index], frames, Path(transition["matte"]), clip,
-                           fps=fps, width=width, height=height, softness=transition.get("softness") or 0.0,
-                           run=lambda command, message="": run_process(command, message=message, span=span),
-                           notes=plan.notes, label=following.shot)
+                matte = Path(transition["matte"])
+                moving = is_moving(matte)
+                plan.notes.extend(matte_notes(matte, frames / fps, fps, following.shot))
+                _graph_join(picture, pictures[index + 1], count[index], frames,
+                            {"graph": recipe(moving, transition.get("softness") or 0.0)}, clip, fps=fps, width=width,
+                            height=height, extra={"matte_clip": read(matte, frames, (width, height), fps,
+                                                                     stretch_to=frames / fps if moving else None)})
             elif transition.get("shader"):
                 from .build import Join, _shader_join
 
@@ -1087,13 +1114,9 @@ def _join_pictures(ffmpeg: str, plan: Plan, pictures: list[Path], count: list[in
                              "-map", "[v]", "-frames:v", str(frames), *encode, str(clip)],
                             message=f"{following.shot}: {transition['id']}", span=span)
             if transition.get("overlay"):
-                from .mattes import lay_overlay
-
-                laid = work / f"join-{index + 1:03d}-overlay.mp4"
-                clip = lay_overlay(ffmpeg, clip, Path(transition["overlay"]), laid, frames=frames, fps=fps, width=width,
-                                   height=height, blend=transition.get("blend") or "normal",
-                                   run=lambda command, message="": run_process(command, message=message, span=span),
-                                   notes=plan.notes, label=following.shot)
+                clip = _lay_overlay(clip, Path(transition["overlay"]), work / f"join-{index + 1:03d}-overlay.mp4",
+                                    transition.get("blend") or "normal", frames, fps, (width, height), plan.notes,
+                                    following.shot)
             pieces.append(clip)
     listing = work / "pictures.txt"
     listing.write_text("".join(f"file '{piece.name}'\n" for piece in pieces), encoding="utf-8")

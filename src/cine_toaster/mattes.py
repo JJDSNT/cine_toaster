@@ -13,8 +13,10 @@ black is the outgoing picture, white the incoming.
 Both pictures keep playing through the join. An **overlay** -- a picture with
 alpha -- is composited over the joined picture afterwards, at its own rate.
 
-These are the FFmpeg renderers; a shader that reads a texture gets its
-pictures from `shader_render` instead.
+The joins are drawn as graphs of SPEC-0012 (ADR 0022) by the same renderers
+as every recipe -- GL when it can, else the NumPy reference; this module holds
+the checks a version reports and the graphs. (Until CT-0071 it drew them with
+FFmpeg filters of its own: a third implementation of luma.)
 """
 
 from __future__ import annotations
@@ -63,80 +65,68 @@ def _brightness(path: Path, last: bool) -> float:
     return float(data[-1]) if data else 0.0
 
 
-def _cover(width: int, height: int) -> str:
-    """Scaled to cover the frame and centred: black in a matte is a meaning, never a border."""
+def matte_notes(matte: Path, seconds: float, fps: float, label: str) -> list[str]:
+    """What a version says about a moving matte: retimed to its join, not starting black, not ending white."""
 
-    return f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},setsar=1"
+    notes = []
+    if not is_moving(matte):
+        return notes
+    length = _probe(matte)["duration"] or seconds
+    if abs(length - seconds) > 1 / fps:
+        notes.append(f"{label}: its matte runs {length:.2f} s and is retimed to the join's {seconds:.2f} s.")
+    if _brightness(matte, last=False) > 8:
+        notes.append(f"{label}: its matte does not start black, so the next shot shows from the first frame.")
+    if _brightness(matte, last=True) < 247:
+        notes.append(f"{label}: its matte does not end white; it is completed over the join's last tenth.")
+    return notes
 
 
-def join(ffmpeg: str, outgoing: Path, incoming: Path, outgoing_frames: int, frames: int, matte: Path,
-         destination: Path, *, fps: float, width: int, height: int, softness: float = 0.0,
-         run: Callable[..., Any], notes: list[str], label: str) -> Path:
-    """The last ``frames`` of ``outgoing`` become the first ``frames`` of ``incoming`` through ``matte``."""
+def recipe(moving: bool, softness: float = 0.0) -> dict[str, Any]:
+    """A join through a matte as a SPEC-0012 graph (ADR 0022): the matte's luma, made a matte, revealing `to`.
 
-    seconds = frames / fps
-    tail = outgoing_frames - frames
-    cover = _cover(width, height)
-    if is_moving(matte):
-        length = _probe(matte)["duration"] or seconds
-        if abs(length - seconds) > 1 / fps:
-            notes.append(f"{label}: its matte runs {length:.2f} s and is retimed to the join's {seconds:.2f} s.")
-        if _brightness(matte, last=False) > 8:
-            notes.append(f"{label}: its matte does not start black, so the next shot shows from the first frame.")
-        if _brightness(matte, last=True) < 247:
-            notes.append(f"{label}: its matte does not end white; it is completed over the join's last tenth.")
-        source = ["-i", str(matte)]
-        shape = (f"[2:v]{cover},format=gray,setpts=(PTS-STARTPTS)*{seconds / length:.6f},fps={fps:g},"
-                 f"trim=end_frame={frames},setpts=PTS-STARTPTS[shape];"
-                 # Whatever the matte does, the join ends on the incoming picture.
-                 f"color=black:s={width}x{height}:r={fps:g}:d={seconds:.4f},format=gray,"
-                 f"geq=lum='255*clip((N+1-0.9*{frames})/(0.1*{frames}),0,1)'[ramp];"
-                 f"[shape][ramp]blend=all_mode=lighten[m]")
+    A still matte is an order (a threshold driven by the progress, spread over ``softness``); a moving one is
+    the shape itself, completed to white over the join's last tenth so the join always ends on `to`. One
+    implementation of luma for every renderer: this replaced an FFmpeg-only drawing (CT-0071).
+    """
+
+    nodes: dict[str, Any] = {
+        "order": {"op": "signal.luma", "picture": "matte_clip"},
+        "shape": {"op": "matte.from_signal", "signal": "order"},
+    }
+    if moving:
+        nodes.update({
+            "white": {"op": "generate.solid", "colour": [1.0, 1.0, 1.0, 1.0]},
+            "late": {"op": "curve.map", "in": "progress", "how": "remap", "low": 0.9, "high": 1.0,
+                     "out_low": 0.0, "out_high": 1.0},
+            "ending": {"op": "matte.threshold", "matte": "white", "progress": "late", "softness": 0.0},
+            "reveal": {"op": "matte.combine", "a": "shape", "b": "ending", "how": "union"},
+        })
     else:
-        spread = max(float(softness or 0.0), 0.002)
-        source = ["-loop", "1", "-framerate", f"{fps:g}", "-t", f"{seconds:.4f}", "-i", str(matte)]
-        # Progress as the shader has it, never exactly 0 or 1: (n + 1) / (frames + 1).
-        progress = f"((N+1)/{frames + 1})*(1+2*{spread})-{spread}"
-        shape = (f"[2:v]{cover},format=gray,trim=end_frame={frames},"
-                 f"geq=lum='255*clip(({progress}-lum(X,Y)/255)/(2*{spread})+0.5,0,1)'[m]")
-    graph = (f"[0:v]trim=start_frame={tail}:end_frame={outgoing_frames},setpts=PTS-STARTPTS,{cover},format=yuv420p[a];"
-             f"[1:v]trim=end_frame={frames},setpts=PTS-STARTPTS,{cover},format=yuv420p[b];"
-             f"{shape};[b][m]alphamerge[shown];[a][shown]overlay=format=auto,format=yuv420p[v]")
-    run([ffmpeg, "-y", "-loglevel", "error", "-i", str(outgoing), "-i", str(incoming), *source,
-         "-filter_complex", graph, "-map", "[v]", "-frames:v", str(frames),
-         "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-r", f"{fps:g}",
-         str(destination)], message=f"{label}: the join through its matte")
-    return destination
+        nodes["reveal"] = {"op": "matte.threshold", "matte": "shape", "progress": "progress",
+                           "softness": max(float(softness or 0.0), 0.002)}
+    nodes["out"] = {"op": "merge.over", "front": "to", "back": "from", "matte": "reveal"}
+    return {"ports": {"from": "picture", "to": "picture", "progress": "curve", "matte_clip": "picture"},
+            "nodes": nodes, "output": "out"}
 
 
-def lay_overlay(ffmpeg: str, clip: Path, overlay: Path, destination: Path, *, frames: int, fps: float, width: int,
-                height: int, blend: str = "normal", run: Callable[..., Any], notes: list[str], label: str) -> Path:
-    """``overlay`` composited over the whole of ``clip``, at its own rate from the start."""
+def overlay_recipe(blend: str = "normal") -> dict[str, Any]:
+    """An overlay with alpha laid over a joined picture, as a graph: over, or a screen or add blend."""
+
+    if blend in ("screen", "add"):
+        laid = {"op": "merge.blend", "a": "joined", "b": "overlay", "mode": blend}
+    else:
+        laid = {"op": "merge.over", "front": "overlay", "back": "joined"}
+    return {"ports": {"joined": "picture", "overlay": "picture"}, "nodes": {"out": laid}, "output": "out"}
+
+
+def overlay_notes(overlay: Path, seconds: float, fps: float, label: str) -> tuple[list[str], bool]:
+    """(notes, usable): an overlay without transparency is not laid; one shorter than its join ends early."""
 
     if not has_alpha(overlay):
-        notes.append(f"{label}: its overlay {overlay.name} has no transparency; it is not laid (it would hide "
-                     "the join).")
-        shutil.copyfile(clip, destination)
-        return destination
-    seconds = frames / fps
+        return [f"{label}: its overlay {overlay.name} has no transparency; it is not laid (it would hide the join)."], False
+    notes = []
     if is_moving(overlay):
         length = _probe(overlay)["duration"]
         if length and length + 1 / fps < seconds:
             notes.append(f"{label}: its overlay runs {length:.2f} s, less than the join's {seconds:.2f} s; it ends early.")
-        source = ["-i", str(overlay)]
-    else:
-        source = ["-loop", "1", "-framerate", f"{fps:g}", "-t", f"{seconds:.4f}", "-i", str(overlay)]
-    cover = _cover(width, height)
-    if blend in ("screen", "add"):
-        mode = "screen" if blend == "screen" else "addition"
-        # Flattened on black first: where the overlay is transparent it then changes nothing.
-        graph = (f"[1:v]{cover},fps={fps:g},format=rgba[o];color=black:s={width}x{height}:r={fps:g}:d={seconds:.4f}[k];"
-                 f"[k][o]overlay=eof_action=pass:format=auto,format=gbrp[flat];"
-                 f"[0:v]format=gbrp[base];[base][flat]blend=all_mode={mode}:shortest=1,format=yuv420p[v]")
-    else:
-        graph = (f"[1:v]{cover},fps={fps:g},format=rgba[o];"
-                 f"[0:v][o]overlay=eof_action=pass:format=auto,format=yuv420p[v]")
-    run([ffmpeg, "-y", "-loglevel", "error", "-i", str(clip), *source, "-filter_complex", graph, "-map", "[v]",
-         "-frames:v", str(frames), "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
-         "-r", f"{fps:g}", str(destination)], message=f"{label}: the overlay on its join")
-    return destination
+    return notes, True

@@ -44,8 +44,9 @@ is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
 CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
 
-- `CT-0071` — C2: the NumPy reference (25 ops), FFmpeg's luma join checked
-  against it (`doing`)
+- `CT-0071` — C2: the NumPy reference (53 of 55 ops), composites and recipe
+  joins in the assembly, a GL renderer checked against it, warp.surface and
+  the warp wipes (`done`)
 - `CT-0070` — C1: the compositing graph specified, SPEC-0012 drafted
   (`review`)
 - `CT-0069` — joins shaped by a picture: mattes and overlays (SPEC-0011);
