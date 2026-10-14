@@ -142,6 +142,8 @@ class Plan:
     speech: list[tuple[float, float]] = field(default_factory=list)
     #: The format's rules the render applies (CT-0049): {aspect, captions}.
     format: dict[str, Any] = field(default_factory=dict)
+    #: The production's frame (CT-0068): {width, height, fps}; empty, the first moving take's.
+    frame: dict[str, Any] = field(default_factory=dict)
     #: Another layout mixed beside the stereo, as a second track ("5.1", CT-0052); and, once rendered,
     #: the loudness of each track.
     surround: str = ""
@@ -397,6 +399,7 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         plan.notes += [note + "." for note in framed if ";" in note]
     form = (scene.get("style") or {}).get("format") or {}
     plan.format = {key: form[key] for key in ("aspect", "captions") if form.get(key)}
+    plan.frame = dict(scene.get("frame") or {})
     plan.surround = str(scene.get("surround") or "")
     plan.subtitles = dict(scene.get("subtitles") or {})
     if scene.get("ambience") or scene.get("music") or any(shot.get("sounds") for shot in scene["shots"]):
@@ -584,6 +587,10 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
     first = probe(root / real.media) if real else {"width": 1280, "height": 720, "fps": FPS, "audio": False}
     if real and real.still:
         first["fps"] = FPS  # a picture has no rate; what ffprobe reports for one is a default
+    if plan.frame:
+        # The production's frame, whatever its first take is (CT-0068); its rate, when it gives one.
+        first = {**first, "width": plan.frame["width"], "height": plan.frame["height"],
+                 "fps": plan.frame.get("fps") or first["fps"]}
     fps = first["fps"] or FPS
     if plan.format.get("aspect"):
         first = _reframe(root, plan, first, work, run_process, within(0.0, 0.05))

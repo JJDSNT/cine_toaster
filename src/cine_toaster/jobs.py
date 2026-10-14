@@ -992,7 +992,7 @@ def _sequence_plan(root: Path, sequence_id: str):
     if sequence is None or sequence_id == "unassigned":
         raise ValidationError(f"No sequence {sequence_id!r}")
     scenes = {scene["id"]: scene for scene in production["scenes"]}
-    plan = Plan(scene=sequence_id)
+    plan = Plan(scene=sequence_id, frame=dict(production.get("frame") or {}))
     joins: dict[str, Any] = {}
     for scene_id in sequence["scene_ids"]:
         scene = scenes[scene_id]

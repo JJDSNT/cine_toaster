@@ -1634,6 +1634,12 @@ def load_production(root: Path) -> dict[str, Any]:
         for path in scene_files(root, manifest)
     ]
     scenes.sort(key=lambda scene: (scene["order"], scene["id"]))
+    # The frame every version is made in (CT-0068), declared once for the production.
+    from .formats import parse_frame
+
+    frame, frame_problem = parse_frame(manifest.get("frame"))
+    for scene in scenes:
+        scene["frame"] = frame
     scene_ids = [scene["id"] for scene in scenes]
     if len(scene_ids) != len(set(scene_ids)):
         raise ProjectFormatError("Scene ids must be unique")
@@ -1654,6 +1660,9 @@ def load_production(root: Path) -> dict[str, Any]:
             ]
 
     attention: list[dict[str, Any]] = []
+    if frame_problem:
+        attention.append({"kind": "frame", "scene_id": "", "scene_title": "",
+                          "message": f"project.yaml: {frame_problem}; versions take the first moving take's frame."})
     if script_problem:
         attention.append({"kind": "screenplay", "scene_id": "", "scene_title": "", "message": script_problem})
     for sequence in sequences:
@@ -1693,6 +1702,7 @@ def load_production(root: Path) -> dict[str, Any]:
         "look": project_look,
         "style": manifest.get("style"),
         "deliver": manifest.get("deliver"),
+        "frame": frame,
         "avoid": _avoid(manifest.get("avoid")),
         "renders": discover_renders(root),
         "script_path": _script_path(manifest, root),

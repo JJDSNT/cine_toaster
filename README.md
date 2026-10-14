@@ -420,6 +420,7 @@ toast take add    ~/productions/the-last-signal SC-030 P2 launch.mp4 \
       --licence "Public domain" --credit NASA  # a recording or a still, with its origin
 toast footage fetch ~/productions/a-film        # the stretches of public files its shots declare
 toast sound beats   ~/productions/a-film track  # a track's beats, so shots can count them (beats: 8)
+#   frame: 1920x1080@29.97 in project.yaml        # the size and rate every version is made in
 toast check  ~/productions/the-last-signal       # continuity, exits 1 on error
 toast why    eyeline_mismatch                    # the rule behind a finding
 toast knowledge ~/productions/the-last-signal    # practices, profiles, coverage

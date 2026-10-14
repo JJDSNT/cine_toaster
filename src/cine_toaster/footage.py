@@ -159,6 +159,9 @@ def fetch(root: Path, production: dict[str, Any], actor: Any, *, scene_id: str |
                 results.append(Fetched(scene["id"], shot["id"], "refused",
                                        f"{shot['id']} gives neither its footage nor itself a duration"))
                 continue
+            if not footage["height"] and (production.get("frame") or {}).get("height"):
+                # No size asked for: fetched to the production's frame (CT-0068).
+                footage = {**footage, "height": production["frame"]["height"]}
             if report:
                 report(f"{scene['id']} {shot['id']}: fetching {footage['url']}")
             try:

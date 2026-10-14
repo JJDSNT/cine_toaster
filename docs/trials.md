@@ -17,6 +17,11 @@ work records named here hold the detail.
 `trials/` is `~/cine-toaster-references/trials/` on the machine they were made
 on. A link is added when a piece is published.
 
+## 2026-10-14 · Orbit in its declared frame (music piece v4)
+
+The production now says its frame, `1920x1080@29.97` (CT-0068); v4 is made
+in it whatever its takes are, and comes out as v3 did, 41.441 s.
+
 ## 2026-10-14 · Orbit, lengths in beats (music piece v3)
 
 The music piece's first scene rewritten with every shot's length in beats of

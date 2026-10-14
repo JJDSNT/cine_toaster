@@ -44,6 +44,14 @@ moved every join after it, and nothing would have said so (CT-0064).
 - `docs/trials.md`: a diary of the pieces made to judge the tool, at the
   user's request.
 
+# To do (solvable limitations; the roadmap's D1b)
+
+- Bars: a downbeat tracker and a person's correction in the record, then
+  `bars:` on a shot and a check for a join that should open a bar.
+- Music that starts after the scene does: count from where it starts.
+- A missed or doubled beat: corrected by hand in the record, seen over the
+  waveform.
+
 # Decisions
 
 - **The music starts with the scene.** Beats are counted from the scene's

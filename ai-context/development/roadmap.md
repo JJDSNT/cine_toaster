@@ -236,8 +236,22 @@ scene (`CT-0065`); footage declared and fetched (`CT-0066`); the music search
 that hid Freesound's tracks; a first music piece and an organic trial, made
 partly by hand, outside the repository.
 
-**D1. ~~Beats are a record.~~** Done (`CT-0067`), except the piece's own
-phrasing (bars) which is left to the breakdown.
+**D1. ~~Beats are a record.~~** Done (`CT-0067`). Limitations left, each
+solvable, to be closed later as **D1b**:
+- **Bars.** librosa gives beats, not downbeats, so nothing knows which beat
+  is the first of a bar. Solvable two ways, both wanted: a downbeat tracker
+  (madmom's `DBNDownBeatTracker`, or a newer model such as beat_this; licences
+  to check against ADR 0011) writing `downbeats` beside `beats`; and a
+  person's correction in the record (`beats_per_bar`, `first_downbeat`), since
+  any detector can be wrong by one beat. Then a shot may count `bars: 2`, and
+  a check says when a join that should open a bar does not.
+- **Music that starts later than the scene.** Beats are counted from the
+  scene's start; music placed with `at` or `from` is refused. Solvable by
+  counting from where the music starts on the timeline.
+- **Tempo changes.** Lengths follow the detected beats, so a track that
+  speeds up is followed; but a beat the detector misses or doubles moves the
+  cut. Solvable with the same correction in the record (beats added or
+  removed by hand) and a view of the beats over the waveform.
 - What: `toast sound beats <project> <sound>` detects a track's tempo and
   beats (librosa, in the voice interpreter, as a worker) and keeps them
   beside the sound. A scene that has music may give a shot's length and a
@@ -249,7 +263,8 @@ phrasing (bars) which is left to the breakdown.
 - Closes: "beats are not in the tool"; "a shortened transition moves later
   joins off the beat" (placing joins by beat makes each independent).
 
-**D2. A production says its frame.**
+**D2. ~~A production says its frame.~~** Done (`CT-0068`); a scene's own
+frame and `toast build` are left in D7.
 - What: size and rate declared once in `project.yaml`; every version is
   made in it, whatever its first take is. Footage is fetched to fit when no
   height is given.
@@ -314,6 +329,9 @@ supporting it: this point measures; what to build follows from the numbers.
 - `toast check` reports a first shot's `transition` that nothing renders.
 - `toast footage fetch` as a job (progress, cancel); a changed declaration
   replaces the take it made.
+- `toast footage fetch` takes only the first audio track of a file.
+- `toast build` draws at a fixed size and ignores the production's frame.
+- A scene cannot set a frame of its own (a vertical insert in a wide film).
 - `toast build`: removed, or made the assembly of a whole production.
 - `rig`, `remotion`, `hyperframes`: a renderer each, or out of the
   vocabulary; `toast doctor` reports what is kept.

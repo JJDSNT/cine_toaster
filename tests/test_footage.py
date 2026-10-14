@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -89,6 +90,21 @@ class FootageTests(unittest.TestCase):
         again = fetch(self.root, load_production(self.root), Actor(id="t"))
         self.assertEqual([item.status for item in again], ["kept"])
 
+
+    @unittest.skipUnless(HAS_FFMPEG, "FFmpeg is missing")
+    def test_footage_with_no_height_is_fetched_to_the_productions_frame(self) -> None:
+        public = self.base / "public.mp4"
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=160x90:r=24:d=5",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", str(public)], check=True)
+        (self.root / "project.yaml").write_text("id: t\ntitle: T\nframe: 64x36@24\npaths:\n  scenes: scenes\n")
+        self.write(url=public.as_uri())
+        scene = self.root / "scenes" / "010" / "scene.yaml"
+        scene.write_text(re.sub(r"\n *height: 54", "", scene.read_text()))
+        fetch(self.root, load_production(self.root), Actor(id="t"))
+        take = load_production(self.root)["scenes"][0]["shots"][0]["takes"][0]
+        size = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0",
+                               str(self.root / take["media"])], capture_output=True, text=True).stdout.strip()
+        self.assertEqual(size, "64,36")
 
 if __name__ == "__main__":
     unittest.main()

@@ -76,6 +76,16 @@ class JoinTests(unittest.TestCase):
         self.assertGreater(self.colour(out, 0.5)[0], 200)
         self.assertGreater(self.colour(out, 3.2)[2], 200)
 
+    def test_the_productions_frame_decides_the_versions_size_and_rate(self) -> None:
+        second = Segment("P2", "B", self.take("b.mp4", "blue", "0"), 1.0, 3.0, normalize=False)
+        plan = self.plan(second)
+        plan.frame = {"width": 320, "height": 180, "fps": 25.0}
+        out = self.root / "cut.mp4"
+        render(self.root, plan, out, self.root / "work", run)
+        made = probe(out)
+        self.assertEqual((made["width"], made["height"], made["fps"]), (320, 180, 25.0))  # the takes are 160x90 at 24
+        self.assertAlmostEqual(made["duration"], 4.0, delta=0.1)
+
     def shader(self) -> Path:
         from cine_toaster.transitions import list_transitions
 
