@@ -213,12 +213,12 @@ def _blender() -> Capability:
 
 
 def _moderngl() -> Capability:
-    from .shader_render import gl_unavailable_reason
+    from .compositing.gl import gl_unavailable_reason
 
     reason = gl_unavailable_reason()
     return Capability(
         name="ModernGL",
-        what_it_enables="running a transition's own GLSL shader in `toast build` instead of its FFmpeg stand-in",
+        what_it_enables="the GL renderer of compositing graphs, and a transition's own GLSL shader instead of its FFmpeg stand-in",
         required=False,
         status=OK if reason is None else MISSING,
         detail=reason or "",
@@ -231,7 +231,7 @@ def _compositing() -> Capability:
 
     from .compositing.reference import IMPLEMENTED as REFERENCE_OPS
     from .compositing.schema import OPS
-    from .shader_render import gl_unavailable_reason
+    from .compositing.gl import gl_unavailable_reason
 
     parts = [f"reference (NumPy, exact): {len(REFERENCE_OPS)} of {len(OPS)} ops"]
     reason = gl_unavailable_reason()

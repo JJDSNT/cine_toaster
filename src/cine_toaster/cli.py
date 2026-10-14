@@ -15,7 +15,7 @@ from .commands import (
     review_assembly,
     select_take,
 )
-from .errors import CineToasterError
+from .errors import CineToasterError, ValidationError
 from .events import tail_events
 from .index import ProjectIndex, build_index, index_path_for
 from .knowledge import coverage, load_practices, load_providers, practices_for_check
@@ -369,26 +369,29 @@ def _foreground_job(kind: str, project: Path, params: dict, output: Path | None,
     return manager.adopt(job["id"], overwrite=True, destination=output)
 
 
-def command_build(args: argparse.Namespace) -> int:
-    """Render the production's composed shots into one watchable file."""
+def command_still(args: argparse.Namespace) -> int:
+    """A shot's frame as the cut draws it: its graph run at one instant (CT-0072)."""
 
-    job = _foreground_job("build", args.project, {"engine": args.engine}, args.output, quiet=args.json)
-    if job is None:
+    from .assembly import plan_scene, still
+    from .project import STILLS_DIRECTORY, load_production
+
+    root = args.project.expanduser().resolve()
+    production = load_production(root)
+    scene = next((item for item in production["scenes"] if item["id"] == args.scene), None)
+    if scene is None:
+        print(f"No scene {args.scene!r}.", file=sys.stderr)
         return 1
-    result = job["result"]["summary"]
-    adopted = job["message"].removeprefix("Adopted: ")
-    if args.json:
-        print(json.dumps({**result, "output": adopted, "job": job["id"]}, indent=2))
-    else:
-        print(
-            f"Built {adopted}\n"
-            f"  {result['shots']} shot(s), {result['transitions']} transition(s), "
-            f"{result['duration_seconds']:.1f}s, "
-            f"{'with audio' if result['audio'] else 'silent'}\n"
-            f"  engine {result['engine']}: {result['shaders']} transition(s) ran their own shader\n"
-            f"  {result['stills']} still(s) kept for the storyboard\n"
-            f"  job {job['id']}"
-        )
+    destination = args.output or root / STILLS_DIRECTORY / args.scene / f"{args.shot}.png"
+    try:
+        plan = plan_scene(root, scene, production.get("words_sidecar") or "{stem}.words.json")
+        still(root, plan, args.shot, destination, args.at)
+    except ValidationError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    for note in plan.notes:
+        if note.startswith(f"{args.shot}:"):
+            print(f"  {note}")
+    print(f"Wrote {destination}")
     return 0
 
 
@@ -2370,18 +2373,16 @@ def build_parser() -> argparse.ArgumentParser:
     frame_parser.add_argument("--json", action="store_true", help="the frame's facts instead of the drawing")
     frame_parser.set_defaults(function=command_frame)
 
-    build_parser = subparsers.add_parser(
-        "build", help="Render the production's composed shots into a file"
+    still_parser = subparsers.add_parser(
+        "still", help="Draw a shot's frame as the cut draws it (a card, a composite), as a PNG; "
+        "titles and effects laid over a composite are not in it yet (C6)"
     )
-    build_parser.add_argument("project", type=Path)
-    build_parser.add_argument("--output", type=Path)
-    build_parser.add_argument("--json", action="store_true")
-    build_parser.add_argument(
-        "--engine", choices=("auto", "gl", "ffmpeg"), default="auto",
-        help="gl runs each GLSL transition's own shader; ffmpeg its declared stand-in "
-        "(default: gl when a GL context is available)",
-    )
-    build_parser.set_defaults(function=command_build)
+    still_parser.add_argument("project", type=Path)
+    still_parser.add_argument("scene")
+    still_parser.add_argument("shot")
+    still_parser.add_argument("--at", type=float, help="seconds into the shot (default: its middle)")
+    still_parser.add_argument("--output", type=Path, help="default: stills/<scene>/<shot>.png in the production")
+    still_parser.set_defaults(function=command_still)
 
     voice_parser = subparsers.add_parser(
         "voice", help="Speak the production's lines with an offline voice"

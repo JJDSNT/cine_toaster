@@ -258,3 +258,6 @@ programs; now it is a primitive.
   slice; 688 after composite shots and memory; 691 after recipes and the warp
   wipe; 697 after warp.surface and the warp wipes; 700 after the GL renderer
   and after one luma (the doctor tests pass with the new capability).
+- C2 was treated as closed only after the convergence audit `CT-0072`
+  (2026-10-14), which removed the second GL pipeline, the quick build and the
+  duplicated decisions this record left behind.

@@ -123,3 +123,17 @@ class UpstreamCatalogTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RenderDeclarationTests(unittest.TestCase):
+    def test_every_reviewed_item_declares_how_it_renders(self) -> None:
+        """A renderer never guesses a substitution the author did not choose (kept from the quick build's tests)."""
+
+        for item in list_transitions(Path(__file__).parents[1] / "examples" / "amiga-demo-reel"):
+            declared = item.get("render") or {}
+            if not item["curated"]:
+                # Nobody has chosen a stand-in for an unreviewed shader.
+                self.assertEqual(declared, {}, item["id"])
+                continue
+            self.assertTrue(declared.get("ffmpeg"), item["id"])
+            self.assertTrue(declared.get("ffmpeg_note"), item["id"])

@@ -264,7 +264,8 @@ solvable, to be closed later as **D1b**:
   joins off the beat" (placing joins by beat makes each independent).
 
 **D2. ~~A production says its frame.~~** Done (`CT-0068`); a scene's own
-frame and `toast build` are left in C10 of the compositing roadmap.
+frame is left in C10 of the compositing roadmap (`toast build` was removed
+in CT-0072).
 - What: size and rate declared once in `project.yaml`; every version is
   made in it, whatever its first take is. Footage is fetched to fit when no
   height is given.

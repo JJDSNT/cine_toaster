@@ -103,7 +103,7 @@ def recipe(moving: bool, softness: float = 0.0) -> dict[str, Any]:
         })
     else:
         nodes["reveal"] = {"op": "matte.threshold", "matte": "shape", "progress": "progress",
-                           "softness": max(float(softness or 0.0), 0.002)}
+                           "softness": float(softness or 0.0)}  # the floor is the threshold's own (semantics)
     nodes["out"] = {"op": "merge.over", "front": "to", "back": "from", "matte": "reveal"}
     return {"ports": {"from": "picture", "to": "picture", "progress": "curve", "matte_clip": "picture"},
             "nodes": nodes, "output": "out"}

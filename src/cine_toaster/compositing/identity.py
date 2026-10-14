@@ -94,6 +94,11 @@ def identities(graph: dict[str, Any], inputs: dict[str, str], *, context: dict[s
                 parts["params"][key] = {"file": file_hash(path) if path.is_file() else f"missing:{value}"}
             elif op == "generate.source" and key == "take" and isinstance(value, str) and resolve(value).is_file():
                 parts["params"][key] = {"file": file_hash(resolve(value))}
+            elif op.startswith("opaque.") and key == "textures" and isinstance(value, dict):
+                # An opaque node's textures are ports of the graph: known by their identities.
+                parts["params"][key] = {uniform: of(str(port)) for uniform, port in sorted(value.items())}
+            elif op.startswith("opaque.") and isinstance(value, str) and resolve(value).is_file():
+                parts["params"][key] = {"file": file_hash(resolve(value))}  # a shader known by its source
             else:
                 parts["params"][key] = value
         known[node] = _digest({**base, **parts})

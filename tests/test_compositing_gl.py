@@ -7,7 +7,7 @@ import unittest
 import numpy as np
 
 from cine_toaster.compositing import reference
-from cine_toaster.shader_render import gl_unavailable_reason
+from cine_toaster.compositing.gl import gl_unavailable_reason
 
 W, H, FPS, FRAMES = 96, 54, 12, 6
 

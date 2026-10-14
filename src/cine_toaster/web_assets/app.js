@@ -1242,38 +1242,6 @@ function demoTexture(gl, variant) {
   return texture;
 }
 
-// A join shaped by a picture (SPEC-0011): the matte's brightness is the order
-// in which pixels change, spread over `softness`. The same rule as the render.
-const MATTE_SHADER = `
-  uniform sampler2D matte;
-  uniform float softness;
-  vec4 transition(vec2 uv) {
-    float s = max(softness, 0.002);
-    float p = progress * (1.0 + 2.0 * s) - s;
-    float a = clamp((p - texture2D(matte, uv).r) / (2.0 * s) + 0.5, 0.0, 1.0);
-    return mix(getFromColor(uv), getToColor(uv), a);
-  }
-`;
-
-// A matte to preview a `matte` item with, when it ships none: the join gives
-// the real one. Soft blobs, so the shape reads as something organic.
-function sampleMatte() {
-  const surface = document.createElement("canvas");
-  surface.width = 640;
-  surface.height = 360;
-  const context = surface.getContext("2d");
-  context.fillStyle = "#fff";
-  context.fillRect(0, 0, 640, 360);
-  for (const [x, y, r, shade] of [[200, 170, 210, 0], [470, 120, 150, 70], [420, 300, 170, 120], [90, 60, 120, 170]]) {
-    const blob = context.createRadialGradient(x, y, 0, x, y, r);
-    blob.addColorStop(0, `rgb(${shade},${shade},${shade})`);
-    blob.addColorStop(1, "rgba(255,255,255,0)");
-    context.fillStyle = blob;
-    context.fillRect(0, 0, 640, 360);
-  }
-  return surface;
-}
-
 function surfaceTexture(gl, surface) {
   const texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -1334,9 +1302,7 @@ async function startShaderPreview(canvas, transition) {
     return;
   }
   try {
-    const shaderCode = transition.kind === "matte"
-      ? MATTE_SHADER
-      : await fetch(transition.asset_url).then((response) => response.text());
+    const shaderCode = await fetch(transition.asset_url).then((response) => response.text());
     const vertexSource = `
       attribute vec2 position;
       varying vec2 vUv;
@@ -1387,12 +1353,9 @@ async function startShaderPreview(canvas, transition) {
     // The shader's own parameters, at the defaults it declares: an unset
     // uniform is zero, and many transitions do nothing at zero.
     for (const param of transition.params || []) setShaderParam(gl, program, param);
-    // Pictures beside the two shots, from unit 2: a shader's textures, or a matte item's matte.
+    // Pictures beside the two shots, from unit 2: a shader's textures.
     const inputs = Object.entries(transition.inputs || {}).filter(([name]) => name !== "overlay");
     const pictures = [];
-    if (transition.kind === "matte" && !inputs.some(([name]) => name === "matte")) {
-      pictures.push(["matte", sampleMatte()]);
-    }
     for (const [name, file] of inputs) pictures.push([name, await inputPicture(transition, file)]);
     const bound = pictures.map(([name, picture], index) => {
       const unit = 2 + index;
@@ -1401,7 +1364,6 @@ async function startShaderPreview(canvas, transition) {
       gl.uniform1i(gl.getUniformLocation(program, name), unit);
       return { unit, texture, picture };
     });
-    gl.uniform1f(gl.getUniformLocation(program, "softness"), transition.softness || 0.06);
     const progressLocation = gl.getUniformLocation(program, "progress");
     const started = performance.now();
     const duration = Math.max(250, transition.duration_ms);
@@ -1450,9 +1412,9 @@ function transitionVisual(transition, large = false, lazy = false) {
       canvas.remove();
       canvas = null;
     });
-  } else if (transition.kind === "webm" || (transition.kind === "graph" && transition.preview_url)) {
-    // A recipe of primitives (ADR 0022) is drawn by the compositing reference, not in the browser:
-    // its preview is a clip the reference made from the same graph.
+  } else if (transition.kind === "webm" || (["graph", "matte"].includes(transition.kind) && transition.preview_url)) {
+    // A recipe of primitives (ADR 0022) -- a matte join among them -- is drawn by the compositing renderers,
+    // not in the browser: its preview is a clip they made from the same graph (CT-0072).
     const video = el("video");
     video.src = transition.preview_url;
     video.muted = true;
@@ -2162,7 +2124,7 @@ async function renderStoryboard() {
     emptyRoom(
       root,
       "No frames have been drawn yet",
-      "Composed shots get their still from `toast build`; generated shots get " +
+      "A card or a composite gets its still when its scene is assembled (or `toast still`); generated shots get " +
         "theirs from a take. Until then a scene is text on a screen.",
     );
   }
@@ -2759,13 +2721,28 @@ async function renderCut() {
   }
 
   const renders = production.renders || [];
-  if (!renders.length) {
+  // Each sequence's latest version is what this room shows first (CT-0072): the files in renders/ were
+  // written by the quick build, which is gone, and are listed only when a production still has some.
+  const latest = production.sequences.filter((sequence) => (sequence.versions || []).length);
+  if (!renders.length && !latest.length && !production.sequences.some((sequence) => sequence.render)) {
     emptyRoom(
       root,
       "Nothing has been assembled yet",
-      "`toast build` writes into the production's renders/ directory. Anything " +
-        "found there appears here; nothing has to be declared.",
+      "A sequence's latest version appears here once it is assembled (`toast assemble-sequence`, or Assemble " +
+        "in the Sequences room); each scene's versions are kept beside the scene.",
     );
+  }
+
+  for (const sequence of latest) {
+    const version = sequence.versions[0];
+    const panel = el("section", "panel wide-panel");
+    panel.append(sectionHeading("SEQUENCE", sequence.label, `${version.id} · ${version.verdict}`));
+    const video = el("video");
+    video.src = `/media/${version.media}`;
+    video.controls = true;
+    video.preload = "metadata";
+    panel.append(video);
+    root.append(panel);
   }
 
   for (const render of renders) {
@@ -2781,7 +2758,7 @@ async function renderCut() {
   }
 
   for (const sequence of production.sequences) {
-    if (!sequence.render) continue;
+    if (!sequence.render || (sequence.versions || []).length) continue;  // a declared render, from before versions
     const panel = el("section", "panel wide-panel");
     panel.append(sectionHeading("SEQUENCE", sequence.label, sequence.render));
     const video = el("video");

@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 from cine_toaster.assembly import Plan, Segment, probe, render
-from cine_toaster.shader_render import gl_unavailable_reason
+from cine_toaster.compositing.gl import gl_unavailable_reason
 from cine_toaster.transitions import list_transitions
 
 HAS_FFMPEG = bool(shutil.which("ffmpeg") and shutil.which("ffprobe"))

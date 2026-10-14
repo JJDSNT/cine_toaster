@@ -124,10 +124,9 @@ cache, small, and enlarged.
 
 # Renderers
 
-- **GL** (`shader_render`): binds each input as a texture after the two
-  pictures; a moving matte's texture is rewritten every frame with the frame
-  for that progress. The host also provides `getMatte(vec2 uv)` for `matte`
-  items, so a `matte` kind needs no shader of its own.
+- **GL** (an `opaque.gl` node in the GL renderer, CT-0072): binds each input
+  as a texture after the two pictures, each frame of a moving one in turn. A
+  `matte` kind has no shader: it is the graph below.
 - **As a graph** (since CT-0071, ADR 0022): a matte join is a SPEC-0012
   graph -- the matte's luma made a matte, a threshold for a still one, a
   completion ramp for a moving one, `to` over `from` through it -- and an

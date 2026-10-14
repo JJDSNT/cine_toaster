@@ -150,8 +150,8 @@ cut and a note:
   fades across the split; the borrowed sound has a 0.15 s edge. A take with
   less handle shortens the split, and the version says by how much.
 - A **transition** replaces the outgoing shot's last frames and the
-  incoming one's first, as `toast build` does: its GLSL shader through GL
-  when a context can be made, otherwise its `[render].ffmpeg` stand-in; one
+  incoming one's first: its GLSL shader as an `opaque.gl` node of a graph, drawn
+  by the GL renderer, when a context can be made, otherwise its `[render].ffmpeg` stand-in; one
   that can do neither is a straight cut, said in the version. It is at most
   half the shorter shot. The sound crossfades over it; a J/L-cut with a
   transition crossfades instead of splitting.

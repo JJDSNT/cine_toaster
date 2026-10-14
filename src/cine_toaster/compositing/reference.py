@@ -23,6 +23,7 @@ import math
 import shutil
 import subprocess
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable
 
@@ -30,6 +31,8 @@ import numpy as np
 
 from ..errors import ValidationError
 from .schema import validate
+from .semantics import blur_kernel, threshold_spread
+from .semantics import default as semantic_default
 
 #: The default spaces, converted by the exact sRGB transfer function; any other goes through OCIO.
 LINEAR = "Linear Rec.709 (sRGB)"
@@ -129,6 +132,18 @@ def _drop_pages(array: np.ndarray, frame: int) -> None:
             pass
 
 
+def conform_filter(width: int, height: int, *, transparent: bool) -> str:
+    """How a picture of any size is fitted to the frame -- one rule for every path (CT-0072, B3).
+
+    Scaled to fit within the frame, keeping its shape, and centred; what is left is transparent in a
+    composite (it can be merged over something) and black in a cut. Never stretched.
+    """
+
+    border = "black@0" if transparent else "black"
+    return (f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color={border},setsar=1")
+
+
 def read(path: Path, frames: int, size: tuple[int, int], fps: float, *, start: float = 0.0,
          colorspace: str = ENCODED, alpha: str = "straight", working: str = LINEAR,
          stretch_to: float | None = None, hold: bool = True) -> Clip:
@@ -147,8 +162,8 @@ def read(path: Path, frames: int, size: tuple[int, int], fps: float, *, start: f
             retime = f"setpts=(PTS-STARTPTS)*{stretch_to / length:.6f},"
     process = subprocess.Popen(
         [_ffmpeg(), "-loglevel", "error", *source, "-i", str(path), "-frames:v", str(frames),
-         "-vf", f"{retime}fps={fps:g},scale={width}:{height}:flags=bicubic", "-f", "rawvideo", "-pix_fmt",
-         "rgba64le", "-"],
+         "-vf", f"{retime}fps={fps:g},format=rgba64le,{conform_filter(width, height, transparent=True)}",
+         "-f", "rawvideo", "-pix_fmt", "rgba64le", "-"],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     handle = tempfile.NamedTemporaryFile(prefix="clip-", suffix=".raw", delete=False)
     stored = np.lib.format.open_memmap(handle.name, mode="w+", dtype="<u2", shape=(frames, height, width, 4))
@@ -186,6 +201,25 @@ def _duration(path: Path) -> float:
         return 0.0
 
 
+def shown(picture: Any, working: str = LINEAR, display: str = ENCODED) -> np.ndarray:
+    """A frame as it is shown: its colour in the display encoding, 0 to 1, over black. One rule for a film
+    written and for a still drawn from it (CT-0072)."""
+
+    rgb = convert(np.clip(np.asarray(picture, dtype=np.float32)[..., :3], 0.0, None), working, display)
+    return np.clip(rgb, 0.0, 1.0)
+
+
+def write_still(picture: Any, destination: Path, *, working: str = LINEAR, display: str = ENCODED) -> Path:
+    """One frame to a PNG, shown as `write` shows it."""
+
+    from PIL import Image
+
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray((shown(picture, working, display) * 255.0 + 0.5).astype(np.uint8), "RGB").save(destination)
+    return destination
+
+
 def write(pictures: Any, destination: Path, fps: float, *, working: str = LINEAR,
           display: str = ENCODED) -> Path:
     """Frames (an array or any sequence of (H, W, 4)), linear premultiplied, to H.264 in the display encoding.
@@ -202,8 +236,7 @@ def write(pictures: Any, destination: Path, fps: float, *, working: str = LINEAR
          str(destination)], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         for picture in _chain(first, frames):
-            rgb = convert(np.clip(np.asarray(picture, dtype=np.float32)[..., :3], 0.0, None), working, display)
-            process.stdin.write((np.clip(rgb, 0.0, 1.0) * 65535.0 + 0.5).astype("<u2").tobytes())
+            process.stdin.write((shown(picture, working, display) * 65535.0 + 0.5).astype("<u2").tobytes())
         process.stdin.close()
         if process.wait(timeout=900) != 0:
             raise ValidationError(f"Writing {destination.name} failed: {process.stderr.read().decode()[-300:]}")
@@ -345,8 +378,7 @@ def _picture(value: Any) -> np.ndarray:
 def _blur(image: np.ndarray, radius: float) -> np.ndarray:
     if radius <= 0:
         return image
-    sigma = max(radius / 2.0, 1e-3)
-    half = max(1, int(math.ceil(sigma * 3)))
+    sigma, half = blur_kernel(radius)
     kernel = np.exp(-0.5 * (np.arange(-half, half + 1) / sigma) ** 2).astype(np.float32)
     kernel /= kernel.sum()
     out = image
@@ -397,6 +429,26 @@ IMPLEMENTED = {
 #: In SPEC-0012 but outside the reference, by definition (opaque) or until a renderer gives them (models, 3D).
 NOT_IN_REFERENCE = {"signal.estimate": "a model's result is recorded, not computed by the reference",
                     "generate.render": "a renderer's own scene; its result is recorded"}
+
+
+@lru_cache(maxsize=64)
+def _text_coverage(text: str, shown: str, font_path: str, size_px: int, position: tuple[float, float],
+                   width: int, height: int) -> np.ndarray:
+    """How much of each pixel the text covers, drawn four times over and averaged. Kept: a still text (a
+    card, a title not revealing) is the same drawing on every frame."""
+
+    from PIL import Image, ImageDraw, ImageFont
+
+    font = ImageFont.truetype(font_path, size_px)
+    canvas = Image.new("L", (width * 4, height * 4), 0)
+    draw = ImageDraw.Draw(canvas)
+    box = draw.textbbox((0, 0), text, font=font)  # placed by the whole text, so letters do not shift
+    x = position[0] * width * 4 - (box[2] - box[0]) / 2 - box[0]
+    y = position[1] * height * 4 - (box[3] - box[1]) / 2 - box[1]
+    draw.text((x, y), shown, font=font, fill=255)
+    coverage = np.asarray(canvas.resize((width, height), Image.BOX), dtype=np.float32) / 255.0
+    coverage.setflags(write=False)
+    return coverage
 
 
 def Image_resize(data: np.ndarray, width: int, height: int) -> np.ndarray:
@@ -668,7 +720,10 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
         seconds = (frame + 0.5) / fps
 
         def param(key: str, default: Any = None) -> Any:
-            given = node.get(key, default)
+            # An author's value, else the op's default as decided once in `semantics` (CT-0072).
+            given = node.get(key)
+            if given is None:
+                given = semantic_default(op, key, default)
             if isinstance(given, dict) and "curve" in given:
                 return curve(given["curve"])(seconds)
             return given
@@ -720,7 +775,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             return (1.0 - out if node.get("invert") else out).astype(np.float32)
         if op == "matte.threshold":
             matte = _matte(value(node["matte"], frame))
-            spread = max(float(param("softness", 0.0) or 0.0), 0.002)
+            spread = threshold_spread(param("softness"))
             progress = float(value(node["progress"], frame))
             # Progress spread so that 0 shows nothing and 1 everything, whatever the matte (SPEC-0011's rule).
             p = progress * (1 + 2 * spread) - spread
@@ -780,10 +835,10 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
         if op == "warp.transform":
             from .warp import transform
 
-            angles = param("rotate", 0.0)
-            return transform(value(node["in"], frame), translate=param("translate", [0.0, 0.0]),
-                             scale=param("scale", [1.0, 1.0]), rotate=angles if angles is not None else 0.0,
-                             pivot=param("pivot", [0.5, 0.5]), perspective=float(param("perspective", 0.0) or 0.0),
+            angles = param("rotate")
+            return transform(value(node["in"], frame), translate=param("translate"),
+                             scale=param("scale"), rotate=angles if angles is not None else 0.0,
+                             pivot=param("pivot"), perspective=float(param("perspective") or 0.0),
                              aspect=aspect)
         if op == "warp.corner_pin":
             from .warp import corner_pin
@@ -809,11 +864,11 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             from .warp import surface
 
             picture, depth = surface(_picture(value(node["in"], frame)), shape=node["shape"],
-                                     morph=float(param("morph", 1.0)), rotate=param("rotate", [0, 0, 0]),
-                                     translate=param("translate", [0, 0, 0]), scale=float(param("scale", 1.0)),
-                                     perspective=float(param("perspective", 35.0) or 0.0),
-                                     light=float(param("light", 0.4)), detail=int(param("detail", 48)),
-                                     supersample=int(param("supersample", 2)), aspect=aspect)
+                                     morph=float(param("morph")), rotate=param("rotate"),
+                                     translate=param("translate"), scale=float(param("scale")),
+                                     perspective=float(param("perspective") or 0.0),
+                                     light=float(param("light")), detail=int(param("detail")),
+                                     supersample=int(param("supersample")), aspect=aspect)
             context.cache[(f"{name}.depth", frame)] = depth
             return picture
         if op == "warp.procedural":
@@ -872,23 +927,15 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             grey = np.clip(grey, 0, 1).astype(np.float32)
             return np.stack([grey, grey, grey, np.ones_like(grey)], axis=-1)
         if op == "generate.text":
-            from PIL import Image, ImageDraw, ImageFont
-
             from ..titles import font_file
 
             text = str(param("text", ""))
             reveal = param("reveal", 1.0)
             shown = text[: int(round(len(text) * float(np.clip(reveal, 0, 1))))] if reveal is not None else text
             size_px = max(4, int(float(param("size", 40)) * height / 720 * 4))
-            font = ImageFont.truetype(font_file({"font": node.get("font") or ""}, root), size_px)
-            canvas = Image.new("L", (width * 4, height * 4), 0)
-            draw = ImageDraw.Draw(canvas)
             position = np.broadcast_to(np.asarray(param("position", [0.5, 0.5]), dtype=np.float32), (2,))
-            box = draw.textbbox((0, 0), text, font=font)  # placed by the whole text, so letters do not shift
-            x = position[0] * width * 4 - (box[2] - box[0]) / 2 - box[0]
-            y = position[1] * height * 4 - (box[3] - box[1]) / 2 - box[1]
-            draw.text((x, y), shown, font=font, fill=255)
-            coverage = np.asarray(canvas.resize((width, height), Image.BOX), dtype=np.float32) / 255.0
+            coverage = _text_coverage(text, shown, font_file({"font": node.get("font") or ""}, root), size_px,
+                                      (float(position[0]), float(position[1])), width, height)
             colour = np.asarray(param("colour", [1, 1, 1, 1]), dtype=np.float32)
             alpha = coverage * (colour[3] if colour.size > 3 else 1.0)
             return np.concatenate([colour[:3] * alpha[..., None], alpha[..., None]], axis=-1).astype(np.float32)

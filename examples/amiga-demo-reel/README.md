@@ -22,8 +22,8 @@ toast serve .
 ```
 
 The reel is assembled like any film: each scene becomes a kept version, and
-the sequence is cut from those. `toast build` still draws a quick slideshow of
-the cards alone.
+the sequence is cut from those. Its cards are drawn by the same compositing
+graph as every composite (`toast still` draws one frame of one).
 
 ## What it demonstrates
 

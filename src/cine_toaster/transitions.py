@@ -328,3 +328,56 @@ def transition_asset_path(
             if path is not None and path.name == filename:
                 return path
     return None
+
+
+def _sample_pictures(size: tuple[int, int]) -> dict[str, Any]:
+    """Two shots and a matte to show a recipe with: a warm and a cool gradient, and soft dark blobs."""
+
+    import numpy as np
+
+    width, height = size
+    y, x = np.mgrid[0:height, 0:width].astype(np.float32)
+    u, v = x / max(width - 1, 1), y / max(height - 1, 1)
+    warm = np.dstack([0.9 - 0.4 * v, 0.35 + 0.3 * u, 0.12 + 0.1 * v, np.ones_like(u)])
+    cool = np.dstack([0.08 + 0.1 * u, 0.25 + 0.3 * v, 0.75 - 0.3 * u, np.ones_like(u)])
+    matte = np.ones_like(u)
+    for cx, cy, r, shade in ((0.31, 0.47, 0.55, 0.0), (0.73, 0.33, 0.4, 0.27), (0.66, 0.83, 0.45, 0.47),
+                             (0.14, 0.17, 0.32, 0.67)):
+        reach = np.clip(np.hypot((u - cx) * width / height, v - cy) / r, 0, 1)
+        matte = np.minimum(matte, shade + (1 - shade) * reach)
+    from .compositing.reference import decode_srgb
+
+    matte = decode_srgb(matte)  # as a matte drawn in an image file arrives: decoded to linear light
+    return {"from": warm.astype(np.float32), "to": cool.astype(np.float32),
+            "matte_clip": np.dstack([matte, matte, matte, np.ones_like(matte)]).astype(np.float32)}
+
+
+def render_preview(transition: dict[str, Any], destination: Path, *, seconds: float = 2.0, fps: int = 24,
+                   size: tuple[int, int] = (640, 360)) -> Path:
+    """A recipe's preview clip, drawn from its graph by the renderers every join uses (ADR 0022, CT-0072).
+
+    A `matte` item is previewed through the matte join's own graph with a sample matte, so the browser
+    holds no copy of the rule. The clip is VP9 WebM, which every browser plays.
+    """
+
+    import shutil
+    import subprocess
+    import tempfile
+
+    from .compositing import reference
+    from .compositing.gl import renderer_for
+    from .mattes import recipe as matte_recipe
+
+    graph = matte_recipe(False) if transition["kind"] == "matte" else transition.get("graph")
+    if not graph:
+        raise TransitionFormatError(f"{transition['id']} has no graph to preview")
+    frames = max(1, round(seconds * fps))
+    inputs = {name: value for name, value in _sample_pictures(size).items() if name in graph["ports"]}
+    pictures, _, _ = reference.render(graph, inputs, frames=frames, size=size, fps=fps, cache=False,
+                                      renderer=renderer_for(graph))
+    with tempfile.TemporaryDirectory() as work:
+        drawn = reference.write(pictures, Path(work) / "preview.mp4", fps)
+        subprocess.run([shutil.which("ffmpeg") or "ffmpeg", "-y", "-loglevel", "error", "-i", str(drawn), "-c:v",
+                        "libvpx-vp9", "-b:v", "0", "-crf", "36", "-pix_fmt", "yuv420p", "-an", str(destination)],
+                       check=True)
+    return Path(destination)

@@ -129,6 +129,21 @@ reference. Several of its compositing filters work only in 8 or 16 bits with
 gamma, and `overlay` takes no float format, so as a reference it could meet
 the contract only with workarounds.)
 
+**Convergence** (amended 2026-10-14, after C2, by the audit CT-0072 the user
+asked for): renderers may differ in *how* they draw an op, never in *what a
+recipe means*. So every decision is made in one place and read by all of
+them -- parameter defaults and derived values (`compositing/semantics.py`),
+how a picture is fitted to the frame (`reference.conform_filter`), how a
+frame is shown (`reference.shown`, for a film and a still alike) -- and every
+picture of a film is made by one path: a graph, run by one GL pipeline or the
+reference. A gl-transitions shader is an `opaque.gl` node of that pipeline,
+run in the display encoding it was written for; a card is a graph; a
+transition's preview is a clip the graph drew; a **still** is the graph run at
+one instant, the same frame the cut shows. The quick build, its PIL cards and
+its own shader pipeline were removed. What still draws outside the graph is
+listed in CT-0072 with the step that ends it, and each compositing step's
+definition of done includes checking that it left no second path.
+
  A graph
 may be run whole by one renderer that has all its nodes, or **split by a
 planner** across several, results handed over as files in the working space;
@@ -215,10 +230,9 @@ composite; C9b adds playing them within a deadline.
 
 - The order of work is `ai-context/development/compositing-roadmap.md`
   (C1-C11); SPEC-0012 specifies this decision first.
-- SPEC-0011's matte and luma become the first implementations of matte and
-  signal; `mattes.py` is their FFmpeg form, the `luma` shader their GL form,
-  already checked against each other. Their colour handling changes to the
-  contract.
+- SPEC-0011's matte and luma became the first implementations of matte and
+  signal; a matte join is a graph of them (CT-0071), drawn by the renderers
+  like any recipe, with no FFmpeg or browser copy of the rule (CT-0072).
 - The transition catalog's `category` becomes a family; VFX items that are a
   primitive with a parameter leave the VFX catalog; element effects become
   layers with a matte.

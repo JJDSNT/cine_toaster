@@ -213,6 +213,32 @@ item (for a shader: `from`, `to`, `progress`, its textures), a parameter set,
 and exactly one renderer. They are allowed, and say what they are: a recipe
 built only of opaque nodes is not portable, and the catalog shows it.
 
+**`opaque.gl`** (a gl-transitions shader, CT-0072) runs in the GL renderer,
+not in a pipeline of its own. Its contract: the shader's source with the
+gl-transitions host functions (`getFromColor`, `getToColor`, `progress`,
+`ratio`, and each texture it names, bound from a port of the graph); its
+pictures are given to it **in the display encoding**, as the shaders were
+written, and its result converted back to the working space; `uv` has its
+origin at the bottom left, as in the shaders' own convention, so a picture
+is not flipped; `progress` is the join's progress at each frame's centre,
+like every curve. Its identity includes the shader file's content and its
+textures' identities.
+
+## Frames in and out
+
+One rule each, used by every renderer and by the assembly (CT-0072):
+
+- **Fitting a picture to the frame**: a picture of another shape is fitted
+  within the frame and centred, never stretched; the rest is transparent in a
+  composite and black in a cut (`reference.conform_filter`).
+- **Showing a frame**: a picture is converted from the working space to the
+  display encoding and clipped to 0..1 over black (`reference.shown`), for a
+  film written and for a still alike.
+- **A still** of a shot drawn by a graph is that graph run at one instant of
+  the shot, at the cut's frame, rate and beats -- the frame the cut shows
+  there. Titles and effects still drawn over a composite by FFmpeg are not in
+  it until C6; an instant inside a join is the sequence's, not one shot's.
+
 # 4. A composite in the breakdown
 
 A shot's picture is the take, unless the shot gives a `composite`:

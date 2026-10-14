@@ -89,6 +89,22 @@ Each step gets a work record when it starts and is struck here when done.
 "Done when" is the acceptance; "Limits" are the solvable ones known in
 advance.
 
+**Convergence is part of every step's "done when"** (CT-0072, the user's
+rule): a step is not done while what it replaced still runs beside it. Before
+closing a step, search for operations it covers still executed outside the
+graph, and for **decisions** (defaults, derived values, fitting to the
+frame, display) made in more than one place; each is removed, or listed with
+the step that owns it. Renderers may differ in how they draw, never in what a
+recipe means.
+
+**Still drawn outside the graph, with their owners** (CT-0072): the VFX
+catalog's FFmpeg chains and element laying (`vfx.py`) -- C6; titles by
+FFmpeg `drawtext` and Blender (`titles.py`), and `assembly._draw_title` that
+calls both -- C6 and C6b; the FFmpeg `xfade` stand-ins used when GL cannot
+run -- C5, each going when its item is a recipe; a format's reframing
+(`formats.reframe_filter`) -- C10, as a `warp.transform`; a production's look
+by `lut3d` (`color.bake_look`, `media/grading.py`) -- C6, as `colour.lut`.
+
 ### C1. The primitives specified (SPEC-0012)
 
 Done (`CT-0070`): `ai-context/specs/SPEC-0012-compositing-graph.md`, accepted
@@ -127,6 +143,14 @@ faster when it covers them; `toast doctor` reports both. Decided on the way:
 GL, not FFmpeg, is the fast renderer, and effects and titles move to the
 graph in C6.
 
+Closed only after the post-C2 convergence audit (`CT-0072`): one GL pipeline
+(gl-transitions shaders are `opaque.gl` nodes of the GL renderer; the
+separate shader pipeline is gone), one place for each decision (defaults and
+derived values in `compositing/semantics.py`, fitting to the frame in
+`reference.conform_filter`, showing a frame in `reference.shown`), cards and
+transition previews drawn by the graph, a still as the graph at an instant,
+and the quick build (`toast build`) removed.
+
 - What: the **NumPy reference** of each primitive in the `compositing` package
   (float, linear, premultiplied, OCIO; FFmpeg only to read and write files);
   the composite record read from the breakdown; then FFmpeg as the first
@@ -159,6 +183,8 @@ graph in C6.
 - Done when: a warp's scale pulses on every beat of the music piece, written
   in the breakdown.
 - Limits: bars (D1b in `roadmap.md`) are needed for "on every bar".
+- Started (`c1facca`): Bézier eases, unknown eases refused, a beat pulse in
+  shot 12 of the music piece; paused for CT-0072, resumed after it.
 
 ### C4. Layers: the ADO move and the keyers
 
@@ -193,6 +219,19 @@ Started early, inside C2 (`CT-0071`): transitions of kind `graph`, the
   into a tube, or turned as a page) that spins and flies away while still
   playing -- runs the same in the reference, on GL and in the preview; no
   transition reimplements luma, a merge or a surface.
+
+### C5b. Surfaces from Blender (proposed, `CT-0073`)
+
+- What: `warp.surface` on a mesh modelled in Blender (glTF binary: positions,
+  triangles, UVs), so the playing picture is laid on any surface -- a page,
+  a flag, a curved screen -- without rendering the video in Blender. Static
+  first; then shape keys driven by curves, baked vertex animation and the
+  file's camera. Geometry only: Blender rendering a picture is C8-C9.
+- Today: four parametric shapes on a grid, implicit UVs, a depth buffer, no
+  culling, animation by parameters only, one camera on the axis.
+- Done when: a page curl modelled in Blender turns a playing shot in a join,
+  drawn the same by the reference and GL, its `morph` on a curve.
+- After C3 and C4.
 
 ### C6. The catalogs re-expressed
 
@@ -304,7 +343,25 @@ prescribed here.
 - `toast check` reports a first shot's `transition` that nothing renders.
 - `toast footage fetch` as a job; a changed declaration replaces the take it
   made; more than the first audio track.
-- `toast build`: removed, or the assembly of a whole production at its frame.
+- ~~`toast build`~~: removed (CT-0072); cards are graphs in the assembly.
+- ~~The Renders room listed files in `renders/`, which nothing writes since
+  the quick build went~~: it shows each sequence's latest version (CT-0072);
+  `renders/` files are listed only where a production still has some.
+- (medium) A still at an instant **inside a join** is the sequence's, not one shot's
+  (the user, CT-0072): plan the sequence, find the join covering that time,
+  and run the join's graph at its progress with the two shots' frames there.
+- (high, with C6) A still of a composite with a **title or effects** over it lacks them while
+  FFmpeg draws them (P1-P3 of CT-0072): it gains them in C6 with no change
+  to the still.
+- (medium) A still is made by **running the shot from its first frame** to
+  the instant (time operations need the past): the inset's still at 2 s took
+  about a minute. The semantics are right; random access is missing. Reuse
+  the same graph -- seek the inputs' decoding to the instant minus the window
+  `node_windows` says each node needs, or keep checkpoints -- never a second
+  renderer.
+- (high) A still of a shot **cut from a take** is the take's frame; `toast still`
+  refuses it today: read the take at the cut's instant through the same
+  conform and display rules.
 - `rig`, `remotion`, `hyperframes`: a renderer each, or out of the vocabulary.
 - A scene's own frame; a stretch's frame-accurate trim.
 - `transition_overlay_without_alpha` and `transition_matte_incomplete` as

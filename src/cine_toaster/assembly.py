@@ -31,7 +31,7 @@ How shots are joined (SPEC-0007):
 
 - a straight cut, unless the cut says otherwise;
 - a **transition** from the catalog replaces the outgoing shot's last frames
-  and the incoming one's first, as `toast build` does: its own GLSL shader
+  and the incoming one's first, drawn as a graph: its own GLSL shader
   when GL can run, else the FFmpeg stand-in its manifest declares; one that
   can do neither is a straight cut, and the version says so. The sound
   crossfades over it;
@@ -58,6 +58,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .cards import is_card, recipe as card_recipe
 from .errors import ValidationError
 
 FPS = 24
@@ -159,6 +160,9 @@ class Plan:
     #: Subtitles in the film's language (CT-0054): {burn: bool}; once rendered, the .srt written beside.
     subtitles: dict[str, Any] = field(default_factory=dict)
     subtitle_file: str = ""
+    #: Once rendered, a still of each shot drawn by a graph (a card, a composite), by shot: what the frame at
+    #: its middle is in the cut (CT-0072). Written in the render's work folder; the job adopts them.
+    stills: dict[str, str] = field(default_factory=dict)
 
     @property
     def takes(self) -> dict[str, str]:
@@ -322,6 +326,24 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
                 _resolve_join(root, plan, cut, segment, joins)
             plan.segments.append(segment)
             continue
+        if chosen is None and is_card(shot):
+            # A card: its words on the look's background, drawn as a graph like every composite (CT-0072).
+            length = float(shot.get("duration_seconds") or 0) or 3.0
+            cut = cuts.get(shot["id"]) or {}
+            if "looks" not in joins:
+                from .looks import load_looks
+
+                joins["looks"] = {name: look.public_dict() for name, look in load_looks(root).items()}
+            segment = Segment(shot["id"], "CARD", "", 0.0, length, cut.get("type") or "hard", "composite",
+                              None, shot.get("level_db"), effects=list(shot.get("effects") or []))
+            segment.composite = card_recipe(shot, joins["looks"].get(shot.get("look") or ""))
+            segment.composite_takes = {}
+            segment.voice_over = _voices_of(root, scene, shot)
+            segment.subtitles = _card_subtitles(root, scene, shot, length)
+            if plan.segments:
+                _resolve_join(root, plan, cut, segment, joins)
+            plan.segments.append(segment)
+            continue
         if chosen is None and shot.get("composite"):
             # A picture made only by its composite (files, generators): no take to cut from (SPEC-0012 §4).
             length = float(shot.get("duration_seconds") or 0) or 3.0
@@ -336,10 +358,7 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
             plan.segments.append(segment)
             continue
         if chosen is None:
-            if shot.get("source") == "composed":
-                plan.notes.append(f"{shot['id']} is composed (a card); its card is not part of a take cut yet.")
-            else:
-                plan.notes.append(f"{shot['id']} has no take to use; it is left out of this version.")
+            plan.notes.append(f"{shot['id']} has no take to use; it is left out of this version.")
             continue
         path = root / chosen["media"]
         still = path.suffix.lower() in STILL_SUFFIXES
@@ -486,7 +505,7 @@ def _resolve_join(root: Path, plan: Plan, cut: dict[str, Any], segment: Segment,
     reference = cut.get("transition") or {}
     if reference.get("id"):
         if "catalog" not in joins:
-            from .shader_render import gl_unavailable_reason
+            from .compositing.gl import gl_unavailable_reason
             from .transitions import list_transitions
 
             joins["catalog"] = {item["id"]: item for item in list_transitions(root)}
@@ -634,20 +653,19 @@ def _scene_beats(root: Path, scene: dict[str, Any]) -> list[float]:
     return list((heard or {}).get("beats") or [])
 
 
-def _render_composite(root: Path, segment: Segment, destination: Path, first: dict[str, Any], fps: float,
-                      run_process, notes: list[str], beats: list[float] | None = None,
-                      at: float = 0.0) -> Path:
-    """The shot's composite through the reference (SPEC-0012, ADR 0022 §5), with its take's sound kept.
+def _composite_pictures(root: Path, segment: Segment, size: tuple[int, int], fps: float,
+                        beats: list[float] | None = None, at: float = 0.0) -> tuple[Any, Any, bool]:
+    """The shot's composite drawn (SPEC-0012, ADR 0022 §5): (pictures, the GL renderer or None, cached).
 
-    The reference is exact, not fast: about a second a frame at 1080 lines for a few nodes. A faster
-    renderer checked against it is the next step of C2.
+    One drawing for the cut and for a still of it: GL when it draws every op of the composite (checked
+    against the reference by the conformance tests), the reference otherwise, exact and slow.
     """
 
     from .compositing import reference
+    from .compositing.gl import renderer_for
 
     length = segment.end - segment.start
     frames = max(1, round(length * fps))
-    size = (first["width"] // 2 * 2, first["height"] // 2 * 2)
     graph = segment.composite
     inputs: dict[str, Any] = {}
     for name, node in graph["nodes"].items():
@@ -664,19 +682,41 @@ def _render_composite(root: Path, segment: Segment, destination: Path, first: di
                                       alpha=node.get("alpha", "straight"))
     # The music's beats in the shot's own seconds: a composite pulses with the cut, not with its take.
     local = [beat - at for beat in beats or [] if -1.0 <= beat - at <= length + 1.0]
-    from .compositing.gl import renderer_for
-
-    # GL when it draws every op of the composite (checked against the reference by the conformance tests);
-    # the reference otherwise, exact and slow.
     fast = renderer_for(graph)
     pictures, _identity, cached = reference.render(graph, inputs, frames=frames, size=size, fps=fps, root=root,
                                                    beats=local, renderer=fast)
+    return pictures, fast, cached
+
+
+def _frames_keeping(pictures: Any, index: int, kept: list[Any]):
+    """The frames as they come, with frame ``index`` kept aside (a still taken from the cut being drawn)."""
+
+    for number, picture in enumerate(pictures):
+        if number == index:
+            kept.append(picture)
+        yield picture
+
+
+def _render_composite(root: Path, segment: Segment, destination: Path, first: dict[str, Any], fps: float,
+                      run_process, notes: list[str], beats: list[float] | None = None,
+                      at: float = 0.0, still: Path | None = None) -> Path:
+    """The shot's composite as a piece of the cut, with its take's sound kept; with ``still``, its middle
+    frame written there too -- the frame the cut shows, not a second drawing."""
+
+    from .compositing import reference
+
+    length = segment.end - segment.start
+    size = (first["width"] // 2 * 2, first["height"] // 2 * 2)
+    pictures, fast, cached = _composite_pictures(root, segment, size, fps, beats, at)
     notes.append(f"{segment.shot}: its composite was drawn by "
                  + (f"GL ({fast.name.split(' (')[0]})." if fast else "the NumPy reference (exact, slow)."))
     if cached:
         notes.append(f"{segment.shot}: its composite was found in the cache.")
+    kept: list[Any] = []
     silent = destination.with_suffix(".picture.mp4")
-    reference.write(pictures, silent, fps)
+    reference.write(_frames_keeping(pictures, max(1, round(length * fps)) // 2, kept), silent, fps)
+    if still is not None and kept:
+        reference.write_still(kept[0], still)
     if segment.media and probe(root / segment.media).get("audio"):
         run_process(["ffmpeg", "-y", "-loglevel", "error", "-i", str(silent), "-ss", f"{segment.start:.3f}",
                      "-t", f"{length:.3f}", "-i", str(root / segment.media), "-map", "0:v:0", "-map", "1:a:0",
@@ -689,6 +729,73 @@ def _render_composite(root: Path, segment: Segment, destination: Path, first: di
                     expected_seconds=length, message=f"{segment.shot}: its composite")
     segment.start, segment.end = 0.0, length
     return destination
+
+
+def _source_frame(root: Path, plan: Plan) -> tuple[dict[str, Any], float]:
+    """The cut's frame and rate before a format reframes it: decided once, for the render and a still."""
+
+    # A moving take decides the frame and the rate; a still only when there is nothing else.
+    real = (next((segment for segment in plan.segments if segment.media and not segment.still), None)
+            or next((segment for segment in plan.segments if segment.media), None))
+    first = probe(root / real.media) if real else {"width": 1280, "height": 720, "fps": FPS, "audio": False}
+    if real and real.still:
+        first["fps"] = FPS  # a picture has no rate; what ffprobe reports for one is a default
+    if plan.frame:
+        # The production's frame, whatever its first take is (CT-0068); its rate, when it gives one.
+        first = {**first, "width": plan.frame["width"], "height": plan.frame["height"],
+                 "fps": plan.frame.get("fps") or first["fps"]}
+    return first, first["fps"] or FPS
+
+
+def _starts(plan: Plan) -> list[float]:
+    """Where each shot starts in the cut: a transition takes its length from both shots it joins."""
+
+    starts, clock = [], 0.0
+    for segment in plan.segments:
+        clock -= segment.overlap
+        starts.append(max(clock, 0.0))
+        clock += segment.end - segment.start
+    return starts
+
+
+def still(root: Path, plan: Plan, shot: str, destination: Path, at: float | None = None) -> Path:
+    """A shot's frame at ``at`` seconds into it (its middle when not given), as the cut draws it: its graph
+    run at that instant, at the cut's frame and rate, with the cut's beats (CT-0072).
+
+    A shot drawn by a graph -- a card, a composite -- only. Titles and effects drawn over a composite are
+    still FFmpeg's (P1-P3 of the audit, owned by C6) and are not in it; an instant inside a join belongs to
+    the sequence, not to one shot (recorded in the compositing roadmap).
+    """
+
+    from .compositing import reference
+
+    index = next((number for number, segment in enumerate(plan.segments) if segment.shot == shot), None)
+    if index is None:
+        raise ValidationError(f"{shot} is not in this cut")
+    segment = plan.segments[index]
+    if not segment.composite:
+        raise ValidationError(f"{shot} is cut from a take, not drawn by a graph: its frame is the take's")
+    if segment.title or segment.effects:
+        plan.notes.append(f"{shot}: its title and effects are drawn over the composite by FFmpeg and are not "
+                          "in this still yet (C6).")
+    first, fps = _source_frame(root, plan)
+    if plan.format.get("aspect"):
+        from .formats import target_size
+
+        first = {**first, **dict(zip(("width", "height"), target_size(first["width"], first["height"],
+                                                                      plan.format["aspect"])))}
+    length = segment.end - segment.start
+    frames = max(1, round(length * fps))
+    wanted = frames // 2 if at is None else min(frames - 1, max(0, round(float(at) * fps)))
+    size = (first["width"] // 2 * 2, first["height"] // 2 * 2)
+    pictures, _fast, _cached = _composite_pictures(root, segment, size, fps, plan.beats, _starts(plan)[index])
+    for number, picture in enumerate(pictures):
+        if number == wanted:
+            return reference.write_still(picture, destination)
+    raise ValidationError(f"{shot}: its graph gave no frame {wanted}")
+
+
+from .compositing.reference import conform_filter  # one rule for fitting a picture to the frame (CT-0072)
 
 
 def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
@@ -712,17 +819,7 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
     if not ffmpeg:
         raise ValidationError("FFmpeg is needed to assemble a cut")
     work.mkdir(parents=True, exist_ok=True)
-    # A moving take decides the frame and the rate; a still only when there is nothing else.
-    real = (next((segment for segment in plan.segments if segment.media and not segment.still), None)
-            or next((segment for segment in plan.segments if segment.media), None))
-    first = probe(root / real.media) if real else {"width": 1280, "height": 720, "fps": FPS, "audio": False}
-    if real and real.still:
-        first["fps"] = FPS  # a picture has no rate; what ffprobe reports for one is a default
-    if plan.frame:
-        # The production's frame, whatever its first take is (CT-0068); its rate, when it gives one.
-        first = {**first, "width": plan.frame["width"], "height": plan.frame["height"],
-                 "fps": plan.frame.get("fps") or first["fps"]}
-    fps = first["fps"] or FPS
+    first, fps = _source_frame(root, plan)
     if plan.format.get("aspect"):
         first = _reframe(root, plan, first, work, run_process, within(0.0, 0.05))
     width, height = first["width"] // 2 * 2, first["height"] // 2 * 2
@@ -734,12 +831,7 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
     overlap = [0] * (total + 1)  # frames each transition takes, into segment i
     pictures, sounds = [], []
     speaking: list[bool] = []  # whether someone speaks in each shot: its sound goes to the centre in a 5.1
-    # Where each shot starts in the cut: a transition takes its length from both shots it joins.
-    starts, clock = [], 0.0
-    for segment in plan.segments:
-        clock -= segment.overlap
-        starts.append(max(clock, 0.0))
-        clock += segment.end - segment.start
+    starts = _starts(plan)
     for index, segment in enumerate(plan.segments):
         if segment.method.startswith("solid:") and not segment.source:
             solid = work / f"solid-{index:03d}.mp4"
@@ -753,8 +845,11 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
             segment.source = str(solid)
         held = None
         if segment.composite and not segment.source:
+            kept = work / "stills" / f"{segment.shot}.png"
             composed = _render_composite(root, segment, work / f"composite-{index:03d}.mp4", first, fps, run_process,
-                                         plan.notes, plan.beats, starts[index])
+                                         plan.notes, plan.beats, starts[index], still=kept)
+            if kept.is_file():
+                plan.stills[segment.shot] = str(kept)
             if segment.title or segment.effects:
                 held = composed  # the title and effects are drawn over the composite
             else:
@@ -762,12 +857,11 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
         if segment.still and not segment.source:
             held = work / f"still-{index:03d}.mp4"
             length = segment.end - segment.start
-            frame = f"{first['width'] // 2 * 2}:{first['height'] // 2 * 2}"
             run_process(["ffmpeg", "-y", "-loglevel", "error", "-loop", "1", "-framerate", str(round(fps) or FPS),
                          "-t", f"{length:.3f}", "-i", str(root / segment.media), "-f", "lavfi", "-t", f"{length:.3f}",
                          "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-shortest",
-                         "-vf", f"scale={frame}:force_original_aspect_ratio=decrease,pad={frame}:(ow-iw)/2:(oh-ih)/2,"
-                                f"setsar=1,format=yuv420p",
+                         "-vf", conform_filter(first["width"] // 2 * 2, first["height"] // 2 * 2, transparent=False)
+                                + ",format=yuv420p",
                          "-c:v", "libx264", "-c:a", "aac", str(held)],
                         expected_seconds=length, message=f"{segment.shot}: the still held {length:g} s")
             if not (segment.title or segment.effects):
@@ -779,8 +873,7 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
         picture = work / f"picture-{index:03d}.mp4"
         run_process([ffmpeg, "-y", "-loglevel", "error", "-ss", f"{segment.start:.3f}", "-t", f"{length:.3f}",
                      "-i", str(source), "-map", "0:v:0",
-                     "-vf", f"scale={size}:force_original_aspect_ratio=decrease,pad={size}:(ow-iw)/2:(oh-ih)/2,"
-                            f"setsar=1,fps={fps},format=yuv420p",
+                     "-vf", conform_filter(width, height, transparent=False) + f",fps={fps},format=yuv420p",
                      "-frames:v", str(max(1, round(length * fps))), "-an", "-c:v", "libx264", "-preset", "veryfast",
                      "-crf", "18", str(picture)],
                     expected_seconds=length, message=f"Cutting {segment.shot}",
@@ -1040,6 +1133,17 @@ def _graph_join(outgoing: Path, incoming: Path, outgoing_frames: int, frames: in
     return destination
 
 
+def shader_recipe(transition: dict[str, Any]) -> dict[str, Any]:
+    """A gl-transitions join as a SPEC-0012 graph: one opaque node with the shader, its uniforms and textures."""
+
+    textures = {name: name for name in transition.get("textures") or {}}
+    uniforms = {param["name"]: param["default"] for param in transition.get("params") or []}
+    ports = {"from": "picture", "to": "picture", "progress": "curve", **{name: "picture" for name in textures}}
+    return {"ports": ports, "output": "out",
+            "nodes": {"out": {"op": "opaque.gl", "shader": transition["shader"], "from": "from", "to": "to",
+                              "progress": "progress", "uniforms": uniforms, "textures": textures}}}
+
+
 def _lay_overlay(clip: Path, overlay: Path, destination: Path, blend: str, frames: int, fps: float,
                  size: tuple[int, int], notes: list[str], label: str) -> Path:
     """An overlay with alpha over a drawn join, as a graph (ADR 0022): over, or a screen or add blend."""
@@ -1063,7 +1167,7 @@ def _lay_overlay(clip: Path, overlay: Path, destination: Path, blend: str, frame
 
 def _join_pictures(ffmpeg: str, plan: Plan, pictures: list[Path], count: list[int], overlap: list[int], work: Path,
                    fps: float, width: int, height: int, run_process, span: tuple[float, float]) -> Path:
-    """The pieces joined: straight cuts, and each transition as its own clip between the bodies (as `toast build`)."""
+    """The pieces joined: straight cuts, and each transition as its own clip between the bodies."""
 
     destination = work / "picture.mp4"
     encode = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-r", f"{fps:g}"]
@@ -1098,12 +1202,13 @@ def _join_pictures(ffmpeg: str, plan: Plan, pictures: list[Path], count: list[in
                             height=height, extra={"matte_clip": read(matte, frames, (width, height), fps,
                                                                      stretch_to=frames / fps if moving else None)})
             elif transition.get("shader"):
-                from .build import Join, _shader_join
+                # A gl-transitions shader: an opaque node of the graph, run by the GL renderer (CT-0072, B1).
+                from .compositing.reference import read
 
-                join = Join(transition["id"], frames / fps, shader=Path(transition["shader"]),
-                            params=transition.get("params") or [])
-                _shader_join(ffmpeg, picture, pictures[index + 1], count[index], frames, join, clip, width, height, fps,
-                             textures={name: Path(path) for name, path in (transition.get("textures") or {}).items()})
+                textures = {name: read(Path(path), frames, (width, height), fps)
+                            for name, path in (transition.get("textures") or {}).items()}
+                _graph_join(picture, pictures[index + 1], count[index], frames, {"graph": shader_recipe(transition)},
+                            clip, fps=fps, width=width, height=height, extra=textures)
             else:
                 tail = count[index] - frames
                 run_process([ffmpeg, "-y", "-loglevel", "error", "-i", str(picture), "-i", str(pictures[index + 1]),

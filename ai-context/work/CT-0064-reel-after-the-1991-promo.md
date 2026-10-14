@@ -239,7 +239,7 @@ Smaller defects found on the way, not yet fixed:
 - a title does not take its colours from the production's look;
 - `toast footage fetch` runs in the foreground: no progress, no cancel; a
   changed declaration does not replace the take that is there;
-- `toast build` duplicates a poorer form of the assembly: keep or remove;
+- ~~`toast build` duplicates a poorer form of the assembly: keep or remove~~ removed in CT-0072, its cards and stills moved to the graph;
 - `rig`, `remotion` and `hyperframes` are accepted engines nothing renders;
 - title catalog: no horizontal crawl, no drop shadow; VFX catalog: no
   posterise, solarise or colour cycling;
@@ -315,8 +315,8 @@ In order. Each numbered step that changes code gets its own record.
      `check` and `shots` with a reason, never at the assembly.
    - A command that brings a recording or a still in as a `captured` or
      `archival` take with its source, licence and credit.
-   - `toast build` becomes the whole-production form of the assembly, or is
-     retired; `make build` follows. Decide after the probe.
+   - ~~`toast build` becomes the whole-production form of the assembly, or is
+     retired~~: retired in CT-0072; `make build` already used the assembly.
    - Correct what is stale: the reel's README (says there is no TTS),
      `project.yaml`'s logline, CT-0017's note that the narration is checked in.
 2. **Write the reel, first version**, with what step 1 gives: both acts, two

@@ -44,6 +44,11 @@ is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
 CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
 
+- `CT-0073` — surfaces from Blender: an external UV mesh for `warp.surface`,
+  evaluated and its interface documented (`proposed`)
+- `CT-0072` — the post-C2 convergence audit: one GL pipeline, one place for
+  each decision, cards and stills drawn by the graph, `toast build` removed
+  (`done`)
 - `CT-0071` — C2: the NumPy reference (53 of 55 ops), composites and recipe
   joins in the assembly, a GL renderer checked against it, warp.surface and
   the warp wipes (`done`)

@@ -45,15 +45,16 @@ the organic trial: what matters is matte support and layers (2026-10-14).
 - **The preview** in the Transitions room binds an item's textures (stills,
   and clips updated every frame) and previews a `matte` item with a sample
   matte of soft blobs; checked in headless Chromium: the three items draw, no
-  shader error.
+  shader error. (Since CT-0072 a `matte` item's preview is a clip drawn by
+  the matte join's graph; the browser no longer holds the rule.)
 - **ADR 0022**, from the user's direction, amended twice and accepted
   (2026-10-14), consolidated into one text: luma, matte, warp and
   wipe are compositing primitives shared by every renderer, not effects; the
   catalogs are to be built on them. `luma` and `matte-wipe` are filed as
   wipes and `displacement` as a warp accordingly (it had been filed beside
   `luma` as "organic", which mixed a reveal with a deformation).
-- `toast build` refuses a matte join with a reason (it draws cards only) and
-  passes textures to its shaders.
+- `toast build` refused a matte join with a reason (it drew cards only) and
+  passed textures to its shaders. (Removed in CT-0072.)
 
 # To do (solvable; also in the roadmap)
 

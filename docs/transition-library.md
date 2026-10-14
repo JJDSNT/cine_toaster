@@ -126,13 +126,16 @@ catalog.
 
 ## Rendering
 
-`toast build` has two engines. **GL** (ModernGL, the `gpu` extra) runs a GLSL
-item's own shader over the real frames of the two shots. **FFmpeg** runs the
-`[render].ffmpeg` stand-in its manifest declares. `--engine auto`, the
-default, uses GL when a context can be created. An item with no stand-in, such
-as every unreviewed shader, is refused by the FFmpeg engine rather than
-replaced. Both engines produce the same running time: a join replaces the end
-of the outgoing shot and the start of the incoming one.
+A join is drawn by the assembly as a compositing graph (ADR 0022). A GLSL
+item's own shader is an `opaque.gl` node, run by the GL renderer (ModernGL,
+the `gpu` extra) in the display encoding it was written for; a recipe (`graph`
+kind) and a `matte` join are drawn by the GL renderer or the NumPy reference.
+When GL cannot run, a reviewed shader's `[render].ffmpeg` stand-in is used and
+the version says so; an item with no stand-in, such as every unreviewed
+shader, becomes a straight cut, also said. A join replaces the end of the
+outgoing shot and the start of the incoming one, so the running time is the
+same either way. A recipe's preview clip is drawn from its graph by
+`transitions.render_preview`.
 
 Recording a per-shot parameter override, and WebM compositing roles, are
 deferred.

@@ -488,7 +488,7 @@ class JobManager:
             target = Path(destination).expanduser().resolve() if destination else (root / item["destination"]).resolve()
             if destination is None:
                 target.relative_to(root.resolve())  # a declared destination stays inside the project
-            if target.exists() and not overwrite:
+            if target.exists() and not (overwrite or item.get("derived")):
                 raise JobError(f"{target} exists; adopt with overwrite to replace it.", path=str(target))
             plan.append((source, target))
         for source, target in plan:
@@ -562,34 +562,6 @@ def _run_previs(context: JobContext) -> dict[str, Any]:
     }
 
 
-def _validate_build(root: Path, params: dict[str, Any]) -> dict[str, Any]:
-    from .build import ENGINES
-
-    engine = str(params.get("engine") or "auto")
-    if engine not in ENGINES:
-        raise ValidationError(f"Unknown engine {engine!r}", available=list(ENGINES))
-    return {"engine": engine}
-
-
-def _run_build(context: JobContext) -> dict[str, Any]:
-    from .build import BuildCancelled, build
-    from .project import load_production
-
-    production_id = load_production(context.project_root)["id"]
-    output = context.staging / f"{production_id}.mp4"
-    try:
-        result = build(
-            context.project_root, output, engine=context.params["engine"],
-            work=context.staging / "work", progress=context.progress, should_stop=context.cancelled,
-        )
-    except BuildCancelled as error:
-        raise JobCancelled() from error
-    return {
-        "files": [{"staged": output.name, "destination": f"renders/{production_id}.mp4"}],
-        "summary": {**result.public_dict(), "output": None},
-    }
-
-
 register(JobKind("previs", _validate_previs, _run_previs))
 
 
@@ -641,7 +613,6 @@ def _run_board_animatic(context: JobContext) -> dict[str, Any]:
 
 register(JobKind("boards", _validate_boards, _run_boards))
 register(JobKind("board_animatic", _validate_boards, _run_board_animatic))
-register(JobKind("build", _validate_build, _run_build))
 
 
 def _next_version(root: Path, scene_id: str) -> str:
@@ -731,7 +702,7 @@ def _voices_for_cut(context: JobContext, production: dict[str, Any], scene_id: s
 
 def _run_assemble(context: JobContext) -> dict[str, Any]:
     from .assembly import plan_scene, render
-    from .project import load_scene
+    from .project import STILLS_DIRECTORY, load_scene
 
     from .project import load_production
 
@@ -756,6 +727,12 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
         staged = context.staging / "stems"
         shutil.move(plan.stems_folder, staged)
         stems = sorted(path.name for path in staged.iterdir())
+    # The still of each shot a graph draws, its middle frame as the cut shows it (CT-0072).
+    stills = []
+    for shot, path in plan.stills.items():
+        (context.staging / "stills").mkdir(exist_ok=True)
+        shutil.move(path, context.staging / "stills" / f"{shot}.png")
+        stills.append(shot)
     shutil.rmtree(context.staging / "work", ignore_errors=True)
     scene_id, version = context.params["scene"], context.params["version"]
     # A version lives with its scene, beside the breakdown that made it (ADR 0021).
@@ -782,7 +759,10 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
                   *([{"staged": "assembly.srt", "destination": f"{folder}/{version}.srt"}]
                     if (context.staging / "assembly.srt").is_file() else []), *renditions,
                   # The sound in its parts, beside the version, for a DAW (CT-0063).
-                  *[{"staged": f"stems/{name}", "destination": f"{folder}/{version}.stems/{name}"} for name in stems]],
+                  *[{"staged": f"stems/{name}", "destination": f"{folder}/{version}.stems/{name}"} for name in stems],
+                  # A still is a drawing of the latest cut, disposable: it replaces the one before.
+                  *[{"staged": f"stills/{shot}.png", "destination": f"{STILLS_DIRECTORY}/{scene_id}/{shot}.png",
+                     "derived": True} for shot in stills]],
         "summary": {"segments": [{**{key: value for key, value in asdict(segment).items() if key not in ("sound", "source")},
                                   "gain_db": plan.gains.get(segment.shot, 0.0)} for segment in plan.segments],
                     "notes": plan.notes, "voices": voices, "sound": plan.sound, "loudness": plan.loudness,

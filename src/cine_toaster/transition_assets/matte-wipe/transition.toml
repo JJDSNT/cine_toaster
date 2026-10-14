@@ -12,6 +12,8 @@ tags = ["matte", "organic", "toaster"]
 use_when = ["A join should look made of something", "The production has a matte clip or image"]
 avoid_when = ["A join that should not be noticed"]
 license = "MIT"
+# Drawn by `transitions.render_preview` from the matte join's graph, with a sample matte (CT-0072).
+preview = "preview.webm"
 # SPEC-0011: no shader and no matte of its own; the join names its matte.
 
 [render]

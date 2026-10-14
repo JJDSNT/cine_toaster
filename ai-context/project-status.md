@@ -14,7 +14,7 @@ tags:
 
 # Project status
 
-Last updated: 2026-10-13
+Last updated: 2026-10-14
 
 ## Current phase
 
@@ -52,10 +52,19 @@ add`). Order agreed: the music-driven piece first, the reel after it and
 out of it; nothing of the previous reel is kept. Next: music brought in
 with its beats as a record.
 
+The compositing engine (ADR 0022, `development/compositing-roadmap.md`): C1
+and C2 are done, C2 closed only after the convergence audit the user asked
+for (CT-0072): one GL pipeline (gl-transitions shaders are `opaque.gl`
+nodes), one place for each decision (defaults, fitting to the frame,
+showing a frame), cards and transition previews drawn by the graph, a still
+as the graph at an instant (`toast still`), and the quick build (`toast
+build`) removed. What still draws outside the graph has an owner step (C5,
+C6, C10). C3 (animation) is started and resumes next.
+
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional
 tape, as the two-act self-demo of `docs/production-validation.md`. Nothing
-is built. The reel is rendered by `toast build`, which draws text cards
+is built. The reel was rendered by `toast build` (removed in CT-0072), which drew text cards
 only, while titles, effects, sound and transitions over moving video live
 in the assembly; the record lists what is missing (the reel on the
 assembly path, a matte and an overlay in the transition contract, layers
@@ -166,7 +175,8 @@ required are all deleted.
 ## Delivered
 
 - `CT-0026` — gl-transitions submodule: 117 unreviewed shaders plus 6 reviewed;
-  `toast build` runs GLSL transitions through ModernGL (`done`).
+  GLSL transitions run through ModernGL, now as `opaque.gl` nodes of the GL
+  renderer (CT-0072) (`done`).
 - `CT-0013` — production-specific tooling boundary and demo examples (`done`).
 - `CT-0002` — canonical take selection (`done`).
 - `CT-0008` — scene geometry, continuity checks, sequences, live board (`done`).

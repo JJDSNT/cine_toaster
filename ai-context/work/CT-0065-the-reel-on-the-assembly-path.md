@@ -82,7 +82,7 @@ over moving video live in the assembly. Everything the reel is to become
    keeps the fixture and its tests working. The footage trial was "a little
    better", not good: its sources were 720p and 360p, its titles defaults.
 1. ~~Footage that is fetched rather than checked in~~ done as CT-0066.
-2. Decide whether `toast build` stays. It now duplicates a poorer form of the
+2. ~~Decide whether `toast build` stays~~ -- removed in CT-0072. It now duplicates a poorer form of the
    assembly; removing it touches the `build` job, the control room and
    `docs/jobs.md`.
 3. Not looked at: a title card taking its colours from the production's look
