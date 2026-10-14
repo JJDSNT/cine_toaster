@@ -75,3 +75,4 @@ renderer in use never becomes the definition of correct.
   shapes have edge coverage and follow a curve; a transform leaves
   transparency; curves hold and ease; refusals; a file read into linear.
 - `tests/test_compositing_schema.py` (12), `tests/test_compositing_conformance.py` (1).
+- Full suite: 665 tests pass (2026-10-14, at b87342d).
