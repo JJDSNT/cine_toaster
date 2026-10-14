@@ -24,6 +24,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .semantics import ease_problem
+
 TYPES = ("picture", "matte", "signal", "sound", "track", "curve", "meta")
 #: The only conversions an edge may make (SPEC-0012 §1).
 CONVERSIONS = {("picture", "matte"), ("matte", "picture")}
@@ -46,7 +48,7 @@ class Port:
 class Op:
     inputs: dict[str, Port] = field(default_factory=dict)
     outputs: dict[str, str] = field(default_factory=lambda: {"out": "picture"})
-    params: dict[str, str] = field(default_factory=dict)  # name -> kind: number, vector, text, file, bool, int, enum:a|b
+    params: dict[str, str] = field(default_factory=dict)  # name -> kind: number, vector, text, file, bool, int, ease, enum:a|b
     #: The signal kind the output carries, a fixed one, or a parameter that names it.
     kind: str = ""
     deterministic: bool = True
@@ -156,14 +158,15 @@ OPS: dict[str, Op] = {
     # Keys over time, or -- given `in` -- over another curve's value (a join's progress, 0 to 1).
     "curve.keys": Op({"in": P(*CRV, required=False)}, {"out": "curve"}, {"keys": "vector"}),
     "curve.beats": Op({}, {"out": "curve"}, {"attack": "number", "decay": "number", "every": "int", "low": "number",
-                                             "high": "number"}),
+                                             "high": "number", "attack_ease": "ease", "decay_ease": "ease",
+                                             "overlap": "enum:max|add"}),
     "curve.from_track": Op({"track": P(*TRK)}, {"out": "curve"}, {"field": "enum:x|y|rotation|scale"}),
     "curve.progress": Op({}, {"out": "curve"}),
     "curve.noise": Op({}, {"out": "curve"}, {"seed": "int", "frequency": "number", "amplitude": "number",
                                              "offset": "number"}),
     "curve.map": Op({"in": P(*CRV)}, {"out": "curve"},
                     {"how": "enum:invert|scale|offset|clamp|remap|ease", "factor": "number", "low": "number",
-                     "high": "number", "out_low": "number", "out_high": "number", "ease": "text"}),
+                     "high": "number", "out_low": "number", "out_high": "number", "ease": "ease"}),
     "curve.combine": Op({"a": P(*CRV), "b": P(*CRV)}, {"out": "curve"}, {"how": "enum:add|subtract|multiply|min|max"}),
 }
 
@@ -334,6 +337,12 @@ def validate(graph: dict[str, Any]) -> list[tuple[str, str]]:
                                  f"{name}.{key} is {value!r}; it is one of {kind[5:].replace('|', ', ')}"))
             elif kind in ("number", "int") and not isinstance(value, (int, float)):
                 problems.append(("composite_type_mismatch", f"{name}.{key} is a number, not {value!r}"))
+            elif kind == "ease" and ease_problem(value):
+                problems.append(("composite_unknown_param", f"{name}.{key}: {ease_problem(value)}"))
+        if op_name == "curve.keys":
+            for key in node.get("keys") or []:
+                if isinstance(key, dict) and "ease" in key and ease_problem(key["ease"]):
+                    problems.append(("composite_unknown_param", f"{name}.keys at {key.get('t')}: {ease_problem(key['ease'])}"))
         for need in REQUIRED_PARAMS.get(op_name, ()):
             choices = need.split("|")
             if not any(node.get(choice) is not None for choice in choices):

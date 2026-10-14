@@ -197,7 +197,7 @@ or procedural warp says `edge: extend` (the border repeated) or `edge: mirror`
 | `track.measure` | picture | track | `kind` (point, plane, camera), a starting region; deterministic per tracker version |
 | `track.read` | -- | track | a file in the track format (§1) |
 | `curve.keys` | optional curve `in` | curve | keyframes `[{t, value, ease}]`; `ease`: linear, in, out, in-out, hold, bezier handles. With `in`, `t` is that curve's value, not seconds: a join's recipe keys along its `progress` (0 to 1), whatever the join's length |
-| `curve.beats` | -- | curve | the scene's music beats (CT-0067): a value per beat with an envelope (`attack`, `decay`) |
+| `curve.beats` | -- | curve | the scene's music beats (CT-0067): a pulse per beat with an envelope (`attack`, `decay`, `attack_ease`, `decay_ease`), `low` to `high`, `every`, `overlap` (max, add); §6 |
 | `curve.from_track` | track | curve | a field of the track (x, y, rotation, scale) |
 | `curve.progress` | -- | curve | 0 at a join's start to 1 at its end; only in recipes for joins |
 | `curve.noise` | -- | curve | `seed`, `frequency`, `amplitude`, `offset` (smooth, repeatable) |
@@ -329,9 +329,22 @@ follow a curve.
   follows the left key's ease; before the first and after the last it holds.
   An ease is a name (linear, in, out, in-out, hold) or a cubic Bézier given
   as its handles `[x1, y1, x2, y2]`, as CSS and animation tools write it; an
-  unknown name is refused.
+  unknown name, or handles whose times leave 0..1, is refused when the graph
+  is validated. An ease is one thing wherever a parameter takes one -- a key,
+  `curve.map`, a pulse's envelope -- so the same Bézier shapes a move, a fade
+  or a beat.
 - **Beats** come from the scene's music (CT-0067); `every` picks every nth
-  beat (bars, once D1b exists).
+  beat (bars, once D1b exists). **When** a pulse happens is the beat's; **how**
+  the value reacts is the envelope's, and the two are kept apart (CT-0074): a
+  pulse rises over `attack` before its beat with `attack_ease` and falls over
+  `decay` after it with `decay_ease`; an ease maps 0 to 0 and 1 to 1, so
+  changing it reshapes the pulse and never moves its peak. The peak is placed
+  at the centre of the frame the beat falls in, so that frame shows the full
+  value whatever the eases. Pulses that meet (beats closer than a pulse
+  lasts) follow `overlap`: `max` keeps the higher (the default), `add` sums
+  them, never past a full pulse. Defaults: attack 0.02 s, decay 0.2 s, low 0,
+  high 1, linear eases. An attack or decay shorter than a frame is seen as
+  a one-frame step (a hit); its ease shows only over two frames or more.
 
 The examples in `SPEC-0012-examples/` use each of these forms.
 

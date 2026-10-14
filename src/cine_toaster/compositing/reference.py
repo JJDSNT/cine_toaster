@@ -291,14 +291,16 @@ def cubic_bezier(x1: float, y1: float, x2: float, y2: float) -> Callable[[float]
 
 
 def ease_of(ease: Any) -> Callable[[float], float]:
-    """A named ease, or a Bézier given as its four handle numbers; an ease nobody knows is refused, not guessed."""
+    """A named ease, or a Bézier given as its four handle numbers; an ease nobody knows is refused, not guessed
+    (what an ease may be is decided in `semantics`, which the validator reads too)."""
 
+    from .semantics import ease_problem
+
+    problem = ease_problem(ease)
+    if problem:
+        raise ValidationError(problem[0].upper() + problem[1:])
     if isinstance(ease, (list, tuple)):
-        if len(ease) != 4:
-            raise ValidationError(f"A Bézier ease is four numbers (x1, y1, x2, y2), not {ease!r}")
         return cubic_bezier(*map(float, ease))
-    if str(ease) not in _EASES:
-        raise ValidationError(f"No ease {ease!r}: {', '.join(_EASES)}, or a Bézier [x1, y1, x2, y2]")
     return _EASES[str(ease)]
 
 
@@ -550,19 +552,32 @@ def curve_factory(nodes: dict[str, Any], curves: dict[str, Callable[[float], Any
             }[how]
             made = lambda seconds: mapping(source(seconds))  # noqa: E731
         elif op == "curve.beats":
-            times = list(beats or [])[:: max(int(node.get("every", 1) or 1), 1)]
-            attack, decay = float(node.get("attack", 0.02)), float(node.get("decay", 0.2))
-            low, high = float(node.get("low", 0.0)), float(node.get("high", 1.0))
+            # When a pulse happens is the beat's; how the value reacts is the envelope's. An ease maps 0 to 0
+            # and 1 to 1, so changing it reshapes the pulse and never moves its peak off the beat (CT-0074).
+            beat = lambda key: semantic_default("curve.beats", key) if node.get(key) is None else node[key]  # noqa: E731
+            # A frame reads its curves at its centre, so a beat's peak is placed at the centre of the frame
+            # it falls in: that frame shows the full pulse, whatever the eases -- a sharp envelope never lets
+            # the frame before it come out higher and move the hit off its frame.
+            times = [(math.floor(at * fps + 1e-9) + 0.5) / fps
+                     for at in list(beats or [])[:: max(int(beat("every") or 1), 1)]]
+            attack, decay = max(float(beat("attack")), 0.0), max(float(beat("decay")), 0.0)
+            low, high = float(beat("low")), float(beat("high"))
+            rise, fall = ease_of(beat("attack_ease")), ease_of(beat("decay_ease"))
+            adding = beat("overlap") == "add"
 
-            def made(seconds: float) -> float:
+            def made(seconds: float, times=times, attack=attack, decay=decay, low=low, high=high, rise=rise,
+                     fall=fall, adding=adding) -> float:
                 level = 0.0
-                for beat in times:
-                    d = seconds - beat
-                    if -attack < d < 0:
-                        level = max(level, 1 + d / attack)
-                    elif 0 <= d < decay:
-                        level = max(level, 1 - d / decay)
-                return low + (high - low) * level
+                for at in times:
+                    d = seconds - at
+                    if d == 0 or (-attack < d < 0):
+                        pulse = 1.0 if d == 0 else rise(1 + d / attack)
+                    elif 0 < d < decay:
+                        pulse = 1.0 - fall(d / decay)
+                    else:
+                        continue
+                    level = level + pulse if adding else max(level, pulse)
+                return low + (high - low) * min(level, 1.0)
         elif op == "curve.from_track":
             track, field = tracks(node["track"]), node["field"]
 

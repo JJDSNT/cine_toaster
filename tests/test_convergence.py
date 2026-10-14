@@ -36,6 +36,14 @@ class DecisionTests(unittest.TestCase):
                 for key in ("perspective", "light", "detail", "supersample"):
                     self.assertIsNone(re.search(rf'p(aram)?\("{key}",\s*[0-9]', text), key)
 
+    def test_the_eases_are_one_vocabulary(self) -> None:
+        """What an ease may be is decided once (CT-0074): the reference's eases are exactly the names the
+        validator accepts, and the beat curve's envelope has no defaults of its own."""
+
+        self.assertEqual(tuple(reference._EASES), semantics.EASE_NAMES)
+        text = (SOURCE / "compositing" / "reference.py").read_text()
+        self.assertIsNone(re.search(r'node\.get\("(attack|decay)",\s*[0-9]', text))
+
     def test_the_reference_reads_a_default_from_semantics(self) -> None:
         options = {"frames": 1, "size": (64, 36), "fps": 12}
         before = reference.evaluate(SURFACE, {"a": picture()}, **options)

@@ -59,7 +59,9 @@ nodes), one place for each decision (defaults, fitting to the frame,
 showing a frame), cards and transition previews drawn by the graph, a still
 as the graph at an instant (`toast still`), and the quick build (`toast
 build`) removed. What still draws outside the graph has an owner step (C5,
-C6, C10). C3 (animation) is started and resumes next.
+C6, C10). C3 (animation) is done (CT-0074): eases are one vocabulary,
+a beat's instant is kept apart from how a parameter reacts, and the music
+piece's plume pulses on every beat. Next: C4, layers.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional

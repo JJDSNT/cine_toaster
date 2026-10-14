@@ -29,7 +29,14 @@ DEFAULTS: dict[str, dict[str, Any]] = {
     "filter.blur": {"radius": 0.0, "kind": "gaussian"},
     "generate.gradient": {"kind": "linear", "colours": [[0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0, 1.0]], "angle": 0.0},
     "generate.source": {"colorspace": "sRGB Encoded Rec.709 (sRGB)", "alpha": "straight", "start": 0.0},
+    # A pulse per beat: rising over `attack` before it, falling over `decay` after it, each with its ease;
+    # pulses that meet keep the higher (`max`) or add up to a full one (`add`) (C3, CT-0074).
+    "curve.beats": {"attack": 0.02, "decay": 0.2, "every": 1, "low": 0.0, "high": 1.0,
+                    "attack_ease": "linear", "decay_ease": "linear", "overlap": "max"},
 }
+
+#: The named eases (SPEC-0012 §6); any other ease is a cubic Bezier given as [x1, y1, x2, y2].
+EASE_NAMES = ("linear", "in", "out", "in-out", "hold")
 
 #: The smallest spread a threshold's edge has: a hard edge is still one level wide, never a division by zero.
 SOFTNESS_FLOOR = 0.002
@@ -37,6 +44,20 @@ SOFTNESS_FLOOR = 0.002
 
 def default(op: str, key: str, fallback: Any = None) -> Any:
     return DEFAULTS.get(op, {}).get(key, fallback)
+
+
+def ease_problem(ease: Any) -> str | None:
+    """Why ``ease`` is not an ease, or None: a name, or a Bezier's four numbers with its times within 0..1."""
+
+    if isinstance(ease, (list, tuple)):
+        if len(ease) != 4 or not all(isinstance(value, (int, float)) for value in ease):
+            return f"a Bezier ease is four numbers (x1, y1, x2, y2), not {list(ease)!r}"
+        if not (0 <= ease[0] <= 1 and 0 <= ease[2] <= 1):
+            return f"a Bezier ease keeps its handles' times within 0 and 1, not {ease[0]} and {ease[2]}"
+        return None
+    if str(ease) not in EASE_NAMES:
+        return f"no ease {ease!r}: {', '.join(EASE_NAMES)}, or a Bezier [x1, y1, x2, y2]"
+    return None
 
 
 def threshold_spread(softness: Any) -> float:

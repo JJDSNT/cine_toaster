@@ -176,15 +176,20 @@ and the quick build (`toast build`) removed.
 - Limits: frame-by-frame FFmpeg is slow for long composites; acceptable for
   the reference; the GL renderer of C5 and C9b is the fast path.
 
-### C3. Animate: parameters over time
+### ~~C3. Animate: parameters over time~~
+
+Done (`CT-0074`): one ease vocabulary (named or Bézier) for keys, maps and
+envelopes, checked before rendering; `curve.beats` with eased attack and
+decay and an explicit overlap rule; a beat's peak on the frame it falls in,
+whatever the ease; the plume of the music piece pulses on all nine beats of
+its shot, drawn by GL in agreement with the reference.
+
 
 - What: keyframes with easing for any primitive's parameter; values driven by
   the music's beats (CT-0067) and later by tracks.
 - Done when: a warp's scale pulses on every beat of the music piece, written
   in the breakdown.
 - Limits: bars (D1b in `roadmap.md`) are needed for "on every bar".
-- Started (`c1facca`): Bézier eases, unknown eases refused, a beat pulse in
-  shot 12 of the music piece; paused for CT-0072, resumed after it.
 
 ### C4. Layers: the ADO move and the keyers
 

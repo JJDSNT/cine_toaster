@@ -44,6 +44,8 @@ is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
 CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
 
+- `CT-0074` — C3: parameters over time; eases one vocabulary, a beat's
+  instant apart from the reaction, the plume on every beat (`done`)
 - `CT-0073` — surfaces from Blender: an external UV mesh for `warp.surface`,
   evaluated and its interface documented (`proposed`)
 - `CT-0072` — the post-C2 convergence audit: one GL pipeline, one place for
