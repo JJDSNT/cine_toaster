@@ -6,16 +6,16 @@ what the person who watched it said. The pieces are not in the repository:
 their footage is fetched, and the files live with their productions. The
 work records named here hold the detail.
 
-| Date | Piece | Length | Where it is |
-|---|---|---|---|
-| 2026-10-14 | Matte prototype | 9 s | `trials/matte-prototype-v1.mp4` |
-| 2026-10-14 | Heat, organic trial | 42 s | `trials/organic-trial-v1.mp4` |
-| 2026-10-14 | Orbit, music piece v2 | 41 s | `trials/music-piece-v2.mp4` |
-| 2026-10-13 | Footage trial | 19 s | `trials/footage-trial-v1.mp4` |
-| 2026-10-13 | The old reel's cards | 26 s | `trials/reel-cards-v1.mp4` |
+| Date | Piece | Length | File | Published |
+|---|---|---|---|---|
+| 2026-10-14 | Matte prototype | 9 s | `trials/matte-prototype-v1.mp4` | not yet |
+| 2026-10-14 | Heat, organic trial | 42 s | `trials/organic-trial-v1.mp4` | [YouTube](https://youtu.be/rI94S8FVFfQ) |
+| 2026-10-14 | Orbit, music piece v2 | 41 s | `trials/music-piece-v2.mp4` | [YouTube](https://youtu.be/xm74luJSxqw) |
+| 2026-10-13 | Footage trial | 19 s | `trials/footage-trial-v1.mp4` | [YouTube](https://youtu.be/4qRcbSUQfV4) |
+| 2026-10-13 | The old reel's cards | 26 s | `trials/reel-cards-v1.mp4` | no |
 
 `trials/` is `~/cine-toaster-references/trials/` on the machine they were made
-on. Public links are added here when the pieces are published.
+on. A link is added when a piece is published.
 
 ## 2026-10-14 · Orbit, lengths in beats (music piece v3)
 
