@@ -66,7 +66,69 @@ The user's direction (2026-10-14):
 5. **Layers (D4) are built on the same primitives**: a layer is a picture,
    a warp (its place, size and perspective over time) and a matte.
 
+## Amendment: the primitives the first list missed (2026-10-14)
+
+Asked to check whether a primitive had been left out, the list was read
+against what a compositing engine (Nuke, Fusion, an OFX host, the Toaster and
+the ADO) cannot do without. Four were missing that everything else depends
+on, and two of the four named ones are a level above the rest.
+
+**Signals, of which luma is one.** Brightness is one channel a picture
+carries; the same role is played by its alpha, each colour channel, hue and
+saturation, and by channels other tools produce: depth (a Blender Z pass, or
+a depth model run on a generated picture), motion vectors, normals, a
+segmentation. A luma key and a depth key are the same operation on different
+signals. *Signal* is the primitive; luma is its most used instance.
+
+**Merge.** A matte says how much of a layer is seen; merge says how two
+layers combine -- over, under, in, out, atop (Porter-Duff) and the blend
+modes (screen, add, multiply, overlay, difference). Without it a matte does
+nothing. The overlay of SPEC-0011 and every VFX element already merge,
+each its own way.
+
+**Colour.** A function of each pixel's colour: a LUT, curves, levels, a hue
+shift, posterise, solarise, colour cycling -- the Toaster's ChromaFX. The
+looks (OCIO, LUTs) already do part of it.
+
+**Filter.** A function of a pixel's neighbourhood: blur, sharpen, glow,
+defocus, edges (the ChromaFX "line art" mode), erode and dilate (which also
+grow and shrink a matte).
+
+**Time.** A picture at another moment: retime, speed ramp, freeze, reverse,
+frame blending, an offset between layers, and feedback -- trails and echoes,
+the ADO's Infinity. Nothing in Cine Toaster operates on time today except the
+cut.
+
+**Generate.** A picture made from parameters, not read: solid, gradient,
+noise, shapes, text (the character generator), particles, a render. Most
+mattes are generated.
+
+Two more are not operations on pixels but feed every operation:
+
+**Track.** Where something is in each frame (a point, a plane, the camera),
+measured from the picture. A window replaced by a matte follows the window
+because a track drives the matte's warp.
+
+**Animate.** Every parameter of every primitive may change over time:
+keyframes with easing, and values driven by other data -- a track, or the
+music's beats (CT-0067), which makes a cut-to-the-beat pulse a parameter like
+any other.
+
+And two of the first four are **families built from primitives**, not
+primitives themselves: a **wipe** is a merge of two pictures through a matte
+whose coverage is driven by the join's progress; a **warp wipe** is that,
+with a warp on each picture driven by the same progress. **Warp** and
+**matte** stay primitives. A matte's own operations (invert, combine as
+union, intersection or difference, grow, shrink, feather) are filters and
+merges applied to a matte, not new primitives.
+
+The primitives, then: **signal, matte, merge, warp, colour, filter, time,
+generate**, fed by **track** and **animate**. Transitions, effects, keys,
+titles and layers are compositions of them, and the catalogs are recipes.
+
 ## Consequences
+
+- The order of work this implies is `development/compositing-roadmap.md`.
 
 - SPEC-0011's matte and luma become the first implementation of two
   primitives. `mattes.py` is their FFmpeg form; the `luma` shader its GL form.

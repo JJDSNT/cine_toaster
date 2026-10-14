@@ -67,6 +67,13 @@ the organic trial: what matters is matte support and layers (2026-10-14).
   does not run. The specification says checks; amend it or add a cached probe.
 - A per-join `softness` for a glsl item (the shader has its own edge).
 
+# Where the plan went (2026-10-14)
+
+The remaining work of this line is ordered in
+`development/compositing-roadmap.md` (C1-C10), built on ADR 0022's
+primitives: signal, matte, merge, warp, colour, filter, time, generate,
+fed by track and animate.
+
 # Decisions
 
 - **Two places for a picture**: the item (a shader with its texture) and the

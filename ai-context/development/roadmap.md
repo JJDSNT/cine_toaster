@@ -264,100 +264,22 @@ solvable, to be closed later as **D1b**:
   joins off the beat" (placing joins by beat makes each independent).
 
 **D2. ~~A production says its frame.~~** Done (`CT-0068`); a scene's own
-frame and `toast build` are left in D7.
+frame and `toast build` are left in C10 of the compositing roadmap.
 - What: size and rate declared once in `project.yaml`; every version is
   made in it, whatever its first take is. Footage is fetched to fit when no
   height is given.
 - Done when: a scene opening on a 4K take and one opening on a card give
   versions of the same declared size.
 
-**D3. A transition can take a matte and an overlay.** In progress
-(`CT-0069`, `SPEC-0011`): catalog inputs, `matte-wipe`, `luma`,
-`displacement`, still and moving mattes and overlays in the assembly are
-done. Left: the preview in the Transitions room, a moving texture for a
-shader, generated mattes from the VFX catalog (the user called this only
-a test: matte support and layers are what matter).
-- What: the transition contract gains two inputs: a matte (a still or a
-  moving picture whose brightness decides where and when the incoming
-  picture appears) and an overlay with alpha that rides the join. Both
-  renderers (shader, FFmpeg stand-in), the browser preview, the catalog
-  manifest, and `luma` and `displacement` back in the catalog.
-- The matte may be a file, or **an effect of the VFX catalog rendered for the
-  length of the join** (the user's idea, 2026-10-14): fog, smoke, fire,
-  liquid, sparks, lightning shaping the join and, as the overlay, seen on it.
-- Evidence it works (2026-10-14, a prototype outside the tool): the
-  catalog's `liquid-splash`, rendered alone over black at 640x360 in 163 s,
-  enlarged and used as the alpha of the incoming picture with FFmpeg, plus
-  a ramp that completes the join. A drop carrying the next picture falls,
-  splashes and floods the frame while both pictures play
-  (`~/cine-toaster-references/trials/matte-prototype-v1.mp4`).
-- Found on the way: `fog` rendered alone is a faint regular diagonal weave,
-  not mist, and no use as a matte; `fire-over` and `smoke-over` need a
-  stock element, and the catalog ships none; a Blender-made effect takes
-  minutes, so a matte is rendered once and cached, small, then enlarged.
-- A specification first: it changes a contract three renderers share.
-- Done when: two playing pictures are joined through a moving matte from
-  the catalog, the same in the preview and in the version.
-- Closes: organic wipes; a graphic riding the join.
+**D3. A transition can take a matte and an overlay.** Done in its first
+part (`CT-0069`, `SPEC-0011`). What it left, and everything that was D3b to
+D7 -- the compositing primitives (ADR 0022), layers and the ADO move, the
+warp wipe, the catalogs rebuilt on primitives, time and tracking, signals
+from models and from 3D, real time and streams, and the loose ends -- is now
+**`development/compositing-roadmap.md`, steps C1 to C10**, with what each is
+done by and the limits known in advance.
 
-**D3b. Compositing primitives** (ADR 0022, proposed by the user's direction,
-2026-10-14). Luma, matte, warp and wipe are primitives defined once and
-implemented by each renderer (FFmpeg, GL, Blender, later ComfyUI); effects,
-transitions and layers are compositions of them.
-- A specification of the four: their parameters, identity, and what each
-  renderer provides.
-- The transition catalog filed by family -- wipes (geometric, luma, custom),
-  warps, warp wipes, dissolves -- instead of free categories.
-- VFX items that are only a primitive (a colour key, a luma key) moved out of
-  the VFX catalog; element effects re-expressed as layers with a matte.
-- A warp wipe: the picture deformed while the next is revealed.
-- Done when: a luma key, a luma matte on a layer and a luma wipe share one
-  implementation of luma, and the catalogs contain no operation twice.
-
-**D4. Layers: a picture over another, moved while it plays.**
-- Built on D3b: a layer is a picture, a warp (place, size, perspective over
-  time) and a matte.
-- What: a shot may hold more than one picture. A layer has a source, a place,
-  a size, a rotation in three axes with perspective, and keyframes with an
-  eased path between them: the ADO's move, held as long as wanted, not only
-  across a join. Then borders, a drop shadow, trails.
-- A keyer on a layer: by luminance or colour, the key travelling with the
-  picture as it moves.
-- A specification first: what is over what, and why, is a Project Core
-  concept.
-- Done when: a playing picture is flown into a corner over another, held,
-  and flown out; and a person is keyed over a background.
-
-**D5. Measure video and streams.** A spike that answers, by running:
-- how many pictures can be composed at once, at what size and rate;
-- whether a transition, an effect and a layer run in real time on this
-  machine's GPU (today a join is rendered through pipes, offline);
-- whether a stream (camera, screen, RTSP, HLS, NDI) can be a source, and with
-  what delay;
-- whether anything can be switched while it plays.
-Live transmission is not what Cine Toaster is for, and nothing prevents
-supporting it: this point measures; what to build follows from the numbers.
-
-**D6. The catalogs brought up to the pieces.**
-- Transitions: a sheet for each positional and organic shader worth using
-  (6 of 117 have one; `undulating-burn-out` is not what its name says);
-  Toaster-style shaders written from observation (`CT-0028`).
-- Titles: a horizontal crawl, a drop shadow, colours taken from the
-  production's look.
-- Effects: posterise, solarise, colour cycling.
-
-**D7. Loose ends in what exists.**
-- `toast check` reports a first shot's `transition` that nothing renders.
-- `toast footage fetch` as a job (progress, cancel); a changed declaration
-  replaces the take it made.
-- `toast footage fetch` takes only the first audio track of a file.
-- `toast build` draws at a fixed size and ignores the production's frame.
-- A scene cannot set a frame of its own (a vertical insert in a wide film).
-- `toast build`: removed, or made the assembly of a whole production.
-- `rig`, `remotion`, `hyperframes`: a renderer each, or out of the
-  vocabulary; `toast doctor` reports what is kept.
-
-**D8. The music piece, finished.** With D1-D4 and D6: joins written in
+**D8. The music piece, finished.** After C5 of the compositing roadmap: joins written in
 beats, organic joins through mattes, a picture flown over another; better
 pictures than the Mars square. In the repository as the fourth demo
 (`docs/production-validation.md`), its footage fetched, not checked in.
@@ -367,9 +289,8 @@ voices) and the music piece as its second. Nothing of the previous reel is
 kept; `examples/amiga-demo-reel` is a placeholder until this replaces it. The
 script goes to the user before it is built.
 
-Order: D1 and D2 are small and unblock D8. D3 is next because the user asked
-for organic joins; D4 follows it. D5 can run beside any of them. D6 and D7
-are taken in the gaps.
+Order: D1b (bars) when a piece needs bars; the compositing roadmap C1-C10
+in its own order; then D8 and D9.
 
 ### Later
 

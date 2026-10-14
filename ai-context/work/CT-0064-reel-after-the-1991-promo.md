@@ -347,6 +347,13 @@ In order. Each numbered step that changes code gets its own record.
 Steps 3-7 do not depend on each other except 4 on 3. Step 2 can start as soon
 as 1 is done, so there is a true reel before the Toaster-class work.
 
+# Where the plan went (2026-10-14)
+
+The remaining work of this line is ordered in
+`development/compositing-roadmap.md` (C1-C10), built on ADR 0022's
+primitives: signal, matte, merge, warp, colour, filter, time, generate,
+fed by track and animate.
+
 # Decisions
 
 - **The tape is a model of structure, not a source.** No NewTek footage,
