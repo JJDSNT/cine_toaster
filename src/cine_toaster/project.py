@@ -342,6 +342,12 @@ def _transition(raw: dict[str, Any]) -> dict[str, Any] | None:
     if value.get("beats") is not None:
         # Its length in beats of the scene's music (CT-0067); turned into milliseconds when the beats are known.
         reference["beats"] = value.get("beats")
+    # Pictures the join gives the transition, over the item's own (SPEC-0011).
+    for key in ("matte", "overlay", "blend"):
+        if value.get(key):
+            reference[key] = _text(value.get(key))
+    if value.get("softness") is not None:
+        reference["softness"] = value.get("softness")
     return reference
 
 
@@ -942,7 +948,10 @@ def _scene_enter(document: dict[str, Any], scene_id: str, root: Path) -> tuple[d
         split = 0.0
     enter = {"type": cut_type, "reason": str(raw.get("reason") or ""),
              "transition": {"id": str(transition["id"]), "duration_ms": transition.get("duration_ms"),
-                            "reason": str(transition.get("reason") or "")} if transition.get("id") else None,
+                            "reason": str(transition.get("reason") or ""),
+                            # A join between scenes may be shaped by a matte too (SPEC-0011).
+                            **{key: transition[key] for key in ("matte", "overlay", "blend", "softness")
+                               if transition.get(key) is not None}} if transition.get("id") else None,
              **({"split": split} if split else {})}
     return enter, findings
 
@@ -970,6 +979,24 @@ def _check_transitions(
     except Exception:
         return []
     findings: list[Finding] = []
+    # The pictures a join gives its transition must be in the production (SPEC-0011).
+    scene_root = root.expanduser().resolve()
+    for shot in shots:
+        reference = shot.get("transition") or {}
+        for key in ("matte", "overlay"):
+            name = reference.get(key)
+            if not name:
+                continue
+            path = (scene_root / name).resolve()
+            if not path.is_relative_to(scene_root):
+                findings.append(Finding(code="transition_input_outside", severity="error", scene_id=scene_id,
+                                        shots=(shot["id"],),
+                                        message=f"{shot['id']}: its transition's {key} {name} is outside the production."))
+            elif not path.is_file():
+                findings.append(Finding(code="transition_input_missing", severity="error", scene_id=scene_id,
+                                        shots=(shot["id"],),
+                                        message=f"{shot['id']}: its transition's {key} {name} is not there; the join "
+                                                "would be made without it."))
     for transition_id, shot_id in sorted(referenced.items()):
         if transition_id in available:
             continue

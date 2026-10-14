@@ -1,0 +1,21 @@
+schema_version = 1
+id = "luma"
+name = "Luma"
+kind = "glsl"
+upstream = "gl-transitions:luma"
+category = "wipe"
+description = "The incoming shot appears in the order a picture's brightness gives: here from the centre out."
+guidance = "A wipe whose shape is a picture. Give the join its own matte to change the shape; this item's is a radial order."
+energy = "medium"
+motion = "outward"
+duration_ms = 1200
+tags = ["matte", "wipe", "iris"]
+use_when = ["A wipe should have a shape no formula draws", "The production has a matte of its own"]
+avoid_when = ["A join that should not be noticed"]
+# SPEC-0011: each sampler2D the shader declares names an input. radial.png is ours (CC0), generated.
+[inputs]
+luma = "radial.png"
+
+[render]
+ffmpeg = "matte"
+ffmpeg_note = "Without GL, the same order is drawn by the matte renderer from the same texture."

@@ -1,0 +1,21 @@
+schema_version = 1
+id = "displacement"
+name = "Displacement"
+kind = "glsl"
+upstream = "gl-transitions:displacement"
+category = "warp"
+description = "The outgoing picture bends away along a map and the incoming one bends into place."
+guidance = "Liquid, heat haze, a picture going soft and returning; the map decides the bending."
+energy = "medium"
+motion = "warp"
+duration_ms = 1200
+tags = ["warp", "liquid", "map"]
+use_when = ["A dissolve should feel physical", "Water, heat, a dream"]
+avoid_when = ["Hard graphic punctuation"]
+# SPEC-0011: noise.png is ours (CC0), generated: smooth noise, so the picture bends rather than breaks.
+[inputs]
+displacementMap = "noise.png"
+
+[render]
+ffmpeg = "dissolve"
+ffmpeg_note = "A dissolve stands in; the bending needs the shader."

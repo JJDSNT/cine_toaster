@@ -63,19 +63,22 @@ def _default(kind: str, raw: str, name: str) -> list[float] | float | bool | int
     return values[0] if count == 1 else values
 
 
-def shader_params(source: str) -> list[dict[str, Any]]:
+def shader_params(source: str, inputs: Any = ()) -> list[dict[str, Any]]:
     """The parameters a gl-transitions shader declares, with their defaults.
 
     The convention is `uniform float count; // = 10.0`. A uniform without a
-    default cannot be rendered honestly, and a texture is an input neither the
-    preview nor the build supplies, so both are refused.
+    default cannot be rendered honestly, and is refused. A texture
+    (`sampler2D`) is an input: allowed when the item names a picture for it in
+    ``inputs`` (SPEC-0011), refused otherwise.
     """
 
     params = []
     for match in _UNIFORM.finditer(source):
         kind, name = match[1], match[2]
-        if name in _PROVIDED:
+        if name in _PROVIDED or (kind == "sampler2D" and name in inputs):
             continue
+        if kind == "sampler2D":
+            raise UnsupportedShader(f"Uniform {name} is a texture, and the item names no picture for it")
         if kind not in _COMPONENTS:
             raise UnsupportedShader(f"Uniform {name} is a {kind}, which no renderer supplies")
         raw = match[3] or match[4]
@@ -134,6 +137,8 @@ def _upstream_catalog(root: Path) -> tuple[dict[str, Any], ...]:
                 "webm_role": "preview",
                 "render": {},
                 "params": params,
+                "inputs": {},
+                "softness": 0.0,
                 "curated": False,
                 "upstream": f"{UPSTREAM_NAME}:{path.stem}",
                 "origin": UPSTREAM_NAME,
@@ -198,18 +203,25 @@ def _load_manifest(path: Path, origin: str) -> dict[str, Any]:
 
     transition_id = str(document["id"])
     kind = str(document["kind"])
-    if kind not in {"glsl", "webm"}:
+    if kind not in {"glsl", "webm", "matte"}:
         raise TransitionFormatError(f"Unsupported transition kind {kind!r} in {path}")
 
     if upstream:
         asset_path = _upstream_shader(upstream)
         asset_name = asset_path.name
         header = {key.lower(): value for key, value in _HEADER.findall(asset_path.read_text(encoding="utf-8"))}
+    elif kind == "matte" and not document.get("asset"):
+        # A matte item draws with the host's own matte renderer; it has no shader (SPEC-0011).
+        asset_name, asset_path, header = "", None, {}
     else:
         asset_name = str(document.get("asset", ""))
         asset_path = _safe_asset(path.parent, asset_name)
         header = {}
-    params = shader_params(asset_path.read_text(encoding="utf-8")) if kind == "glsl" else []
+    # Pictures the item gives its renderer: a matte, an overlay, a shader's textures (SPEC-0011).
+    declared = document.get("inputs") or {}
+    inputs = {name: _safe_asset(path.parent, str(value)) for name, value in declared.items() if isinstance(value, str)}
+    softness = float(declared.get("softness", 0.0) or 0.0) if isinstance(declared, dict) else 0.0
+    params = shader_params(asset_path.read_text(encoding="utf-8"), inputs) if kind == "glsl" else []
     preview_name = str(document.get("preview", ""))
     preview_path = _safe_asset(path.parent, preview_name) if preview_name else None
 
@@ -235,6 +247,8 @@ def _load_manifest(path: Path, origin: str) -> dict[str, Any]:
         # declared by the item rather than inferred by a renderer.
         "render": dict(document.get("render", {})),
         "params": params,
+        "inputs": inputs,
+        "softness": softness,
         "curated": True,
         "upstream": upstream or None,
         "origin": origin,
@@ -273,7 +287,8 @@ def list_transitions(project_root: Path | None = None) -> list[dict[str, Any]]:
 def public_transition(transition: dict[str, Any]) -> dict[str, Any]:
     value = {key: item for key, item in transition.items() if not key.endswith("_path")}
     transition_id = transition["id"]
-    value["asset_url"] = f"/transition-assets/{transition_id}/{transition['asset']}"
+    value["inputs"] = {name: path.name for name, path in (transition.get("inputs") or {}).items()}
+    value["asset_url"] = f"/transition-assets/{transition_id}/{transition['asset']}" if transition["asset"] else None
     if transition["preview"]:
         value["preview_url"] = f"/transition-assets/{transition_id}/{transition['preview']}"
     elif transition["kind"] == "webm":
@@ -291,8 +306,8 @@ def transition_asset_path(
     for transition in list_transitions(project_root):
         if transition["id"] != transition_id:
             continue
-        for key in ("asset_path", "preview_path"):
-            path = transition.get(key)
+        for path in [transition.get("asset_path"), transition.get("preview_path"),
+                     *(transition.get("inputs") or {}).values()]:
             if path is not None and path.name == filename:
                 return path
     return None

@@ -271,7 +271,12 @@ frame and `toast build` are left in D7.
 - Done when: a scene opening on a 4K take and one opening on a card give
   versions of the same declared size.
 
-**D3. A transition can take a matte and an overlay.**
+**D3. A transition can take a matte and an overlay.** In progress
+(`CT-0069`, `SPEC-0011`): catalog inputs, `matte-wipe`, `luma`,
+`displacement`, still and moving mattes and overlays in the assembly are
+done. Left: the preview in the Transitions room, a moving texture for a
+shader, generated mattes from the VFX catalog (the user called this only
+a test: matte support and layers are what matter).
 - What: the transition contract gains two inputs: a matte (a still or a
   moving picture whose brightness decides where and when the incoming
   picture appears) and an overlay with alpha that rides the join. Both
@@ -295,7 +300,23 @@ frame and `toast build` are left in D7.
   the catalog, the same in the preview and in the version.
 - Closes: organic wipes; a graphic riding the join.
 
+**D3b. Compositing primitives** (ADR 0022, proposed by the user's direction,
+2026-10-14). Luma, matte, warp and wipe are primitives defined once and
+implemented by each renderer (FFmpeg, GL, Blender, later ComfyUI); effects,
+transitions and layers are compositions of them.
+- A specification of the four: their parameters, identity, and what each
+  renderer provides.
+- The transition catalog filed by family -- wipes (geometric, luma, custom),
+  warps, warp wipes, dissolves -- instead of free categories.
+- VFX items that are only a primitive (a colour key, a luma key) moved out of
+  the VFX catalog; element effects re-expressed as layers with a matte.
+- A warp wipe: the picture deformed while the next is revealed.
+- Done when: a luma key, a luma matte on a layer and a luma wipe share one
+  implementation of luma, and the catalogs contain no operation twice.
+
 **D4. Layers: a picture over another, moved while it plays.**
+- Built on D3b: a layer is a picture, a warp (place, size, perspective over
+  time) and a matte.
 - What: a shot may hold more than one picture. A layer has a source, a place,
   a size, a rotation in three axes with perspective, and keyframes with an
   eased path between them: the ADO's move, held as long as wanted, not only

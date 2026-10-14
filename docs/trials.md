@@ -8,6 +8,7 @@ work records named here hold the detail.
 
 | Date | Piece | Length | File | Published |
 |---|---|---|---|---|
+| 2026-10-14 | Heat v2, joins through mattes | 42 s | `trials/organic-trial-v2.mp4` | not yet |
 | 2026-10-14 | Matte prototype | 9 s | `trials/matte-prototype-v1.mp4` | not yet |
 | 2026-10-14 | Heat, organic trial | 42 s | `trials/organic-trial-v1.mp4` | [YouTube](https://youtu.be/rI94S8FVFfQ) |
 | 2026-10-14 | Orbit, music piece v2 | 41 s | `trials/music-piece-v2.mp4` | [YouTube](https://youtu.be/xm74luJSxqw) |
@@ -16,6 +17,20 @@ work records named here hold the detail.
 
 `trials/` is `~/cine-toaster-references/trials/` on the machine they were made
 on. A link is added when a piece is published.
+
+## 2026-10-14 · Heat v2: joins shaped by a picture
+
+The organic trial assembled again by the tool, now able to take a matte
+(SPEC-0011, CT-0069). The join into the engine's vapour goes through a splash
+of water: the moving matte is the shape, and both pictures keep playing
+through it. The join into the Sun goes through `luma`: the Sun opens from its
+centre outward over the test stand.
+
+- Tool: the whole join, matte included. By hand: the splash itself, rendered
+  from the VFX catalog and cropped into a matte file of the production.
+- The version said what it did: the matte was retimed to the join, did not
+  start black (the falling drop already carries the next picture) and was
+  completed to white.
 
 ## 2026-10-14 · Orbit in its declared frame (music piece v4)
 

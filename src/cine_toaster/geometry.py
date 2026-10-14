@@ -63,6 +63,8 @@ CHECK_CODES = frozenset(
         "subject_path_crosses_axis",
         "subjects_overlap",
         "transition_reason_missing",
+        "transition_input_missing",
+        "transition_input_outside",
         "transition_unknown",
         "unknown_camera",
         "unknown_mark",

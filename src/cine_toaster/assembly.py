@@ -471,8 +471,30 @@ def _resolve_join(root: Path, plan: Plan, cut: dict[str, Any], segment: Segment,
         seconds = float(reference.get("duration_ms") or (item or {}).get("duration_ms") or 1000) / 1000.0
         room = 0.5 * min(previous.end - previous.start, segment.end - segment.start)
         mode = ((item or {}).get("render") or {}).get("ffmpeg")
+        # Pictures the join gives the transition, over the item's own (SPEC-0011).
+        inputs = dict((item or {}).get("inputs") or {})
+        for key in ("matte", "overlay"):
+            if reference.get(key):
+                inputs[key] = (root / reference[key]).resolve()
+        missing = [key for key, path in inputs.items() if not Path(path).is_file()]
+        # A matte item, or a shader whose FFmpeg stand-in is the matte renderer when GL cannot run it.
+        by_matte = bool(item) and (item["kind"] == "matte" or (mode == "matte" and joins["gl"]))
+        matte = (inputs.get("matte") or inputs.get("luma")) if by_matte else None
         if item is None:
             plan.notes.append(f"{segment.shot}: the transition {reference['id']!r} is in no catalog; a straight cut.")
+        elif missing:
+            plan.notes.append(f"{segment.shot}: the transition {item['id']!r} has no {', '.join(missing)} to read; "
+                              "a straight cut in this version.")
+        elif by_matte and matte is None:
+            plan.notes.append(f"{segment.shot}: the transition {item['id']!r} is shaped by a matte and the join gives "
+                              "none (matte: on the join); a straight cut in this version.")
+        elif by_matte:
+            if seconds > room:
+                plan.notes.append(f"{segment.shot}: the transition {item['id']!r} is shortened to {room:.2f} s, half "
+                                  "the shorter of the shots it joins.")
+                seconds = room
+            segment.transition = {"id": item["id"], "seconds": round(seconds, 3), "matte": str(matte),
+                                  "softness": float(reference.get("softness", item.get("softness") or 0.0) or 0.0)}
         elif item["kind"] != "glsl" and not mode or item["kind"] == "glsl" and joins["gl"] and not mode:
             why = f"GL cannot run here ({joins['gl']})" if item["kind"] == "glsl" else "it is not a shader"
             plan.notes.append(f"{segment.shot}: the transition {item['id']!r} cannot be rendered: {why}, and it "
@@ -484,9 +506,14 @@ def _resolve_join(root: Path, plan: Plan, cut: dict[str, Any], segment: Segment,
                 seconds = room
             if item["kind"] == "glsl" and not joins["gl"]:
                 segment.transition = {"id": item["id"], "seconds": round(seconds, 3),
-                                      "shader": str(item["asset_path"]), "params": item.get("params") or []}
+                                      "shader": str(item["asset_path"]), "params": item.get("params") or [],
+                                      "textures": {name: str(path) for name, path in inputs.items()
+                                                   if name not in ("matte", "overlay")}}
             else:
                 segment.transition = {"id": item["id"], "seconds": round(seconds, 3), "mode": str(mode)}
+        if segment.transition and inputs.get("overlay"):
+            segment.transition["overlay"] = str(inputs["overlay"])
+            segment.transition["blend"] = str(reference.get("blend") or "normal")
     if segment.join in ("j", "l"):
         if segment.transition:
             plan.notes.append(f"{segment.shot}: a {segment.join.upper()}-cut with a transition: the sound "
@@ -892,12 +919,20 @@ def _join_pictures(ffmpeg: str, plan: Plan, pictures: list[Path], count: list[in
             following = plan.segments[index + 1]
             transition, frames = following.transition, overlap[index + 1]
             clip = work / f"join-{index + 1:03d}.mp4"
-            if transition.get("shader"):
+            if transition.get("matte"):
+                from .mattes import join as matte_join
+
+                matte_join(ffmpeg, picture, pictures[index + 1], count[index], frames, Path(transition["matte"]), clip,
+                           fps=fps, width=width, height=height, softness=transition.get("softness") or 0.0,
+                           run=lambda command, message="": run_process(command, message=message, span=span),
+                           notes=plan.notes, label=following.shot)
+            elif transition.get("shader"):
                 from .build import Join, _shader_join
 
                 join = Join(transition["id"], frames / fps, shader=Path(transition["shader"]),
                             params=transition.get("params") or [])
-                _shader_join(ffmpeg, picture, pictures[index + 1], count[index], frames, join, clip, width, height, fps)
+                _shader_join(ffmpeg, picture, pictures[index + 1], count[index], frames, join, clip, width, height, fps,
+                             textures={name: Path(path) for name, path in (transition.get("textures") or {}).items()})
             else:
                 tail = count[index] - frames
                 run_process([ffmpeg, "-y", "-loglevel", "error", "-i", str(picture), "-i", str(pictures[index + 1]),
@@ -907,6 +942,14 @@ def _join_pictures(ffmpeg: str, plan: Plan, pictures: list[Path], count: list[in
                              f"[a][b]xfade=transition={transition['mode']}:duration={frames / fps:.3f}:offset=0[v]",
                              "-map", "[v]", "-frames:v", str(frames), *encode, str(clip)],
                             message=f"{following.shot}: {transition['id']}", span=span)
+            if transition.get("overlay"):
+                from .mattes import lay_overlay
+
+                laid = work / f"join-{index + 1:03d}-overlay.mp4"
+                clip = lay_overlay(ffmpeg, clip, Path(transition["overlay"]), laid, frames=frames, fps=fps, width=width,
+                                   height=height, blend=transition.get("blend") or "normal",
+                                   run=lambda command, message="": run_process(command, message=message, span=span),
+                                   notes=plan.notes, label=following.shot)
             pieces.append(clip)
     listing = work / "pictures.txt"
     listing.write_text("".join(f"file '{piece.name}'\n" for piece in pieces), encoding="utf-8")

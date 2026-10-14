@@ -93,6 +93,8 @@ class Join:
     ffmpeg_mode: str | None = None
     shader: Path | None = None
     params: list[dict[str, Any]] = field(default_factory=list)
+    #: Pictures the shader reads beside the two shots (SPEC-0011), by uniform name.
+    textures: dict[str, Path] = field(default_factory=dict)
 
 
 def _ffmpeg() -> str:
@@ -209,8 +211,12 @@ def _transition_for(
         )
     milliseconds = reference.get("duration_ms") or item.get("duration_ms") or 1000
     seconds = float(milliseconds) / 1000.0
+    if item["kind"] == "matte" or (not gl and item.get("render", {}).get("ffmpeg") == "matte"):
+        raise BuildError(f"Shot {shot['id']} asks for {item['id']!r}, a join shaped by a matte; the quick build "
+                         "draws cards only. Assemble the scene to see it (toast assemble).")
     if gl and item["kind"] == "glsl":
-        return Join(item["id"], seconds, shader=item["asset_path"], params=item.get("params") or [])
+        return Join(item["id"], seconds, shader=item["asset_path"], params=item.get("params") or [],
+                    textures=dict(item.get("inputs") or {}))
     mode = (item.get("render") or {}).get("ffmpeg")
     if not mode:
         engine_hint = (
@@ -447,7 +453,8 @@ def _assemble(
             clip = work / f"join-{index + 1:03d}.mp4"
             count = overlap[index + 1]
             if join.shader:
-                _shader_join(ffmpeg, segment, segments[index + 1], frames[index], count, join, clip)
+                _shader_join(ffmpeg, segment, segments[index + 1], frames[index], count, join, clip,
+                             textures=join.textures)
             else:
                 tail = frames[index] - count
                 _run(
@@ -489,13 +496,15 @@ def _frames(ffmpeg: str, source: Path, start: int, end: int, width: int = WIDTH,
 
 def _shader_join(
     ffmpeg: str, outgoing: Path, incoming: Path, outgoing_frames: int, count: int, join: Join, clip: Path,
-    width: int = WIDTH, height: int = HEIGHT, fps: float = FPS,
+    width: int = WIDTH, height: int = HEIGHT, fps: float = FPS, textures: dict[str, Path] | None = None,
 ) -> None:
     tail = _frames(ffmpeg, outgoing, outgoing_frames - count, outgoing_frames, width, height)
     head = _frames(ffmpeg, incoming, 0, count, width, height)
     if not tail or not head:
         raise BuildError(f"No frames to run {join.transition_id} over.")
-    renderer = ShaderTransition(join.shader, join.params, width, height)
+    # A shader's textures (SPEC-0011): each picture read once, at the frame's size, oriented as the frames are.
+    pictures = {name: _frames(ffmpeg, path, 0, 1, width, height)[0] for name, path in (textures or {}).items()}
+    renderer = ShaderTransition(join.shader, join.params, width, height, textures=pictures)
     encode = ["-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-r", f"{fps:g}"]
     encoder = subprocess.Popen(
         [ffmpeg, "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",

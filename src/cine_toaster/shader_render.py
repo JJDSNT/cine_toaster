@@ -55,7 +55,7 @@ class ShaderTransition:
     """One compiled transition, rendering RGB frames of a fixed size."""
 
     def __init__(self, shader: Path, params: list[dict[str, Any]], width: int, height: int,
-                 overrides: dict[str, Any] | None = None) -> None:
+                 overrides: dict[str, Any] | None = None, textures: dict[str, bytes] | None = None) -> None:
         import moderngl
 
         self.width, self.height = width, height
@@ -96,6 +96,14 @@ class ShaderTransition:
         for texture in self.textures:
             texture.repeat_x = texture.repeat_y = False
         self.target = self.context.simple_framebuffer((width, height), components=3)
+        # Pictures the shader reads beside the two shots (SPEC-0011): bound after them, from unit 2.
+        self.inputs = []
+        for unit, (name, data) in enumerate(sorted((textures or {}).items()), 2):
+            texture = self.context.texture((width, height), 3, data)
+            texture.repeat_x = texture.repeat_y = False
+            if name in self.program:
+                self.program[name].value = unit
+            self.inputs.append((unit, texture))
 
     def render(self, outgoing: bytes, incoming: bytes, progress: float) -> bytes:
         """Frames are packed RGB, bottom row first -- GL's own orientation."""
@@ -109,6 +117,8 @@ class ShaderTransition:
         self.textures[1].write(incoming)
         self.textures[0].use(0)
         self.textures[1].use(1)
+        for unit, texture in self.inputs:
+            texture.use(unit)
         if "progress" in self.program:
             self.program["progress"].value = progress
         self.target.use()

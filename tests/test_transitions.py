@@ -100,9 +100,16 @@ class UpstreamCatalogTests(unittest.TestCase):
         for item in self.catalog.values():
             self.assertIn(item["license"], PERMISSIVE, item["id"])
 
-    def test_shaders_that_need_a_texture_are_left_out(self) -> None:
-        self.assertNotIn("luma", self.catalog)
-        self.assertNotIn("displacement", self.catalog)
+    def test_shaders_that_need_a_texture_come_only_with_one(self) -> None:
+        # The raw upstream items are left out; the reviewed ones name their picture (SPEC-0011).
+        for transition_id in ("luma", "displacement"):
+            self.assertTrue(self.catalog[transition_id]["curated"], transition_id)
+            self.assertTrue(self.catalog[transition_id]["inputs"], transition_id)
+        from cine_toaster.transitions import UnsupportedShader, shader_params
+
+        with self.assertRaises(UnsupportedShader):
+            shader_params("uniform sampler2D luma;\nvec4 transition(vec2 uv) { return vec4(0.0); }")
+        self.assertEqual(shader_params("uniform sampler2D luma;", inputs={"luma": None}), [])
 
     def test_a_curated_manifest_replaces_the_raw_shader(self) -> None:
         burn = self.catalog["film-burn"]

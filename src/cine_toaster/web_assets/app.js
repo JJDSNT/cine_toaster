@@ -1242,6 +1242,67 @@ function demoTexture(gl, variant) {
   return texture;
 }
 
+// A join shaped by a picture (SPEC-0011): the matte's brightness is the order
+// in which pixels change, spread over `softness`. The same rule as the render.
+const MATTE_SHADER = `
+  uniform sampler2D matte;
+  uniform float softness;
+  vec4 transition(vec2 uv) {
+    float s = max(softness, 0.002);
+    float p = progress * (1.0 + 2.0 * s) - s;
+    float a = clamp((p - texture2D(matte, uv).r) / (2.0 * s) + 0.5, 0.0, 1.0);
+    return mix(getFromColor(uv), getToColor(uv), a);
+  }
+`;
+
+// A matte to preview a `matte` item with, when it ships none: the join gives
+// the real one. Soft blobs, so the shape reads as something organic.
+function sampleMatte() {
+  const surface = document.createElement("canvas");
+  surface.width = 640;
+  surface.height = 360;
+  const context = surface.getContext("2d");
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, 640, 360);
+  for (const [x, y, r, shade] of [[200, 170, 210, 0], [470, 120, 150, 70], [420, 300, 170, 120], [90, 60, 120, 170]]) {
+    const blob = context.createRadialGradient(x, y, 0, x, y, r);
+    blob.addColorStop(0, `rgb(${shade},${shade},${shade})`);
+    blob.addColorStop(1, "rgba(255,255,255,0)");
+    context.fillStyle = blob;
+    context.fillRect(0, 0, 640, 360);
+  }
+  return surface;
+}
+
+function surfaceTexture(gl, surface) {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, surface);
+  return texture;
+}
+
+// The pictures an item names for its shader (SPEC-0011): a still is read
+// once; a clip is played and its current frame uploaded at every draw.
+async function inputPicture(transition, file) {
+  const url = `/transition-assets/${encodeURIComponent(transition.id)}/${encodeURIComponent(file)}`;
+  if (/\.(mp4|webm|mov)$/i.test(file)) {
+    const video = el("video");
+    Object.assign(video, { src: url, muted: true, loop: true, playsInline: true, crossOrigin: "anonymous" });
+    await video.play().catch(() => {});
+    await new Promise((resolve) => (video.readyState >= 2 ? resolve() : video.addEventListener("loadeddata", resolve, { once: true })));
+    return video;
+  }
+  const image = new Image();
+  image.src = url;
+  await image.decode();
+  return image;
+}
+
 function compileShader(gl, type, source) {
   const shader = gl.createShader(type);
   gl.shaderSource(shader, source);
@@ -1273,7 +1334,9 @@ async function startShaderPreview(canvas, transition) {
     return;
   }
   try {
-    const shaderCode = await fetch(transition.asset_url).then((response) => response.text());
+    const shaderCode = transition.kind === "matte"
+      ? MATTE_SHADER
+      : await fetch(transition.asset_url).then((response) => response.text());
     const vertexSource = `
       attribute vec2 position;
       varying vec2 vUv;
@@ -1324,6 +1387,21 @@ async function startShaderPreview(canvas, transition) {
     // The shader's own parameters, at the defaults it declares: an unset
     // uniform is zero, and many transitions do nothing at zero.
     for (const param of transition.params || []) setShaderParam(gl, program, param);
+    // Pictures beside the two shots, from unit 2: a shader's textures, or a matte item's matte.
+    const inputs = Object.entries(transition.inputs || {}).filter(([name]) => name !== "overlay");
+    const pictures = [];
+    if (transition.kind === "matte" && !inputs.some(([name]) => name === "matte")) {
+      pictures.push(["matte", sampleMatte()]);
+    }
+    for (const [name, file] of inputs) pictures.push([name, await inputPicture(transition, file)]);
+    const bound = pictures.map(([name, picture], index) => {
+      const unit = 2 + index;
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      const texture = surfaceTexture(gl, picture);
+      gl.uniform1i(gl.getUniformLocation(program, name), unit);
+      return { unit, texture, picture };
+    });
+    gl.uniform1f(gl.getUniformLocation(program, "softness"), transition.softness || 0.06);
     const progressLocation = gl.getUniformLocation(program, "progress");
     const started = performance.now();
     const duration = Math.max(250, transition.duration_ms);
@@ -1334,6 +1412,12 @@ async function startShaderPreview(canvas, transition) {
       const elapsed = (now - started) % cycle;
       const progress = Math.max(0, Math.min(1, (elapsed - 350) / duration));
       gl.viewport(0, 0, canvas.width, canvas.height);
+      for (const { unit, texture, picture } of bound) {
+        if (!(picture instanceof HTMLVideoElement)) continue;
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, picture);
+      }
       gl.uniform1f(progressLocation, progress);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       requestAnimationFrame(draw);
