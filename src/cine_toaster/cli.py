@@ -269,6 +269,50 @@ def command_take_select(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_take_add(args: argparse.Namespace) -> int:
+    from .commands import add_take
+
+    result = add_take(args.project, scene_id=args.scene, shot_id=args.shot, source=args.file,
+                      actor=_resolve_actor(args), name=args.name, kind=args.kind, origin=args.source or "",
+                      licence=args.licence or "", credit=args.credit or "")
+    if args.json:
+        print(json.dumps(result.public_dict(), ensure_ascii=False, indent=2))
+    else:
+        print(f"Added {result.event['payload']['media']} as take {result.take_id} of {result.shot_id}")
+    return 0
+
+
+def command_footage(args: argparse.Namespace) -> int:
+    """Footage declared in the breakdown: what there is, and bringing it in (CT-0066)."""
+
+    from .footage import fetch
+
+    root = args.project.expanduser().resolve()
+    production = load_production(root)
+    if args.footage_command == "list":
+        found = False
+        for scene in production["scenes"]:
+            for shot in scene["shots"]:
+                footage = shot.get("footage")
+                if not footage or (args.scene and scene["id"] != args.scene):
+                    continue
+                found = True
+                state = "fetched" if shot.get("takes") else "not fetched"
+                print(f"{scene['id']} {shot['id']:5} {state:12} {footage['in']:g} s + "
+                      f"{footage['duration'] or shot.get('duration_seconds') or 0:g} s  {footage['licence']}"
+                      f"  ({footage['credit'] or 'no credit'})\n      {footage['page'] or footage['url']}")
+        if not found:
+            print("No shot declares footage.")
+        return 0
+    results = fetch(root, production, _resolve_actor(args), scene_id=args.scene, report=print)
+    if not results:
+        print("No shot declares footage.")
+        return 0
+    for item in results:
+        print(f"  {item.status:8} {item.scene} {item.shot}  {item.detail}")
+    return 1 if any(item.status == "refused" for item in results) else 0
+
+
 def command_take_clear(args: argparse.Namespace) -> int:
     result = clear_selection(
         args.project,
@@ -1108,6 +1152,18 @@ def command_assemble_sequence(args: argparse.Namespace) -> int:
 
     from .jobs import JobManager
 
+    if getattr(args, "scenes", False):
+        # The whole sequence from its records: a new version of each scene, then of the sequence (CT-0065).
+        sequence = next((item for item in load_production(args.project)["sequences"] if item["id"] == args.sequence), None)
+        if sequence is None:
+            print(f"There is no sequence {args.sequence!r} in this production.", file=sys.stderr)
+            return 1
+        for scene_id in sequence["scene_ids"]:
+            made = command_assemble(argparse.Namespace(project=args.project, scene=scene_id, version=None,
+                                                       summary=args.summary, stems=False))
+            if made:
+                return made
+
     manager = JobManager()
     try:
         job = manager.wait(manager.submit("assemble_sequence", args.project, {
@@ -1271,42 +1327,27 @@ def command_voice(args: argparse.Namespace) -> int:
     root = args.project.expanduser().resolve()
     production = load_production(root)
 
-    pending: list[tuple[str, str, dict]] = []
-    for scene in production["scenes"]:
-        if args.scene and scene["id"] != args.scene:
-            continue
-        for shot in scene["shots"]:
-            for line in shot["lines"]:
-                target = (line.get("mix") or {}).get("file")
-                if not target:
-                    continue
-                pending.append((scene["id"], shot["id"], {**line, "target": target}))
+    from .narration import speak_lines
 
-    if not pending:
+    narrators: dict[str, PiperNarration] = {}
+
+    def speaker(voice: str) -> PiperNarration:
+        # Voices are downloaded once into the production, where the film can be remade from.
+        return narrators.setdefault(voice, PiperNarration(root / VOICES_DIRECTORY, voice))
+
+    results = speak_lines(root, production, speaker, scene_id=args.scene,
+                          default_voice=args.voice or DEFAULT_VOICE, force=args.force)
+    if not results:
         print("No lines with a mix destination. Nothing to speak.")
         return 0
-
-    narrator = PiperNarration(root / VOICES_DIRECTORY, args.voice or DEFAULT_VOICE)
-    made = 0
-    for scene_id, shot_id, line in pending:
-        destination = root / line["target"]
-        if destination.is_file() and not args.force:
-            print(f"  keep   {line['target']}  (exists; --force to remake)")
-            continue
-        if destination.suffix.lower() != ".wav":
-            print(
-                f"  refuse {line['target']}  "
-                f"offline narration writes WAV; declare a .wav file"
-            )
-            continue
-        text = line.get("en") or line.get("text") or ""
-        result = narrator.speak(text=text, output=destination)
-        made += 1
-        print(
-            f"  spoke  {scene_id} {shot_id}  {result.duration_seconds:.1f}s  "
-            f"{result.media.relative_to(root)}  [{result.model}]"
-        )
-    print(f"\n{made} line(s) spoken, {len(pending) - made} not made. Cost: $0.00, offline.")
+    for item in results:
+        if item.made:
+            print(f"  {item.status:<7}{item.scene} {item.shot}  {item.seconds:.1f}s  {item.file}  [{item.voice}]"
+                  + (f"  ({item.reason})" if item.reason else ""))
+        else:
+            print(f"  {item.status:<7}{item.file}  ({item.reason})")
+    made = sum(1 for item in results if item.made)
+    print(f"\n{made} line(s) spoken, {len(results) - made} not made. Cost: $0.00, offline.")
     return 0
 
 
@@ -1841,6 +1882,23 @@ def build_parser() -> argparse.ArgumentParser:
     select_parser.add_argument("--json", action="store_true")
     select_parser.set_defaults(function=command_take_select)
 
+    add_parser = take_actions.add_parser(
+        "add", help="Bring a recording or a still in as a take, with its source, licence and credit")
+    add_parser.add_argument("project", type=Path)
+    add_parser.add_argument("scene")
+    add_parser.add_argument("shot")
+    add_parser.add_argument("file", type=Path)
+    add_parser.add_argument("--name", help="what this take is called; needed when the shot already has one")
+    add_parser.add_argument("--kind", choices=("captured", "archival"), default="captured",
+                            help="filmed for this production, or someone else's footage (default: captured)")
+    add_parser.add_argument("--source", help="where it came from: a URL, a library, a card")
+    add_parser.add_argument("--licence", help="its licence (required for archival)")
+    add_parser.add_argument("--credit", help="who must be credited, as the licence asks")
+    add_parser.add_argument("--actor")
+    add_parser.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
+    add_parser.add_argument("--json", action="store_true")
+    add_parser.set_defaults(function=command_take_add)
+
     clear_parser = take_actions.add_parser("clear", help="Return a shot to undecided")
     clear_parser.add_argument("project", type=Path)
     clear_parser.add_argument("scene")
@@ -1853,6 +1911,18 @@ def build_parser() -> argparse.ArgumentParser:
     clear_parser.add_argument("--expect-revision", type=int)
     clear_parser.add_argument("--json", action="store_true")
     clear_parser.set_defaults(function=command_take_clear)
+
+    footage_parser = subparsers.add_parser(
+        "footage", help="Footage from outside, declared in the breakdown: list it, fetch it (CT-0066)")
+    footage_actions = footage_parser.add_subparsers(dest="footage_command", required=True)
+    for name, text in (("list", "What the shots declare, and whether it is here"),
+                       ("fetch", "Download each declared stretch and bring it in as its shot's take")):
+        action = footage_actions.add_parser(name, help=text)
+        action.add_argument("project", type=Path)
+        action.add_argument("--scene")
+        action.add_argument("--actor")
+        action.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
+        action.set_defaults(function=command_footage)
 
     check_parser = subparsers.add_parser(
         "check", help="Check scene geometry for continuity problems"
@@ -1928,6 +1998,8 @@ def build_parser() -> argparse.ArgumentParser:
     sequence_parser.add_argument("sequence")
     sequence_parser.add_argument("--version")
     sequence_parser.add_argument("--summary")
+    sequence_parser.add_argument("--scenes", action="store_true",
+                                 help="first assemble a new version of each of its scenes")
     sequence_parser.set_defaults(function=command_assemble_sequence)
 
     cast_parser = subparsers.add_parser("cast", help="Cast sheets: list them, or draft them from the scenes")

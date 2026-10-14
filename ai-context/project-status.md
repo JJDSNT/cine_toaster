@@ -5,7 +5,7 @@ type: status
 status: current
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-09-20
+updated_at: 2026-10-13
 tags:
   - status
   - tracker
@@ -14,7 +14,7 @@ tags:
 
 # Project status
 
-Last updated: 2026-10-03
+Last updated: 2026-10-13
 
 ## Current phase
 
@@ -43,6 +43,27 @@ against US$ 1.75/h assumed, so estimates run about 10% low. Stems for a DAW are 
 error. Waiting for the user: the
 4K/finishing spike's cost, what feeds the 5.1, and
 switching the working folder to ~/films/singular.
+
+The demos line (2026-10-14): the reel is on the assembly path, a still is
+a take, narration is written beside its scene in each line's voice
+(CT-0065); footage is declared on a shot and fetched as its take with
+source, licence and credit (CT-0066, `toast footage fetch`, `toast take
+add`). Order agreed: the music-driven piece first, the reel after it and
+out of it; nothing of the previous reel is kept. Next: music brought in
+with its beats as a record.
+
+Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
+Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional
+tape, as the two-act self-demo of `docs/production-validation.md`. Nothing
+is built. The reel is rendered by `toast build`, which draws text cards
+only, while titles, effects, sound and transitions over moving video live
+in the assembly; the record lists what is missing (the reel on the
+assembly path, a matte and an overlay in the transition contract, layers
+and a keyer, renderers for three declared composed engines) and the
+order. It is its own line, not ordered by SINGULAR's milestones. A probe
+on a copy of the reel showed the assembly already cuts catalog title
+cards and recordings with transitions over moving video; it refuses a
+still take, and `toast voice` has three defects.
 
 Earlier: the first canonical production write is delivered. Cine Toaster is
 no longer a read-only prototype: a human or an agent can compare registered

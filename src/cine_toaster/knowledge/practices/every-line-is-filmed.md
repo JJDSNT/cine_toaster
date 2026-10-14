@@ -3,7 +3,7 @@ id = "every-line-is-filmed"
 title = "Every line in the screenplay is covered by some shot"
 domain = "writing"
 status = "convention"
-enforced_by = ["dialogue_uncovered", "line_audio_missing"]
+enforced_by = ["dialogue_uncovered", "line_audio_missing", "line_audio_stale"]
 evidence = ["SPEC-0006"]
 +++
 
@@ -18,3 +18,8 @@ cut in the screenplay, not left uncovered.
 A line laid from its own file -- a narration, a line recorded apart and mixed
 in -- is covered only if the file is there. A missing file is a silent hole:
 the cut plays, and the line is simply not heard.
+
+The file is read beside the scene's breakdown, so a version's snapshot of the
+scene still finds it. Audio the tool spoke itself records the words and the
+voice it was given; when the line changes after that, the audio is stale: it
+still plays, saying what the breakdown no longer says.

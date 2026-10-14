@@ -145,12 +145,16 @@ def draw_card(shot: dict[str, Any], look: dict[str, Any] | None, destination: Pa
     draw = ImageDraw.Draw(image)
 
     text = shot.get("text") or {}
-    if shot.get("engine") == "solid" and not text:
+    if shot.get("engine") == "solid" and not text and not shot.get("title"):
         image.save(destination)
         return destination
 
-    headline = str(text.get("headline") or "").upper()
-    subhead = str(text.get("subhead") or "")
+    # A card named from the title catalog (CT-0065) is drawn here by its words alone: this is the quick
+    # slideshow, and the assembly is what draws the title as its item says.
+    title = shot.get("title") if isinstance(shot.get("title"), dict) else {}
+    params = title.get("params") or {}
+    headline = str(text.get("headline") or title.get("text") or "").upper()
+    subhead = str(text.get("subhead") or params.get("subtitle") or "")
     body = str(text.get("body") or "")
 
     def font(size: int):
@@ -308,7 +312,11 @@ def build(
         segments.append(segment)
         stills.append(card)
         durations.append(seconds)
-        transitions.append(_transition_for(shot, catalog, gl) if index else None)
+        entering = shot
+        if index and shot is scene["shots"][0] and not (shot.get("transition") or {}).get("id"):
+            # A scene says how it is entered (`enter`, CT-0051); its first shot joins the scene before it.
+            entering = {**shot, "transition": (scene.get("enter") or {}).get("transition")}
+        transitions.append(_transition_for(entering, catalog, gl) if index else None)
 
     step(0.8, "Cutting the shots together")
     video = work / "video.mp4"
@@ -513,7 +521,7 @@ def _shader_join(
 
 
 def _production_audio(production: dict[str, Any], root: Path) -> Path | None:
-    """The first spoken line that actually exists on disk.
+    """The first spoken line that actually exists on disk, beside its scene.
 
     Deliberately simple: a real mix is a later tier, and pretending to have one
     would hide that.
@@ -525,7 +533,8 @@ def _production_audio(production: dict[str, Any], root: Path) -> Path | None:
                 target = (line.get("mix") or {}).get("file")
                 if not target:
                     continue
-                path = root / target
+                # Beside the scene, where `toast voice` writes it and the assembly reads it (CT-0065).
+                path = root / Path(scene["file"]).parent / target
                 if path.is_file():
                     return path
     return None

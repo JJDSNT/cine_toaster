@@ -62,6 +62,20 @@ class JoinTests(unittest.TestCase):
                 self.assertGreater(self.colour(out, 0.5)[0], 200)
                 self.assertGreater(self.colour(out, 3.2)[2], 200)
 
+    def test_a_still_take_is_held_for_the_shot_and_joined_like_any_other(self) -> None:
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=blue:s=320x180",
+                        "-frames:v", "1", str(self.root / "b.png")], check=True)
+        second = Segment("P2", "B", "b.png", 0.0, 2.0, normalize=False, still=True,
+                         transition={"id": "cross-dissolve", "seconds": 0.5, "mode": "fade"})
+        plan = self.plan(second)
+        out = self.root / "cut.mp4"
+        render(self.root, plan, out, self.root / "work", run)
+        made = probe(out)
+        self.assertAlmostEqual(made["duration"], 3.5, delta=0.1)
+        self.assertEqual((made["width"], made["height"], made["fps"]), (160, 90, 24.0))  # the moving take's frame
+        self.assertGreater(self.colour(out, 0.5)[0], 200)
+        self.assertGreater(self.colour(out, 3.2)[2], 200)
+
     def shader(self) -> Path:
         from cine_toaster.transitions import list_transitions
 

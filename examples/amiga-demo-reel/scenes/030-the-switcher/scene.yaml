@@ -16,18 +16,22 @@ shots:
     duration: 4
     label: A cut that means nothing has changed but the subject.
     scanline_rate: 60
-    text:
-      headline: CUT
-      body: No transition. The plainest edit there is.
+    title:
+      id: reel-card
+      text: CUT
+      subtitle: No transition. The plainest edit there is.
+      reason: The word is the demonstration.
 
   - n: 2
     source: composed
     engine: text
     duration: 4
     label: A dissolve, for a shift that should not be noticed.
-    text:
-      headline: DISSOLVE
-      body: Invisible punctuation.
+    title:
+      id: reel-card
+      text: DISSOLVE
+      subtitle: Invisible punctuation.
+      reason: The word is the demonstration.
     transition:
       id: cross-dissolve
       duration_ms: 1200
@@ -38,9 +42,11 @@ shots:
     engine: text
     duration: 4
     label: A wipe, for a change that should be overt.
-    text:
-      headline: WIPE
-      body: Graphic punctuation, on purpose.
+    title:
+      id: reel-card
+      text: WIPE
+      subtitle: Graphic punctuation, on purpose.
+      reason: The word is the demonstration.
     transition:
       id: diamond-wipe
       duration_ms: 900

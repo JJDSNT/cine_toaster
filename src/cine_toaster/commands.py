@@ -124,6 +124,95 @@ def _locked(command):
     return locked
 
 
+#: What a take brought in from outside may be: filmed for this production, or someone else's footage.
+BROUGHT_IN_KINDS = ("captured", "archival")
+
+
+@_locked
+def add_take(
+    root: Path,
+    *,
+    scene_id: str,
+    shot_id: str,
+    source: Path,
+    actor: Actor,
+    name: str | None = None,
+    kind: str = "captured",
+    origin: str = "",
+    licence: str = "",
+    credit: str = "",
+    excerpt: dict[str, Any] | None = None,
+) -> CommandResult:
+    """Bring a recording or a still in as a take of a shot, with where it came from (CT-0065).
+
+    The file is copied beside the scene and its origin written next to it,
+    as a generated take's provenance is: footage with no record of its
+    source and licence cannot be shown, and nobody remembers it later. The
+    first take of a shot is the one in the cut; later ones are alternatives
+    to select. Nothing already there is replaced.
+    """
+
+    import hashlib
+    import json
+    import re
+    import shutil
+
+    from .takes import MEDIA_SUFFIXES, PROVENANCE_SUFFIX, shot_key, work_directory_for
+
+    root = root.expanduser().resolve()
+    source = Path(source).expanduser()
+    if not source.is_file():
+        raise ResourceNotFoundError(f"There is no file at {source}")
+    suffix = source.suffix.lower()
+    if suffix not in MEDIA_SUFFIXES:
+        raise ValidationError(f"A take is one of {', '.join(MEDIA_SUFFIXES)}; {source.name} is not")
+    if kind not in BROUGHT_IN_KINDS:
+        raise ValidationError(f"A take brought in is {' or '.join(BROUGHT_IN_KINDS)}, not {kind!r}")
+    if kind == "archival" and not (origin.strip() and licence.strip()):
+        raise ValidationError("Archival footage is someone else's: say where it is from (source) and its licence")
+
+    production, scene, shot = _locate(root, scene_id, shot_id)
+    directory = scene_directory(root, scene_id)
+    _check_writable(directory, scene_id)
+    work = work_directory_for(root / scene["file"])
+    key = shot_key(shot["id"])
+    match = re.fullmatch(r"(\d+)([a-z]*)", key)
+    stem = f"c{int(match.group(1)):02d}{match.group(2)}" if match else f"c{key}"
+    slug = re.sub(r"[^a-z0-9]+", "-", (name or "").strip().lower()).strip("-")
+    if not shot["takes"] and not slug:
+        destination = work / f"{stem}{suffix}"
+    else:
+        slug = slug or re.sub(r"[^a-z0-9]+", "-", source.stem.lower()).strip("-") or "take"
+        destination = work / "_takes" / f"{stem}-{slug}{suffix}"
+    if destination.exists():
+        raise ValidationError(f"{destination.relative_to(root)} is already there; give this take another name")
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staged = destination.with_name(destination.name + ".adding")
+    shutil.copyfile(source, staged)
+    digest = hashlib.sha256(staged.read_bytes()).hexdigest()
+    record = {"kind": kind, "source": origin.strip(), "licence": licence.strip(), "credit": credit.strip(),
+              "file": source.name, "sha256": digest, "added_at": now(), "added_by": actor.public_dict()}
+    if excerpt:
+        # The stretch of a larger file this take is (CT-0066), so it can be fetched again.
+        record["excerpt"] = dict(excerpt)
+    destination.with_name(destination.name + PROVENANCE_SUFFIX).write_text(
+        json.dumps({"origin": record}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    staged.replace(destination)
+
+    media = destination.relative_to(root).as_posix()
+    added = next((take for take in _locate(root, scene_id, shot_id)[2]["takes"] if take["media"] == media), None)
+    take_id = added["id"] if added else destination.stem
+    command_id = _new_command_id()
+    event = append_event(root, Event.create(
+        "take.added", production["id"], scene_id=scene_id, shot_id=shot_id, take_id=take_id, media=media,
+        origin=record, actor=actor.public_dict(), command_id=command_id))
+    return CommandResult(
+        command_id=command_id, type="take.added", project_id=production["id"], scene_id=scene_id, shot_id=shot_id,
+        take_id=take_id, previous_take_id=None, revision=load_scene_state(directory, scene_id).revision,
+        event=event.public_dict())
+
+
 @_locked
 def select_take(
     root: Path,

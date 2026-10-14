@@ -2,27 +2,32 @@
 
 Cine Toaster is named after NewTek's Video Toaster, whose demo reel was a
 slideshow carried by its transitions. This production is that reel: an opening
-narration, four cards, four transitions, one look.
+narration, cards, transitions chosen for a reason, one look.
 
 Every part of it runs with **no API key**. That is the point of it. A demo that
 needs a credential is a demo most people never see run.
 
 | Piece | How it is made | Status |
 |---|---|---|
-| Cards | `source: composed` — drawn from data, never generated | works today |
-| Transitions | the catalog, including this production's own `amiga-copper-bars` | works today |
-| Narration | declared, cast and placed in the mix; needs an audio tier to exist | not generated |
-| Music bed | CC0, needs the same tier to fetch and record its licence | not fetched |
+| Cards | `source: composed`, each a title from the catalog: this production's own `reel-card` (`titles/`) | works today |
+| Transitions | the catalog, including this production's own `amiga-copper-bars`; a scene's first join is its `enter` | works today |
+| Narration | declared, cast and placed in the mix; spoken offline by `toast voice` | made by `make build`, not checked in |
+| Music bed | a sound-catalog item or a fetched CC0 recording, its licence recorded | not chosen |
 
 ```bash
-toast serve .
 toast check .
-toast shots . --scene SC-030
+toast voice .                                # speaks the lines, beside their scenes
+toast assemble-sequence . the-reel --scenes  # each scene, then the reel
+toast serve .
 ```
+
+The reel is assembled like any film: each scene becomes a kept version, and
+the sequence is cut from those. `toast build` still draws a quick slideshow of
+the cards alone.
 
 ## What it demonstrates
 
-- **All four transitions**, each with the editorial reason it was chosen, so the
+- **Five transitions**, each with the editorial reason it was chosen, so the
   catalog's `use_when` can be read against the choice actually made.
 - **A project-local transition** (`amiga-copper-bars`) referenced by a shot
   rather than merely loadable — the production-owned side of the boundary in
@@ -36,15 +41,12 @@ toast shots . --scene SC-030
 - **Composed shots with dialogue**, which is how the narration is cast, timed,
   and placed in the mix.
 
-## Sound is declared, not yet made
+## The narration is made, not shipped
 
-The reel casts its narration, names the voice and places it in the mix. It does
-not ship the audio, because Cine Toaster cannot yet make it: there is no TTS and
-no sound library in the tool.
+The reel casts its narration, names the voice and places it in the mix.
+`toast voice` speaks it offline with Piper and writes it beside its scene
+(`scenes/010-cold-boot/sound/`), with a record of the words and the voice it
+was given, so a line that is rewritten is spoken again.
 
-Checking in a file the tool cannot reproduce would be worse than not having one.
-The asset would have no provenance and no way to be remade, which is exactly the
-problem the end card claims the reel does not have.
-
-Declaring it anyway is the honest production state, and it is what an audio tier
-gets built against.
+The audio is not checked in: the tool makes the same file from the same line
+on any machine, and a second copy in the repository would only drift.

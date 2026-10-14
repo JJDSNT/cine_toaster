@@ -415,6 +415,10 @@ toast shots ~/productions/the-last-signal --scene SC-030
 toast take select ~/productions/the-last-signal SC-030 SH-030-01 T02 \
       --rationale "Dread beats volume."
 toast take clear  ~/productions/the-last-signal SC-030 SH-030-01
+toast take add    ~/productions/the-last-signal SC-030 P2 launch.mp4 \
+      --kind archival --source https://images.nasa.gov/details/... \
+      --licence "Public domain" --credit NASA  # a recording or a still, with its origin
+toast footage fetch ~/productions/a-film        # the stretches of public files its shots declare
 toast check  ~/productions/the-last-signal       # continuity, exits 1 on error
 toast why    eyeline_mismatch                    # the rule behind a finding
 toast knowledge ~/productions/the-last-signal    # practices, profiles, coverage

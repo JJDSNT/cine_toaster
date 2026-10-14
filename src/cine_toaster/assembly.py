@@ -74,6 +74,11 @@ DEFAULT_SPLIT = 0.8
 SPLIT_EDGE = 0.15
 
 
+#: Takes that are one picture, not a clip; and how long one is held when the shot does not say.
+STILL_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp")
+STILL_SECONDS = 3.0
+
+
 @dataclass(slots=True)
 class Segment:
     shot: str
@@ -111,6 +116,8 @@ class Segment:
     voice_over: list[tuple[float, str]] = field(default_factory=list)
     #: A scene version's renditions, by format (a sequence's segments): the sequence's renditions use them.
     renditions: dict[str, str] = field(default_factory=dict)
+    #: The take is a still picture (a grabbed frame, a photograph): held for as long as the shot plays (CT-0065).
+    still: bool = False
     #: The join into this shot, resolved: a transition ({id, seconds, shader | mode}) and a J/L split.
     transition: dict[str, Any] | None = None
     split: float = 0.0
@@ -315,7 +322,16 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
                 plan.notes.append(f"{shot['id']} has no take to use; it is left out of this version.")
             continue
         path = root / chosen["media"]
-        info = probe(path)
+        still = path.suffix.lower() in STILL_SUFFIXES
+        if still:
+            # A picture has no length of its own: the shot says how long it is held.
+            held = float(shot.get("duration_seconds") or 0)
+            if not held:
+                held = STILL_SECONDS
+                plan.notes.append(f"{shot['id']} is a still with no duration; held {STILL_SECONDS:g} s.")
+            info = {**probe(path), "duration": held}
+        else:
+            info = probe(path)
         speaks = _speaks(shot)
         words = words_for(path, words_sidecar) if speaks else []
         if speaks and not words:
@@ -332,6 +348,7 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
             shot["id"], chosen["id"], chosen["media"], start, end, join, method,
             (spoken[0][0], spoken[-1][1]) if spoken else None, shot.get("level_db"),
             revoice=bool(shot.get("voice_in_cut")), title=title, effects=list(shot.get("effects") or []),
+            still=still,
         )
         if plan.segments:
             _resolve_join(root, plan, cut, segment, joins)
@@ -491,7 +508,8 @@ def loudness_gain(source: Path, segment: Segment) -> float:
     return round(max(-12.0, min(ceiling, target - float(measured[-1]))), 1)
 
 
-def _draw_title(root: Path, segment: Segment, output: Path, first: dict[str, Any], fps: float, run_process) -> None:
+def _draw_title(root: Path, segment: Segment, output: Path, first: dict[str, Any], fps: float, run_process,
+                held: Path | None = None) -> None:
     """Render a segment's effects and title: a card on its own, or over the cut piece of its take, sound kept.
 
     The segment is then cut from that file, which starts where the cut does.
@@ -501,7 +519,9 @@ def _draw_title(root: Path, segment: Segment, output: Path, first: dict[str, Any
 
     length = segment.end - segment.start
     background = None
-    if segment.media:
+    if held is not None:
+        background = held
+    elif segment.media:
         # A take whose voice was converted is titled over the converted sound.
         background = Path(segment.sound) if segment.sound else root / segment.media
         if segment.sound:
@@ -558,8 +578,12 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
     if not ffmpeg:
         raise ValidationError("FFmpeg is needed to assemble a cut")
     work.mkdir(parents=True, exist_ok=True)
-    real = next((segment for segment in plan.segments if segment.media), None)
+    # A moving take decides the frame and the rate; a still only when there is nothing else.
+    real = (next((segment for segment in plan.segments if segment.media and not segment.still), None)
+            or next((segment for segment in plan.segments if segment.media), None))
     first = probe(root / real.media) if real else {"width": 1280, "height": 720, "fps": FPS, "audio": False}
+    if real and real.still:
+        first["fps"] = FPS  # a picture has no rate; what ffprobe reports for one is a default
     fps = first["fps"] or FPS
     if plan.format.get("aspect"):
         first = _reframe(root, plan, first, work, run_process, within(0.0, 0.05))
@@ -583,8 +607,22 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
                          "-pix_fmt", "yuv420p", "-c:a", "aac", str(solid)],
                         expected_seconds=length, message=f"{segment.shot}: {segment.method.split(':', 1)[1]} screen")
             segment.source = str(solid)
+        held = None
+        if segment.still and not segment.source:
+            held = work / f"still-{index:03d}.mp4"
+            length = segment.end - segment.start
+            frame = f"{first['width'] // 2 * 2}:{first['height'] // 2 * 2}"
+            run_process(["ffmpeg", "-y", "-loglevel", "error", "-loop", "1", "-framerate", str(round(fps) or FPS),
+                         "-t", f"{length:.3f}", "-i", str(root / segment.media), "-f", "lavfi", "-t", f"{length:.3f}",
+                         "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-shortest",
+                         "-vf", f"scale={frame}:force_original_aspect_ratio=decrease,pad={frame}:(ow-iw)/2:(oh-ih)/2,"
+                                f"setsar=1,format=yuv420p",
+                         "-c:v", "libx264", "-c:a", "aac", str(held)],
+                        expected_seconds=length, message=f"{segment.shot}: the still held {length:g} s")
+            if not (segment.title or segment.effects):
+                segment.source, segment.start, segment.end = str(held), 0.0, length
         if (segment.title or segment.effects) and not segment.source:
-            _draw_title(root, segment, work / f"title-{index:03d}.mp4", first, fps, run_process)
+            _draw_title(root, segment, work / f"title-{index:03d}.mp4", first, fps, run_process, held)
         source = Path(segment.source) if segment.source else root / segment.media
         length = segment.end - segment.start
         picture = work / f"picture-{index:03d}.mp4"

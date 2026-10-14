@@ -4,18 +4,23 @@ title: Sign Off
 sequence: The Reel
 summary: The claim the reel exists to make.
 
+enter:
+  transition:
+    id: analog-scan
+    duration_ms: 1600
+    reason: Close on the format's own texture rather than on a graphic effect.
+
 shots:
   - n: 1
     source: composed
     engine: title
     duration: 5
     label: The end card states the cost.
-    text:
-      headline: NO KEYS REQUIRED
-      subhead: narration by offline TTS · music CC0 · transitions from the catalog
-    transition:
-      id: analog-scan
-      duration_ms: 1600
-      reason: Close on the format's own texture rather than on a graphic effect.
+    title:
+      id: reel-card
+      text: NO KEYS REQUIRED
+      subtitle: narration by offline TTS · transitions from the catalog
+      size: 52
+      reason: The claim the reel exists to make.
     notes:
       - The music bed is fetched separately; see this production's README.

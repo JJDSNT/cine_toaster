@@ -5,7 +5,7 @@ type: roadmap
 status: active
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-09-29
+updated_at: 2026-10-13
 tags:
   - development
   - roadmap
@@ -221,6 +221,25 @@ Agreed order (2026-10-04):
    through a command; a per-shot brief override.
 6. **Cast lineage** (`CT-0015`): `cast_reference_unused` and
    `_superseded`; master references attached to video generation.
+
+### The demos line: the music piece, then the reel (opened 2026-10-13)
+
+Its own line of work (the user, 2026-10-13): capabilities the demos need,
+which become part of Cine Toaster. It has no specific relation to SINGULAR
+and does not follow that line's priorities. The map and the order are in
+`CT-0064`; agreed on 2026-10-14:
+
+1. the reel on the assembly path (`CT-0065`);
+2. footage declared in the breakdown and fetched;
+3. music brought in, its beats a record of the project;
+4. the music-driven piece, first version -- nothing of the previous reel kept;
+5. a measurement of video and streams (sources at once, real time, streams
+   as sources, switching while playing): live transmission is not the
+   purpose, and it is not ruled out;
+6. a matte and an overlay in the transition contract, then `CT-0028`;
+7. layers, a keyer, and ADO-style moves within a shot;
+8. the reel: a narrated first act, the music piece as its second;
+9. catalog items, and the composed engines that nothing renders.
 
 ### Later
 

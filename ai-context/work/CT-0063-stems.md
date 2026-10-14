@@ -87,5 +87,6 @@ an external DAW such as Ardour; Cine Toaster should not reimplement a DAW").
   - `line_audio_missing` accepts either place, as their consumers do.
   - A line spoken by Cine Toaster itself (`voice: piper/...`) that is not
     made yet is advice (`toast voice`), not an error.
-  - Remains: one convention for `mix.file`. The scene's folder is the
+  - Closed by CT-0065: `mix.file` is read and written beside the scene.
+  - Remained then: one convention for `mix.file`. The scene's folder is the
     likelier one, since a version snapshots the scene.

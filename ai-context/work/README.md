@@ -5,7 +5,7 @@ type: index
 status: active
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-09-29
+updated_at: 2026-10-13
 tags:
   - work
   - tracker
@@ -42,8 +42,16 @@ execution history and links to those destinations.
 The ordered plan in [`development/roadmap.md`](../development/roadmap.md)
 is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
-CT-0041, CT-0052, CT-0053.
+CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
 
+- `CT-0066` — footage declared on a shot and fetched as its take, with
+  source, licence and credit (`done`)
+- `CT-0065` — the reel on the assembly path: stills as takes, narration
+  beside the scene and in each line's voice; bringing material in is next
+  (`doing`)
+- `CT-0064` — the Amiga reel after the 1991 Video Toaster promo: the gap
+  between the tape and what is rendered today, and the order to close it;
+  nothing built yet (`ready`)
 - `CT-0054` — migrating SINGULAR to ~/films/singular, the validation
   milestone; layout proposed, awaiting the user (`review`)
 - `CT-0053` — upscaling to 4K: SeedVR2 on takes, 4K as a delivery

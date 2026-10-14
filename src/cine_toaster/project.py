@@ -222,6 +222,8 @@ def _load_shots(
                 "sound_fades_at": float(field(raw, "sound_fades_at")) if field(raw, "sound_fades_at") not in (None, "") else None,
                 # Where a format's frame sits in the take (CT-0049): {x, y}, 0 to 1, centred by default.
                 "reframe": field(raw, "reframe") if isinstance(field(raw, "reframe"), dict) else None,
+                # The stretch of a public file this shot's picture is (CT-0066).
+                "footage": _footage(field(raw, "footage")),
                 "derive": _derive(field(raw, "derive")),
                 "guide_at_cut": field(raw, "guide_at_cut") if isinstance(field(raw, "guide_at_cut"), bool) else None,
                 "guide_strength": field(raw, "guide_strength"),
@@ -745,25 +747,58 @@ def _load_scene(
                          f"A generation makes one continuous run of shots; the shots between would be cut out of it."),
             ).public_dict())
 
+    # Footage from outside is declared with where it is and its licence, and fetched (CT-0066).
+    from .footage import problem as footage_problem
+
+    for shot in shots:
+        declared = shot.get("footage")
+        if not declared or shot.get("out_of_cut"):
+            continue
+        wrong = footage_problem(declared)
+        if wrong:
+            findings.append(Finding(
+                code="footage_incomplete", severity="error", scene_id=scene_id, shots=(shot["id"],),
+                message=f"{shot['id']} {wrong}; footage that cannot say where it is from cannot be shown.",
+            ).public_dict())
+        elif not shot.get("takes"):
+            findings.append(Finding(
+                code="footage_not_fetched", severity="advice", scene_id=scene_id, shots=(shot["id"],),
+                message=f"{shot['id']}: its footage is declared, not fetched yet; toast footage fetch brings it.",
+            ).public_dict())
+
     # A line laid from a file (a narration, a line recorded apart) whose file is not there is not heard (CT-0063).
+    # The cut reads it beside the scene, and nowhere else (CT-0065).
+    from .narration import stale as line_stale
+
     for shot in shots:
         for line in shot.get("lines") or []:
             mix = line.get("mix") if isinstance(line.get("mix"), dict) else {}
             name = mix.get("file") or mix.get("arquivo")
-            # Beside the scene (the assembly reads it there) or from the production (the reel's `toast voice`).
-            if not name or shot.get("out_of_cut") or (directory / str(name)).is_file() or (root / str(name)).is_file():
+            if not name or shot.get("out_of_cut"):
                 continue
             who = line.get("who") or "a line"
+            if (directory / str(name)).is_file():
+                changed = line_stale(directory / str(name), line)
+                if changed:
+                    findings.append(Finding(
+                        code="line_audio_stale", severity="warning", scene_id=scene_id, shots=(shot["id"],),
+                        message=(f"{shot['id']}: {who}'s audio {name} was spoken before {changed}; "
+                                 f"toast voice speaks it again."),
+                    ).public_dict())
+                continue
+            elsewhere = (f" It is at the production root, where the cut does not read it."
+                         if (root / str(name)).is_file() else "")
             if str(line.get("voice") or "").startswith("piper/"):
                 # Cine Toaster speaks it itself: not lost, only not made yet.
                 findings.append(Finding(
                     code="line_audio_missing", severity="advice", scene_id=scene_id, shots=(shot["id"],),
-                    message=f"{shot['id']}: {who}'s line is not spoken yet ({name}); toast voice makes it.",
+                    message=f"{shot['id']}: {who}'s line is not spoken yet ({name}); toast voice makes it.{elsewhere}",
                 ).public_dict())
             else:
                 findings.append(Finding(
                     code="line_audio_missing", severity="error", scene_id=scene_id, shots=(shot["id"],),
-                    message=f"{shot['id']}: {who}'s audio {name} is not there, so the cut does not hear it.",
+                    message=(f"{shot['id']}: {who}'s audio {name} is not beside the scene, so the cut does not "
+                             f"hear it.{elsewhere}"),
                 ).public_dict())
 
     decisions = [
@@ -1157,6 +1192,12 @@ def _identifier(name: str) -> str:
 
     text = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
     return re.sub(r"[^A-Za-z0-9]+", "-", text).strip("-").upper() or "SUBJECT"
+
+
+def _footage(raw: Any) -> dict[str, Any] | None:
+    from .footage import read
+
+    return read(raw)
 
 
 def scene_directory(root: Path, scene_id: str) -> Path:

@@ -149,7 +149,7 @@ voice: install-audio
 
 build: install-media install-audio
 	@$(TOAST) voice "$(DEMOS)/amiga-demo-reel"
-	@$(TOAST) build "$(DEMOS)/amiga-demo-reel"
+	@$(TOAST) assemble-sequence "$(DEMOS)/amiga-demo-reel" the-reel --scenes
 
 # ---- Development ----
 
