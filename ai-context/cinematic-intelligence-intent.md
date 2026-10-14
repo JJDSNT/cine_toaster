@@ -11,6 +11,8 @@ scope: AI agents, filmmaking capabilities, production knowledge, and creative de
 
 Cine Toaster should enable AI agents to make meaningful use of its filmmaking capabilities across pre-production, production, editing, compositing, sound, and finishing. The ambition is not merely to let agents operate tools, but to let them explore technical possibilities in the context of a particular film while preserving the filmmaker's creative freedom.
 
+Cine Toaster should actively equip AI agents with the knowledge and understanding needed to **discover, learn, and effectively use the full potential of its integrated filmmaking capabilities**. This includes understanding technical possibilities, operational constraints, and how capabilities may be combined, including combinations not anticipated by their original developers. Making a tool available to an agent is not, by itself, sufficient: the project should help agents develop the competence to use it meaningfully, without prescribing artistic interpretations or limiting creative exploration.
+
 This document records **intent**, not an implementation plan. It does not require a new subsystem, a particular agent framework, an API, a schema, or a prescribed workflow.
 
 ## Central principle
