@@ -301,6 +301,9 @@ follow a curve.
   after any `time.*` node upstream of that node has remapped its time.
 - **Keys** are `[t, value]` or `{t, value, ease}`; between keys the value
   follows the left key's ease; before the first and after the last it holds.
+  An ease is a name (linear, in, out, in-out, hold) or a cubic Bézier given
+  as its handles `[x1, y1, x2, y2]`, as CSS and animation tools write it; an
+  unknown name is refused.
 - **Beats** come from the scene's music (CT-0067); `every` picks every nth
   beat (bars, once D1b exists).
 

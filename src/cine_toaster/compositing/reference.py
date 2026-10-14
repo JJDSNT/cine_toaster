@@ -230,15 +230,54 @@ _EASES: dict[str, Callable[[float], float]] = {
 }
 
 
+def cubic_bezier(x1: float, y1: float, x2: float, y2: float) -> Callable[[float], float]:
+    """An ease as CSS and every animation tool write it: a cubic Bézier from (0, 0) to (1, 1) with two handles.
+
+    The time axis is solved for the curve's parameter by bisection (it is monotonic for handles within
+    0..1 on x), then the value read on the other axis.
+    """
+
+    if not (0 <= x1 <= 1 and 0 <= x2 <= 1):
+        raise ValidationError(f"A Bézier ease keeps its handles' times within 0 and 1, not {x1} and {x2}")
+
+    def axis(a: float, b: float, s: float) -> float:
+        return 3 * a * (1 - s) ** 2 * s + 3 * b * (1 - s) * s ** 2 + s ** 3
+
+    def ease(x: float) -> float:
+        x = min(max(x, 0.0), 1.0)
+        low, high = 0.0, 1.0
+        for _ in range(40):
+            middle = (low + high) / 2
+            if axis(x1, x2, middle) < x:
+                low = middle
+            else:
+                high = middle
+        return axis(y1, y2, (low + high) / 2)
+
+    return ease
+
+
+def ease_of(ease: Any) -> Callable[[float], float]:
+    """A named ease, or a Bézier given as its four handle numbers; an ease nobody knows is refused, not guessed."""
+
+    if isinstance(ease, (list, tuple)):
+        if len(ease) != 4:
+            raise ValidationError(f"A Bézier ease is four numbers (x1, y1, x2, y2), not {ease!r}")
+        return cubic_bezier(*map(float, ease))
+    if str(ease) not in _EASES:
+        raise ValidationError(f"No ease {ease!r}: {', '.join(_EASES)}, or a Bézier [x1, y1, x2, y2]")
+    return _EASES[str(ease)]
+
+
 def keys_curve(keys: list[Any]) -> Callable[[float], Any]:
     """`[t, value]` or `{t, value, ease}`: between keys the left key's ease; outside them, held (SPEC-0012 §6)."""
 
     points = []
     for key in keys:
         if isinstance(key, dict):
-            points.append((float(key["t"]), np.asarray(key["value"], dtype=np.float32), str(key.get("ease", "linear"))))
+            points.append((float(key["t"]), np.asarray(key["value"], dtype=np.float32), ease_of(key.get("ease", "linear"))))
         else:
-            points.append((float(key[0]), np.asarray(key[1], dtype=np.float32), "linear"))
+            points.append((float(key[0]), np.asarray(key[1], dtype=np.float32), _EASES["linear"]))
     points.sort(key=lambda point: point[0])
 
     def at(seconds: float) -> Any:
@@ -246,7 +285,7 @@ def keys_curve(keys: list[Any]) -> Callable[[float], Any]:
             return points[0][1]
         for (t0, v0, ease), (t1, v1, _) in zip(points, points[1:]):
             if seconds < t1:
-                x = _EASES.get(ease, _EASES["linear"])((seconds - t0) / (t1 - t0))
+                x = ease((seconds - t0) / (t1 - t0))
                 return v0 + (v1 - v0) * x
         return points[-1][1]
 
@@ -448,7 +487,7 @@ def curve_factory(nodes: dict[str, Any], curves: dict[str, Callable[[float], Any
             low, high = float(node.get("low", 0.0)), float(node.get("high", 1.0))
             out_low, out_high = float(node.get("out_low", 0.0)), float(node.get("out_high", 1.0))
             factor = float(node.get("factor", 1.0))
-            ease = _EASES.get(str(node.get("ease", "in-out")), _EASES["linear"])
+            ease = ease_of(node.get("ease", "in-out"))
             mapping = {
                 "invert": lambda x: 1.0 - x,
                 "scale": lambda x: x * factor,

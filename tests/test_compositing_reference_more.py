@@ -326,3 +326,19 @@ class RetentionTests(unittest.TestCase):
                             {"a": self.moving(40)}, **options)
         self.assertEqual(float(np.abs(streamed[0] - expected[int(round(1.6 * FPS - 0.5)) - 1]).max()) < 1e-6
                          or float(np.abs(streamed[0] - expected[int(round(1.6 * FPS - 0.5))]).max()) < 1e-6, True)
+
+
+class EaseTests(unittest.TestCase):
+    def test_a_bezier_ease_matches_its_named_twin_and_unknown_eases_are_refused(self) -> None:
+        from cine_toaster.compositing.reference import cubic_bezier, keys_curve
+        from cine_toaster.errors import ValidationError
+
+        linear = cubic_bezier(0, 0, 1, 1)
+        self.assertAlmostEqual(linear(0.3), 0.3, places=4)
+        css_ease_in_out = cubic_bezier(0.42, 0, 0.58, 1)
+        self.assertAlmostEqual(css_ease_in_out(0.5), 0.5, places=4)
+        self.assertLess(css_ease_in_out(0.2), 0.2)  # slow out of the start
+        overshoot = keys_curve([{"t": 0, "value": 0, "ease": [0.3, 1.6, 0.6, 1.0]}, [1, 10]])
+        self.assertGreater(float(max(overshoot(x / 50) for x in range(51))), 10.0)  # a back-out passes the target
+        with self.assertRaises(ValidationError):
+            keys_curve([{"t": 0, "value": 0, "ease": "bounce"}, [1, 1]])
