@@ -28,13 +28,48 @@ building.
 
 # Done
 
-- `SPEC-0012` drafted, status `draft`, awaiting review.
+- `SPEC-0012` drafted, reviewed once from outside, corrected; status `review`.
 - Appendix B writes every existing transition family, VFX item and title as
   a graph. It found two operations missing -- `merge.channels` (chromatic
   aberration) and `merge.depth` (occlusion; also the first piece of 2.5D) --
   both added to the primitives. With them, everything is expressible, or
   expressible as an opaque node: gl-transitions shaders not re-expressed, OFX
   plugins, Blender simulations as `generate.render`.
+
+## After the outside review (2026-10-14)
+
+The review the user brought found six problems, all real when checked:
+
+1. The luma wipe fed a signal straight into `matte.threshold`, which takes a
+   matte: `matte.from_signal` was missing, in the TOML and in Appendix B (and
+   in the warp wipe).
+2. The luma key used `low` and `high`, which `matte.key` did not declare:
+   its parameters are now stated per method.
+3. Curves were used ("1 - progress", animated noise) but not defined:
+   `curve.map`, `curve.combine`, `curve.noise`, the `{curve: node}` form, and
+   the rules for time, keys and vectors; no expression language.
+4. Depth from a monocular model and depth from a Blender camera are not
+   comparable: `depth` (metric, one camera) and `depth_relative` are distinct
+   kinds, `signal.align_depth` converts, and `merge.depth` refuses the
+   relative kind.
+5. Handover as half-float EXR for everything was wrong for depth, vectors and
+   labels: a table per type (32-bit float for depth and vectors, 32-bit
+   unsigned integers for segmentation).
+6. Identity lacked the OCIO config's hash, the time context, frame size,
+   renderer dependencies, external files by content, and model weights.
+
+And its condition: the example graphs validated automatically. Done:
+`cine_toaster.compositing.schema` holds the operations as data with a
+validator; `ai-context/specs/SPEC-0012-examples/` holds 19 graphs (every
+transition family, the warp wipe, a DVE move, an opaque shader, the window
+replaced fixed and tracked, a luma key, an alpha matte from Blender, a Blender
+object behind a person by depth, chromatic aberration, an element, grain, a
+typewriter title, a beat pulse, trails) and 5 that must be refused -- two of
+them the draft's own mistakes. `tests/test_compositing_schema.py` checks
+them. Writing them found a clash: `curve.map` had a parameter named `op`, the
+same as the node's own key; renamed `how`.
+
+The specification is now `review`.
 
 # Decisions
 
@@ -61,4 +96,6 @@ building.
 
 # Validation
 
-- On paper only, by design: Appendix B.
+- `tests/test_compositing_schema.py` (6): every example valid; every invalid
+  one refused for its reason; every primitive family used; curves drive
+  numbers, not choices; only the two conversions allowed; ops named by family.

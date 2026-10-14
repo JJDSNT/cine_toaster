@@ -1,0 +1,9 @@
+# A Blender object behind a person in a generated picture, ordered by depth (C8). Monocular depth is aligned to
+# the render's metric depth before the two are compared (SPEC-0012 §1).
+nodes:
+  person:  {op: generate.source, take: CUT}
+  guessed: {op: signal.estimate, picture: person, kind: depth_relative, model: depth-anything-v2, seed: 0}
+  metric:  {op: signal.align_depth, signal: guessed, reference: object.depth, method: scale_shift}
+  object:  {op: generate.render, renderer: blender, scene: blender/set.blend, seed: 1, camera: shot-camera}
+  out:     {op: merge.depth, pictures: [person, object], depths: [metric, object.depth], near_is_small: true}
+output: out

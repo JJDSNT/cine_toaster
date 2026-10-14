@@ -1,0 +1,4 @@
+expect: composite_unknown_op
+nodes:
+  out: {op: magic.make_it_good}
+output: out

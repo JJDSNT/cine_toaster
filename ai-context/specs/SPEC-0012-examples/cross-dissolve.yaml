@@ -1,0 +1,5 @@
+# The plainest join: the two pictures mixed by the join's progress.
+ports: {from: picture, to: picture, progress: curve}
+nodes:
+  out: {op: merge.mix, a: from, b: to, by: progress}
+output: out

@@ -1,0 +1,8 @@
+# The draft's own mistake, found by the review: a signal is not a matte.
+expect: composite_type_mismatch
+ports: {from: picture, to: picture, progress: curve, texture: picture}
+nodes:
+  order:  {op: signal.luma, picture: texture}
+  reveal: {op: matte.threshold, matte: order, progress: progress}
+  out:    {op: merge.over, front: to, back: from, matte: reveal}
+output: out

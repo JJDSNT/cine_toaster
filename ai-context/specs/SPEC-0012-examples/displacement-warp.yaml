@@ -1,0 +1,11 @@
+# `displacement`: each picture bends along a map; the outgoing one more as the join goes on, the incoming one less.
+ports: {from: picture, to: picture, progress: curve, map_picture: picture}
+nodes:
+  map:      {op: signal.luma, picture: map_picture}
+  leaving:  {op: curve.map, in: progress, how: scale, factor: 0.4}
+  remaining: {op: curve.map, in: progress, how: invert}
+  arriving: {op: curve.map, in: remaining, how: scale, factor: 0.4}
+  a:        {op: warp.displace, in: from, map: map, strength: {curve: leaving}}
+  b:        {op: warp.displace, in: to, map: map, strength: {curve: arriving}}
+  out:      {op: merge.mix, a: a, b: b, by: progress}
+output: out

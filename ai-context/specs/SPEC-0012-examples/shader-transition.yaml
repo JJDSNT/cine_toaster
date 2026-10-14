@@ -1,0 +1,5 @@
+# Any gl-transitions shader not re-expressed yet: an opaque node, one renderer, typed ports from its item.
+ports: {from: picture, to: picture, progress: curve}
+nodes:
+  out: {op: opaque.gl, shader: cube, from: from, to: to, progress: progress}
+output: out

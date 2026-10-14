@@ -2,7 +2,7 @@
 id: SPEC-0012
 title: The compositing graph — primitives, typed values, colour, identity and renderers
 type: specification
-status: draft
+status: review
 implementation: planned
 owner: project
 created_at: 2026-10-14
@@ -42,10 +42,14 @@ node's extent, sampled at the composite's frame rate.
 | `meta` | facts that ride along | provenance, licence, credit, source timecode |
 
 Signal kinds: `luminance`, `luma`, `alpha`, `red`, `green`, `blue`, `hue`,
-`saturation`, `depth` (distance from the camera, scene units; a direction
-flag says near = small), `vectors` (two channels, pixels per frame),
+`saturation`, `depth` (metric: distance from a named camera in scene units;
+near is small), `depth_relative` (from a monocular model: unknown scale and
+shift, possibly inverse -- not comparable with anything until aligned), `vectors` (two channels, pixels per frame),
 `normals` (three), `segmentation` (an integer label per pixel, with a table of
-labels). A signal declares its range; a `matte` is made from a signal by an
+labels). Two depths are comparable only if both are `depth` from the same
+camera; `signal.align_depth` turns a `depth_relative` into a `depth` by fitting
+its scale and shift to a reference (or by values a person gives). A signal
+declares its range; a `matte` is made from a signal by an
 operation (§3), never by reinterpreting it.
 
 A connection is valid when the port's type equals the value's, or when the
@@ -100,14 +104,15 @@ FFmpeg first.
 | `signal.luma` | picture | signal | `transfer` (default sRGB), `weights` |
 | `signal.channel` | picture | signal | `channel`: red, green, blue, alpha, hue, saturation |
 | `signal.read` | -- | signal | `file`, `kind` (depth, vectors, normals, segmentation), `range` |
-| `signal.estimate` | picture | signal | `kind`, `model`, `seed`; not deterministic unless the model says so |
+| `signal.estimate` | picture | signal | `kind` (depth_relative, vectors, normals, segmentation), `model`, `seed`; not deterministic unless the model says so |
+| `signal.align_depth` | `depth_relative` signal, optional `depth` reference, optional region matte | `depth` signal | `method`: scale_shift (fitted to the reference over the region) or manual (`scale`, `shift`); `inverse` |
 
 ## matte
 
 | Op | In | Out | Parameters |
 |---|---|---|---|
 | `matte.from_signal` | signal | matte | `low`, `high` (the range mapped to 0..1), `invert`, `gamma` |
-| `matte.key` | picture | matte | `by`: luminance, luma, colour, difference; `colour`, `tolerance`, `softness`; a second picture for `difference` |
+| `matte.key` | picture, optional `reference` | matte | `by`: luminance or luma -- `low`, `high`, `softness`, `invert`; colour -- `colour`, `tolerance`, `softness`; difference -- the `reference` picture, `tolerance`, `softness` |
 | `matte.label` | signal (segmentation) | matte | `labels` |
 | `matte.shape` | -- | matte | `shape` (rectangle, ellipse, polygon, spline), points, `feather` |
 | `matte.threshold` | matte, `progress` (curve) | matte | `softness` -- the wipe rule: a pixel is revealed when progress passes its value |
@@ -125,7 +130,7 @@ matte (§3 filter, colour); they are not repeated here.
 | `merge.blend` | two pictures | picture | `mode`: screen, add, multiply, overlay, difference, lighten, darken; `mix` |
 | `merge.mix` | two pictures, a `matte` or a `curve` | picture | -- (a dissolve is `merge.mix` with a curve) |
 | `merge.channels` | up to four signals or mattes | picture | which input fills red, green, blue, alpha (found missing by Appendix B: chromatic aberration) |
-| `merge.depth` | pictures, each with a `depth` signal | picture | `near_is_small`; each pixel takes the nearest opaque picture (occlusion; §8; found missing by Appendix B) |
+| `merge.depth` | pictures, and a `depth` signal for each (metric, one camera; a `depth_relative` is refused) | picture | `near_is_small`; each pixel takes the nearest opaque picture (occlusion; §8; found missing by Appendix B) |
 
 A matte on `merge.over` multiplies the front's alpha before the merge.
 
@@ -189,6 +194,9 @@ Pixels outside the source after a warp are transparent.
 | `curve.beats` | -- | curve | the scene's music beats (CT-0067): a value per beat with an envelope (`attack`, `decay`) |
 | `curve.from_track` | track | curve | a field of the track (x, y, rotation, scale) |
 | `curve.progress` | -- | curve | 0 at a join's start to 1 at its end; only in recipes for joins |
+| `curve.noise` | -- | curve | `seed`, `frequency`, `amplitude`, `offset` (smooth, repeatable) |
+| `curve.map` | curve | curve | `how`: invert (1 - x), scale (`factor`), offset (`factor`), clamp (`low`, `high`), remap (`low`, `high` to `out_low`, `out_high`), ease (`ease`) |
+| `curve.combine` | curve, curve | curve | `how`: add, subtract, multiply, min, max |
 
 ## Opaque nodes
 
@@ -228,7 +236,8 @@ id = "luma-wipe"
 family = "wipe/luma"
 [graph]
 nodes.order   = {op = "signal.luma", picture = "matte_source"}
-nodes.reveal  = {op = "matte.threshold", matte = "order", progress = "progress", softness = 0.05}
+nodes.shape   = {op = "matte.from_signal", signal = "order"}
+nodes.reveal  = {op = "matte.threshold", matte = "shape", progress = "progress", softness = 0.05}
 nodes.out     = {op = "merge.over", front = "to", back = "from", matte = "reveal"}
 output = "out"
 [inputs]
@@ -242,9 +251,23 @@ no others (this is CT-0050's per-cut override, done).
 
 - A source node's identity is the SHA-256 of its file (or of the take's), its
   stretch, and its declared colour space and alpha.
-- Any other node's identity is the SHA-256 of a canonical JSON of: its op, its
-  parameters (curves included), its inputs' identities in port order, the
-  working space, and the renderer and version that computes it.
+- Any other node's identity is the SHA-256 of a canonical JSON of everything
+  that can change its result:
+  - its op, its parameters (curves included, as their own identities), and
+    its inputs' identities in port order;
+  - the colour context: the working space, the OCIO config's own hash (not
+    only its name), and the precision the renderer computes in;
+  - the time context: frame rate, the extent (start, length) and any time
+    remap it is evaluated under;
+  - the frame size it is rendered at;
+  - the renderer, its version, and its own dependencies that change pixels
+    (Blender's version and add-ons, FFmpeg's build, a GPU driver for GL when
+    the renderer declares results depend on it);
+  - every external file a parameter names -- a font, a LUT, a texture, a
+    scene -- by content hash;
+  - for a model, its name, version and a hash of its weights, and the seed.
+  An input the renderer cannot vouch for (a driver whose output varies) makes
+  the node not deterministic (below).
 - A result is cached under its identity, outside the production
   (`~/.cache/cine-toaster/composite/`). Deleting the cache loses time only.
 - A node whose op is not deterministic (`signal.estimate`, `generate.render`
@@ -258,11 +281,24 @@ no others (this is CT-0050's per-cut override, done).
 
 # 6. Curves and time
 
-A parameter is a constant, or a curve: `{keys: [...]}`, `{beats: ..., attack,
-decay}`, `{track: <node>, field}`, or `{progress: true}` in a join's recipe.
-Times are seconds from the shot's start (or the join's, in a recipe). Curves
-are evaluated per output frame. `time.*` nodes change the time at which their
-input is evaluated; nothing else does.
+A numeric or vector parameter is a constant, or follows a curve: `{curve:
+<node>}`, where the node is a `curve.*` op. There is no expression language:
+"1 - progress" is `curve.map(progress; how invert)`, a moving value with
+noise is `curve.combine(keys, noise; add)`. Text and choice parameters never
+follow a curve.
+
+- **Values.** A curve gives a number or a vector (keys may hold `[x, y]`); a
+  vector parameter fed a number uses it for every component.
+- **Time.** A curve is evaluated at `t = (frame + 0.5) / fps` seconds from the
+  start of the extent it belongs to: the shot, or the join (where `progress`
+  is `t / length`). It is evaluated at the time of the node that reads it,
+  after any `time.*` node upstream of that node has remapped its time.
+- **Keys** are `[t, value]` or `{t, value, ease}`; between keys the value
+  follows the left key's ease; before the first and after the last it holds.
+- **Beats** come from the scene's music (CT-0067); `every` picks every nth
+  beat (bars, once D1b exists).
+
+The examples in `SPEC-0012-examples/` use each of these forms.
 
 # 7. Renderers
 
@@ -279,9 +315,19 @@ deterministic: [op, ...]
 - **One renderer, whole graph** (C2 onward): every node must be in its
   `implements`; otherwise the graph is refused with the missing ops named.
 - **Split across renderers** (C9): a planner assigns nodes; a value crossing
-  renderers is written in the working space as OpenEXR (half float, linear,
-  premultiplied) for pictures and signals, WAV for sound, JSON for tracks and
-  curves; each part runs as a job with its place and cost.
+  renderers is written in the working space, in the form its type needs; each
+  part runs as a job with its place and cost.
+
+  | Value | Handed over as |
+  |---|---|
+  | picture | OpenEXR, half float, linear, premultiplied RGBA |
+  | matte | OpenEXR, half float, one channel |
+  | signal: luminance, luma, channels | OpenEXR, half float |
+  | signal: depth, depth_relative | OpenEXR, **32-bit float** (half loses range and steps visibly at distance) |
+  | signal: vectors, normals | OpenEXR, 32-bit float, two or three channels |
+  | signal: segmentation | OpenEXR **32-bit unsigned integer** channel, and its label table as JSON beside it |
+  | sound | WAV, 32-bit float |
+  | track, curve, meta | JSON |
 - **Conformance** (C2 onward): for each op a renderer claims, a reference
   scene is rendered by it and by the reference (FFmpeg) and compared within
   a tolerance stated per op, at 160x90 and 1920x1080, 24 and 29.97 fps, 8-bit
@@ -306,11 +352,13 @@ here; nothing above prevents it.
 | `composite_unrenderable` | error (warning before C9) | no renderer implements a node |
 | `composite_unrecorded` | warning | a non-deterministic node whose result is not recorded yet |
 | `composite_colourspace_unknown` | error | a source's colour space OCIO does not know |
+| `composite_unknown_param` | error | a parameter the op does not have, or a value outside its choices |
 
 # 10. Acceptance (for C1)
 
 - Every op above has its ports, types and parameters stated (done here).
-- The examples in Appendix B are valid under §1-§9.
+- The examples in `SPEC-0012-examples/` are validated automatically against
+  the schema, and the invalid ones refused for their stated reason.
 - Every existing transition, VFX item and title is placed in Appendix B as
   expressible, expressible with an opaque node, or not yet expressible with
   what is missing named.
@@ -327,12 +375,16 @@ here; nothing above prevents it.
 
 # Appendix B: what exists, written as graphs
 
-The representative graphs, each as `node: op(inputs; parameters)`.
+The authoritative graphs are the files in `SPEC-0012-examples/`, validated
+by `tests/test_compositing_schema.py` against the schema in
+`cine_toaster.compositing.schema`; `invalid/` holds graphs that must be refused,
+two of them the mistakes an earlier draft of this appendix made. Below, the
+same in short form, `node: op(inputs; parameters)`.
 
 **Cross-dissolve** (`cross-dissolve`): `out: merge.mix(from, to; curve=progress)`.
 
 **Luma wipe** (`luma`, with its texture): `order: signal.luma(texture)`,
-`reveal: matte.threshold(order, progress; softness 0)`,
+`shape: matte.from_signal(order)`, `reveal: matte.threshold(shape, progress; softness 0)`,
 `out: merge.over(to over from; matte reveal)`.
 
 **Custom wipe with a moving matte** (`matte-wipe`, SPEC-0011):
@@ -345,11 +397,11 @@ The representative graphs, each as `node: op(inputs; parameters)`.
 its size or angle a curve of progress; `out: merge.over(to over from; matte shape)`.
 
 **Warp** (`displacement`): `wa: warp.displace(from, noise; strength = curve of progress)`,
-`wb: warp.displace(to, noise; strength = curve of 1 - progress)`,
+`wb: warp.displace(to, noise; strength = curve.map(progress; invert))`,
 `out: merge.mix(wa, wb; progress)`.
 
 **Warp wipe** (new, the user's): `wa: warp.displace(from, map; strength rising)`,
-`reveal: matte.threshold(signal.luma(texture), progress)`,
+`reveal: matte.threshold(matte.from_signal(signal.luma(texture)), progress)`,
 `out: merge.over(to over wa; matte reveal)`.
 
 **DVE moves** (`cube`, `doorway`, `switcher-flip`): expressible as
@@ -406,11 +458,11 @@ length and placement from beats (CT-0067) -- a join's `progress` spans its
 beats; a beat-pulsing parameter is `curve.beats`.
 
 **A window replaced** (the user's example): the composite in §4.
-**A luma key**: `k: matte.key(picture; by luminance, low, high)`,
+**A luma key**: `k: matte.key(picture; by luminance, low, high, invert)`,
 `out: merge.over(picture over background; matte k)`.
 **A Blender object behind a person** (C8): `person: generate.source(take)`,
-`d: signal.estimate(person; kind depth)`, `obj: generate.render(blender; with depth pass)`,
-then `merge.depth(person with d, obj with its depth)`.
+`d: signal.estimate(person; kind depth_relative)`, `obj: generate.render(blender; camera)`,
+`m: signal.align_depth(d; reference obj.depth)`, then `merge.depth(person with m, obj with obj.depth)`.
 
 What the appendix found missing, and §3 now has:
 

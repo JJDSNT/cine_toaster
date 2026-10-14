@@ -1,0 +1,6 @@
+# The user's alpha matte: a Blender render laid over an AI-generated picture by its own alpha.
+nodes:
+  generated: {op: generate.source, take: CUT}
+  object:    {op: generate.render, renderer: blender, scene: blender/probe.blend, seed: 4}
+  out:       {op: merge.over, front: object, back: generated, matte: object.alpha}
+output: out

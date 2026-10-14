@@ -1,0 +1,15 @@
+# `chromatic-aberration`: the red and blue channels scaled a little apart and the picture rebuilt.
+nodes:
+  take:  {op: generate.source, take: CUT}
+  red:   {op: signal.channel, picture: take, channel: red}
+  green: {op: signal.channel, picture: take, channel: green}
+  blue:  {op: signal.channel, picture: take, channel: blue}
+  alpha: {op: signal.channel, picture: take, channel: alpha}
+  r:     {op: warp.transform, in: red_picture, scale: [1.004, 1.004]}
+  red_picture: {op: merge.channels, red: red}
+  b:     {op: warp.transform, in: blue_picture, scale: [0.996, 0.996]}
+  blue_picture: {op: merge.channels, blue: blue}
+  r_signal: {op: signal.channel, picture: r, channel: red}
+  b_signal: {op: signal.channel, picture: b, channel: blue}
+  out:   {op: merge.channels, red: r_signal, green: green, blue: b_signal, alpha: alpha}
+output: out

@@ -1,0 +1,7 @@
+# The user's example: a matte isolates a window and a landscape takes its place (fixed camera).
+nodes:
+  take:   {op: generate.source, take: CUT}
+  sky:    {op: generate.source, file: plates/sunset.mov, colorspace: "sRGB Encoded Rec.709 (sRGB)", alpha: straight}
+  window: {op: matte.shape, shape: polygon, points: [[0.31, 0.2], [0.62, 0.2], [0.62, 0.71], [0.31, 0.71]], feather: 0.01}
+  inside: {op: merge.over, front: sky, back: take, matte: window}
+output: inside

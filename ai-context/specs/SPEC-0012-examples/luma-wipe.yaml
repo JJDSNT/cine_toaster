@@ -1,0 +1,8 @@
+# `luma`: a picture's luma is the order in which pixels change.
+ports: {from: picture, to: picture, progress: curve, texture: picture}
+nodes:
+  order:  {op: signal.luma, picture: texture}
+  shape:  {op: matte.from_signal, signal: order, low: 0, high: 1}
+  reveal: {op: matte.threshold, matte: shape, progress: progress, softness: 0}
+  out:    {op: merge.over, front: to, back: from, matte: reveal}
+output: out

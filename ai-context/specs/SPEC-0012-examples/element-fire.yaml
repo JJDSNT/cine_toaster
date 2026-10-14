@@ -1,0 +1,6 @@
+# `fire-over`: a black-backed stock element laid over the shot by screen.
+nodes:
+  take: {op: generate.source, take: CUT}
+  fire: {op: generate.source, file: vfx_elements/fire-01/fire.mov}
+  out:  {op: merge.blend, a: take, b: fire, mode: screen}
+output: out

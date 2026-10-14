@@ -1,0 +1,7 @@
+# `diamond-wipe`: a shape whose size follows the progress.
+ports: {from: picture, to: picture, progress: curve}
+nodes:
+  grow:   {op: curve.map, in: progress, how: scale, factor: 1.5}
+  shape:  {op: matte.shape, shape: polygon, points: [[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]], size: {curve: grow}, feather: 0.01}
+  out:    {op: merge.over, front: to, back: from, matte: shape}
+output: out

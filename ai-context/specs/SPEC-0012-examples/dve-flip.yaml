@@ -1,0 +1,10 @@
+# A DVE move (`switcher-flip`) without 2.5D: each picture turns about its vertical axis; the front one is chosen at the half.
+ports: {from: picture, to: picture, progress: curve}
+nodes:
+  turn_out: {op: curve.map, in: progress, how: remap, low: 0, high: 0.5, out_low: 0, out_high: 90}
+  turn_in:  {op: curve.map, in: progress, how: remap, low: 0.5, high: 1, out_low: -90, out_high: 0}
+  a:        {op: warp.transform, in: from, rotate: {curve: turn_out}, perspective: 40}
+  b:        {op: warp.transform, in: to, rotate: {curve: turn_in}, perspective: 40}
+  half:     {op: curve.map, in: progress, how: remap, low: 0.499, high: 0.501, out_low: 0, out_high: 1}
+  out:      {op: merge.mix, a: a, b: b, by: half}
+output: out
