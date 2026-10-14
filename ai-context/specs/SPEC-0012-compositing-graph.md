@@ -146,7 +146,9 @@ A matte on `merge.over` multiplies the front's alpha before the merge.
 | `warp.displace` | picture, signal (vectors or one channel) | same | `strength`, `direction` |
 | `warp.procedural` | picture | same | `kind`: ripple, swirl, bend, lens; its parameters |
 
-Pixels outside the source after a warp are transparent.
+Pixels outside the source after a warp are transparent, unless a displacement
+or procedural warp says `edge: extend` (the border repeated) or `edge: mirror`
+-- what a full-frame warp in a join wants, so no black is pulled in.
 
 ## colour
 

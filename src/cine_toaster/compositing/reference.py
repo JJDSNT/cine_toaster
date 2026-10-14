@@ -544,8 +544,9 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
         else:  # track.measure
             from .tracking import measure
 
-            pictures = np.stack([_picture(value(node["in"], frame)) for frame in range(frames)])
-            track_cache[reference] = measure(pictures, node["kind"], node.get("region"), working)
+            # Frame by frame: tracking holds two frames, not the clip (CT-0071).
+            track_cache[reference] = measure(lambda index: _picture(value(node["in"], index)), node["kind"],
+                                             node.get("region"), working, frames=frames)
         return track_cache[reference]
 
     def value(reference: str, frame: int) -> Any:
@@ -721,12 +722,13 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             from .warp import displace
 
             return displace(value(node["in"], frame), value(node["map"], frame), float(param("strength", 0.1)),
-                            param("direction"))
+                            param("direction"), str(node.get("edge", "transparent")))
         if op == "warp.procedural":
             from .warp import procedural
 
             return procedural(value(node["in"], frame), node["kind"], float(param("amount", 1.0)),
-                              float(param("frequency", 4.0)), param("centre"), aspect)
+                              float(param("frequency", 4.0)), param("centre"), aspect,
+                              str(node.get("edge", "transparent")))
         if op == "colour.grade":
             picture = _picture(value(node["in"], frame)).copy()
             alpha = picture[..., 3:4]

@@ -14,8 +14,12 @@ import numpy as np
 from ..errors import ValidationError
 
 
-def measure(pictures: np.ndarray, kind: str, region: Any, working: str) -> dict[str, Any]:
-    """Points (their centre) or a plane (four corners) followed through ``pictures`` (frames, H, W, 4)."""
+def measure(pictures: Any, kind: str, region: Any, working: str, frames: int | None = None) -> dict[str, Any]:
+    """Points (their centre) or a plane (four corners) followed through the frames.
+
+    ``pictures`` is an array (frames, H, W, 4) or a function giving frame ``i``; with a function, only two
+    frames are ever held, so a long clip is tracked in the memory of two.
+    """
 
     try:
         import cv2
@@ -25,17 +29,22 @@ def measure(pictures: np.ndarray, kind: str, region: Any, working: str) -> dict[
         raise ValidationError(f"The reference tracks points and planes, not {kind!r} (a camera solve is C7)")
     from .reference import ENCODED, convert
 
-    frames, height, width = pictures.shape[:3]
-    grey = []
-    for picture in pictures:
+    frame_of = pictures if callable(pictures) else (lambda index: pictures[index])
+    count = frames if callable(pictures) else len(pictures)
+
+    def grey(index: int) -> np.ndarray:
+        picture = np.asarray(frame_of(index), dtype=np.float32)
         alpha = picture[..., 3:4]
         rgb = np.divide(picture[..., :3], alpha, out=np.zeros_like(picture[..., :3]), where=alpha > 1e-6)
         encoded = convert(rgb, working, ENCODED)
-        grey.append((np.clip(encoded @ np.array([0.2126, 0.7152, 0.0722], np.float32), 0, 1) * 255).astype(np.uint8))
+        return (np.clip(encoded @ np.array([0.2126, 0.7152, 0.0722], np.float32), 0, 1) * 255).astype(np.uint8)
+
+    previous = grey(0)
+    height, width = previous.shape
     x0, y0, x1, y1 = (np.asarray(region, dtype=np.float32) if region is not None else np.array([0, 0, 1, 1]))
     mask = np.zeros((height, width), np.uint8)
     mask[int(y0 * height):int(y1 * height), int(x0 * width):int(x1 * width)] = 255
-    start = cv2.goodFeaturesToTrack(grey[0], maxCorners=200, qualityLevel=0.01, minDistance=3, mask=mask)
+    start = cv2.goodFeaturesToTrack(previous, maxCorners=200, qualityLevel=0.01, minDistance=3, mask=mask)
     if start is None or len(start) < (4 if kind == "plane" else 1):
         raise ValidationError("Nothing in the region to track: it needs texture")
     corners0 = np.float32([[x0 * width, y0 * height], [x1 * width, y0 * height], [x1 * width, y1 * height],
@@ -43,11 +52,12 @@ def measure(pictures: np.ndarray, kind: str, region: Any, working: str) -> dict[
     points, alive = start, np.ones(len(start), bool)
     first = start.reshape(-1, 2)
     out = []
-    for index in range(frames):
+    for index in range(count):
         if index:
-            moved, status, _ = cv2.calcOpticalFlowPyrLK(grey[index - 1], grey[index], points, None)
+            current = grey(index)
+            moved, status, _ = cv2.calcOpticalFlowPyrLK(previous, current, points, None)
             alive &= status.reshape(-1).astype(bool)
-            points = moved
+            points, previous = moved, current
         now = points.reshape(-1, 2)[alive]
         if kind == "point":
             out.append({"points": [[float(now[:, 0].mean() / width), float(now[:, 1].mean() / height)]]})

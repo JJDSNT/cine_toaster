@@ -1450,7 +1450,9 @@ function transitionVisual(transition, large = false, lazy = false) {
       canvas.remove();
       canvas = null;
     });
-  } else if (transition.kind === "webm") {
+  } else if (transition.kind === "webm" || (transition.kind === "graph" && transition.preview_url)) {
+    // A recipe of primitives (ADR 0022) is drawn by the compositing reference, not in the browser:
+    // its preview is a clip the reference made from the same graph.
     const video = el("video");
     video.src = transition.preview_url;
     video.muted = true;

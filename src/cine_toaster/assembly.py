@@ -147,6 +147,8 @@ class Plan:
     format: dict[str, Any] = field(default_factory=dict)
     #: The production's frame (CT-0068): {width, height, fps}; empty, the first moving take's.
     frame: dict[str, Any] = field(default_factory=dict)
+    #: The scene music's beats in seconds of the cut (CT-0067), for composites that move with them.
+    beats: list[float] = field(default_factory=list)
     #: Another layout mixed beside the stereo, as a second track ("5.1", CT-0052); and, once rendered,
     #: the loudness of each track.
     surround: str = ""
@@ -421,6 +423,7 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
     form = (scene.get("style") or {}).get("format") or {}
     plan.format = {key: form[key] for key in ("aspect", "captions") if form.get(key)}
     plan.frame = dict(scene.get("frame") or {})
+    plan.beats = _scene_beats(root, scene)
     plan.surround = str(scene.get("surround") or "")
     plan.subtitles = dict(scene.get("subtitles") or {})
     if scene.get("ambience") or scene.get("music") or any(shot.get("sounds") for shot in scene["shots"]):
@@ -509,6 +512,15 @@ def _resolve_join(root: Path, plan: Plan, cut: dict[str, Any], segment: Segment,
         elif by_matte and matte is None:
             plan.notes.append(f"{segment.shot}: the transition {item['id']!r} is shaped by a matte and the join gives "
                               "none (matte: on the join); a straight cut in this version.")
+        elif item["kind"] == "graph":
+            # A recipe of SPEC-0012 primitives, drawn by the compositing reference (ADR 0022).
+            if seconds > room:
+                plan.notes.append(f"{segment.shot}: the transition {item['id']!r} is shortened to {room:.2f} s, half "
+                                  "the shorter of the shots it joins.")
+                seconds = room
+            segment.transition = {"id": item["id"], "seconds": round(seconds, 3), "graph": item["graph"],
+                                  "inputs": {name: str(path) for name, path in inputs.items()
+                                             if name not in ("matte", "overlay")}}
         elif by_matte:
             if seconds > room:
                 plan.notes.append(f"{segment.shot}: the transition {item['id']!r} is shortened to {room:.2f} s, half "
@@ -608,8 +620,23 @@ def _draw_title(root: Path, segment: Segment, output: Path, first: dict[str, Any
     segment.source, segment.start, segment.end = str(output), 0.0, length
 
 
+def _scene_beats(root: Path, scene: dict[str, Any]) -> list[float]:
+    """The beats of the scene's music, in seconds of the cut, when the music starts with the scene."""
+
+    music = scene.get("music") or []
+    if not music or music[0].get("from") or float(music[0].get("at") or 0):
+        return []
+    from .beats import read
+    from .sounds import list_sounds
+
+    item = next((sound for sound in list_sounds(root) if sound["id"] == music[0]["id"]), None)
+    heard, _ = read(item) if item else (None, "")
+    return list((heard or {}).get("beats") or [])
+
+
 def _render_composite(root: Path, segment: Segment, destination: Path, first: dict[str, Any], fps: float,
-                      run_process, notes: list[str]) -> Path:
+                      run_process, notes: list[str], beats: list[float] | None = None,
+                      at: float = 0.0) -> Path:
     """The shot's composite through the reference (SPEC-0012, ADR 0022 §5), with its take's sound kept.
 
     The reference is exact, not fast: about a second a frame at 1080 lines for a few nodes. A faster
@@ -635,7 +662,10 @@ def _render_composite(root: Path, segment: Segment, destination: Path, first: di
         inputs[name] = reference.read(root / media, frames, size, fps, start=start,
                                       colorspace=node.get("colorspace", reference.ENCODED),
                                       alpha=node.get("alpha", "straight"))
-    pictures, _identity, cached = reference.render(graph, inputs, frames=frames, size=size, fps=fps, root=root)
+    # The music's beats in the shot's own seconds: a composite pulses with the cut, not with its take.
+    local = [beat - at for beat in beats or [] if -1.0 <= beat - at <= length + 1.0]
+    pictures, _identity, cached = reference.render(graph, inputs, frames=frames, size=size, fps=fps, root=root,
+                                                   beats=local)
     if cached:
         notes.append(f"{segment.shot}: its composite was found in the cache.")
     silent = destination.with_suffix(".picture.mp4")
@@ -697,6 +727,12 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
     overlap = [0] * (total + 1)  # frames each transition takes, into segment i
     pictures, sounds = [], []
     speaking: list[bool] = []  # whether someone speaks in each shot: its sound goes to the centre in a 5.1
+    # Where each shot starts in the cut: a transition takes its length from both shots it joins.
+    starts, clock = [], 0.0
+    for segment in plan.segments:
+        clock -= segment.overlap
+        starts.append(max(clock, 0.0))
+        clock += segment.end - segment.start
     for index, segment in enumerate(plan.segments):
         if segment.method.startswith("solid:") and not segment.source:
             solid = work / f"solid-{index:03d}.mp4"
@@ -711,7 +747,7 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
         held = None
         if segment.composite and not segment.source:
             composed = _render_composite(root, segment, work / f"composite-{index:03d}.mp4", first, fps, run_process,
-                                         plan.notes)
+                                         plan.notes, plan.beats, starts[index])
             if segment.title or segment.effects:
                 held = composed  # the title and effects are drawn over the composite
             else:
@@ -971,6 +1007,27 @@ def _reframe(root: Path, plan: Plan, first: dict[str, Any], work: Path, run_proc
     return {**first, "width": target[0], "height": target[1]}
 
 
+def _graph_join(outgoing: Path, incoming: Path, outgoing_frames: int, frames: int, transition: dict[str, Any],
+                destination: Path, *, fps: float, width: int, height: int) -> Path:
+    """A join drawn from its recipe's graph by the reference: the last frames of one picture, the first of the
+    next, and the recipe's own pictures, both pictures playing through it."""
+
+    from .compositing import reference
+
+    size = (width, height)
+    inputs: dict[str, Any] = {
+        "from": reference.read(outgoing, frames, size, fps, start=(outgoing_frames - frames) / fps),
+        "to": reference.read(incoming, frames, size, fps),
+    }
+    for name, path in (transition.get("inputs") or {}).items():
+        inputs[name] = reference.read(Path(path), frames, size, fps)
+    pictures, _, _ = reference.render(transition["graph"], inputs, frames=frames, size=size, fps=fps)
+    silent = destination.with_suffix(".picture.mp4")
+    reference.write(pictures, silent, fps)
+    silent.replace(destination)
+    return destination
+
+
 def _join_pictures(ffmpeg: str, plan: Plan, pictures: list[Path], count: list[int], overlap: list[int], work: Path,
                    fps: float, width: int, height: int, run_process, span: tuple[float, float]) -> Path:
     """The pieces joined: straight cuts, and each transition as its own clip between the bodies (as `toast build`)."""
@@ -993,7 +1050,10 @@ def _join_pictures(ffmpeg: str, plan: Plan, pictures: list[Path], count: list[in
             following = plan.segments[index + 1]
             transition, frames = following.transition, overlap[index + 1]
             clip = work / f"join-{index + 1:03d}.mp4"
-            if transition.get("matte"):
+            if transition.get("graph"):
+                _graph_join(picture, pictures[index + 1], count[index], frames, transition, clip, fps=fps,
+                            width=width, height=height)
+            elif transition.get("matte"):
                 from .mattes import join as matte_join
 
                 matte_join(ffmpeg, picture, pictures[index + 1], count[index], frames, Path(transition["matte"]), clip,

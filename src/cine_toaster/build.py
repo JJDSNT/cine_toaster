@@ -211,7 +211,7 @@ def _transition_for(
         )
     milliseconds = reference.get("duration_ms") or item.get("duration_ms") or 1000
     seconds = float(milliseconds) / 1000.0
-    if item["kind"] == "matte" or (not gl and item.get("render", {}).get("ffmpeg") == "matte"):
+    if item["kind"] in ("matte", "graph") or (not gl and item.get("render", {}).get("ffmpeg") == "matte"):
         raise BuildError(f"Shot {shot['id']} asks for {item['id']!r}, a join shaped by a matte; the quick build "
                          "draws cards only. Assemble the scene to see it (toast assemble).")
     if gl and item["kind"] == "glsl":

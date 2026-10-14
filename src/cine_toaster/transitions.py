@@ -139,6 +139,7 @@ def _upstream_catalog(root: Path) -> tuple[dict[str, Any], ...]:
                 "params": params,
                 "inputs": {},
                 "softness": 0.0,
+                "graph": None,
                 "curated": False,
                 "upstream": f"{UPSTREAM_NAME}:{path.stem}",
                 "origin": UPSTREAM_NAME,
@@ -203,14 +204,14 @@ def _load_manifest(path: Path, origin: str) -> dict[str, Any]:
 
     transition_id = str(document["id"])
     kind = str(document["kind"])
-    if kind not in {"glsl", "webm", "matte"}:
+    if kind not in {"glsl", "webm", "matte", "graph"}:
         raise TransitionFormatError(f"Unsupported transition kind {kind!r} in {path}")
 
     if upstream:
         asset_path = _upstream_shader(upstream)
         asset_name = asset_path.name
         header = {key.lower(): value for key, value in _HEADER.findall(asset_path.read_text(encoding="utf-8"))}
-    elif kind == "matte" and not document.get("asset"):
+    elif kind in ("matte", "graph") and not document.get("asset"):
         # A matte item draws with the host's own matte renderer; it has no shader (SPEC-0011).
         asset_name, asset_path, header = "", None, {}
     else:
@@ -249,6 +250,8 @@ def _load_manifest(path: Path, origin: str) -> dict[str, Any]:
         "params": params,
         "inputs": inputs,
         "softness": softness,
+        # A recipe of SPEC-0012 primitives (ADR 0022), checked when the catalog loads.
+        "graph": _recipe(document.get("graph"), path),
         "curated": True,
         "upstream": upstream or None,
         "origin": origin,
@@ -257,6 +260,20 @@ def _load_manifest(path: Path, origin: str) -> dict[str, Any]:
         "asset_path": asset_path,
         "preview_path": preview_path,
     }
+
+
+def _recipe(graph: Any, path: Path) -> dict[str, Any] | None:
+    if not graph:
+        return None
+    from .compositing.schema import validate
+
+    problems = validate(graph)
+    for name in ("from", "to", "progress"):
+        if name not in (graph.get("ports") or {}):
+            problems.append(("composite_input_missing", f"a join's recipe has a port {name!r}"))
+    if problems:
+        raise TransitionFormatError(f"The graph in {path} is not valid: " + "; ".join(text for _, text in problems))
+    return graph
 
 
 def list_transitions(project_root: Path | None = None) -> list[dict[str, Any]]:

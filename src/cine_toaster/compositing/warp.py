@@ -12,10 +12,19 @@ from typing import Any
 import numpy as np
 
 
-def sample(image: np.ndarray, sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
-    """``image`` at source pixel positions ``sx``, ``sy`` (pixel units, centres at .5 - .5 = integers)."""
+def sample(image: np.ndarray, sx: np.ndarray, sy: np.ndarray, edge: str = "transparent") -> np.ndarray:
+    """``image`` at source pixel positions ``sx``, ``sy`` (pixel units, centres at .5 - .5 = integers).
+
+    ``edge`` says what lies outside the source: nothing (`transparent`, SPEC-0012's default), its border
+    pixels repeated (`extend`), or its reflection (`mirror`) -- what a full-frame warp usually wants.
+    """
 
     height, width = image.shape[:2]
+    if edge == "extend":
+        sx, sy = np.clip(sx, 0, width - 1), np.clip(sy, 0, height - 1)
+    elif edge == "mirror":
+        sx = (width - 1) - np.abs(np.mod(sx, 2 * (width - 1)) - (width - 1))
+        sy = (height - 1) - np.abs(np.mod(sy, 2 * (height - 1)) - (height - 1))
     planes = image if image.ndim == 3 else image[..., None]
     padded = np.pad(planes, ((1, 1), (1, 1), (0, 0)))
     x0, y0 = np.floor(sx).astype(int), np.floor(sy).astype(int)
@@ -38,9 +47,9 @@ def grid(shape: tuple[int, ...]) -> tuple[np.ndarray, np.ndarray]:
     return (xs + 0.5) / width, (ys + 0.5) / height
 
 
-def from_fractions(image: np.ndarray, u: np.ndarray, v: np.ndarray) -> np.ndarray:
+def from_fractions(image: np.ndarray, u: np.ndarray, v: np.ndarray, edge: str = "transparent") -> np.ndarray:
     height, width = image.shape[:2]
-    return sample(image, u * width - 0.5, v * height - 0.5)
+    return sample(image, u * width - 0.5, v * height - 0.5, edge)
 
 
 def homography(source: list[list[float]], target: list[list[float]]) -> np.ndarray:
@@ -102,7 +111,8 @@ def transform(image: np.ndarray, *, translate: Any, scale: Any, rotate: Any, piv
     return corner_pin(image, target, aspect)
 
 
-def displace(image: np.ndarray, field: np.ndarray, strength: float, direction: Any) -> np.ndarray:
+def displace(image: np.ndarray, field: np.ndarray, strength: float, direction: Any,
+             edge: str = "transparent") -> np.ndarray:
     """Each pixel taken from a neighbour along a field: one channel along ``direction``, two as vectors (pixels)."""
 
     height, width = image.shape[:2]
@@ -114,11 +124,11 @@ def displace(image: np.ndarray, field: np.ndarray, strength: float, direction: A
         direction = np.broadcast_to(np.asarray(direction if direction is not None else [1.0, 0.0], dtype=np.float32),
                                     (2,))
         dx, dy = values * direction[0] * strength * width, values * direction[1] * strength * height
-    return sample(image, xs - dx, ys - dy)
+    return sample(image, xs - dx, ys - dy, edge)
 
 
 def procedural(image: np.ndarray, kind: str, amount: float, frequency: float, centre: Any,
-               aspect: float) -> np.ndarray:
+               aspect: float, edge: str = "transparent") -> np.ndarray:
     u, v = grid(image.shape)
     cx, cy = np.broadcast_to(np.asarray(centre if centre is not None else [0.5, 0.5], dtype=np.float32), (2,))
     du, dv = (u - cx) * aspect, v - cy
@@ -136,4 +146,4 @@ def procedural(image: np.ndarray, kind: str, amount: float, frequency: float, ce
         du, dv = du * factor, dv * factor
     else:
         raise ValueError(f"no procedural warp {kind!r}")
-    return from_fractions(image, du / aspect + cx, dv + cy)
+    return from_fractions(image, du / aspect + cx, dv + cy, edge)

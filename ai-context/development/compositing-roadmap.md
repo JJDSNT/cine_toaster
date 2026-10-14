@@ -193,6 +193,36 @@ it. Next: the `composite:` record in an assembly, and FFmpeg as a renderer.
 - Done when: no operation exists twice across the catalogs, and every item
   says which primitives it uses.
 
+### C6b. Rich typography and animated lettering (intention, recorded 2026-10-14)
+
+Recorded at the user's request during C2, to be investigated after the
+primitives are consolidated; not part of C2, and no format, library or API is
+prescribed here.
+
+- **Inspiration**: the Amiga's Kara Fonts / Kara Collection -- ColorFonts and
+  AnimFonts: decorative lettering, textured and dimensional type, metallic and
+  glass-like materials, shadows, bevels, gradients, colour cycling, animated
+  letters. **The historical reference, not the functional limit**: modern
+  directions to look at include OpenType colour fonts, SVG fonts, procedural
+  typography and per-character animation, without assuming all of them are
+  built.
+- **What the catalog should eventually offer**:
+  - font selection: conventional fonts, colour fonts and other suitable
+    typography formats;
+  - visual styles: materials, textures, gradients, bevels, shadows, outlines,
+    glow and other effects;
+  - animation presets: scrolling, crawling, rotation, reveals, per-character
+    animation and others;
+  - composable recipes: text generation with warps, mattes, filters, curves
+    and layers;
+  - backend flexibility: FFmpeg, Blender and GL where each fits, without
+    duplicating what they already do.
+- **Principle**: typography is another composable capability of Cine
+  Toaster -- recipes of the primitives (`generate.text` and the rest) -- not
+  an independent effects engine, and not static images of styled text.
+- **Acceptance direction**: each typography entry names the primitives it is
+  built from and the renderer capabilities it needs, as every C6 entry does.
+
 ### C7. Time and track
 
 - What: retime, speed ramp, freeze, reverse, frame blending, an offset

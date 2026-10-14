@@ -1,0 +1,38 @@
+schema_version = 1
+id = "warp-wipe"
+name = "Warp wipe"
+kind = "graph"
+category = "warp-wipe"
+description = "The outgoing picture bends along a map while the incoming one is revealed through a luma order: a deformation and a reveal at once."
+guidance = "For a change that should feel physical and organic at the same time -- liquid, heat, a dream giving way. The map decides the bending, the order where the next shot appears first."
+energy = "medium"
+motion = "organic"
+duration_ms = 1600
+tags = ["warp", "wipe", "organic", "toaster"]
+use_when = ["A join that should feel like the picture itself gives way", "Water, heat, memory"]
+avoid_when = ["A cut that should not be noticed", "Hard graphic punctuation"]
+license = "MIT"
+# A recipe of SPEC-0012's primitives (ADR 0022): nothing of its own is drawn. map.png and order.png are ours (CC0).
+preview = "preview.webm"
+
+
+[inputs]
+map_picture = "map.png"
+order_picture = "order.png"
+
+[graph]
+ports = {from = "picture", to = "picture", progress = "curve", map_picture = "picture", order_picture = "picture"}
+output = "out"
+
+[graph.nodes]
+map = {op = "signal.luma", picture = "map_picture"}
+bending = {op = "curve.map", in = "progress", how = "scale", factor = 0.25}
+bent = {op = "warp.displace", in = "from", map = "map", strength = {curve = "bending"}, direction = [1.0, 0.6], edge = "mirror"}
+order = {op = "signal.luma", picture = "order_picture"}
+shape = {op = "matte.from_signal", signal = "order"}
+reveal = {op = "matte.threshold", matte = "shape", progress = "progress", softness = 0.08}
+out = {op = "merge.over", front = "to", back = "bent", matte = "reveal"}
+
+[render]
+ffmpeg = "graph"
+ffmpeg_note = "Drawn by the compositing reference from its graph, on every engine: no shader runs it yet."

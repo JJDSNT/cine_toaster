@@ -3,7 +3,7 @@ ports: {from: picture, to: picture, progress: curve, map_picture: picture, order
 nodes:
   map:     {op: signal.luma, picture: map_picture}
   bending: {op: curve.map, in: progress, how: scale, factor: 0.6}
-  bent:    {op: warp.displace, in: from, map: map, strength: {curve: bending}}
+  bent:    {op: warp.displace, in: from, map: map, strength: {curve: bending}, edge: mirror}
   order:   {op: signal.luma, picture: order_picture}
   shape:   {op: matte.from_signal, signal: order}
   reveal:  {op: matte.threshold, matte: shape, progress: progress, softness: 0.08}

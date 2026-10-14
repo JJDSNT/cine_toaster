@@ -8,6 +8,7 @@ work records named here hold the detail.
 
 | Date | Piece | Length | File | Published |
 |---|---|---|---|---|
+| 2026-10-14 | Heat v3, the warp wipe | 42 s | `trials/organic-trial-v3.mp4` | not yet |
 | 2026-10-14 | Heat v2, joins through mattes | 42 s | `trials/organic-trial-v2.mp4` | not yet |
 | 2026-10-14 | Matte prototype | 9 s | `trials/matte-prototype-v1.mp4` | not yet |
 | 2026-10-14 | Heat, organic trial | 42 s | `trials/organic-trial-v1.mp4` | [YouTube](https://youtu.be/rI94S8FVFfQ) |
@@ -17,6 +18,16 @@ work records named here hold the detail.
 
 `trials/` is `~/cine-toaster-references/trials/` on the machine they were made
 on. A link is added when a piece is published.
+
+## 2026-10-14 · Heat v3: the warp wipe
+
+The join from the launch plume into the engine test stand is now the warp
+wipe the user asked for: the outgoing picture bends along a map while the
+incoming one opens from the centre, both playing. It is not a shader: it is a
+recipe of compositing primitives (ADR 0022) -- a luma signal, a displacement,
+a matte from a signal, a threshold, a merge -- drawn by the NumPy reference.
+Every part made by the tool. Slow: the scene took six minutes; a fast
+renderer of the same graph is next.
 
 ## 2026-10-14 · Heat v2: joins shaped by a picture
 

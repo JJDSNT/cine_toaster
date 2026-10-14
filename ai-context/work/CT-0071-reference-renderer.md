@@ -106,17 +106,35 @@ renderer in use never becomes the definition of correct.
   real-time requirements (deadline, buffer pool, GPU, playback cache with
   prefetch, planning, degradation by policy).
 
+# Done (recipes and the warp wipe)
+
+- **Transitions as recipes**: a catalog item of kind `graph` holds a
+  SPEC-0012 graph with ports `from`, `to`, `progress` and its own pictures,
+  checked when the catalog loads; the assembly draws its join through the
+  reference, both pictures playing (`_graph_join`); the quick build refuses
+  it with a reason; the Transitions room plays its preview, a clip the
+  reference made from the same graph.
+- **The warp wipe** the user asked for, the first recipe: the outgoing
+  picture displaced along a map while the incoming one is revealed through a
+  radial luma order. Used for real in the organic trial (Heat v3), replacing
+  `undulating-burn-out`.
+- **Edges of a warp**: a displacement or procedural warp may say `edge:
+  extend` or `edge: mirror`; the first preview pulled black in from outside
+  the picture, which a full-frame warp in a join never wants.
+- **Tracking holds two frames**, not the clip; **beats inside a shot's
+  composite**: the scene music's beats in the shot's own seconds.
+
 # To do
 
 - `matte.key` by colour and by difference, `signal.channel` hue and
   saturation, and `warp.procedural` bend are still refused by the reference.
 - Recording a non-deterministic result in the production (SPEC-0012 §5), for
   when `signal.estimate` and `generate.render` get renderers (C8, C9).
-- A join's recipe from the catalog (`[graph]` in a transition item) rendered
-  in an assembly; `curve.beats` inside a shot's composite (the shot's offset in
-  the scene's music).
-- Tracking still holds a whole clip in memory (`track.measure` stacks every
-  frame): stream it.
+- **Speed.** The reference is exact, not fast: the Heat scene took 6 min 23 s
+  with one 2.9 s warp wipe at 1080p. A fast renderer of the graph (FFmpeg for
+  what it can do correctly, GL for the rest) checked against the reference is
+  the next piece of C2; real time is C9b.
+- The other gl-transitions worth it re-expressed as recipes (C5, C6).
 - FFmpeg as a renderer of the graph for the ops it can do correctly, with a
   manifest; conformance cases for each, at more sizes, rates, bit depths and
   both alphas.
@@ -136,4 +154,5 @@ renderer in use never becomes the definition of correct.
   curve peaking on its beat; identities that move only with what changed and
   know files by content; the cache's hits and misses; every runnable example.
 - Full suite: 665 tests pass (2026-10-14, at b87342d); 679 after the second
-  slice; 688 after composite shots and memory.
+  slice; 688 after composite shots and memory; 691 after recipes and the warp
+  wipe.

@@ -105,10 +105,10 @@ OPS: dict[str, Op] = {
                           "perspective": "number", "depth": "number"}),
     "warp.corner_pin": Op({"in": P(*EITHER), "track": P(*TRK, required=False)}, {"out": SAME}, {"corners": "vector"}),
     "warp.displace": Op({"in": P(*EITHER), "map": P(*SIG)}, {"out": SAME},
-                        {"strength": "number", "direction": "vector"}),
+                        {"strength": "number", "direction": "vector", "edge": "enum:transparent|extend|mirror"}),
     "warp.procedural": Op({"in": P(*EITHER)}, {"out": SAME},
                           {"kind": "enum:ripple|swirl|bend|lens", "amount": "number", "frequency": "number",
-                           "centre": "vector"}),
+                           "centre": "vector", "edge": "enum:transparent|extend|mirror"}),
     # -- colour
     "colour.lut": Op({"in": P(*PIC)}, params={"file": "file", "look": "text"}),
     "colour.grade": Op({"in": P(*PIC)}, params={"lift": "vector", "gamma": "vector", "gain": "vector",
