@@ -664,8 +664,15 @@ def _render_composite(root: Path, segment: Segment, destination: Path, first: di
                                       alpha=node.get("alpha", "straight"))
     # The music's beats in the shot's own seconds: a composite pulses with the cut, not with its take.
     local = [beat - at for beat in beats or [] if -1.0 <= beat - at <= length + 1.0]
+    from .compositing.gl import renderer_for
+
+    # GL when it draws every op of the composite (checked against the reference by the conformance tests);
+    # the reference otherwise, exact and slow.
+    fast = renderer_for(graph)
     pictures, _identity, cached = reference.render(graph, inputs, frames=frames, size=size, fps=fps, root=root,
-                                                   beats=local)
+                                                   beats=local, renderer=fast)
+    notes.append(f"{segment.shot}: its composite was drawn by "
+                 + (f"GL ({fast.name.split(' (')[0]})." if fast else "the NumPy reference (exact, slow)."))
     if cached:
         notes.append(f"{segment.shot}: its composite was found in the cache.")
     silent = destination.with_suffix(".picture.mp4")
@@ -1021,7 +1028,10 @@ def _graph_join(outgoing: Path, incoming: Path, outgoing_frames: int, frames: in
     }
     for name, path in (transition.get("inputs") or {}).items():
         inputs[name] = reference.read(Path(path), frames, size, fps)
-    pictures, _, _ = reference.render(transition["graph"], inputs, frames=frames, size=size, fps=fps)
+    from .compositing.gl import renderer_for
+
+    pictures, _, _ = reference.render(transition["graph"], inputs, frames=frames, size=size, fps=fps,
+                                      renderer=renderer_for(transition["graph"]))
     silent = destination.with_suffix(".picture.mp4")
     reference.write(pictures, silent, fps)
     silent.replace(destination)

@@ -8,6 +8,7 @@ work records named here hold the detail.
 
 | Date | Piece | Length | File | Published |
 |---|---|---|---|---|
+| 2026-10-14 | Heat v5, the warp wipe in GL | 42 s | `trials/organic-trial-v5.mp4` | not yet |
 | 2026-10-14 | Heat v4, the warp wipe (a ball) | 42 s | `trials/organic-trial-v4.mp4` | not yet |
 | 2026-10-14 | Heat v3, a displace wipe | 42 s | `trials/organic-trial-v3.mp4` | not yet |
 | 2026-10-14 | Heat v2, joins through mattes | 42 s | `trials/organic-trial-v2.mp4` | not yet |
@@ -19,6 +20,12 @@ work records named here hold the detail.
 
 `trials/` is `~/cine-toaster-references/trials/` on the machine they were made
 on. A link is added when a piece is published.
+
+## 2026-10-14 · Heat v5: the same warp wipe, drawn in GL
+
+The first join back to `perlin`, which the user preferred to the splash
+matte; the warp wipe now drawn by the GL renderer, checked against the
+reference: visually the same, the scene in 3 min 29 s instead of 9 min 52 s.
 
 ## 2026-10-14 · Heat v4: the warp wipe
 

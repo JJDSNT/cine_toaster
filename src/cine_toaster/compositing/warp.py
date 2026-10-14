@@ -85,6 +85,14 @@ def transform(image: np.ndarray, *, translate: Any, scale: Any, rotate: Any, piv
               aspect: float) -> np.ndarray:
     """Move, scale and rotate in three axes about a pivot; with a field of view, in perspective."""
 
+    return corner_pin(image, transform_corners(translate=translate, scale=scale, rotate=rotate, pivot=pivot,
+                                               perspective=perspective, aspect=aspect), aspect)
+
+
+def transform_corners(*, translate: Any, scale: Any, rotate: Any, pivot: Any, perspective: float,
+                      aspect: float) -> list[list[float]]:
+    """Where the picture's four corners land (fractions of the frame): the geometry every renderer shares."""
+
     translate = np.broadcast_to(np.asarray(translate, dtype=np.float64), (2,))
     scale = np.broadcast_to(np.asarray(scale, dtype=np.float64), (2,))
     angles = np.asarray(rotate, dtype=np.float64).reshape(-1)
@@ -108,7 +116,7 @@ def transform(image: np.ndarray, *, translate: Any, scale: Any, rotate: Any, piv
             factor = distance / max(distance + z, 1e-6)
             x, y = x * factor, y * factor
         target.append([(x / aspect) + pivot[0] + translate[0], y + pivot[1] + translate[1]])
-    return corner_pin(image, target, aspect)
+    return target
 
 
 def displace(image: np.ndarray, field: np.ndarray, strength: float, direction: Any,
@@ -210,6 +218,20 @@ def surface(image: np.ndarray, *, shape: str, morph: float, rotate: Any, transla
 
     height, width = image.shape[:2]
     big_w, big_h = width * supersample, height * supersample
+    mesh = surface_mesh(shape=shape, morph=morph, rotate=rotate, translate=translate, scale=scale,
+                        perspective=perspective, light=light, detail=detail, aspect=aspect)
+    gu, gv, z, shade = mesh["u"], mesh["v"], mesh["z"], mesh["shade"]
+    sx, sy = mesh["x"] * big_w, mesh["y"] * big_h
+    rows, columns = gu.shape[0] - 1, gu.shape[1] - 1
+    del mesh
+    return _rasterise(image, gu, gv, z, shade, sx, sy, rows, columns, big_w, big_h, width, height, supersample)
+
+
+def surface_mesh(*, shape: str, morph: float, rotate: Any, translate: Any, scale: float, perspective: float,
+                 light: float, detail: int, aspect: float) -> dict[str, np.ndarray]:
+    """The surface's mesh as every renderer draws it: per vertex its place on the screen (x, y as fractions of
+    the frame), its distance from the camera (z), its place in the picture (u, v) and its light."""
+
     columns = max(8, int(detail))
     rows = max(4, int(round(columns / aspect)))
     gu, gv = np.meshgrid(np.linspace(0, 1, columns + 1), np.linspace(0, 1, rows + 1))
@@ -221,8 +243,8 @@ def surface(image: np.ndarray, *, shape: str, morph: float, rotate: Any, transla
     distance = 0.5 / np.tan(np.radians(perspective) / 2) if perspective else 1e6
     z = points[..., 2] + move[2] + (centre[2] * float(scale) if shape in ("sphere", "cylinder") else 0.0)
     factor = distance / np.maximum(distance + z, 1e-6)
-    sx = ((points[..., 0] * factor) / aspect + 0.5 + move[0]) * big_w
-    sy = ((points[..., 1] * factor) + 0.5 + move[1]) * big_h
+    sx = (points[..., 0] * factor) / aspect + 0.5 + move[0]
+    sy = (points[..., 1] * factor) + 0.5 + move[1]
 
     # A normal per vertex, from the mesh's neighbours, for the light.
     du = np.gradient(points, axis=1)
@@ -230,7 +252,12 @@ def surface(image: np.ndarray, *, shape: str, morph: float, rotate: Any, transla
     normal = np.cross(du, dv)
     normal /= np.maximum(np.linalg.norm(normal, axis=-1, keepdims=True), 1e-9)
     shade = 1.0 - float(light) * (1.0 - np.abs(normal[..., 2]))
+    return {"x": sx, "y": sy, "z": z, "u": gu, "v": gv, "shade": shade}
 
+
+def _rasterise(image: np.ndarray, gu: np.ndarray, gv: np.ndarray, z: np.ndarray, shade: np.ndarray, sx: np.ndarray,
+               sy: np.ndarray, rows: int, columns: int, big_w: int, big_h: int, width: int, height: int,
+               supersample: int) -> tuple[np.ndarray, np.ndarray]:
     depth_buffer = np.full((big_h, big_w), np.inf, dtype=np.float64)
     u_buffer = np.zeros((big_h, big_w), dtype=np.float32)
     v_buffer = np.zeros((big_h, big_w), dtype=np.float32)

@@ -151,17 +151,54 @@ programs; now it is a primitive.
   edge); each ends on the incoming picture alone, previews made by the
   reference. The mistaken recipe kept, renamed `displace-wipe`.
 
+# Done (the GL renderer)
+
+- **`compositing/gl.py`**: the same graphs drawn in float GL textures
+  (RGBA32F, R32F), linear and premultiplied, with programs compiled once.
+  Geometry (a transform's corners, a surface's mesh) and curves come from
+  the very functions the reference uses (`transform_corners`,
+  `surface_mesh`, `curve_factory`), so only the drawing differs. It draws
+  sources, solids, gradients, luminance, luma, channels, mattes from signals,
+  thresholds, combinations, luma keys, over, mix, blends, Porter-Duff, flat
+  and perspective transforms, corner pins, surfaces (a mesh with a depth
+  test, drawn twice the size and reduced), grade, invert, blur, and every
+  curve except those from tracks. Anything else is refused by name and the
+  reference draws.
+- **Conformance** (`tests/test_compositing_gl.py`): six graphs and the three
+  warp wipes agree with the reference -- within 0.001 mean for pixel
+  operations, 0.01-0.02 for warps and meshes, where rasterisers differ at
+  edges.
+- **The assembly uses it** when GL runs here and draws every op of a
+  composite or a recipe join (`gl.renderer_for`); the version's notes say
+  which drew. Its cached results are kept apart from the reference's.
+- **Measured** at 1080p, the ball warp wipe: 152 ms a frame in GL, 4.1 s in
+  the reference. The Heat scene: 3 min 29 s, against 9 min 52 s.
+- **This machine's GL** is Mesa's llvmpipe by default; with
+  `GALLIUM_DRIVER=d3d12` it is the Intel UHD Graphics 620 through Windows. A
+  1080p float pass: 1.5 ms on llvmpipe, 5.4 ms on the GPU; reading it back:
+  8 and 18 ms. llvmpipe is the faster here.
+
 # To do
 
 - `matte.key` by colour and by difference, `signal.channel` hue and
   saturation, and `warp.procedural` bend are still refused by the reference.
 - Recording a non-deterministic result in the production (SPEC-0012 §5), for
   when `signal.estimate` and `generate.render` get renderers (C8, C9).
-- **Speed.** The reference is exact, not fast: the Heat scene took 6 min 23 s
+- `toast doctor` does not say which GL a machine has (llvmpipe, a GPU through
+  D3D12, a native driver) nor which is faster; it should, for C9b.
+- The GL renderer uploads its inputs and reads its output every frame (the
+  bulk of its 152 ms); for real time, sources must stay on the GPU (C9b).
+- GL lacks time operations, displacement, procedural warps, colour LUTs,
+  keys by colour or difference, tracks, depth merges: those graphs fall to
+  the reference.
+- **Speed (before the GL renderer).** The reference is exact, not fast: the Heat scene took 6 min 23 s
   with one 2.9 s warp wipe at 1080p. A fast renderer of the graph (FFmpeg for
   what it can do correctly, GL for the rest) checked against the reference is
   the next piece of C2; real time is C9b.
 - The other gl-transitions worth it re-expressed as recipes (C5, C6).
+- The user (2026-10-14): the aim of the warp wipe work was to internalise the
+  concept the closed shaders already had; the transitions of the music piece are
+  not to be polished now. They are refined later.
 - `page-turn` folds along a vertical line only; a diagonal fold (an angle),
   and the back of the page showing something else, are open.
 - `warp.surface` has four shapes; tiles (the picture breaking into flying
@@ -188,4 +225,4 @@ programs; now it is a primitive.
   know files by content; the cache's hits and misses; every runnable example.
 - Full suite: 665 tests pass (2026-10-14, at b87342d); 679 after the second
   slice; 688 after composite shots and memory; 691 after recipes and the warp
-  wipe; 697 after warp.surface and the warp wipes.
+  wipe; 697 after warp.surface and the warp wipes; 700 after the GL renderer.

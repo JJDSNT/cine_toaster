@@ -400,63 +400,11 @@ class _Held:
         return self.picture[key[1:]] if isinstance(key, tuple) else self.picture
 
 
-def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size: tuple[int, int], fps: float,
-             working: str = LINEAR, root: Path | None = None, beats: list[float] | None = None,
-             stream: bool = False, stats: dict[str, int] | None = None, budget: int | None = None) -> Any:
-    """The graph's output picture for every frame of its extent: (frames, H, W, 4), linear, premultiplied.
-
-    With ``stream``, a generator of frames instead, made one at a time: memory stays bounded by the
-    graph and a few frames, not by the length.
-
-    Four things are kept apart (SPEC-0012 §5): a node's **identity** says whether a result can be reused;
-    the **persistent cache** (`render`) keeps results between runs, on disk; the **resident** values here
-    hold what the frame being made and the time operations' window need, within an optional ``budget`` in
-    bytes; and a value's **lifetime** ends when nothing still to be made needs it, whether or not the
-    persistent cache has it. ``stats`` receives what was kept at most (entries, bytes), hits, misses and
-    recomputations.
-
-    ``beats`` are the scene music's beats in seconds from the extent's start (CT-0067), for `curve.beats`.
-    An input that is a recorded result of `signal.estimate` or `generate.render` is given like any other.
-    """
-
-    problems = validate(graph)
-    if problems:
-        raise ValidationError("The graph is not valid: " + "; ".join(message for _, message in problems))
-    nodes = graph["nodes"]
-    missing = sorted({node["op"] for node in nodes.values() if node["op"] not in IMPLEMENTED})
-    if missing:
-        why = "; ".join(f"{op}: {NOT_IN_REFERENCE[op]}" for op in missing if op in NOT_IN_REFERENCE)
-        raise ValidationError(f"The reference does not implement {', '.join(missing)}" + (f" ({why})" if why else " yet"))
-    aspect = size[0] / size[1]
-    context = Context(size, fps, frames, working, root, window=temporal_window(graph), budget=budget)
-    counts = {"hits": 0, "misses": 0, "recomputed": 0}
-    windows = node_windows(graph)
-    made_once: set[tuple[str, int]] = set()
-    width, height = size
-    length = frames / fps
-    port_types = graph.get("ports") or {}
-
-    def port_kind(name: str) -> str:
-        return str(port_types.get(name, ""))
-    curves: dict[str, Callable[[float], Any]] = {}
-    clips: dict[str, np.ndarray] = {}
-    for name, value in inputs.items():
-        if isinstance(value, dict):  # a track, as data
-            continue
-        if callable(value):
-            curves[name] = value
-        elif isinstance(value, Clip):
-            clips[name] = value
-        elif isinstance(value, np.ndarray):
-            per_frame = value.ndim == 4 or (port_kind(name) == "signal" and value.ndim == 3 and value.shape[0] == frames)
-            clips[name] = value if per_frame else _Held(value, frames)
-        else:
-            clips[name] = read(Path(value), frames, size, fps, working=working)
-    for name, kind in port_types.items():
-        if kind == "curve" and name not in curves:
-            curves[name] = lambda seconds: seconds / length if length else 0.0  # a join's progress, by default
-        elif kind in ("picture", "matte", "signal") and name not in clips:
-            raise ValidationError(f"The graph's port {name!r} was given no {kind}")
+def curve_factory(nodes: dict[str, Any], curves: dict[str, Callable[[float], Any]], *, fps: float, length: float,
+                  beats: list[float] | None, tracks: Callable[[str], dict[str, Any]]) -> Callable[[str], Callable]:
+    """The curves of a graph (SPEC-0012 §6), evaluated the same way by every renderer: they are numbers per
+    frame, computed on the CPU and handed to whatever draws the pictures. ``curves`` holds those given as
+    inputs and is filled as curves are made."""
 
     def curve(reference: str) -> Callable[[float], Any]:
         if reference in curves:
@@ -528,6 +476,70 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             raise ValidationError(f"{reference} is not a curve")
         curves[reference] = made
         return made
+
+    return curve
+
+
+def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size: tuple[int, int], fps: float,
+             working: str = LINEAR, root: Path | None = None, beats: list[float] | None = None,
+             stream: bool = False, stats: dict[str, int] | None = None, budget: int | None = None) -> Any:
+    """The graph's output picture for every frame of its extent: (frames, H, W, 4), linear, premultiplied.
+
+    With ``stream``, a generator of frames instead, made one at a time: memory stays bounded by the
+    graph and a few frames, not by the length.
+
+    Four things are kept apart (SPEC-0012 §5): a node's **identity** says whether a result can be reused;
+    the **persistent cache** (`render`) keeps results between runs, on disk; the **resident** values here
+    hold what the frame being made and the time operations' window need, within an optional ``budget`` in
+    bytes; and a value's **lifetime** ends when nothing still to be made needs it, whether or not the
+    persistent cache has it. ``stats`` receives what was kept at most (entries, bytes), hits, misses and
+    recomputations.
+
+    ``beats`` are the scene music's beats in seconds from the extent's start (CT-0067), for `curve.beats`.
+    An input that is a recorded result of `signal.estimate` or `generate.render` is given like any other.
+    """
+
+    problems = validate(graph)
+    if problems:
+        raise ValidationError("The graph is not valid: " + "; ".join(message for _, message in problems))
+    nodes = graph["nodes"]
+    missing = sorted({node["op"] for node in nodes.values() if node["op"] not in IMPLEMENTED})
+    if missing:
+        why = "; ".join(f"{op}: {NOT_IN_REFERENCE[op]}" for op in missing if op in NOT_IN_REFERENCE)
+        raise ValidationError(f"The reference does not implement {', '.join(missing)}" + (f" ({why})" if why else " yet"))
+    aspect = size[0] / size[1]
+    context = Context(size, fps, frames, working, root, window=temporal_window(graph), budget=budget)
+    counts = {"hits": 0, "misses": 0, "recomputed": 0}
+    windows = node_windows(graph)
+    made_once: set[tuple[str, int]] = set()
+    width, height = size
+    length = frames / fps
+    port_types = graph.get("ports") or {}
+
+    def port_kind(name: str) -> str:
+        return str(port_types.get(name, ""))
+    curves: dict[str, Callable[[float], Any]] = {}
+    clips: dict[str, np.ndarray] = {}
+    for name, value in inputs.items():
+        if isinstance(value, dict):  # a track, as data
+            continue
+        if callable(value):
+            curves[name] = value
+        elif isinstance(value, Clip):
+            clips[name] = value
+        elif isinstance(value, np.ndarray):
+            per_frame = value.ndim == 4 or (port_kind(name) == "signal" and value.ndim == 3 and value.shape[0] == frames)
+            clips[name] = value if per_frame else _Held(value, frames)
+        else:
+            clips[name] = read(Path(value), frames, size, fps, working=working)
+    for name, kind in port_types.items():
+        if kind == "curve" and name not in curves:
+            curves[name] = lambda seconds: seconds / length if length else 0.0  # a join's progress, by default
+        elif kind in ("picture", "matte", "signal") and name not in clips:
+            raise ValidationError(f"The graph's port {name!r} was given no {kind}")
+
+    curve = curve_factory(nodes, curves, fps=fps, length=length, beats=beats,
+                          tracks=lambda reference: tracks(reference))
 
     track_cache: dict[str, dict[str, Any]] = {}
 
@@ -1015,7 +1027,7 @@ def _input_identity(value: Any) -> str | None:
 
 def render(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size: tuple[int, int], fps: float,
            working: str = LINEAR, root: Path | None = None, beats: list[float] | None = None,
-           cache: Path | None | bool = True) -> tuple[np.ndarray, str, bool]:
+           cache: Path | None | bool = True, renderer: Any = None) -> tuple[np.ndarray, str, bool]:
     """`evaluate`, kept by the output's identity (SPEC-0012 §5): (pictures, identity, whether it was cached).
 
     The cache is disposable: deleting it costs time only. An input with no identity (a curve given as
@@ -1025,11 +1037,13 @@ def render(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size: 
     from .identity import REFERENCE_VERSION, identities
 
     known = {name: _input_identity(value) for name, value in inputs.items()}
-    context = {"renderer": REFERENCE_VERSION, "numpy": np.__version__, "working": working, "fps": fps,
+    # Another renderer (GL) draws the same graph; its results are kept apart from the reference's.
+    draw = renderer.evaluate if renderer is not None else evaluate
+    context = {"renderer": f"gl/{renderer.name}" if renderer is not None else REFERENCE_VERSION, "numpy": np.__version__, "working": working, "fps": fps,
                "frames": frames, "size": list(size), "beats": list(beats or [])}
     if cache is False or any(identity is None for identity in known.values()):
-        return evaluate(graph, inputs, frames=frames, size=size, fps=fps, working=working, root=root,
-                        beats=beats, stream=True), "", False
+        return draw(graph, inputs, frames=frames, size=size, fps=fps, working=working, root=root,
+                    beats=beats, stream=True), "", False
     output = identities(graph, known, context=context, root=root)[graph["output"].split(".")[0]]
     folder = Path(cache) if isinstance(cache, (str, Path)) else cache_directory()
     stored = folder / f"{output}.npy"
@@ -1039,8 +1053,8 @@ def render(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size: 
     partial = stored.with_suffix(".part.npy")
     # Half floats, the precision SPEC-0012 hands pictures over in, written frame by frame to disk.
     kept = np.lib.format.open_memmap(partial, mode="w+", dtype=np.float16, shape=(frames, size[1], size[0], 4))
-    for index, picture in enumerate(evaluate(graph, inputs, frames=frames, size=size, fps=fps, working=working,
-                                             root=root, beats=beats, stream=True)):
+    for index, picture in enumerate(draw(graph, inputs, frames=frames, size=size, fps=fps, working=working,
+                                         root=root, beats=beats, stream=True)):
         kept[index] = picture
         if index % 16 == 15:
             kept.flush()
