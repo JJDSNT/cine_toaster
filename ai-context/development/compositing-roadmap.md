@@ -90,6 +90,9 @@ advance.
 
 ### C1. The primitives specified (SPEC-0012)
 
+Drafted (`CT-0070`): `ai-context/specs/SPEC-0012-compositing-graph.md`,
+awaiting review.
+
 - Accept ADR 0022 -- done (2026-10-14, consolidated and accepted).
 - What: each primitive's parameters, units and identity; the composite record
   as a **typed graph** (picture, matte, signal, sound, track, curve, metadata

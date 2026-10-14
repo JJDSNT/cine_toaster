@@ -47,6 +47,7 @@ work is tracked separately under `ai-context/work/`.
 | `SPEC-0009` | workflows and human gates: the built-in state machine that stops for a person | accepted | partial |
 | `SPEC-0010` | locations and the backlot: a set declared once, pinned from a shared library | accepted | partial |
 | `SPEC-0011` | transition mattes and overlays: a join shaped by a picture, and a picture riding it | accepted | partial |
+| `SPEC-0012` | the compositing graph: primitives, typed values, colour, identity, renderers (ADR 0022) | draft | planned |
 
 ## Rule
 

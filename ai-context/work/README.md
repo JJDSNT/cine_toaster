@@ -44,6 +44,8 @@ is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
 CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
 
+- `CT-0070` — C1: the compositing graph specified, SPEC-0012 drafted
+  (`review`)
 - `CT-0069` — joins shaped by a picture: mattes and overlays (SPEC-0011);
   the preview is left (`doing`)
 - `CT-0068` — a production declares the frame its versions are made in
