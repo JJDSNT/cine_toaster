@@ -47,6 +47,14 @@ to copy.
       and between shots as a join; recorded in the breakdown, never in code
 ```
 
+After an outside review (ADR 0022's second amendment), five more things
+hold from the first step: the composite is a **typed graph**; there is a
+**colour contract** (working space, alpha, precision, luma's weights);
+execution is **split across renderers** by a planner; every node has an
+**identity** that makes caching and invalidation exact, and expensive results
+are promoted to production records; and **conformance** between renderers is
+tested continuously, across sizes, rates, bit depths and alpha.
+
 Three things follow and every step below respects them:
 
 1. **A composite is a production record.** A shot's layers and a join's recipe
@@ -83,8 +91,17 @@ advance.
 ### C1. The primitives specified (SPEC-0012)
 
 - What: each primitive's parameters, units and identity; the composite record
-  (a small graph: sources, operations, the order of layers); how a renderer
-  declares what it implements; how a recipe declares what it needs.
+  as a **typed graph** (picture, matte, signal, sound, track, curve, metadata
+  on its edges; wrong connections refused); the **colour contract** (working
+  space scene-linear through OCIO, premultiplied or straight alpha at each
+  edge, precision and HDR, luma's weights for the working space); **node
+  identity** (a hash of operation, parameters, renderer version, inputs) and
+  what is cached, what is promoted to a record, what is not deterministic;
+  formats for tracks and curves apart from what makes them; how a renderer
+  declares what it implements; how a graph is **split across renderers** and
+  results handed over.
+- Kept distinct: the compositing graph is a record a shot holds, not the
+  production canvas nor the orchestration graph (CT-0023).
 - Accept ADR 0022 first (the user).
 - Done when: the specification is accepted, and every existing transition,
   VFX item and title can be written as a recipe of its primitives on paper.
@@ -96,7 +113,14 @@ advance.
   keying and laying, and the overlay moved onto it. A capability matrix in
   `toast doctor`.
 - Done when: the existing joins, effects and titles render through it with
-  their tests unchanged, and luma is computed in one place.
+  their tests unchanged, and luma is computed in one place, in the working
+  space of the colour contract (today it is FFmpeg's Y in display-encoded
+  4:2:0).
+- **The conformance suite starts here** and grows with every step: each
+  primitive and recipe rendered on every renderer that claims it, compared
+  within a tolerance, at several sizes, rates, bit depths and with straight
+  and premultiplied alpha.
+- A cache by node identity, with selective invalidation.
 - Limits: frame-by-frame FFmpeg is slow for long composites; acceptable for
   the reference, addressed in C9.
 
@@ -160,16 +184,33 @@ advance.
 - Done when: a Blender-rendered object sits behind a person in a generated
   picture, ordered by depth.
 
-### C9. Real time, streams, and renderer parity
+### C9. Hybrid execution
+
+- What: a planner that splits a graph across renderers (FFmpeg, GL, Blender,
+  ComfyUI or other model runners, OpenCV), runs each part where it can --
+  locally or on Runpod as a job with its cost -- and hands results over as
+  files in the working space. ComfyUI and Blender join as renderers of the
+  primitives they hold.
+- Done when: one composite segments a person with a model, renders a set in
+  Blender, and merges them in FFmpeg, from one record, with each part's cost
+  recorded.
+
+### C9b. Real time and streams
 
 - What: the measurement of the old D5 (sources at once, real time on this
   GPU, a stream as a source, switching while playing); a GL renderer for the
-  composite graph, so the preview and a live output are the same program;
-  ComfyUI and Blender as renderers where they hold primitives the others do
-  not; tests that a recipe gives the same pictures on each renderer within a
-  tolerance.
+  graph, so the preview and a live output are the same program.
 - Done when: the numbers are written down, and what can run live does, in the
   preview, from the same records.
+
+### C11. A compositing view for the filmmaker
+
+- What: layers, mattes, moves and effects shown and edited as a filmmaker
+  thinks of them, with the typed graph beneath; agents build and change the
+  graph through the same commands. On the React Flow canvas (ADR 0015), kept
+  apart from the canvas's entity and step nodes (CT-0023).
+- Done when: a layer's move and matte are edited in the interface and the
+  breakdown changes, and an agent can do the same through MCP.
 
 ### C10. Loose ends kept from the demos line
 
@@ -190,7 +231,9 @@ advance.
 C1 -> C2 -> C3 -> C4 ----> C5 -> C6
                    \        \
                     -> C7    -> C8
-C9 measures beside any step; it builds after C2.
+Conformance tests run from C2 onward, in every step.
+C9 (hybrid execution) after C2 and before C8; C9b (real time) measures
+beside any step and builds after C2. C11 after C4 and C5.
 C10 is taken in the gaps.
 D8 (the music piece) after C5; D9 (the reel) after C6.
 ```

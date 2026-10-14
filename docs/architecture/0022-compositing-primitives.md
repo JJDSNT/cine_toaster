@@ -126,6 +126,59 @@ The primitives, then: **signal, matte, merge, warp, colour, filter, time,
 generate**, fed by **track** and **animate**. Transitions, effects, keys,
 titles and layers are compositions of them, and the catalogs are recipes.
 
+## Amendment: after an outside review (2026-10-14)
+
+The user had the ADR and its roadmap read by another model. What it raised
+that holds, checked against the code:
+
+**The composite is a typed graph.** Not "a small graph" left to C1: nodes are
+operations, edges carry typed values -- picture, matte, signal (luma, depth,
+vectors), sound, a track, a curve, metadata -- and a connection of the wrong
+type is refused before anything renders. This is a third graph, distinct from
+the two of CT-0023: the production canvas (records) and orchestration (steps
+that run). A compositing graph is a record a shot holds; the canvas may show
+it, orchestration may run it, neither is it.
+
+**A colour contract.** Today composition happens in display-encoded 8-bit
+4:2:0 (`mattes.py` mixes in `yuv420p`; luma is FFmpeg's Y, whichever matrix
+the file declares), while `color.py` already handles scene-linear EXR and
+premultiplied alpha from Blender. Two renderers can implement the same merge
+and disagree because of this alone. The specification fixes: a working space
+(scene-linear, with conversions in and out through OCIO), whether alpha is
+premultiplied or straight at each edge, the precision of each value (8-bit,
+16-bit, float; HDR), and luma's weights for the working space (Rec.709 in
+linear light, not a file's Y).
+
+**Execution across renderers, not by one.** The first text said a recipe
+runs on the renderer that has all its primitives. That is too narrow: a
+composite may segment with a model, render a set in Blender, track with
+OpenCV and merge in FFmpeg. A planner splits the graph by node, each part on
+a renderer that has it, results handed over as files in the working space;
+the cost and place of each part (local, Runpod) go to FinOps as jobs already
+do.
+
+**Identity and cache from the start.** Each node's identity is a hash of its
+operation, its parameters, its renderer's version and its inputs' identities;
+a result is found by that identity, and a change invalidates exactly what
+depends on it. With one correction to the review: a cache is disposable
+(AGENTS.md). A result that is expensive and wanted -- a generated matte, a
+model's segmentation -- is promoted to a production record (a take, an
+asset with provenance), not kept only in a cache. A node that is not
+deterministic (a model with a seed) says so, and its result is recorded,
+not recomputed.
+
+**Data apart from algorithms.** A track is data (points or planes over
+frames) in a format of its own, whatever made it -- OpenCV, Blender, a person;
+likewise a curve. The graph carries the data; trackers are renderers.
+
+**Conformance is continuous.** That the same recipe gives the same pictures
+on each renderer is tested from the first renderer on, across sizes, rates,
+bit depths and alpha -- not saved for the end. Today's tests run at 160x90,
+8-bit.
+
+One point of the review was not taken as written: it calls the ADO "Amiga
+Digital Operations"; it is the Ampex Digital Optics.
+
 ## Consequences
 
 - The order of work this implies is `development/compositing-roadmap.md`.
