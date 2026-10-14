@@ -2,7 +2,7 @@
 id: CT-0070
 title: C1 -- the compositing graph specified (SPEC-0012)
 type: work
-status: review
+status: done
 owner: unassigned
 created_at: 2026-10-14
 updated_at: 2026-10-14
@@ -70,6 +70,14 @@ them. Writing them found a clash: `curve.map` had a parameter named `op`, the
 same as the node's own key; renamed `how`.
 
 The specification is now `review`.
+
+## Accepted (2026-10-14)
+
+The user approved SPEC-0012 for C2 after a second outside reading, which
+asked for two more tests, now written: signal kinds kept apart where an op
+says which it takes (metric and relative depth, segmentation for labels),
+and each way of keying checked for what it needs -- which the validator did
+not check before (`composite_param_missing`, added to §9).
 
 # Decisions
 

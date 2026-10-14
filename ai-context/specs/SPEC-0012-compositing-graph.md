@@ -2,8 +2,8 @@
 id: SPEC-0012
 title: The compositing graph — primitives, typed values, colour, identity and renderers
 type: specification
-status: review
-implementation: planned
+status: accepted
+implementation: partial
 owner: project
 created_at: 2026-10-14
 updated_at: 2026-10-14
@@ -353,6 +353,7 @@ here; nothing above prevents it.
 | `composite_unrecorded` | warning | a non-deterministic node whose result is not recorded yet |
 | `composite_colourspace_unknown` | error | a source's colour space OCIO does not know |
 | `composite_unknown_param` | error | a parameter the op does not have, or a value outside its choices |
+| `composite_param_missing` | error | a parameter an op's chosen method needs is not given (`matte.key` by luminance without `low` and `high`, by difference without its `reference`) |
 
 # 10. Acceptance (for C1)
 

@@ -160,6 +160,10 @@ OPS: dict[str, Op] = {
     "curve.combine": Op({"a": P(*CRV), "b": P(*CRV)}, {"out": "curve"}, {"how": "enum:add|subtract|multiply|min|max"}),
 }
 
+#: What each way of keying needs (SPEC-0012 §3, matte.key): parameters, or the `reference` input.
+KEY_NEEDS = {"luminance": ("low", "high"), "luma": ("low", "high"), "colour": ("colour", "tolerance"),
+             "difference": ("reference", "tolerance")}
+
 #: An opaque node declares its own ports; these are a shader transition's (SPEC-0012 §3, Opaque nodes).
 OPAQUE_PREFIX = "opaque."
 
@@ -292,6 +296,16 @@ def validate(graph: dict[str, Any]) -> list[tuple[str, str]]:
                                  f"{name}.{key} is {value!r}; it is one of {kind[5:].replace('|', ', ')}"))
             elif kind in ("number", "int") and not isinstance(value, (int, float)):
                 problems.append(("composite_type_mismatch", f"{name}.{key} is a number, not {value!r}"))
+        if op_name == "matte.key":
+            method = str(node.get("by") or "")
+            if method not in KEY_NEEDS:
+                problems.append(("composite_param_missing", f"{name} (matte.key) says no `by`: "
+                                                            f"{', '.join(KEY_NEEDS)}"))
+            else:
+                lacking = [key for key in KEY_NEEDS[method] if node.get(key) is None]
+                if lacking:
+                    problems.append(("composite_param_missing",
+                                     f"{name} keys by {method} and needs {', '.join(lacking)}"))
         for output, kind in op.outputs.items():
             if kind == SAME:
                 value = _Value(first.type, first.kind) if first else _Value("picture")

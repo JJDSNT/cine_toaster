@@ -56,5 +56,50 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual({name.split(".")[0] for name in OPS}, families)
 
 
+class SignalKindTests(unittest.TestCase):
+    """Signals of different kinds are not interchangeable where an op says which it takes."""
+
+    def check(self, nodes: dict, output: str = "out", ports: dict | None = None) -> list[str]:
+        return [code for code, _ in validate({"ports": ports or {"p": "picture"}, "nodes": nodes, "output": output})]
+
+    def test_depth_and_relative_depth_go_only_where_they_belong(self) -> None:
+        relative = {"op": "signal.estimate", "picture": "p", "kind": "depth_relative"}
+        metric = {"op": "signal.read", "file": "z.exr", "kind": "depth"}
+        merged = {"op": "merge.depth", "pictures": ["p", "p"], "depths": ["metric", "metric"]}
+        self.assertEqual(self.check({"metric": metric, "out": merged}), [])
+        # Relative depth is refused by merge.depth, and metric depth is refused where only relative is aligned.
+        self.assertIn("composite_type_mismatch",
+                      self.check({"guess": relative, "out": {**merged, "depths": ["guess", "guess"]}}))
+        self.assertIn("composite_type_mismatch", self.check(
+            {"metric": metric, "aligned": {"op": "signal.align_depth", "signal": "metric"}, "out": merged}))
+        self.assertEqual(self.check({"guess": relative, "metric": metric,
+                                     "aligned": {"op": "signal.align_depth", "signal": "guess", "reference": "metric"},
+                                     "out": {**merged, "depths": ["aligned", "metric"]}}), [])
+
+    def test_labels_come_only_from_a_segmentation(self) -> None:
+        luma = {"op": "signal.luma", "picture": "p"}
+        label = {"op": "matte.label", "signal": "luma", "labels": [1]}
+        over = {"op": "merge.over", "front": "p", "back": "p", "matte": "label"}
+        self.assertIn("composite_type_mismatch", self.check({"luma": luma, "label": label, "out": over}))
+        segments = {"op": "signal.estimate", "picture": "p", "kind": "segmentation"}
+        self.assertEqual(self.check({"luma": segments, "label": label, "out": over}), [])
+
+
+class KeyTests(unittest.TestCase):
+    def codes(self, key: dict) -> list[str]:
+        graph = {"ports": {"p": "picture", "plate": "picture"},
+                 "nodes": {"k": {"op": "matte.key", "picture": "p", **key},
+                           "out": {"op": "merge.over", "front": "p", "back": "plate", "matte": "k"}}, "output": "out"}
+        return [code for code, _ in validate(graph)]
+
+    def test_each_way_of_keying_needs_its_own_parameters(self) -> None:
+        self.assertEqual(self.codes({"by": "luminance", "low": 0.7, "high": 0.9}), [])
+        self.assertEqual(self.codes({"by": "colour", "colour": [0, 1, 0], "tolerance": 0.2}), [])
+        self.assertEqual(self.codes({"by": "difference", "reference": "plate", "tolerance": 0.1}), [])
+        for key in ({"by": "luminance", "low": 0.7}, {"by": "colour", "tolerance": 0.2},
+                    {"by": "difference", "tolerance": 0.1}, {"low": 0.2, "high": 0.8}):
+            with self.subTest(key=key):
+                self.assertIn("composite_param_missing", self.codes(key))
+
 if __name__ == "__main__":
     unittest.main()
