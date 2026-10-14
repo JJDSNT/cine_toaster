@@ -264,6 +264,16 @@ partly by hand, outside the repository.
 - The matte may be a file, or **an effect of the VFX catalog rendered for the
   length of the join** (the user's idea, 2026-10-14): fog, smoke, fire,
   liquid, sparks, lightning shaping the join and, as the overlay, seen on it.
+- Evidence it works (2026-10-14, a prototype outside the tool): the
+  catalog's `liquid-splash`, rendered alone over black at 640x360 in 163 s,
+  enlarged and used as the alpha of the incoming picture with FFmpeg, plus
+  a ramp that completes the join. A drop carrying the next picture falls,
+  splashes and floods the frame while both pictures play
+  (`~/cine-toaster-references/trials/matte-prototype-v1.mp4`).
+- Found on the way: `fog` rendered alone is a faint regular diagonal weave,
+  not mist, and no use as a matte; `fire-over` and `smoke-over` need a
+  stock element, and the catalog ships none; a Blender-made effect takes
+  minutes, so a matte is rendered once and cached, small, then enlarged.
 - A specification first: it changes a contract three renderers share.
 - Done when: two playing pictures are joined through a moving matte from
   the catalog, the same in the preview and in the version.
