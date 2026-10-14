@@ -860,6 +860,17 @@ def command_sound(args: argparse.Namespace) -> int:
         print(f"registered {len(made)} sounds from {args.folder}")
         return 0
     catalog = {item["id"]: item for item in list_sounds(root)}
+    if args.sound_command == "beats":
+        from .beats import detect
+
+        if args.id not in catalog:
+            print(f"No sound {args.id!r} in the catalog", file=sys.stderr)
+            return 1
+        heard = detect(catalog[args.id])
+        times = heard["beats"]
+        print(f"{args.id}: {heard['tempo']:g} BPM, {len(times)} beats from {times[0]:.2f} s to {times[-1]:.2f} s "
+              f"-> {Path(catalog[args.id]['directory']).relative_to(root) / 'beats.json'}")
+        return 0
     if args.sound_command == "preview":
         if args.id not in catalog:
             print(f"No sound {args.id!r} in the catalog", file=sys.stderr)
@@ -2195,6 +2206,9 @@ def build_parser() -> argparse.ArgumentParser:
     sound_preview.add_argument("id")
     sound_preview.add_argument("--seconds", type=float, default=0.0)
     sound_preview.add_argument("--output")
+    sound_beats = sound_sub.add_parser("beats", help="Hear a music track's tempo and beats and keep them beside it")
+    sound_beats.add_argument("project", type=Path)
+    sound_beats.add_argument("id")
     sound_search = sound_sub.add_parser("search", help="Search a source; nothing is written")
     sound_search.add_argument("source", choices=("freesound", "sonniss", "openverse"))
     sound_search.add_argument("terms")

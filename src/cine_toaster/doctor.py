@@ -391,6 +391,22 @@ def _whisper() -> Capability:
     )
 
 
+def _beats() -> Capability:
+    from .voice import voice_python
+
+    voice = voice_python()
+    ok = bool(voice and list(voice.parent.parent.glob("lib/python*/site-packages/librosa")))
+    return Capability(
+        name="Beats",
+        what_it_enables="a music track's beats heard and kept (`toast sound beats`), so shots are cut to it in beats",
+        required=False,
+        status=OK if ok else MISSING,
+        detail=f"librosa in {voice.parent.parent}" if ok else "",
+        remedy="" if ok else "make install-voice",
+        wired=True,
+    )
+
+
 CHECKS: tuple[Callable[[], Capability], ...] = (
     _python,
     _yaml,
@@ -410,6 +426,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _natron,
     _splat,
     _sound_sources,
+    _beats,
     # Detected, not yet used. See `report`.
     _sox,
     _blender,

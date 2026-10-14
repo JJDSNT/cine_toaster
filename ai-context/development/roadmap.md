@@ -236,7 +236,8 @@ scene (`CT-0065`); footage declared and fetched (`CT-0066`); the music search
 that hid Freesound's tracks; a first music piece and an organic trial, made
 partly by hand, outside the repository.
 
-**D1. Beats are a record.**
+**D1. ~~Beats are a record.~~** Done (`CT-0067`), except the piece's own
+phrasing (bars) which is left to the breakdown.
 - What: `toast sound beats <project> <sound>` detects a track's tempo and
   beats (librosa, in the voice interpreter, as a worker) and keeps them
   beside the sound. A scene that has music may give a shot's length and a

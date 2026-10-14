@@ -222,6 +222,8 @@ def _load_shots(
                 "sound_fades_at": float(field(raw, "sound_fades_at")) if field(raw, "sound_fades_at") not in (None, "") else None,
                 # Where a format's frame sits in the take (CT-0049): {x, y}, 0 to 1, centred by default.
                 "reframe": field(raw, "reframe") if isinstance(field(raw, "reframe"), dict) else None,
+                # Its length in beats of the scene's music, instead of seconds (CT-0067).
+                "beats": field(raw, "beats"),
                 # The stretch of a public file this shot's picture is (CT-0066).
                 "footage": _footage(field(raw, "footage")),
                 "derive": _derive(field(raw, "derive")),
@@ -332,11 +334,15 @@ def _transition(raw: dict[str, Any]) -> dict[str, Any] | None:
         return None
     if not isinstance(value, dict):
         return {"id": _text(value), "duration_ms": None, "reason": ""}
-    return {
+    reference = {
         "id": _text(value.get("id")),
         "duration_ms": value.get("duration_ms"),
         "reason": vtext(value, "reason"),
     }
+    if value.get("beats") is not None:
+        # Its length in beats of the scene's music (CT-0067); turned into milliseconds when the beats are known.
+        reference["beats"] = value.get("beats")
+    return reference
 
 
 def _extra_shot_fields(
@@ -679,6 +685,12 @@ def _load_scene(
     move_findings.extend(_expand_titles(shots, scene_id, root))
     move_findings.extend(_expand_effects(shots, scene_id, root))
     sound_beds, sound_findings = _expand_sounds(shots, document, scene_id, root)
+    if any(shot.get("beats") is not None for shot in shots):
+        from .beats import lay_out
+        from .sounds import list_sounds
+
+        sound_findings.extend(Finding(**problem) for problem in lay_out(
+            shots, sound_beds["music"], {item["id"]: item for item in list_sounds(root)}, scene_id))
     move_findings.extend(sound_findings)
     enter, enter_findings = _scene_enter(document, scene_id, root)
     move_findings.extend(enter_findings)

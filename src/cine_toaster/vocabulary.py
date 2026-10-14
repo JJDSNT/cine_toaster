@@ -154,6 +154,8 @@ CORE_SHOT_FIELDS: frozenset[str] = frozenset(
         # CT-0054: stretches of the take's sound silenced ([[from, to]], take seconds), and where it fades out.
         "mute",
         "sound_fades_at",
+        # CT-0067: the shot's length in beats of the scene's music.
+        "beats",
         # CT-0066: the stretch of a public file this shot's picture is, fetched by `toast footage fetch`.
         "footage",
         # What a generation must not do (production intent, translated by each provider; docs/generation.md).

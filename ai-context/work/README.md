@@ -44,6 +44,8 @@ is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
 CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
 
+- `CT-0067` — beats heard and kept beside a track; shots cut to music in
+  beats (`done`)
 - `CT-0066` — footage declared on a shot and fetched as its take, with
   source, licence and credit (`done`)
 - `CT-0065` — the reel on the assembly path: stills as takes, narration
