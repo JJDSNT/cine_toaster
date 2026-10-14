@@ -38,6 +38,10 @@ another machine.
   never downloaded), re-encodes it (x264 CRF 16, AAC), keeps it in
   `~/.cache/cine-toaster/footage/` and adds it through `commands.add_take` as
   an `archival` take. A shot with a take is kept as it is.
+- **`height:`** on the declaration fetches the stretch at that many lines
+  (a 4K original at 1080, say); the file's own size when left out. Added
+  after the first commit, for the music piece: thirteen 4K stretches at
+  1080 lines in 2 min 23 s.
 - **The take records the excerpt**: `add_take(excerpt=...)` writes `{url, in,
   duration}` into the origin beside the take.
 - **`toast footage list`**: what each shot declares and whether it is here.

@@ -9,6 +9,7 @@ declares it, and the file is fetched:
       page: https://images.nasa.gov/details/...     # where a person reads about it
       in: 46            # seconds into the file
       duration: 8       # the shot's duration when left out
+      height: 1080      # fetched at this many lines; the file's own when left out
       licence: Public domain (NASA media usage guidelines)
       credit: NASA/Sam Lott
 
@@ -55,7 +56,7 @@ def read(raw: Any) -> dict[str, Any] | None:
             return -1.0
 
     return {"url": str(raw.get("url") or "").strip(), "page": str(raw.get("page") or "").strip(),
-            "in": number("in"), "duration": number("duration"),
+            "in": number("in"), "duration": number("duration"), "height": int(number("height")),
             "licence": str(raw.get("licence") or raw.get("license") or "").strip(),
             "credit": str(raw.get("credit") or "").strip()}
 
@@ -70,6 +71,8 @@ def problem(footage: dict[str, Any]) -> str:
         return f"names footage at {footage['url']!r}, which is not an address to fetch"
     if footage["in"] < 0 or footage["duration"] < 0:
         return "gives its footage an `in` or a `duration` that is not a number of seconds"
+    if footage["height"] < 0:
+        return "gives its footage a `height` that is not a number of lines"
     return ""
 
 
@@ -82,12 +85,12 @@ def address(url: str) -> str:
     return urllib.parse.quote(url, safe=":/?&=~%+,;@#")
 
 
-def stretch_path(url: str, start: float, seconds: float) -> Path:
+def stretch_path(url: str, start: float, seconds: float, height: int = 0) -> Path:
     name = hashlib.sha256(url.encode("utf-8")).hexdigest()[:20]
-    return cache_directory() / f"{name}-{start:g}-{seconds:g}.mp4"
+    return cache_directory() / f"{name}-{start:g}-{seconds:g}{f'-{height}p' if height else ''}.mp4"
 
 
-def cut(url: str, start: float, seconds: float, destination: Path) -> Path:
+def cut(url: str, start: float, seconds: float, destination: Path, height: int = 0) -> Path:
     """The stretch as its own clip, read straight from where the file is.
 
     FFmpeg seeks in the remote file and reads only what the stretch needs, so
@@ -106,7 +109,8 @@ def cut(url: str, start: float, seconds: float, destination: Path) -> Path:
     try:
         completed = subprocess.run(
             [ffmpeg, "-y", "-loglevel", "error", "-ss", f"{start:.3f}", "-t", f"{seconds:.3f}", "-i", address(url),
-             "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "medium", "-crf", "16",
+             "-map", "0:v:0", "-map", "0:a:0?", *(["-vf", f"scale=-2:{height}"] if height else []),
+             "-c:v", "libx264", "-preset", "medium", "-crf", "16",
              "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", str(partial)],
             capture_output=True, text=True, timeout=1800)
     except subprocess.TimeoutExpired as error:
@@ -159,11 +163,13 @@ def fetch(root: Path, production: dict[str, Any], actor: Any, *, scene_id: str |
                 report(f"{scene['id']} {shot['id']}: fetching {footage['url']}")
             try:
                 stretch = cutter(footage["url"], footage["in"], seconds,
-                                 stretch_path(footage["url"], footage["in"], seconds))
+                                 stretch_path(footage["url"], footage["in"], seconds, footage["height"]),
+                                 footage["height"])
                 made = add_take(root, scene_id=scene["id"], shot_id=shot["id"], source=stretch, actor=actor,
                                 kind="archival", origin=footage["page"] or footage["url"],
                                 licence=footage["licence"], credit=footage["credit"],
-                                excerpt={"url": footage["url"], "in": footage["in"], "duration": seconds})
+                                excerpt={"url": footage["url"], "in": footage["in"], "duration": seconds}
+                                | ({"height": footage["height"]} if footage["height"] else {}))
             except ValidationError as error:
                 results.append(Fetched(scene["id"], shot["id"], "refused", str(error)))
                 continue

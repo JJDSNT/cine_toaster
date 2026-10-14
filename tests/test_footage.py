@@ -27,6 +27,7 @@ SCENE = textwrap.dedent("""\
           url: {url}
           page: https://example.org/launch
           in: 1
+          height: 54
           licence: {licence}
           credit: An Agency
 """)
@@ -75,7 +76,10 @@ class FootageTests(unittest.TestCase):
         origin = take["provenance"]["origin"]
         self.assertEqual((origin["kind"], origin["source"], origin["licence"], origin["credit"]),
                          ("archival", "https://example.org/launch", "CC0 1.0", "An Agency"))
-        self.assertEqual(origin["excerpt"], {"url": public.as_uri(), "in": 1.0, "duration": 2.0})
+        self.assertEqual(origin["excerpt"], {"url": public.as_uri(), "in": 1.0, "duration": 2.0, "height": 54})
+        size = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0",
+                               str(self.root / take["media"])], capture_output=True, text=True).stdout.strip()
+        self.assertEqual(size, "96,54")  # fetched at the height asked, not the file's 90 lines
         seconds = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
                                         "csv=p=0", str(self.root / take["media"])],
                                        capture_output=True, text=True).stdout)

@@ -149,6 +149,44 @@ another way.
   - Not probed: `effects:` on a take was accepted but not judged by eye;
     whether a title card takes the look's palette; stems of a card scene.
 
+# The music piece, first version (2026-10-14)
+
+Made so the user can judge what Cine Toaster does today; steps 3 and 4 of the
+order below, done by hand where the tool has nothing yet.
+
+- A production outside the repository, `~/cine-toaster-demos/music-piece`:
+  one scene, thirteen shots, 41.4 s at 1920x1080.
+- Footage: stretches of four NASA originals (Earth from the ISS in 4K, the
+  Artemis I and II launches, Perseverance's descent), declared with
+  `footage:` and fetched (CT-0066).
+- Music: "Circuit Synthwave" by Doctor_Dreamchip, CC0, fetched with `toast
+  sound fetch openverse` into the production's `sounds/`, laid as the scene's
+  `music`.
+- Joins: four straight cuts in a burst and eight catalog transitions
+  (`cross-zoom`, `cube`, `swap`, `ripple`, `pixelate`, `inverted-page-curl`,
+  `film-burn`, `dreamy-zoom`), each with its reason; two titles; `light-leak`,
+  `glitch` and `fade-to-black`.
+- Every cut and the middle of every transition was placed on a beat by
+  computing the shot lengths from the track's beats (123 BPM).
+- Kept for the user: `~/cine-toaster-references/trials/music-piece-v2.mp4`.
+
+What making it showed is missing:
+
+- **Beats are not in the tool.** They were detected with librosa in a scratch
+  script, and the shot lengths written from them by another. Nothing in the
+  project holds the beats, and nothing checks a cut against them.
+- **A production cannot say its frame.** A version takes the size and rate of
+  its first moving take; footage had to be fetched at 1080 lines to get a
+  1080-line piece.
+- **`toast sound search openverse` finds nothing for "synthwave"** with its
+  music filter; the same query to Openverse without it returns 175 items.
+- A transition is shortened to half the shorter shot it joins (said in a
+  note). After a one-second shot that moved every later join off the beat;
+  the first version was 0.24 s long until the transition was made one beat.
+- The piece was checked by eye on sampled frames and by its length (41.44 s
+  against 41.42 computed). Nobody has listened to it: whether the joins are
+  felt on the beat is for the user to say.
+
 # Order agreed (2026-10-14)
 
 The music-driven piece (Demo 4 in `docs/production-validation.md`) comes
