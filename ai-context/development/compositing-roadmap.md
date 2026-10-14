@@ -117,8 +117,9 @@ Done (`CT-0070`): `ai-context/specs/SPEC-0012-compositing-graph.md`, accepted
 
 ### C2. The reference renderer and the record
 
-In progress (`CT-0071`): the reference evaluates 25 ops; FFmpeg's `luma` join
-is the first renderer case checked against it.
+In progress (`CT-0071`): the reference evaluates 61 ops with node identity
+and a cache; FFmpeg's `luma` join is the first renderer case checked against
+it. Next: the `composite:` record in an assembly, and FFmpeg as a renderer.
 
 - What: the **NumPy reference** of each primitive in the `compositing` package
   (float, linear, premultiplied, OCIO; FFmpeg only to read and write files);

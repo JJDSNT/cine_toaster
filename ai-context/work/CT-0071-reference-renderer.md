@@ -52,14 +52,33 @@ renderer in use never becomes the definition of correct.
   frames without resetting time, so FFmpeg repeated them -- and was redone
   before anything was concluded.
 
+# Done (second slice)
+
+- The reference evaluates every op of SPEC-0012 except the two that are
+  recorded, never computed by it (`signal.estimate`, `generate.render`), and
+  opaque nodes: 61 ops. New: noise and text generators; signals read from
+  EXR, NumPy or image files; depth aligned (least squares, or by hand) and
+  merged by depth per pixel; labels; warps in perspective (a 3D turn as a
+  homography), corner pins (by corners or a track), displacement, ripple,
+  swirl, lens; colour curves, LUTs (`.cube` applied in the display encoding,
+  OCIO looks), posterise, solarise, hue cycling; sharpen, glow, edges, erode,
+  dilate, grain; time remap, offset, frame blend, echo; tracks read or
+  measured by OpenCV (`tracking.py`: points and planes; a camera solve is C7);
+  curves from tracks and from the music's beats.
+- `identity.py`: a node's identity per SPEC-0012 §5 -- its op, parameters
+  (files by content, curves by their own identity), inputs, the colour,
+  time and size context, the OCIO config's own cache identity, the renderer
+  and NumPy version. `reference.render` keeps results by that identity in a
+  disposable cache (`~/.cache/cine-toaster/composite/`, half floats).
+- Every example graph the reference can run, it runs (`ExamplesEvaluateTests`).
+- SPEC-0012 §2 now says colours given as parameters are in the working space.
+
 # To do
 
-- The rest of the ops in the reference: generate.noise and text, signals
-  read from files and estimated, matte.label, merge.depth, warp beyond 2D
-  (perspective, corner pin, displace, procedural), the remaining colour and
-  filter ops, time, track. Opaque nodes stay out of the reference by
-  definition.
-- Node identity (SPEC-0012 §5) and the cache by it.
+- `matte.key` by colour and by difference, `signal.channel` hue and
+  saturation, and `warp.procedural` bend are still refused by the reference.
+- Recording a non-deterministic result in the production (SPEC-0012 §5), for
+  when `signal.estimate` and `generate.render` get renderers (C8, C9).
 - The composite record read from a shot's breakdown (`composite:`) and a
   join's recipe from the catalog, rendered in an assembly.
 - FFmpeg as a renderer of the graph for the ops it can do correctly, with a
@@ -75,4 +94,10 @@ renderer in use never becomes the definition of correct.
   shapes have edge coverage and follow a curve; a transform leaves
   transparency; curves hold and ease; refusals; a file read into linear.
 - `tests/test_compositing_schema.py` (12), `tests/test_compositing_conformance.py` (1).
-- Full suite: 665 tests pass (2026-10-14, at b87342d).
+- `tests/test_compositing_reference_more.py` (14): perspective, corner pin,
+  displacement, swirl; depth order and alignment; posterise, hue turn,
+  dilation; offset and echo; a point tracked to within 1.5 pixels; a beat
+  curve peaking on its beat; identities that move only with what changed and
+  know files by content; the cache's hits and misses; every runnable example.
+- Full suite: 665 tests pass (2026-10-14, at b87342d); 679 after the second
+  slice.

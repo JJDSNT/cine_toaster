@@ -237,53 +237,42 @@ def _shape(node: dict[str, Any], size: tuple[int, int], scale: float) -> np.ndar
     return _blur(matte, feather)
 
 
-def _affine(image: np.ndarray, node: dict[str, Any], params: Callable[[str, Any], Any]) -> np.ndarray:
-    """A 2D transform about a pivot, sampled bilinearly; outside the source is transparent (SPEC-0012 §3)."""
-
-    height, width = image.shape[:2]
-    translate = np.broadcast_to(np.asarray(params("translate", [0.0, 0.0]), dtype=np.float32), (2,))
-    scale = np.broadcast_to(np.asarray(params("scale", [1.0, 1.0]), dtype=np.float32), (2,))
-    rotate = np.asarray(params("rotate", 0.0), dtype=np.float32).reshape(-1)
-    if rotate.size > 1 and (abs(rotate[0]) > 1e-6 or abs(rotate[1]) > 1e-6) or float(params("perspective", 0) or 0):
-        raise ValidationError("The reference does not yet rotate out of the picture plane (perspective): C4")
-    angle = math.radians(float(rotate[-1]))
-    pivot = np.broadcast_to(np.asarray(params("pivot", [0.5, 0.5]), dtype=np.float32), (2,))
-    ys, xs = np.mgrid[0:height, 0:width].astype(np.float32)
-    # Output pixel -> source pixel: undo translate, rotate, scale about the pivot (all in picture fractions).
-    u = (xs + 0.5) / width - pivot[0] - translate[0]
-    v = (ys + 0.5) / height - pivot[1] - translate[1]
-    cos, sin = math.cos(-angle), math.sin(-angle)
-    u, v = (u * cos - v * sin * height / width), (u * sin * width / height + v * cos)
-    sx = (u / max(scale[0], 1e-6) + pivot[0]) * width - 0.5
-    sy = (v / max(scale[1], 1e-6) + pivot[1]) * height - 0.5
-    x0, y0 = np.floor(sx).astype(int), np.floor(sy).astype(int)
-    fx, fy = (sx - x0)[..., None], (sy - y0)[..., None]
-    padded = np.pad(image if image.ndim == 3 else image[..., None], ((1, 1), (1, 1), (0, 0)))
-
-    def sample(px: np.ndarray, py: np.ndarray) -> np.ndarray:
-        inside = (px >= -1) & (px <= width) & (py >= -1) & (py <= height)
-        return padded[np.clip(py + 1, 0, height + 1), np.clip(px + 1, 0, width + 1)] * inside[..., None]
-
-    out = (sample(x0, y0) * (1 - fx) * (1 - fy) + sample(x0 + 1, y0) * fx * (1 - fy)
-           + sample(x0, y0 + 1) * (1 - fx) * fy + sample(x0 + 1, y0 + 1) * fx * fy)
-    return out.astype(np.float32) if image.ndim == 3 else out[..., 0].astype(np.float32)
-
-
 IMPLEMENTED = {
-    "generate.source", "generate.solid", "generate.gradient",
-    "signal.luminance", "signal.luma", "signal.channel",
-    "matte.from_signal", "matte.threshold", "matte.combine", "matte.shape", "matte.key",
-    "merge.over", "merge.mix", "merge.blend", "merge.porter_duff", "merge.channels",
-    "warp.transform",
-    "colour.grade", "colour.invert",
-    "filter.blur",
-    "curve.progress", "curve.keys", "curve.map", "curve.combine", "curve.noise",
+    "generate.source", "generate.solid", "generate.gradient", "generate.noise", "generate.text",
+    "signal.luminance", "signal.luma", "signal.channel", "signal.read", "signal.align_depth",
+    "matte.from_signal", "matte.threshold", "matte.combine", "matte.shape", "matte.key", "matte.label",
+    "merge.over", "merge.mix", "merge.blend", "merge.porter_duff", "merge.channels", "merge.depth",
+    "warp.transform", "warp.corner_pin", "warp.displace", "warp.procedural",
+    "colour.grade", "colour.invert", "colour.curve", "colour.lut", "colour.posterise", "colour.solarise",
+    "colour.cycle",
+    "filter.blur", "filter.sharpen", "filter.glow", "filter.edges", "filter.morphology", "filter.noise",
+    "time.remap", "time.offset", "time.blend", "time.echo",
+    "track.read", "track.measure",
+    "curve.progress", "curve.keys", "curve.map", "curve.combine", "curve.noise", "curve.beats", "curve.from_track",
 }
+#: In SPEC-0012 but outside the reference, by definition (opaque) or until a renderer gives them (models, 3D).
+NOT_IN_REFERENCE = {"signal.estimate": "a model's result is recorded, not computed by the reference",
+                    "generate.render": "a renderer's own scene; its result is recorded"}
+
+
+def Image_resize(data: np.ndarray, width: int, height: int) -> np.ndarray:
+    """A float array resized to the frame, channel by channel (signals are not pictures to encode)."""
+
+    from PIL import Image
+
+    planes = data if data.ndim == 3 else data[..., None]
+    out = np.stack([np.asarray(Image.fromarray(planes[..., index].astype(np.float32), "F").resize(
+        (width, height), Image.BILINEAR)) for index in range(planes.shape[-1])], axis=-1)
+    return out if data.ndim == 3 else out[..., 0]
 
 
 def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size: tuple[int, int], fps: float,
-             working: str = LINEAR, root: Path | None = None) -> np.ndarray:
-    """The graph's output picture for every frame of its extent: (frames, H, W, 4), linear, premultiplied."""
+             working: str = LINEAR, root: Path | None = None, beats: list[float] | None = None) -> np.ndarray:
+    """The graph's output picture for every frame of its extent: (frames, H, W, 4), linear, premultiplied.
+
+    ``beats`` are the scene music's beats in seconds from the extent's start (CT-0067), for `curve.beats`.
+    An input that is a recorded result of `signal.estimate` or `generate.render` is given like any other.
+    """
 
     problems = validate(graph)
     if problems:
@@ -291,24 +280,32 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
     nodes = graph["nodes"]
     missing = sorted({node["op"] for node in nodes.values() if node["op"] not in IMPLEMENTED})
     if missing:
-        raise ValidationError(f"The reference does not implement {', '.join(missing)} yet")
+        why = "; ".join(f"{op}: {NOT_IN_REFERENCE[op]}" for op in missing if op in NOT_IN_REFERENCE)
+        raise ValidationError(f"The reference does not implement {', '.join(missing)}" + (f" ({why})" if why else " yet"))
+    aspect = size[0] / size[1]
     context = Context(size, fps, frames, working, root)
     width, height = size
     length = frames / fps
     port_types = graph.get("ports") or {}
+
+    def port_kind(name: str) -> str:
+        return str(port_types.get(name, ""))
     curves: dict[str, Callable[[float], Any]] = {}
     clips: dict[str, np.ndarray] = {}
     for name, value in inputs.items():
+        if isinstance(value, dict):  # a track, as data
+            continue
         if callable(value):
             curves[name] = value
         elif isinstance(value, np.ndarray):
-            clips[name] = value if value.ndim == 4 else np.repeat(value[None], frames, axis=0)
+            per_frame = value.ndim == 4 or (port_kind(name) == "signal" and value.ndim == 3 and value.shape[0] == frames)
+            clips[name] = value if per_frame else np.repeat(value[None], frames, axis=0)
         else:
             clips[name] = read(Path(value), frames, size, fps, working=working)
     for name, kind in port_types.items():
         if kind == "curve" and name not in curves:
             curves[name] = lambda seconds: seconds / length if length else 0.0  # a join's progress, by default
-        elif kind in ("picture", "matte") and name not in clips:
+        elif kind in ("picture", "matte", "signal") and name not in clips:
             raise ValidationError(f"The graph's port {name!r} was given no {kind}")
 
     def curve(reference: str) -> Callable[[float], Any]:
@@ -338,6 +335,35 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
                 "ease": lambda x: ease(float(np.clip(x, 0, 1))),
             }[how]
             made = lambda seconds: mapping(source(seconds))  # noqa: E731
+        elif op == "curve.beats":
+            times = list(beats or [])[:: max(int(node.get("every", 1) or 1), 1)]
+            attack, decay = float(node.get("attack", 0.02)), float(node.get("decay", 0.2))
+            low, high = float(node.get("low", 0.0)), float(node.get("high", 1.0))
+
+            def made(seconds: float) -> float:
+                level = 0.0
+                for beat in times:
+                    d = seconds - beat
+                    if -attack < d < 0:
+                        level = max(level, 1 + d / attack)
+                    elif 0 <= d < decay:
+                        level = max(level, 1 - d / decay)
+                return low + (high - low) * level
+        elif op == "curve.from_track":
+            track, field = tracks(node["track"]), node["field"]
+
+            def made(seconds: float) -> Any:
+                frame = track["frames"][min(int(seconds * fps), len(track["frames"]) - 1)]
+                points = np.asarray(frame.get("points") or frame.get("corners"), dtype=np.float32)
+                if field in ("x", "y"):
+                    return float(points.mean(axis=0)[0 if field == "x" else 1])
+                first = np.asarray(track["frames"][0].get("points") or track["frames"][0].get("corners"))
+                if len(points) < 2:
+                    return 0.0 if field == "rotation" else 1.0
+                now, then = points[1] - points[0], first[1] - first[0]
+                if field == "rotation":
+                    return math.degrees(math.atan2(now[1], now[0]) - math.atan2(then[1], then[0]))
+                return float(np.hypot(*now) / max(np.hypot(*then), 1e-9))
         elif op == "curve.combine":
             a, b = curve(node["a"]), curve(node["b"])
             how = {"add": np.add, "subtract": np.subtract, "multiply": np.multiply, "min": np.minimum,
@@ -347,6 +373,30 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             raise ValidationError(f"{reference} is not a curve")
         curves[reference] = made
         return made
+
+    track_cache: dict[str, dict[str, Any]] = {}
+
+    def tracks(reference: str) -> dict[str, Any]:
+        """A track as data (SPEC-0012 §1): {kind, frames: [{points} or {corners}]}."""
+
+        if reference in track_cache:
+            return track_cache[reference]
+        if reference in inputs and isinstance(inputs[reference], dict):
+            track_cache[reference] = inputs[reference]
+            return track_cache[reference]
+        node = nodes[reference]
+        if node["op"] == "track.read":
+            import json
+
+            path = Path(node["file"])
+            path = (root / path) if root and not path.is_absolute() else path
+            track_cache[reference] = json.loads(path.read_text(encoding="utf-8"))
+        else:  # track.measure
+            from .tracking import measure
+
+            pictures = np.stack([_picture(value(node["in"], frame)) for frame in range(frames)])
+            track_cache[reference] = measure(pictures, node["kind"], node.get("region"), working)
+        return track_cache[reference]
 
     def value(reference: str, frame: int) -> Any:
         if reference in clips:
@@ -474,7 +524,38 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
                     out[..., index] = given if given.ndim == 2 else given[..., 0]
             return out
         if op == "warp.transform":
-            return _affine(value(node["in"], frame), node, param)
+            from .warp import transform
+
+            angles = param("rotate", 0.0)
+            return transform(value(node["in"], frame), translate=param("translate", [0.0, 0.0]),
+                             scale=param("scale", [1.0, 1.0]), rotate=angles if angles is not None else 0.0,
+                             pivot=param("pivot", [0.5, 0.5]), perspective=float(param("perspective", 0.0) or 0.0),
+                             aspect=aspect)
+        if op == "warp.corner_pin":
+            from .warp import corner_pin
+
+            if node.get("track"):
+                track = tracks(node["track"])
+                entry = track["frames"][min(frame, len(track["frames"]) - 1)]
+                first = track["frames"][0]
+                if "corners" in entry:
+                    corners = entry["corners"]
+                else:  # a point track moves the picture with it
+                    shift = np.mean(entry["points"], axis=0) - np.mean(first["points"], axis=0)
+                    corners = (np.asarray(node.get("corners") or [[0, 0], [1, 0], [1, 1], [0, 1]]) + shift).tolist()
+            else:
+                corners = param("corners")
+            return corner_pin(value(node["in"], frame), [list(map(float, corner)) for corner in corners], aspect)
+        if op == "warp.displace":
+            from .warp import displace
+
+            return displace(value(node["in"], frame), value(node["map"], frame), float(param("strength", 0.1)),
+                            param("direction"))
+        if op == "warp.procedural":
+            from .warp import procedural
+
+            return procedural(value(node["in"], frame), node["kind"], float(param("amount", 1.0)),
+                              float(param("frequency", 4.0)), param("centre"), aspect)
         if op == "colour.grade":
             picture = _picture(value(node["in"], frame)).copy()
             alpha = picture[..., 3:4]
@@ -498,7 +579,254 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             return out
         if op == "filter.blur":
             return _blur(value(node["in"], frame), float(param("radius", 0.0)))
+        return more(name, node, op, frame, seconds, param, value)
+
+    def more(name: str, node: dict[str, Any], op: str, frame: int, seconds: float, param, value) -> Any:
+        """The ops of the second slice (CT-0071): generators, signals from files, depth, colour, filters, time."""
+
+        def straight(picture: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            alpha = picture[..., 3:4]
+            return np.divide(picture[..., :3], alpha, out=np.zeros_like(picture[..., :3]), where=alpha > 1e-6), alpha
+
+        def rebuilt(rgb: np.ndarray, alpha: np.ndarray) -> np.ndarray:
+            return np.concatenate([rgb * alpha, alpha], axis=-1).astype(np.float32)
+
+        if op == "generate.noise":
+            seed = int(param("seed", 0) or 0)
+            kind = param("kind", "value")
+            if kind == "grain":
+                grey = np.random.default_rng([seed, frame]).normal(0.5, 0.15, (height, width)).astype(np.float32)
+            else:
+                cells = max(1.0, float(param("scale", 8.0)))
+                from PIL import Image
+
+                coarse = np.random.default_rng(seed).uniform(0, 1, (int(cells * height / width) + 2, int(cells) + 2))
+                grey = np.asarray(Image.fromarray(coarse.astype(np.float32), "F").resize((width, height),
+                                                                                         Image.BICUBIC))
+            grey = np.clip(grey, 0, 1).astype(np.float32)
+            return np.stack([grey, grey, grey, np.ones_like(grey)], axis=-1)
+        if op == "generate.text":
+            from PIL import Image, ImageDraw, ImageFont
+
+            from ..titles import font_file
+
+            text = str(param("text", ""))
+            reveal = param("reveal", 1.0)
+            shown = text[: int(round(len(text) * float(np.clip(reveal, 0, 1))))] if reveal is not None else text
+            size_px = max(4, int(float(param("size", 40)) * height / 720 * 4))
+            font = ImageFont.truetype(font_file({"font": node.get("font") or ""}, root), size_px)
+            canvas = Image.new("L", (width * 4, height * 4), 0)
+            draw = ImageDraw.Draw(canvas)
+            position = np.broadcast_to(np.asarray(param("position", [0.5, 0.5]), dtype=np.float32), (2,))
+            box = draw.textbbox((0, 0), text, font=font)  # placed by the whole text, so letters do not shift
+            x = position[0] * width * 4 - (box[2] - box[0]) / 2 - box[0]
+            y = position[1] * height * 4 - (box[3] - box[1]) / 2 - box[1]
+            draw.text((x, y), shown, font=font, fill=255)
+            coverage = np.asarray(canvas.resize((width, height), Image.BOX), dtype=np.float32) / 255.0
+            colour = np.asarray(param("colour", [1, 1, 1, 1]), dtype=np.float32)
+            alpha = coverage * (colour[3] if colour.size > 3 else 1.0)
+            return np.concatenate([colour[:3] * alpha[..., None], alpha[..., None]], axis=-1).astype(np.float32)
+        if op == "signal.read":
+            path = Path(node["file"])
+            path = (root / path) if root and not path.is_absolute() else path
+            key = f"read:{name}"
+            if key not in clips:
+                if path.suffix.lower() == ".exr":
+                    from ..color import read_exr
+
+                    data = read_exr(path)
+                    data = np.asarray(Image_resize(data, width, height))
+                elif path.suffix.lower() == ".npy":
+                    data = np.load(path).astype(np.float32)
+                else:
+                    data = read(path, 1, size, fps, colorspace=LINEAR, alpha="premultiplied", working=LINEAR)[0]
+                kind = node["kind"]
+                channels = {"vectors": 2, "normals": 3}.get(kind, 1)
+                if data.ndim == 3:
+                    data = data[..., :channels] if channels > 1 else data[..., 0]
+                clips[key] = data.astype(np.float32 if kind != "segmentation" else np.int64)
+            return clips[key]
+        if op == "signal.align_depth":
+            relative = value(node["signal"], frame).astype(np.float64)
+            if node.get("inverse"):
+                relative = 1.0 / np.maximum(relative, 1e-6)
+            if (node.get("method") or "scale_shift") == "manual":
+                return (relative * float(node["scale"]) + float(node["shift"])).astype(np.float32)
+            reference = value(node["reference"], frame).astype(np.float64)
+            region = _matte(value(node["region"], frame)) > 0.5 if node.get("region") else np.isfinite(reference)
+            a = np.stack([relative[region], np.ones(int(region.sum()))], axis=1)
+            scale, shift = np.linalg.lstsq(a, reference[region], rcond=None)[0]
+            return (relative * scale + shift).astype(np.float32)
+        if op == "matte.label":
+            labels = value(node["signal"], frame)
+            return np.isin(np.rint(labels).astype(np.int64), np.asarray(node["labels"], dtype=np.int64)).astype(
+                np.float32)
+        if op == "merge.depth":
+            pictures = np.stack([_picture(value(item, frame)) for item in node["pictures"]])
+            depths = np.stack([value(item, frame) for item in node["depths"]])
+            if not node.get("near_is_small", True):
+                depths = -depths
+            order = np.argsort(depths, axis=0)  # nearest first, per pixel
+            out = np.zeros(pictures.shape[1:], dtype=np.float32)
+            for rank in range(pictures.shape[0] - 1, -1, -1):  # far to near, each over what is behind it
+                layer = np.take_along_axis(pictures, order[rank][None, ..., None].repeat(4, axis=-1), axis=0)[0]
+                out = layer + out * (1 - layer[..., 3:4])
+            return out
+        if op == "colour.curve":
+            given = value(node["in"], frame)
+            points = np.asarray(node.get("points") or [[0, 0], [1, 1]], dtype=np.float32)
+            curve_of = lambda x: np.interp(x, points[:, 0], points[:, 1]).astype(np.float32)  # noqa: E731
+            if given.ndim == 2:
+                return curve_of(given)
+            rgb, alpha = straight(given)
+            return rebuilt(curve_of(rgb), alpha)
+        if op == "colour.lut":
+            rgb, alpha = straight(_picture(value(node["in"], frame)))
+            from ..color import config
+
+            import PyOpenColorIO as ocio
+
+            if node.get("look"):
+                transform = ocio.LookTransform(src=working, dst=working, looks=node["look"])
+                processor = config().getProcessor(transform).getDefaultCPUProcessor()
+                flat = np.ascontiguousarray(rgb.reshape(-1, 3), dtype=np.float32)
+                processor.applyRGB(flat)
+                return rebuilt(flat.reshape(rgb.shape), alpha)
+            path = Path(node["file"])
+            path = (root / path) if root and not path.is_absolute() else path
+            # A .cube is made for encoded pictures: applied in the display encoding, then back to linear.
+            processor = config().getProcessor(ocio.FileTransform(src=str(path))).getDefaultCPUProcessor()
+            flat = np.ascontiguousarray(convert(rgb, working, ENCODED).reshape(-1, 3), dtype=np.float32)
+            processor.applyRGB(flat)
+            return rebuilt(convert(flat.reshape(rgb.shape), ENCODED, working), alpha)
+        if op in ("colour.posterise", "colour.solarise"):
+            rgb, alpha = straight(_picture(value(node["in"], frame)))
+            encoded = convert(rgb, working, ENCODED)
+            if op == "colour.posterise":
+                levels = max(2, int(param("levels", 4)))
+                encoded = np.round(np.clip(encoded, 0, 1) * (levels - 1)) / (levels - 1)
+            else:
+                threshold = float(param("threshold", 0.5))
+                encoded = np.where(encoded > threshold, 1 - encoded, encoded)
+            return rebuilt(convert(encoded.astype(np.float32), ENCODED, working), alpha)
+        if op == "colour.cycle":
+            rgb, alpha = straight(_picture(value(node["in"], frame)))
+            angle = math.radians(float(param("speed", 90.0)) * seconds)  # hue turned, degrees per second
+            cos, sin = math.cos(angle), math.sin(angle)
+            k = np.ones(3, dtype=np.float32) / math.sqrt(3)
+            matrix = (cos * np.eye(3) + sin * np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+                      + (1 - cos) * np.outer(k, k))
+            return rebuilt(np.clip(rgb @ matrix.T.astype(np.float32), 0, None), alpha)
+        if op == "filter.sharpen":
+            picture = _picture(value(node["in"], frame))
+            return np.clip(picture + float(param("amount", 0.5)) * (picture - _blur(picture, 2.0)), 0, None)
+        if op == "filter.glow":
+            picture = _picture(value(node["in"], frame))
+            rgb, alpha = straight(picture)
+            bright = np.clip(rgb @ np.asarray(REC709, dtype=np.float32) - float(param("threshold", 0.8)), 0, None)
+            halo = _blur(picture[..., :3] * (bright > 0)[..., None], float(param("radius", 8.0)))
+            out = picture.copy()
+            out[..., :3] += halo * float(param("intensity", 1.0))
+            return out
+        if op == "filter.edges":
+            rgb, _ = straight(_picture(value(node["in"], frame)))
+            grey = rgb @ np.asarray(REC709, dtype=np.float32)
+            gy, gx = np.gradient(grey)
+            return np.clip(np.hypot(gx, gy) * 4, 0, 1).astype(np.float32)
+        if op == "filter.morphology":
+            matte = _matte(value(node["in"], frame))
+            radius = max(0, int(round(float(param("radius", 1.0)))))
+            padded = np.pad(matte, radius, mode="edge")
+            stack = [padded[dy:dy + height, dx:dx + width] for dy in range(2 * radius + 1)
+                     for dx in range(2 * radius + 1)]
+            return (np.min(stack, axis=0) if node["operation"] == "erode" else np.max(stack, axis=0)).astype(
+                np.float32)
+        if op == "filter.noise":
+            picture = _picture(value(node["in"], frame))
+            grain = np.random.default_rng([int(param("seed", 0) or 0), frame]).normal(0, 1, (height, width))
+            grain = _blur(grain.astype(np.float32), max(float(param("size", 1.0)) - 1.0, 0.0))
+            out = picture.copy()
+            out[..., :3] = np.clip(picture[..., :3] + grain[..., None] * float(param("amount", 0.1)) * 0.1
+                                   * picture[..., 3:4], 0, None)
+            return out
+        if op in ("time.remap", "time.offset"):
+            if op == "time.offset":
+                source_frame = frame - int(param("frames", 0))
+            else:
+                source_frame = int(round(float(param("map", seconds)) * fps - 0.5))
+            return value(node["in"], int(np.clip(source_frame, 0, frames - 1)))
+        if op == "time.blend":
+            span = max(1, int(param("frames", 2)))
+            around = [int(np.clip(frame + offset, 0, frames - 1)) for offset in range(-(span // 2), span - span // 2)]
+            return np.mean([_picture(value(node["in"], item)) for item in around], axis=0).astype(np.float32)
+        if op == "time.echo":
+            count, spacing = int(param("count", 4)), max(1, int(param("spacing", 1)))
+            decay = float(param("decay", 0.5))
+            out = np.zeros((height, width, 4), dtype=np.float32)
+            for index in range(count, -1, -1):  # the oldest echo first, the present last, on top
+                earlier = frame - index * spacing
+                if earlier < 0:
+                    continue
+                out = (_picture(value(node["in"], earlier)) * decay ** index) + out * (
+                    1 - _picture(value(node["in"], earlier))[..., 3:4] * decay ** index)
+            return out
         raise ValidationError(f"The reference does not implement {op}")
 
     output = graph["output"]
     return np.stack([_picture(value(output, frame)) for frame in range(frames)]).astype(np.float32)
+
+
+def cache_directory() -> Path:
+    import os
+
+    configured = os.environ.get("XDG_CACHE_HOME")
+    base = Path(configured).expanduser() if configured else Path.home() / ".cache"
+    return base / "cine-toaster" / "composite"
+
+
+def _input_identity(value: Any) -> str | None:
+    """An input's identity: a file by content, an array by its bytes; a curve given as code has none."""
+
+    import hashlib
+
+    from .identity import file_hash
+
+    if isinstance(value, np.ndarray):
+        return "array:" + hashlib.sha256(np.ascontiguousarray(value).tobytes()).hexdigest()
+    if isinstance(value, (str, Path)) and Path(value).is_file():
+        return "file:" + file_hash(Path(value))
+    if isinstance(value, dict):  # a track as data
+        import json
+
+        return "track:" + hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+    return None
+
+
+def render(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size: tuple[int, int], fps: float,
+           working: str = LINEAR, root: Path | None = None, beats: list[float] | None = None,
+           cache: Path | None | bool = True) -> tuple[np.ndarray, str, bool]:
+    """`evaluate`, kept by the output's identity (SPEC-0012 §5): (pictures, identity, whether it was cached).
+
+    The cache is disposable: deleting it costs time only. An input with no identity (a curve given as
+    code) makes the result uncacheable, and it is computed every time.
+    """
+
+    from .identity import REFERENCE_VERSION, identities
+
+    known = {name: _input_identity(value) for name, value in inputs.items()}
+    context = {"renderer": REFERENCE_VERSION, "numpy": np.__version__, "working": working, "fps": fps,
+               "frames": frames, "size": list(size), "beats": list(beats or [])}
+    if cache is False or any(identity is None for identity in known.values()):
+        return evaluate(graph, inputs, frames=frames, size=size, fps=fps, working=working, root=root,
+                        beats=beats), "", False
+    output = identities(graph, known, context=context, root=root)[graph["output"].split(".")[0]]
+    folder = Path(cache) if isinstance(cache, (str, Path)) else cache_directory()
+    stored = folder / f"{output}.npy"
+    if stored.is_file():
+        return np.load(stored).astype(np.float32), output, True
+    pictures = evaluate(graph, inputs, frames=frames, size=size, fps=fps, working=working, root=root, beats=beats)
+    folder.mkdir(parents=True, exist_ok=True)
+    partial = stored.with_suffix(".part.npy")
+    np.save(partial, pictures.astype(np.float16))  # half floats: the precision SPEC-0012 hands pictures over in
+    partial.replace(stored)
+    return pictures, output, False

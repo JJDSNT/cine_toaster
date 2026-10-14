@@ -80,6 +80,9 @@ Any other mismatch is an error before rendering (`composite_type_mismatch`).
 - **Out of the working space.** At the version's encode, through the output
   transform the production's frame and delivery give (today `sRGB - Display`
   with the `Un-tone-mapped` view, as `color.py`).
+- **Colours given as parameters** (`generate.solid`, `generate.text`,
+  `matte.key` by colour) are in the working space, straight (not premultiplied).
+  An interface that shows a picker converts from the display encoding first.
 - **Luma and luminance.** `signal.luminance` is computed from linear values
   with explicit weights; the default weights are Rec.709's (0.2126, 0.7152,
   0.0722), and an operation may name others or a transform (for HDR or another

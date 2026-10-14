@@ -91,9 +91,10 @@ class GraphTests(unittest.TestCase):
         self.assertAlmostEqual(float(curve(0.5)), 2.5)  # ease in: x squared
 
     def test_an_op_the_reference_lacks_or_an_invalid_graph_is_refused_by_name(self) -> None:
-        with self.assertRaisesRegex(ValidationError, "filter.glow"):
-            run({"ports": {"a": "picture"}, "nodes": {"out": {"op": "filter.glow", "in": "a"}}, "output": "out"},
-                a=solid(1, 1, 1))
+        with self.assertRaisesRegex(ValidationError, "signal.estimate.*recorded"):
+            run({"ports": {"a": "picture"},
+                 "nodes": {"d": {"op": "signal.estimate", "picture": "a", "kind": "depth_relative", "model": "m"},
+                           "out": {"op": "warp.displace", "in": "a", "map": "d"}}, "output": "out"}, a=solid(1, 1, 1))
         with self.assertRaisesRegex(ValidationError, "not valid"):
             run({"nodes": {"out": {"op": "merge.over"}}, "output": "out"})
 
