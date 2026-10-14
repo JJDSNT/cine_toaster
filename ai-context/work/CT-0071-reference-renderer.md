@@ -73,14 +73,50 @@ renderer in use never becomes the definition of correct.
 - Every example graph the reference can run, it runs (`ExamplesEvaluateTests`).
 - SPEC-0012 §2 now says colours given as parameters are in the working space.
 
+# Done (composite shots and memory)
+
+- **A shot's composite in the assembly**: `composite:` in the breakdown is
+  parsed, checked when the scene loads (the six `composite_*` codes, under the
+  practice `a-composite-is-a-checked-graph`; a take or file it names must be
+  there), and rendered through the reference, the take's sound kept under it;
+  a composite with no take (files and generators only) is a shot too.
+  A real trial: the launch flown in over the Earth, turning in perspective,
+  `music-piece` SC-030.
+- **Memory**, after the first real composite was killed by the kernel at
+  11 GB (clips held whole as floats, every node's value for every frame):
+  - clips are decoded once to a memory-mapped file and converted to floats
+    only for the frames in use; results are written as they are made;
+  - each node's value is kept for the frame being made and, for a node a
+    time operation reads, as far back as its farthest reader reaches
+    (`node_windows`), then released; an optional byte budget evicts the oldest
+    first; hits, misses and recomputations are counted;
+  - mapped pages behind every reader are let go (`madvise`), from the frame
+    access layer, never from an operation.
+
+  | 1080p composite (SC-030) | anonymous | file-backed | held | time |
+  |---|---|---|---|---|
+  | 30 frames | 553 MiB | 497 MiB | 94 MiB, 3 buffers | 37 s |
+  | 120 frames | 563 MiB | 400 MiB | 94 MiB, 3 buffers | 151 s |
+  | 120 frames with echoes, one window for all | 1819 MiB | 684 MiB | 1265 MiB, 40 buffers | 159 s |
+  | the same, a window per node | 1059 MiB | 685 MiB | 474 MiB, 15 buffers | 164 s, no recomputation |
+
+- **ADR 0022 §9**, with the user: the graph, the execution plan, frame access
+  and memory policy are separate; offline and real time are two strategies of
+  one graph, with the policies tabled there. The roadmap's C9b carries the
+  real-time requirements (deadline, buffer pool, GPU, playback cache with
+  prefetch, planning, degradation by policy).
+
 # To do
 
 - `matte.key` by colour and by difference, `signal.channel` hue and
   saturation, and `warp.procedural` bend are still refused by the reference.
 - Recording a non-deterministic result in the production (SPEC-0012 §5), for
   when `signal.estimate` and `generate.render` get renderers (C8, C9).
-- The composite record read from a shot's breakdown (`composite:`) and a
-  join's recipe from the catalog, rendered in an assembly.
+- A join's recipe from the catalog (`[graph]` in a transition item) rendered
+  in an assembly; `curve.beats` inside a shot's composite (the shot's offset in
+  the scene's music).
+- Tracking still holds a whole clip in memory (`track.measure` stacks every
+  frame): stream it.
 - FFmpeg as a renderer of the graph for the ops it can do correctly, with a
   manifest; conformance cases for each, at more sizes, rates, bit depths and
   both alphas.
@@ -100,4 +136,4 @@ renderer in use never becomes the definition of correct.
   curve peaking on its beat; identities that move only with what changed and
   know files by content; the cache's hits and misses; every runnable example.
 - Full suite: 665 tests pass (2026-10-14, at b87342d); 679 after the second
-  slice.
+  slice; 688 after composite shots and memory.

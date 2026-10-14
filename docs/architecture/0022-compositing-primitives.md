@@ -1,6 +1,6 @@
 # ADR 0022: Composition is a typed graph of primitives, not a collection of effects
 
-Status: accepted (2026-10-14, CT-0069; §5 amended the same day, before C2). Directed by the user, amended twice
+Status: accepted (2026-10-14, CT-0069; §5 amended the same day, before C2; §9 added during C2). Directed by the user, amended twice
 the same day -- for the primitives the first list missed, and after an outside
 review the user brought -- and accepted on the user's word with the review's
 recommendation. This text consolidates the decision; "How it was reached"
@@ -152,6 +152,58 @@ The model must admit layers placed in a space with a virtual camera, depth,
 parallax and occlusion, without requiring a full Blender scene: a warp in
 perspective plus a depth signal per layer. Not required by the first
 specification; not to be precluded by it.
+
+### 9. The graph is separate from how it is executed
+
+One declarative graph; several ways to run it (decided 2026-10-14, while C2's
+memory was being fixed, with the user's direction for real time). Four
+things are kept apart, and the primitives assume none of them:
+
+- **the graph**: contracts, parameters, time and dependencies -- nothing about
+  files, order, or where results live;
+- **the execution plan**: in what order frames and nodes are made, which run
+  together, what is fused or precomputed;
+- **frame access**: how a picture reaches a node (decoded once to disk and
+  mapped, streamed, from a GPU texture, from a stream) -- and its page policy;
+- **memory policy**: for each result, its temporal dependency (which frames
+  its consumers read), its **retention** (how long it must stay, computed
+  by the executor from its consumers' declared reach, the largest of them,
+  for that result only), where it is cached under what budget, and when it is
+  **released** (after its last consumer).
+
+Two strategies follow, from the same graph:
+
+| | Offline (the reference, final renders) | Real time (preview, live; C9b) |
+|---|---|---|
+| Aim | quality, determinism, cache, incremental | latency, a deadline per frame (41.7 ms at 24 fps, 33.3 at 30, 16.7 at 60) |
+| Reading | sequential first | with prefetch |
+| Pages | dropped after use | kept for the playback window, behind and ahead |
+| Cache | reuse within a memory budget | low latency, predictable |
+| Buffers | bounded | preferably pre-allocated, from a pool |
+| GPU | optional | often required |
+| A late frame | waits | an explicit policy: lower resolution, a proxy, or the previous frame; the final render is never degraded |
+
+The page and buffer policies belong to frame access and the executor, never to
+an operation: a primitive is written once and runs under either strategy.
+
+Not every operation has to run in real time, and the Video Toaster did not
+ask that either: its switcher worked live while LightWave rendered scenes
+ahead of time, and the two met in the production (the user, 2026-10-14). So
+each node of a composite is run in one of four ways, chosen by the executor
+from the node's dependencies and what is available:
+
+- **live**, on the CPU within the deadline;
+- **accelerated**, on the GPU;
+- **precomputed**: a subgraph whose inputs do not change while playing is
+  rendered ahead and read back by its identity (§6), like a pre-rendered clip;
+- **offline**: a node no live executor can run (a fluid simulation, a model)
+  is rendered beforehand and its result recorded in the production (§6), then
+  used like any other picture.
+
+One composite may combine them -- a pre-rendered LightWave-like element under
+a matte and a warp driven live -- wherever its contracts and dependencies
+allow. C9 establishes how results made by different mechanisms coexist in one
+composite; C9b adds playing them within a deadline.
 
 ## Consequences
 

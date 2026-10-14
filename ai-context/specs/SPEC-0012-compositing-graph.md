@@ -343,6 +343,20 @@ deterministic: [op, ...]
   a tolerance stated per op, at 160x90 and 1920x1080, 24 and 29.97 fps, 8-bit
   and float input, straight and premultiplied alpha.
 
+## Execution and memory (ADR 0022 §9)
+
+The reference executes offline, incrementally: one frame at a time, each
+node's value kept for the frame being made and, for a node a time operation
+reads, as far back as the farthest such reader reaches (`node_windows`);
+everything else is released after its last consumer. An optional budget in
+bytes bounds what is resident; past it the oldest frames go first and are
+computed again if asked. Decoded clips live in a memory-mapped file whose
+pages are let go once behind every reader. Measured on a real 1080p composite
+(CT-0071): anonymous memory 545 MiB for 30 frames and 551 MiB for 120 --
+independent of the length -- where holding clips whole had exhausted 11 GB.
+These are properties of the executor, not of the operations, and a
+real-time executor (C9b) applies other policies to the same graph.
+
 # 8. Room for 2.5D
 
 `warp.transform` carries `depth` and a camera's `perspective`; a picture may

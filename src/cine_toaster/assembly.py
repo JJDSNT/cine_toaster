@@ -118,6 +118,9 @@ class Segment:
     renditions: dict[str, str] = field(default_factory=dict)
     #: The take is a still picture (a grabbed frame, a photograph): held for as long as the shot plays (CT-0065).
     still: bool = False
+    #: The shot's picture is a composite (SPEC-0012): its graph, and the media of each take it may name.
+    composite: dict[str, Any] | None = None
+    composite_takes: dict[str, str] = field(default_factory=dict)
     #: The join into this shot, resolved: a transition ({id, seconds, shader | mode}) and a J/L split.
     transition: dict[str, Any] | None = None
     split: float = 0.0
@@ -159,7 +162,7 @@ class Plan:
     def takes(self) -> dict[str, str]:
         # A title card is drawn, not chosen: it has no take to remember.
         return {segment.shot: segment.take for segment in self.segments
-                if segment.method != "title" and not segment.method.startswith("solid:")}
+                if segment.method not in ("title", "composite") and not segment.method.startswith("solid:")}
 
     @property
     def duration(self) -> float:
@@ -317,6 +320,19 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
                 _resolve_join(root, plan, cut, segment, joins)
             plan.segments.append(segment)
             continue
+        if chosen is None and shot.get("composite"):
+            # A picture made only by its composite (files, generators): no take to cut from (SPEC-0012 §4).
+            length = float(shot.get("duration_seconds") or 0) or 3.0
+            cut = cuts.get(shot["id"]) or {}
+            segment = Segment(shot["id"], "COMPOSITE", "", 0.0, length, cut.get("type") or "hard", "composite",
+                              None, shot.get("level_db"), title=title, effects=list(shot.get("effects") or []))
+            segment.composite = shot["composite"]
+            segment.composite_takes = {take["id"]: take["media"] for take in shot.get("takes") or []}
+            segment.voice_over = _voices_of(root, scene, shot)
+            if plan.segments:
+                _resolve_join(root, plan, cut, segment, joins)
+            plan.segments.append(segment)
+            continue
         if chosen is None:
             if shot.get("source") == "composed":
                 plan.notes.append(f"{shot['id']} is composed (a card); its card is not part of a take cut yet.")
@@ -355,6 +371,11 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         if plan.segments:
             _resolve_join(root, plan, cut, segment, joins)
         segment.reframe = shot.get("reframe")
+        if shot.get("composite"):
+            segment.composite = shot["composite"]
+            segment.composite_takes = {take["id"]: take["media"] for take in shot.get("takes") or []}
+            segment.composite_takes.setdefault("CUT", chosen["media"])
+            segment.composite_takes[chosen["id"]] = chosen["media"]
         segment.mute = list(shot.get("mute") or [])
         scene_dir = root / Path(scene["file"]).parent
         segment.voice_over = [(float(line["mix"].get("at", line["mix"].get("em")) or 0.0),
@@ -587,6 +608,52 @@ def _draw_title(root: Path, segment: Segment, output: Path, first: dict[str, Any
     segment.source, segment.start, segment.end = str(output), 0.0, length
 
 
+def _render_composite(root: Path, segment: Segment, destination: Path, first: dict[str, Any], fps: float,
+                      run_process, notes: list[str]) -> Path:
+    """The shot's composite through the reference (SPEC-0012, ADR 0022 §5), with its take's sound kept.
+
+    The reference is exact, not fast: about a second a frame at 1080 lines for a few nodes. A faster
+    renderer checked against it is the next step of C2.
+    """
+
+    from .compositing import reference
+
+    length = segment.end - segment.start
+    frames = max(1, round(length * fps))
+    size = (first["width"] // 2 * 2, first["height"] // 2 * 2)
+    graph = segment.composite
+    inputs: dict[str, Any] = {}
+    for name, node in graph["nodes"].items():
+        if node.get("op") != "generate.source" or not node.get("take"):
+            continue
+        media = segment.composite_takes.get(str(node["take"]))
+        if media is None:
+            raise ValidationError(f"{segment.shot}: its composite names the take {node['take']!r}, which the shot "
+                                  f"does not have ({', '.join(segment.composite_takes) or 'none'})")
+        # The cut's stretch of the take, unless the node asks for another start.
+        start = float(node["start"]) if node.get("start") is not None else segment.start
+        inputs[name] = reference.read(root / media, frames, size, fps, start=start,
+                                      colorspace=node.get("colorspace", reference.ENCODED),
+                                      alpha=node.get("alpha", "straight"))
+    pictures, _identity, cached = reference.render(graph, inputs, frames=frames, size=size, fps=fps, root=root)
+    if cached:
+        notes.append(f"{segment.shot}: its composite was found in the cache.")
+    silent = destination.with_suffix(".picture.mp4")
+    reference.write(pictures, silent, fps)
+    if segment.media and probe(root / segment.media).get("audio"):
+        run_process(["ffmpeg", "-y", "-loglevel", "error", "-i", str(silent), "-ss", f"{segment.start:.3f}",
+                     "-t", f"{length:.3f}", "-i", str(root / segment.media), "-map", "0:v:0", "-map", "1:a:0",
+                     "-c:v", "copy", "-c:a", "aac", "-shortest", str(destination)],
+                    expected_seconds=length, message=f"{segment.shot}: the take's sound under its composite")
+    else:
+        run_process(["ffmpeg", "-y", "-loglevel", "error", "-i", str(silent), "-f", "lavfi", "-t", f"{length:.3f}",
+                     "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-map", "0:v:0", "-map", "1:a:0",
+                     "-c:v", "copy", "-c:a", "aac", "-shortest", str(destination)],
+                    expected_seconds=length, message=f"{segment.shot}: its composite")
+    segment.start, segment.end = 0.0, length
+    return destination
+
+
 def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
            span: tuple[float, float] = (0.0, 1.0)) -> None:
     """Cut each take, normalise it, join the pictures and lay the sound.
@@ -642,6 +709,13 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
                         expected_seconds=length, message=f"{segment.shot}: {segment.method.split(':', 1)[1]} screen")
             segment.source = str(solid)
         held = None
+        if segment.composite and not segment.source:
+            composed = _render_composite(root, segment, work / f"composite-{index:03d}.mp4", first, fps, run_process,
+                                         plan.notes)
+            if segment.title or segment.effects:
+                held = composed  # the title and effects are drawn over the composite
+            else:
+                segment.source = str(composed)
         if segment.still and not segment.source:
             held = work / f"still-{index:03d}.mp4"
             length = segment.end - segment.start

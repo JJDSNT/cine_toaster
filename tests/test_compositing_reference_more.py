@@ -209,3 +209,120 @@ class ExamplesEvaluateTests(unittest.TestCase):
                 self.assertTrue(np.isfinite(out).all())
                 ran.append(path.stem)
         self.assertGreaterEqual(len(ran), 14, ran)
+
+
+class IncrementalTests(unittest.TestCase):
+    """Made frame by frame, the result is the same as made whole; memory follows the graph, not the length."""
+
+    def graph(self) -> dict:
+        return {"ports": {"a": "picture", "b": "picture"},
+                "nodes": {"soft": {"op": "filter.blur", "in": "a", "radius": 1.5},
+                          "echo": {"op": "time.echo", "in": "soft", "count": 3, "spacing": 2, "decay": 0.5},
+                          "late": {"op": "time.offset", "in": "b", "frames": 2},
+                          "out": {"op": "merge.over", "front": "echo", "back": "late"}}, "output": "out"}
+
+    def inputs(self, frames: int) -> dict:
+        moving = np.stack([box((2 * frame) % (W - 6), 10, (2 * frame) % (W - 6) + 6, 20, (1, 0.5, 0.2))
+                           for frame in range(frames)])
+        moving[..., :3] *= 0.7  # premultiplied by a partial alpha
+        moving[..., 3] *= 0.7
+        return {"a": moving, "b": np.stack([solid(0.1, 0.2, frame / frames) for frame in range(frames)])}
+
+    def test_streamed_and_whole_agree_exactly(self) -> None:
+        options = {"frames": 30, "size": (W, H), "fps": FPS}
+        whole = evaluate(self.graph(), self.inputs(30), **options)
+        streamed = np.stack(list(evaluate(self.graph(), self.inputs(30), stream=True, **options)))
+        self.assertEqual(float(np.abs(whole - streamed).max()), 0.0)
+
+    def test_what_is_kept_does_not_grow_with_the_length(self) -> None:
+        kept = []
+        for frames in (20, 120):
+            stats: dict = {}
+            for _ in evaluate(self.graph(), self.inputs(frames), frames=frames, size=(W, H), fps=FPS, stream=True,
+                              stats=stats):
+                pass
+            kept.append(stats["most_kept"])
+        self.assertEqual(kept[0], kept[1])
+        # Only the echo's input is kept back (six frames and the present); the other nodes, the present only.
+        self.assertLessEqual(kept[1], (6 + 1) + 3 + 2)
+
+    def test_a_cached_result_is_the_streamed_one_in_half_floats(self) -> None:
+        from cine_toaster.compositing.reference import render
+
+        with tempfile.TemporaryDirectory() as folder:
+            options = {"frames": 12, "size": (W, H), "fps": FPS, "cache": Path(folder)}
+            made, identity, _ = render(self.graph(), self.inputs(12), **options)
+            found, same, hit = render(self.graph(), self.inputs(12), **options)
+            direct = evaluate(self.graph(), self.inputs(12), frames=12, size=(W, H), fps=FPS)
+            self.assertTrue(hit and same == identity)
+            self.assertLess(float(np.abs(np.asarray(found, np.float32) - direct).max()), 2e-3)
+
+
+class BudgetTests(unittest.TestCase):
+    def test_a_budget_bounds_the_bytes_held_and_costs_recomputation_not_correctness(self) -> None:
+        test = IncrementalTests()
+        graph, inputs = test.graph(), test.inputs(40)
+        options = {"frames": 40, "size": (W, H), "fps": FPS}
+        free: dict = {}
+        unbounded = np.stack(list(evaluate(graph, inputs, stream=True, stats=free, **options)))
+        frame_bytes = W * H * 4 * 4
+        tight: dict = {}
+        bounded = np.stack(list(evaluate(graph, inputs, stream=True, stats=tight, budget=6 * frame_bytes, **options)))
+        self.assertEqual(float(np.abs(unbounded - bounded).max()), 0.0)
+        self.assertLessEqual(tight["most_kept_bytes"], 6 * frame_bytes + frame_bytes)  # the frame being made may add one
+        self.assertLess(tight["most_kept_bytes"], free["most_kept_bytes"])
+        self.assertGreater(tight["recomputed"], free["recomputed"])
+
+    def test_the_bytes_held_do_not_grow_with_the_length(self) -> None:
+        test = IncrementalTests()
+        held = []
+        for frames in (20, 160):
+            stats: dict = {}
+            for _ in evaluate(test.graph(), test.inputs(frames), frames=frames, size=(W, H), fps=FPS, stream=True,
+                              stats=stats):
+                pass
+            held.append(stats["most_kept_bytes"])
+        self.assertEqual(held[0], held[1])
+
+
+class RetentionTests(unittest.TestCase):
+    """Retention follows each result's consumers: the largest reach any of them needs, and only for that result."""
+
+    def moving(self, frames: int) -> np.ndarray:
+        return np.stack([box((3 * frame) % (W - 6), 8, (3 * frame) % (W - 6) + 6, 28, (0.9, 0.6, 0.3))
+                         for frame in range(frames)])
+
+    def test_two_consumers_of_one_result_keep_it_as_long_as_the_farther_needs(self) -> None:
+        from cine_toaster.compositing.reference import node_windows
+
+        graph = {"ports": {"a": "picture"},
+                 "nodes": {"soft": {"op": "filter.blur", "in": "a", "radius": 1},
+                           "near": {"op": "time.offset", "in": "soft", "frames": 2},
+                           "far": {"op": "time.echo", "in": "soft", "count": 3, "spacing": 3},
+                           "both": {"op": "merge.over", "front": "near", "back": "far"},
+                           "graded": {"op": "colour.grade", "in": "a", "gain": 1.5},
+                           "out": {"op": "merge.blend", "a": "both", "b": "graded", "mode": "screen"}},
+                 "output": "out"}
+        self.assertEqual(node_windows(graph), {"soft": 9})  # the echo's nine, not the offset's two; nobody else
+        options = {"frames": 40, "size": (W, H), "fps": FPS}
+        whole = evaluate(graph, {"a": self.moving(40)}, **options)
+        stats: dict = {}
+        streamed = np.stack(list(evaluate(graph, {"a": self.moving(40)}, stream=True, stats=stats, **options)))
+        self.assertEqual(float(np.abs(whole - streamed).max()), 0.0)
+        self.assertEqual(stats["recomputed"], 0)
+        self.assertLessEqual(stats["most_kept"], (9 + 1) + 5 + 1)  # soft's past and present; the rest, the present
+
+    def test_reading_out_of_order_recomputes_what_was_let_go_and_stays_right(self) -> None:
+        reverse = {"ports": {"a": "picture"},
+                   "nodes": {"soft": {"op": "filter.blur", "in": "a", "radius": 1},
+                             "back": {"op": "curve.keys", "keys": [[0, 1.6], [1.6, 0]]},
+                             "out": {"op": "time.remap", "in": "soft", "map": {"curve": "back"}}}, "output": "out"}
+        options = {"frames": 40, "size": (W, H), "fps": FPS}
+        stats: dict = {}
+        streamed = np.stack(list(evaluate(reverse, {"a": self.moving(40)}, stream=True, stats=stats, **options)))
+        self.assertGreater(float(streamed[0, ..., 3].sum()), 0)  # the first frame shows the clip's end
+        expected = evaluate({"ports": {"a": "picture"}, "nodes": {"out": {"op": "filter.blur", "in": "a",
+                                                                          "radius": 1}}, "output": "out"},
+                            {"a": self.moving(40)}, **options)
+        self.assertEqual(float(np.abs(streamed[0] - expected[int(round(1.6 * FPS - 0.5)) - 1]).max()) < 1e-6
+                         or float(np.abs(streamed[0] - expected[int(round(1.6 * FPS - 0.5))]).max()) < 1e-6, True)

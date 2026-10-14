@@ -224,6 +224,8 @@ def _load_shots(
                 "reframe": field(raw, "reframe") if isinstance(field(raw, "reframe"), dict) else None,
                 # Its length in beats of the scene's music, instead of seconds (CT-0067).
                 "beats": field(raw, "beats"),
+                # The shot's picture as a composite of SPEC-0012 (a graph), when it is not the take alone.
+                "composite": field(raw, "composite") if isinstance(field(raw, "composite"), dict) else None,
                 # The stretch of a public file this shot's picture is (CT-0066).
                 "footage": _footage(field(raw, "footage")),
                 "derive": _derive(field(raw, "derive")),
@@ -764,6 +766,33 @@ def _load_scene(
                 message=(f"Block {block.id} holds {', '.join(block.shots)}, which are not consecutive. "
                          f"A generation makes one continuous run of shots; the shots between would be cut out of it."),
             ).public_dict())
+
+    # A composite is checked as SPEC-0012 says, before anything renders; its takes and files must be there.
+    if any(shot.get("composite") for shot in shots):
+        from .compositing.schema import validate as validate_composite
+
+        for shot in shots:
+            graph = shot.get("composite")
+            if not graph:
+                continue
+            for code, message in validate_composite(graph):
+                findings.append(Finding(code=code, severity="error", scene_id=scene_id, shots=(shot["id"],),
+                                        message=f"{shot['id']}: its composite: {message}.").public_dict())
+            takes = {take["id"] for take in shot.get("takes") or []} | ({"CUT"} if shot.get("takes") else set())
+            for node_name, node in (graph.get("nodes") or {}).items():
+                if not isinstance(node, dict):
+                    continue
+                if node.get("op") == "generate.source" and node.get("take") and str(node["take"]) not in takes:
+                    findings.append(Finding(code="composite_input_missing", severity="error", scene_id=scene_id,
+                                            shots=(shot["id"],),
+                                            message=f"{shot['id']}: its composite's {node_name} names the take "
+                                                    f"{node['take']!r}, which the shot does not have.").public_dict())
+                for key in ("file", "scene"):
+                    if isinstance(node.get(key), str) and not (root / node[key]).is_file():
+                        findings.append(Finding(code="composite_input_missing", severity="error", scene_id=scene_id,
+                                                shots=(shot["id"],),
+                                                message=f"{shot['id']}: its composite's {node_name} reads "
+                                                        f"{node[key]}, which is not there.").public_dict())
 
     # Footage from outside is declared with where it is and its licence, and fetched (CT-0066).
     from .footage import problem as footage_problem

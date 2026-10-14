@@ -78,47 +78,125 @@ def _ffmpeg() -> str:
     return path
 
 
+class Clip:
+    """A clip read once into a file on disk, each frame converted to the working space when it is asked for.
+
+    At 1080 lines a second of float RGBA is a gigabyte; held whole, a few clips and every node's frame
+    exhausted memory (CT-0071). Here the decoded 16-bit frames live in a memory-mapped file, and only the
+    frames in use are ever floats.
+    """
+
+    def __init__(self, raw: np.ndarray, colorspace: str, alpha: str, working: str) -> None:
+        self.raw, self.colorspace, self.alpha, self.working = raw, colorspace, alpha, working
+        self.shape = (raw.shape[0],) + raw.shape[1:3] + (4,)
+
+    def __len__(self) -> int:
+        return self.shape[0]
+
+    def release_before(self, frame: int) -> None:
+        """Let the kernel drop the pages of frames no longer needed; they are read again from disk if asked."""
+
+        _drop_pages(self.raw, frame)
+
+    def frame(self, index: int) -> np.ndarray:
+        data = np.asarray(self.raw[min(index, len(self) - 1)], dtype=np.float32) / 65535.0
+        rgb = convert(data[..., :3], self.colorspace, self.working)
+        if self.alpha == "straight":
+            rgb = rgb * data[..., 3:4]
+        return np.concatenate([rgb, data[..., 3:4]], axis=-1).astype(np.float32)
+
+    def __getitem__(self, key: Any) -> np.ndarray:
+        if isinstance(key, tuple):
+            return self.frame(int(key[0]))[key[1:]]
+        return self.frame(int(key))
+
+
+def _drop_pages(array: np.ndarray, frame: int) -> None:
+    """Advise the kernel that a memory-mapped array's frames before ``frame`` are not needed for now."""
+
+    import mmap
+
+    handle = getattr(array, "_mmap", None)
+    if handle is None or frame <= 0 or not hasattr(handle, "madvise"):
+        return
+    per_frame = int(np.prod(array.shape[1:])) * array.dtype.itemsize
+    header = getattr(array, "offset", 0)
+    end = (header + frame * per_frame) // mmap.PAGESIZE * mmap.PAGESIZE
+    if end > 0:
+        try:
+            handle.madvise(mmap.MADV_DONTNEED, 0, end)
+        except (OSError, ValueError):  # advice only: if refused, the pages stay and nothing is lost
+            pass
+
+
 def read(path: Path, frames: int, size: tuple[int, int], fps: float, *, start: float = 0.0,
-         colorspace: str = ENCODED, alpha: str = "straight", working: str = LINEAR) -> np.ndarray:
-    """A clip or a still as (frames, H, W, 4) in the working space, premultiplied (SPEC-0012 §2)."""
+         colorspace: str = ENCODED, alpha: str = "straight", working: str = LINEAR) -> Clip:
+    """A clip or a still, `frames` long, in the working space and premultiplied when used (SPEC-0012 §2)."""
+
+    import tempfile
 
     width, height = size
     still = Path(path).suffix.lower() in (".png", ".jpg", ".jpeg", ".webp", ".exr", ".tif", ".tiff")
     source = ["-loop", "1", "-framerate", f"{fps:g}"] if still else ["-ss", f"{start:.4f}"]
-    completed = subprocess.run(
+    process = subprocess.Popen(
         [_ffmpeg(), "-loglevel", "error", *source, "-i", str(path), "-frames:v", str(frames),
          "-vf", f"fps={fps:g},scale={width}:{height}:flags=bicubic", "-f", "rawvideo", "-pix_fmt", "rgba64le", "-"],
-        capture_output=True, timeout=900)
-    if completed.returncode != 0:
-        raise ValidationError(f"Reading {Path(path).name} failed: {completed.stderr.decode()[-300:]}")
-    data = np.frombuffer(completed.stdout, dtype="<u2").astype(np.float32) / 65535.0
-    count = data.size // (width * height * 4)
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    handle = tempfile.NamedTemporaryFile(prefix="clip-", suffix=".raw", delete=False)
+    stored = np.lib.format.open_memmap(handle.name, mode="w+", dtype="<u2", shape=(frames, height, width, 4))
+    Path(handle.name).unlink()  # the mapping keeps it; nothing is left behind
+    handle.close()
+    size_bytes, count = width * height * 4 * 2, 0
+    while count < frames:
+        chunk = process.stdout.read(size_bytes)
+        if len(chunk) < size_bytes:
+            break
+        stored[count] = np.frombuffer(chunk, dtype="<u2").reshape(height, width, 4)
+        count += 1
+        if count % 16 == 0:  # written frames are flushed to the file and their pages let go
+            stored.flush()
+            _drop_pages(stored, count)
+    process.stdout.close()
+    error = process.stderr.read().decode()
+    process.wait(timeout=60)
     if count == 0:
-        raise ValidationError(f"{Path(path).name} gave no frames")
-    pictures = data[: count * width * height * 4].reshape(count, height, width, 4)
-    if count < frames:  # a clip shorter than the extent holds its last frame
-        pictures = np.concatenate([pictures, np.repeat(pictures[-1:], frames - count, axis=0)])
-    rgb = convert(pictures[..., :3], colorspace, working)
-    if alpha == "straight":
-        rgb = rgb * pictures[..., 3:4]
-    return np.concatenate([rgb, pictures[..., 3:4]], axis=-1).astype(np.float32)
+        raise ValidationError(f"Reading {Path(path).name} gave no frames: {error[-300:]}")
+    for index in range(count, frames):  # a clip shorter than the extent holds its last frame
+        stored[index] = stored[count - 1]
+    return Clip(stored, colorspace, alpha, working)
 
 
-def write(pictures: np.ndarray, destination: Path, fps: float, *, working: str = LINEAR,
+def write(pictures: Any, destination: Path, fps: float, *, working: str = LINEAR,
           display: str = ENCODED) -> Path:
-    """(frames, H, W, 4) linear premultiplied to an H.264 file in the display encoding, over black."""
+    """Frames (an array or any sequence of (H, W, 4)), linear premultiplied, to H.264 in the display encoding.
 
-    frames, height, width, _ = pictures.shape
-    rgb = convert(np.clip(pictures[..., :3], 0.0, None), working, display)  # premultiplied: already over black
-    data = (np.clip(rgb, 0.0, 1.0) * 65535.0 + 0.5).astype("<u2")
-    completed = subprocess.run(
+    Written as they come, so a long composite never has to be in memory at once.
+    """
+
+    frames = iter(pictures)
+    first = next(frames)
+    height, width = first.shape[:2]
+    process = subprocess.Popen(
         [_ffmpeg(), "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb48le", "-s", f"{width}x{height}",
          "-r", f"{fps:g}", "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", "12", "-pix_fmt", "yuv444p",
-         str(destination)],
-        input=data.tobytes(), capture_output=True, timeout=900)
-    if completed.returncode != 0:
-        raise ValidationError(f"Writing {destination.name} failed: {completed.stderr.decode()[-300:]}")
+         str(destination)], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        for picture in _chain(first, frames):
+            rgb = convert(np.clip(np.asarray(picture, dtype=np.float32)[..., :3], 0.0, None), working, display)
+            process.stdin.write((np.clip(rgb, 0.0, 1.0) * 65535.0 + 0.5).astype("<u2").tobytes())
+        process.stdin.close()
+        if process.wait(timeout=900) != 0:
+            raise ValidationError(f"Writing {destination.name} failed: {process.stderr.read().decode()[-300:]}")
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.stderr.close()
     return destination
+
+
+def _chain(first: Any, rest: Any):
+    yield first
+    yield from rest
 
 
 # --- curves -----------------------------------------------------------------------------
@@ -182,6 +260,13 @@ class Context:
     working: str = LINEAR
     root: Path | None = None  # where a source's relative path is read from
     cache: dict[tuple[str, int], Any] = field(default_factory=dict)
+    #: Frames of node values kept behind the one being made, from what the graph's time operations reach
+    #: back (`temporal_window`); older ones are computed again when asked for. Memory is bounded by the
+    #: graph and this window, never by the length.
+    window: int = 0
+    #: A ceiling on the bytes of node values held in memory; past it the oldest frames go first, never the
+    #: frame being made. None: only the window bounds it.
+    budget: int | None = None
 
 
 def _matte(value: Any) -> np.ndarray:
@@ -266,9 +351,69 @@ def Image_resize(data: np.ndarray, width: int, height: int) -> np.ndarray:
     return out if data.ndim == 3 else out[..., 0]
 
 
+def node_windows(graph: dict[str, Any]) -> dict[str, int]:
+    """For each node a time operation reads, how many frames back it is read; every other node needs only
+    the frame being made. Kept per node, so a long echo holds its input's past, not the whole graph's."""
+
+    reach: dict[str, int] = {}
+    for node in (graph.get("nodes") or {}).values():
+        op, source = node.get("op"), str(node.get("in") or "").split(".")[0]
+        back = 0
+        if op == "time.offset" and isinstance(node.get("frames"), int):
+            back = abs(node["frames"])
+        elif op == "time.echo":
+            back = int(node.get("count", 4)) * int(node.get("spacing", 1))
+        elif op == "time.blend":
+            back = int(node.get("frames", 2))
+        if back and source:
+            reach[source] = max(reach.get(source, 0), back)
+    return reach
+
+
+def temporal_window(graph: dict[str, Any]) -> int:
+    """How many frames back the graph's time operations read, so their inputs stay in memory that long.
+
+    Each node's value is kept for the frame being made (two nodes reading one result share it); a node
+    behind an offset, an echo or a blend is kept as far back as those reach. A remap may reach anywhere:
+    what it asks for beyond the window is computed again rather than kept.
+    """
+
+    reach = 0
+    for node in (graph.get("nodes") or {}).values():
+        op = node.get("op")
+        if op == "time.offset" and isinstance(node.get("frames"), int):
+            reach = max(reach, abs(node["frames"]))
+        elif op == "time.echo":
+            reach = max(reach, int(node.get("count", 4)) * int(node.get("spacing", 1)))
+        elif op == "time.blend":
+            reach = max(reach, int(node.get("frames", 2)))
+    return reach
+
+
+class _Held:
+    """One picture standing for every frame, without copying it once per frame."""
+
+    def __init__(self, picture: np.ndarray, frames: int) -> None:
+        self.picture, self.shape = picture, (frames,) + picture.shape
+
+    def __getitem__(self, key: Any) -> np.ndarray:
+        return self.picture[key[1:]] if isinstance(key, tuple) else self.picture
+
+
 def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size: tuple[int, int], fps: float,
-             working: str = LINEAR, root: Path | None = None, beats: list[float] | None = None) -> np.ndarray:
+             working: str = LINEAR, root: Path | None = None, beats: list[float] | None = None,
+             stream: bool = False, stats: dict[str, int] | None = None, budget: int | None = None) -> Any:
     """The graph's output picture for every frame of its extent: (frames, H, W, 4), linear, premultiplied.
+
+    With ``stream``, a generator of frames instead, made one at a time: memory stays bounded by the
+    graph and a few frames, not by the length.
+
+    Four things are kept apart (SPEC-0012 §5): a node's **identity** says whether a result can be reused;
+    the **persistent cache** (`render`) keeps results between runs, on disk; the **resident** values here
+    hold what the frame being made and the time operations' window need, within an optional ``budget`` in
+    bytes; and a value's **lifetime** ends when nothing still to be made needs it, whether or not the
+    persistent cache has it. ``stats`` receives what was kept at most (entries, bytes), hits, misses and
+    recomputations.
 
     ``beats`` are the scene music's beats in seconds from the extent's start (CT-0067), for `curve.beats`.
     An input that is a recorded result of `signal.estimate` or `generate.render` is given like any other.
@@ -283,7 +428,10 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
         why = "; ".join(f"{op}: {NOT_IN_REFERENCE[op]}" for op in missing if op in NOT_IN_REFERENCE)
         raise ValidationError(f"The reference does not implement {', '.join(missing)}" + (f" ({why})" if why else " yet"))
     aspect = size[0] / size[1]
-    context = Context(size, fps, frames, working, root)
+    context = Context(size, fps, frames, working, root, window=temporal_window(graph), budget=budget)
+    counts = {"hits": 0, "misses": 0, "recomputed": 0}
+    windows = node_windows(graph)
+    made_once: set[tuple[str, int]] = set()
     width, height = size
     length = frames / fps
     port_types = graph.get("ports") or {}
@@ -297,9 +445,11 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             continue
         if callable(value):
             curves[name] = value
+        elif isinstance(value, Clip):
+            clips[name] = value
         elif isinstance(value, np.ndarray):
             per_frame = value.ndim == 4 or (port_kind(name) == "signal" and value.ndim == 3 and value.shape[0] == frames)
-            clips[name] = value if per_frame else np.repeat(value[None], frames, axis=0)
+            clips[name] = value if per_frame else _Held(value, frames)
         else:
             clips[name] = read(Path(value), frames, size, fps, working=working)
     for name, kind in port_types.items():
@@ -404,9 +554,30 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
         if reference in curves or nodes.get(reference, {}).get("op", "").startswith("curve."):
             return curve(reference)((frame + 0.5) / fps)
         key = (reference, frame)
-        if key not in context.cache:
-            context.cache[key] = compute(reference, frame)
-        return context.cache[key]
+        if key in context.cache:
+            counts["hits"] += 1
+            return context.cache[key]
+        counts["misses"] += 1
+        if key in made_once:
+            counts["recomputed"] += 1  # dropped by the window or the budget, and asked for again
+        made_once.add(key)
+        result = compute(reference, frame)
+        context.cache[key] = result
+        if context.budget is not None:
+            while resident() > context.budget:
+                older = [held for held in context.cache if held[1] < frame]
+                if not older:
+                    break
+                del context.cache[min(older, key=lambda held: held[1])]
+        return result
+
+    def resident() -> int:
+        return sum(getattr(held, "nbytes", 0) for held in context.cache.values())
+
+    def forget_before(frame: int) -> None:
+        # A value is dropped once no frame still to be made reaches back to it: per node, not graph-wide.
+        for key in [key for key in context.cache if key[1] <= frame - 1 - windows.get(key[0], 0)]:
+            del context.cache[key]
 
     def compute(name: str, frame: int) -> Any:
         node = nodes[name]
@@ -773,7 +944,23 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
         raise ValidationError(f"The reference does not implement {op}")
 
     output = graph["output"]
-    return np.stack([_picture(value(output, frame)) for frame in range(frames)]).astype(np.float32)
+
+    def each() -> Any:
+        for frame in range(frames):
+            yield np.asarray(_picture(value(output, frame)), dtype=np.float32)
+            if stats is not None:
+                stats["most_kept"] = max(stats.get("most_kept", 0), len(context.cache))
+                stats["most_kept_bytes"] = max(stats.get("most_kept_bytes", 0), resident())
+            forget_before(frame + 1)
+            for clip in clips.values():
+                if isinstance(clip, Clip):
+                    clip.release_before(frame + 1 - context.window)
+        if stats is not None:
+            stats.update(counts)
+
+    if stream:
+        return each()
+    return np.stack(list(each())).astype(np.float32)
 
 
 def cache_directory() -> Path:
@@ -818,15 +1005,23 @@ def render(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size: 
                "frames": frames, "size": list(size), "beats": list(beats or [])}
     if cache is False or any(identity is None for identity in known.values()):
         return evaluate(graph, inputs, frames=frames, size=size, fps=fps, working=working, root=root,
-                        beats=beats), "", False
+                        beats=beats, stream=True), "", False
     output = identities(graph, known, context=context, root=root)[graph["output"].split(".")[0]]
     folder = Path(cache) if isinstance(cache, (str, Path)) else cache_directory()
     stored = folder / f"{output}.npy"
     if stored.is_file():
-        return np.load(stored).astype(np.float32), output, True
-    pictures = evaluate(graph, inputs, frames=frames, size=size, fps=fps, working=working, root=root, beats=beats)
+        return np.load(stored, mmap_mode="r"), output, True
     folder.mkdir(parents=True, exist_ok=True)
     partial = stored.with_suffix(".part.npy")
-    np.save(partial, pictures.astype(np.float16))  # half floats: the precision SPEC-0012 hands pictures over in
+    # Half floats, the precision SPEC-0012 hands pictures over in, written frame by frame to disk.
+    kept = np.lib.format.open_memmap(partial, mode="w+", dtype=np.float16, shape=(frames, size[1], size[0], 4))
+    for index, picture in enumerate(evaluate(graph, inputs, frames=frames, size=size, fps=fps, working=working,
+                                             root=root, beats=beats, stream=True)):
+        kept[index] = picture
+        if index % 16 == 15:
+            kept.flush()
+            _drop_pages(kept, index + 1)
+    kept.flush()
+    del kept
     partial.replace(stored)
-    return pictures, output, False
+    return np.load(stored, mmap_mode="r"), output, False

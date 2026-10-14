@@ -214,6 +214,13 @@ it. Next: the `composite:` record in an assembly, and FFmpeg as a renderer.
 
 ### C9. Hybrid execution
 
+- How results made by different mechanisms coexist in one composite (ADR 0022
+  §9): each node live, accelerated, precomputed or offline; a subgraph whose
+  inputs do not change while playing is rendered ahead and read back by its
+  identity; an offline node's result is a production record. Real time (C9b)
+  then needs only the live and accelerated parts to meet the deadline -- as
+  the Toaster played live what LightWave had rendered beforehand.
+
 - What: a planner that splits a graph across renderers (FFmpeg, GL, Blender,
   ComfyUI or other model runners, OpenCV), runs each part where it can --
   locally or on Runpod as a job with its cost -- and hands results over as
@@ -226,8 +233,17 @@ it. Next: the `composite:` record in an assembly, and FFmpeg as a renderer.
 ### C9b. Real time and streams
 
 - What: the measurement of the old D5 (sources at once, real time on this
-  GPU, a stream as a source, switching while playing); a GL renderer for the
-  graph, so the preview and a live output are the same program.
+  GPU, a stream as a source, switching while playing); a real-time executor of
+  the same graph (ADR 0022 §9), so the preview and a live output are the same
+  program as the final render, not a second compositing language:
+  - a deadline per frame (41.7 ms at 24 fps, 33.3 at 30, 16.7 at 60), measured;
+  - a pool of pre-allocated buffers, no allocation while playing;
+  - the GPU for merges, warps, mattes and colour;
+  - a playback cache: a window of frames behind and ahead, with prefetch, for
+    playing, scrubbing and time operations -- pages kept, not dropped;
+  - planning: nodes fused, run in parallel, or precomputed;
+  - degradation by policy when a deadline is missed (lower resolution, a
+    proxy, the previous frame), never in the final render.
 - Done when: the numbers are written down, and what can run live does, in the
   preview, from the same records.
 
