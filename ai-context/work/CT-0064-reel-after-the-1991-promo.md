@@ -187,6 +187,58 @@ What making it showed is missing:
   against 41.42 computed). Nobody has listened to it: whether the joins are
   felt on the beat is for the user to say.
 
+# Where the line stands (2026-10-14)
+
+One list of everything this line has found, so nothing lives only in a
+conversation. The sections below hold the detail.
+
+Done:
+
+- the reel assembled like a film; a still as a take; `toast voice` beside the
+  scene, in each line's voice, respeaking a changed line (CT-0065);
+- `toast take add`: material brought in with source, licence, credit (CT-0065);
+- `footage:` declared on a shot and fetched, at a chosen height (CT-0066);
+- `toast sound search openverse` finds music Openverse does not categorise
+  (Freesound's): it returned nothing for "synthwave", now five tracks;
+- a first music piece and an organic trial, made by hand where noted below.
+
+To do, in the agreed order:
+
+1. **Beats as a record**: detect a track's beats (librosa is in
+   `.venv-voice`), keep them with the sound, and let a shot's length and a
+   join's place be given in beats; a check for a join that is off the beat.
+2. **A production's frame**: its size and rate declared once, instead of
+   inherited from the first moving take.
+3. **A matte and an overlay in the transition contract** (moved up: the user
+   asked for organic transitions): a join shaped by a moving matte, a
+   graphic riding it; `luma` and `displacement` back in the catalog.
+4. **Layers and ADO-style moves**: a playing picture sized, placed, rotated
+   in perspective on keyframes over another, held; borders, drop shadow,
+   trails; a keyer (luminance, colour) with its key travelling with it.
+5. **Measure video and streams**: sources at once, real time, a stream as a
+   source, switching while playing.
+6. **Toaster-style shaders** (CT-0028), and a review of the catalog's
+   positional and organic shaders: 6 of 117 have a sheet, and
+   `undulating-burn-out` is not what its name suggests.
+7. **The music piece, finished**, then **the reel** written from scratch: a
+   narrated first act, the piece as its second. The fixture in
+   `examples/amiga-demo-reel` is a placeholder until then.
+
+Smaller defects found on the way, not yet fixed:
+
+- a transition shortened to half its shorter shot moves later joins off the
+  beat; it is said in a note, nothing more;
+- a first shot's `transition` that nothing renders is not reported by
+  `toast check` (a scene's first join is its `enter`);
+- a title does not take its colours from the production's look;
+- `toast footage fetch` runs in the foreground: no progress, no cancel; a
+  changed declaration does not replace the take that is there;
+- `toast build` duplicates a poorer form of the assembly: keep or remove;
+- `rig`, `remotion` and `hyperframes` are accepted engines nothing renders;
+- title catalog: no horizontal crawl, no drop shadow; VFX catalog: no
+  posterise, solarise or colour cycling;
+- the piece's Mars shots are a small square in a black frame: choose others.
+
 # What the user said of the first piece (2026-10-14)
 
 He liked the montage. What he missed: **video with more movement inside an

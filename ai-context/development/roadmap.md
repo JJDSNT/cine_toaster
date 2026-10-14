@@ -229,17 +229,19 @@ which become part of Cine Toaster. It has no specific relation to SINGULAR
 and does not follow that line's priorities. The map and the order are in
 `CT-0064`; agreed on 2026-10-14:
 
-1. the reel on the assembly path (`CT-0065`);
-2. footage declared in the breakdown and fetched;
-3. music brought in, its beats a record of the project;
-4. the music-driven piece, first version -- nothing of the previous reel kept;
-5. a measurement of video and streams (sources at once, real time, streams
-   as sources, switching while playing): live transmission is not the
-   purpose, and it is not ruled out;
-6. a matte and an overlay in the transition contract, then `CT-0028`;
-7. layers, a keyer, and ADO-style moves within a shot;
-8. the reel: a narrated first act, the music piece as its second;
-9. catalog items, and the composed engines that nothing renders.
+1. ~~the reel on the assembly path~~ done (`CT-0065`);
+2. ~~footage declared in the breakdown and fetched~~ done (`CT-0066`);
+3. a first music piece and an organic trial exist, made partly by hand
+   (outside the repository); what they showed is in `CT-0064`;
+4. beats as a record of the project, and a production's frame declared;
+5. a matte and an overlay in the transition contract (moved up by the user's
+   wish for organic transitions);
+6. layers, a keyer, and ADO-style moves within a shot;
+7. a measurement of video and streams: live transmission is not the purpose,
+   and it is not ruled out;
+8. Toaster-style shaders (`CT-0028`) and a review of the catalog's;
+9. the music piece finished, then the reel: a narrated first act, the piece
+   as its second -- nothing of the previous reel kept.
 
 ### Later
 
