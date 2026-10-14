@@ -64,7 +64,8 @@ Three things follow and every step below respects them:
    renderer; a luma key, a luma matte and a luma wipe call it.
 3. **Renderers are judged by primitive.** A capability matrix says what each
    one implements; a recipe runs on any renderer that has its primitives, and
-   the FFmpeg form is the reference others are tested against.
+   the NumPy reference (float, linear, premultiplied, with OCIO) defines the
+   right result and every renderer -- FFmpeg included -- is tested against it.
 
 ## Where things stand (2026-10-14)
 
@@ -116,10 +117,15 @@ Done (`CT-0070`): `ai-context/specs/SPEC-0012-compositing-graph.md`, accepted
 
 ### C2. The reference renderer and the record
 
-- What: a `compositing` package with the FFmpeg form of each primitive; the
-  composite record read from the breakdown; `mattes.py`, the VFX catalog's
-  keying and laying, and the overlay moved onto it. A capability matrix in
-  `toast doctor`.
+- What: the **NumPy reference** of each primitive in the `compositing` package
+  (float, linear, premultiplied, OCIO; FFmpeg only to read and write files);
+  the composite record read from the breakdown; then FFmpeg as the first
+  production renderer of the ops it can do correctly, checked against the
+  reference; `mattes.py`, the VFX catalog's keying and laying, and the overlay
+  moved onto them. A capability matrix in `toast doctor`.
+- The validator's three robustness gaps found by the second outside reading
+  (depth cameras and counts in `merge.depth`, opaque nodes' ports, required
+  parameters beyond `matte.key`) were closed at the start of this step.
 - Done when: the existing joins, effects and titles render through it with
   their tests unchanged, and luma is computed in one place, in the working
   space of the colour contract (today it is FFmpeg's Y in display-encoded

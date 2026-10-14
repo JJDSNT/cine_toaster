@@ -164,14 +164,34 @@ OPS: dict[str, Op] = {
 KEY_NEEDS = {"luminance": ("low", "high"), "luma": ("low", "high"), "colour": ("colour", "tolerance"),
              "difference": ("reference", "tolerance")}
 
-#: An opaque node declares its own ports; these are a shader transition's (SPEC-0012 §3, Opaque nodes).
+#: Parameters an op cannot run without; "a|b" means one of them (SPEC-0012 §9, composite_param_missing).
+REQUIRED_PARAMS: dict[str, tuple[str, ...]] = {
+    "signal.channel": ("channel",), "signal.read": ("file", "kind"), "signal.estimate": ("kind", "model"),
+    "matte.shape": ("shape",), "matte.combine": ("how",), "matte.label": ("labels",),
+    "merge.porter_duff": ("op",), "merge.blend": ("mode",),
+    "warp.procedural": ("kind",), "warp.corner_pin": ("corners|track",),
+    "colour.lut": ("file|look",), "colour.posterise": ("levels",), "colour.solarise": ("threshold",),
+    "filter.morphology": ("operation", "radius"), "filter.blur": ("radius",),
+    "time.remap": ("map",), "time.offset": ("frames",), "time.blend": ("frames",), "time.echo": ("count",),
+    "generate.source": ("take|file",), "generate.solid": ("colour",), "generate.text": ("text",),
+    "generate.render": ("renderer",), "track.measure": ("kind",), "track.read": ("file",),
+    "curve.keys": ("keys",), "curve.map": ("how",), "curve.combine": ("how",), "curve.from_track": ("field",),
+}
+
+#: An opaque node declares its own ports (SPEC-0012 §3, Opaque nodes): the renderer it needs, and what it reads.
 OPAQUE_PREFIX = "opaque."
+OPAQUE_PORTS: dict[str, dict[str, Port]] = {
+    "opaque.gl": {"from": P(*PIC), "to": P(*PIC), "progress": P(*CRV)},  # a gl-transitions shader
+    "opaque.natron": {"in": P(*PIC)},  # an OFX plugin
+    "opaque.blender": {},  # a scene that makes its own picture
+}
 
 
 @dataclass
 class _Value:
     type: str
     kind: str = ""
+    camera: str = ""  # for a metric depth: the camera it is measured from
 
 
 def _ref(value: Any) -> str | None:
@@ -243,10 +263,21 @@ def validate(graph: dict[str, Any]) -> list[tuple[str, str]]:
         node = nodes[name]
         op_name = str(node.get("op") or "")
         if op_name.startswith(OPAQUE_PREFIX):
-            # An opaque node's ports are its item's; here only that it reads existing values and gives a picture.
-            for key, value in node.items():
-                if key != "op" and _ref(value) and (value in external or value.split(".")[0] in nodes):
-                    resolve(value, f"{name}.{key}")
+            if op_name not in OPAQUE_PORTS:
+                problems.append(("composite_unknown_op", f"{name} asks for {op_name!r}; opaque nodes are "
+                                                         f"{', '.join(OPAQUE_PORTS)}"))
+                continue
+            # Its declared ports are checked like any op's; other values are its item's own parameters.
+            op = Op(OPAQUE_PORTS[op_name], {"out": "picture"}, {key: "text" for key in node if key != "op"})
+            for port_name, port in op.inputs.items():
+                given = _ref(node.get(port_name))
+                if given is None:
+                    problems.append(("composite_input_missing", f"{name} ({op_name}) has nothing on its {port_name}"))
+                    continue
+                value = resolve(given, f"{name}.{port_name}")
+                if value is not None and value.type not in port.types and (value.type, port.types[0]) not in CONVERSIONS:
+                    problems.append(("composite_type_mismatch", f"{name}.{port_name} takes {port.types[0]}; {given} "
+                                                                f"gives {value.type}"))
             values[name] = _Value("picture")
             continue
         op = OPS.get(op_name)
@@ -296,6 +327,32 @@ def validate(graph: dict[str, Any]) -> list[tuple[str, str]]:
                                  f"{name}.{key} is {value!r}; it is one of {kind[5:].replace('|', ', ')}"))
             elif kind in ("number", "int") and not isinstance(value, (int, float)):
                 problems.append(("composite_type_mismatch", f"{name}.{key} is a number, not {value!r}"))
+        for need in REQUIRED_PARAMS.get(op_name, ()):
+            choices = need.split("|")
+            if not any(node.get(choice) is not None for choice in choices):
+                problems.append(("composite_param_missing", f"{name} ({op_name}) needs {' or '.join(choices)}"))
+        if op_name == "signal.align_depth":
+            method = node.get("method") or "scale_shift"
+            lacking = ([key for key in ("scale", "shift") if node.get(key) is None] if method == "manual"
+                       else ([] if node.get("reference") else ["reference"]))
+            if lacking:
+                problems.append(("composite_param_missing", f"{name} aligns by {method} and needs {', '.join(lacking)}"))
+        if op_name == "merge.depth":
+            pictures, depths = node.get("pictures") or [], node.get("depths") or []
+            if len(pictures) != len(depths):
+                problems.append(("composite_type_mismatch",
+                                 f"{name} has {len(pictures)} picture(s) and {len(depths)} depth(s); one each"))
+            cameras = set()
+            for reference in depths:
+                value = resolve(reference, f"{name}.depths") if _ref(reference) else None
+                if value is not None and value.kind == "depth":
+                    if not value.camera:
+                        problems.append(("composite_param_missing", f"{name}: the depth {reference} says no camera; "
+                                                                    "depths are compared only within one camera"))
+                    cameras.add(value.camera)
+            if len(cameras - {""}) > 1:
+                problems.append(("composite_type_mismatch",
+                                 f"{name} compares depths from different cameras: {', '.join(sorted(cameras - {''}))}"))
         if op_name == "matte.key":
             method = str(node.get("by") or "")
             if method not in KEY_NEEDS:
@@ -308,12 +365,18 @@ def validate(graph: dict[str, Any]) -> list[tuple[str, str]]:
                                      f"{name} keys by {method} and needs {', '.join(lacking)}"))
         for output, kind in op.outputs.items():
             if kind == SAME:
-                value = _Value(first.type, first.kind) if first else _Value("picture")
+                value = _Value(first.type, first.kind, first.camera) if first else _Value("picture")
             else:
                 signal_kind = ""
                 if kind == "signal":
                     signal_kind = str(node.get(op.kind[1:], "")) if op.kind.startswith("@") else op.kind
-                value = _Value(kind, signal_kind)
+                camera = ""
+                if signal_kind == "depth":
+                    camera = str(node.get("camera") or "")
+                    if not camera and op_name == "signal.align_depth" and _ref(node.get("reference")):
+                        reference = resolve(node["reference"], f"{name}.reference")
+                        camera = reference.camera if reference else ""
+                value = _Value(kind, signal_kind, camera)
             if output == next(iter(op.outputs)):
                 values[name] = value
             values[f"{name}.{output}"] = value

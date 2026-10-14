@@ -94,7 +94,7 @@ Any other mismatch is an error before rendering (`composite_type_mismatch`).
 
 Each operation is `<primitive>.<name>`. Ports are named; parameters may be
 constants or curves (§6). The tables are the contract; C2 implements them in
-FFmpeg first.
+the NumPy reference first (§7).
 
 ## signal
 
@@ -302,6 +302,12 @@ The examples in `SPEC-0012-examples/` use each of these forms.
 
 # 7. Renderers
 
+**The reference** is an evaluator in NumPy with OCIO: every op of §3 that is
+not opaque, in float, scene-linear, premultiplied, with the conversions of §2
+done by OCIO (or, for the default spaces, by the exact sRGB transfer
+function). FFmpeg reads and writes its files. It defines the expected result;
+every other renderer is checked against it, within a tolerance per op.
+
 A renderer publishes a manifest (`toast doctor` shows it):
 
 ```text
@@ -329,7 +335,8 @@ deterministic: [op, ...]
   | sound | WAV, 32-bit float |
   | track, curve, meta | JSON |
 - **Conformance** (C2 onward): for each op a renderer claims, a reference
-  scene is rendered by it and by the reference (FFmpeg) and compared within
+  scene is rendered by it and by the reference (NumPy and OCIO, §7) and
+  compared within
   a tolerance stated per op, at 160x90 and 1920x1080, 24 and 29.97 fps, 8-bit
   and float input, straight and premultiplied alpha.
 

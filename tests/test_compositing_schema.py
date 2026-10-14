@@ -63,8 +63,8 @@ class SignalKindTests(unittest.TestCase):
         return [code for code, _ in validate({"ports": ports or {"p": "picture"}, "nodes": nodes, "output": output})]
 
     def test_depth_and_relative_depth_go_only_where_they_belong(self) -> None:
-        relative = {"op": "signal.estimate", "picture": "p", "kind": "depth_relative"}
-        metric = {"op": "signal.read", "file": "z.exr", "kind": "depth"}
+        relative = {"op": "signal.estimate", "picture": "p", "kind": "depth_relative", "model": "m"}
+        metric = {"op": "signal.read", "file": "z.exr", "kind": "depth", "camera": "shot"}
         merged = {"op": "merge.depth", "pictures": ["p", "p"], "depths": ["metric", "metric"]}
         self.assertEqual(self.check({"metric": metric, "out": merged}), [])
         # Relative depth is refused by merge.depth, and metric depth is refused where only relative is aligned.
@@ -81,8 +81,39 @@ class SignalKindTests(unittest.TestCase):
         label = {"op": "matte.label", "signal": "luma", "labels": [1]}
         over = {"op": "merge.over", "front": "p", "back": "p", "matte": "label"}
         self.assertIn("composite_type_mismatch", self.check({"luma": luma, "label": label, "out": over}))
-        segments = {"op": "signal.estimate", "picture": "p", "kind": "segmentation"}
+        segments = {"op": "signal.estimate", "picture": "p", "kind": "segmentation", "model": "m"}
         self.assertEqual(self.check({"luma": segments, "label": label, "out": over}), [])
+
+    def test_depths_are_compared_one_per_picture_and_within_one_camera(self) -> None:
+        def depth(camera: str) -> dict:
+            return {"op": "signal.read", "file": "z.exr", "kind": "depth", **({"camera": camera} if camera else {})}
+
+        merged = {"op": "merge.depth", "pictures": ["p", "p"], "depths": ["a", "b"]}
+        self.assertEqual(self.check({"a": depth("shot"), "b": depth("shot"), "out": merged}), [])
+        self.assertIn("composite_type_mismatch", self.check({"a": depth("shot"), "b": depth("other"), "out": merged}))
+        self.assertIn("composite_param_missing", self.check({"a": depth(""), "b": depth("shot"), "out": merged}))
+        self.assertIn("composite_type_mismatch",
+                      self.check({"a": depth("shot"), "b": depth("shot"), "out": {**merged, "pictures": ["p"]}}))
+
+
+class RequiredTests(unittest.TestCase):
+    def codes(self, nodes: dict) -> list[str]:
+        return [code for code, _ in validate({"ports": {"p": "picture", "progress": "curve"}, "nodes": nodes,
+                                              "output": "out"})]
+
+    def test_an_op_without_what_it_cannot_run_without_is_refused(self) -> None:
+        self.assertIn("composite_param_missing", self.codes(
+            {"z": {"op": "signal.read", "kind": "depth"}, "out": {"op": "warp.displace", "in": "p", "map": "z"}}))
+        self.assertIn("composite_param_missing", self.codes({"out": {"op": "generate.source"}}))
+        self.assertEqual(self.codes({"out": {"op": "generate.source", "file": "a.mov"}}), [])
+
+    def test_an_opaque_node_is_checked_against_the_ports_its_renderer_declares(self) -> None:
+        good = {"out": {"op": "opaque.gl", "shader": "cube", "from": "p", "to": "p", "progress": "progress"}}
+        self.assertEqual(self.codes(good), [])
+        self.assertIn("composite_input_missing", self.codes({"out": {"op": "opaque.gl", "shader": "cube", "from": "p"}}))
+        self.assertIn("composite_type_mismatch",
+                      self.codes({"out": {**good["out"], "progress": "p"}}))
+        self.assertIn("composite_unknown_op", self.codes({"out": {"op": "opaque.unreal"}}))
 
 
 class KeyTests(unittest.TestCase):

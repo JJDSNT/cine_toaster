@@ -1,6 +1,6 @@
 # ADR 0022: Composition is a typed graph of primitives, not a collection of effects
 
-Status: accepted (2026-10-14, CT-0069). Directed by the user, amended twice
+Status: accepted (2026-10-14, CT-0069; §5 amended the same day, before C2). Directed by the user, amended twice
 the same day -- for the primitives the first list missed, and after an outside
 review the user brought -- and accepted on the user's word with the review's
 recommendation. This text consolidates the decision; "How it was reached"
@@ -104,10 +104,26 @@ The canvas may show a composite and orchestration may run one; neither is it.
   **luma** (from encoded values) are different quantities, and an operation
   says which it uses.
 
-### 5. Execution: one renderer per part, a planner for the whole
+### 5. Execution: a reference, renderers, and a planner for the whole
 
-Each renderer -- FFmpeg (the reference), GL, Blender, model runners such as
-ComfyUI, OpenCV, Natron -- implements primitives and declares which. A graph
+The **reference** is an evaluator in NumPy with OCIO: float, linear light,
+premultiplied alpha, exactly as the colour contract says. It is the
+definition of the right result, made executable; it is not meant to be fast.
+The **renderers** do the work: FFmpeg (decoding, encoding, and the operations
+it can do correctly, for production), GL (the interactive preview and
+accelerated composition), Blender, model runners such as ComfyUI, OpenCV,
+Natron (specialised operations). Each implements primitives and declares
+which, under the same contract for what goes in and out, and each is
+checked against the reference -- never the reverse. A fast renderer does not
+become the definition of correct by being the one in use, and the colour
+contract is never changed to suit a renderer's limits.
+
+(Amended 2026-10-14, before C2, with the user: the first text made FFmpeg the
+reference. Several of its compositing filters work only in 8 or 16 bits with
+gamma, and `overlay` takes no float format, so as a reference it could meet
+the contract only with workarounds.)
+
+ A graph
 may be run whole by one renderer that has all its nodes, or **split by a
 planner** across several, results handed over as files in the working space;
 the cost and place of each part (local, Runpod) are recorded as jobs already
