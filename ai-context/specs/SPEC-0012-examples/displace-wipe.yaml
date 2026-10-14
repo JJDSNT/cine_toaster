@@ -1,4 +1,4 @@
-# The warp wipe the user asked for: the outgoing picture bends along a map while the incoming one is revealed through a luma order.
+# A displace wipe (first, mistakenly, called the warp wipe -- a warp wipe maps the picture onto a 3D object): the outgoing picture bends along a map while the incoming one is revealed through a luma order.
 ports: {from: picture, to: picture, progress: curve, map_picture: picture, order_picture: picture}
 nodes:
   map:     {op: signal.luma, picture: map_picture}

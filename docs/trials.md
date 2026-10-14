@@ -8,7 +8,8 @@ work records named here hold the detail.
 
 | Date | Piece | Length | File | Published |
 |---|---|---|---|---|
-| 2026-10-14 | Heat v3, the warp wipe | 42 s | `trials/organic-trial-v3.mp4` | not yet |
+| 2026-10-14 | Heat v4, the warp wipe (a ball) | 42 s | `trials/organic-trial-v4.mp4` | not yet |
+| 2026-10-14 | Heat v3, a displace wipe | 42 s | `trials/organic-trial-v3.mp4` | not yet |
 | 2026-10-14 | Heat v2, joins through mattes | 42 s | `trials/organic-trial-v2.mp4` | not yet |
 | 2026-10-14 | Matte prototype | 9 s | `trials/matte-prototype-v1.mp4` | not yet |
 | 2026-10-14 | Heat, organic trial | 42 s | `trials/organic-trial-v1.mp4` | [YouTube](https://youtu.be/rI94S8FVFfQ) |
@@ -19,11 +20,25 @@ work records named here hold the detail.
 `trials/` is `~/cine-toaster-references/trials/` on the machine they were made
 on. A link is added when a piece is published.
 
-## 2026-10-14 · Heat v3: the warp wipe
+## 2026-10-14 · Heat v4: the warp wipe
 
-The join from the launch plume into the engine test stand is now the warp
-wipe the user asked for: the outgoing picture bends along a map while the
-incoming one opens from the centre, both playing. It is not a shader: it is a
+The same join, now a warp wipe as the user meant it: the launch, still
+playing, wraps itself onto a ball -- the video applied to the effect's mesh --
+spins, and flies off to the top right, uncovering the engine on its stand.
+It is a recipe (`warp-ball`) of a new primitive, `warp.surface` (the picture
+on a plane, ball, tube or page), drawn by the NumPy reference with a depth
+buffer. Every part made by the tool. Slow: the scene took ten minutes, most of
+it rasterising the mesh at twice the size; the GL renderer is where meshes
+belong.
+
+## 2026-10-14 · Heat v3: a displace wipe (not the warp wipe)
+
+The join from the launch plume into the engine test stand: the outgoing
+picture bends along a map while the incoming one opens from the centre, both
+playing. It was made as the warp wipe the user asked for, and it is not one:
+the user corrected it -- a warp wipe maps the playing picture onto a 3D
+object, as the Toaster's warps did (the tape, 12:09-12:22). It is kept under
+its right name, displace wipe. It is not a shader: it is a
 recipe of compositing primitives (ADR 0022) -- a luma signal, a displacement,
 a matte from a signal, a threshold, a merge -- drawn by the NumPy reference.
 Every part made by the tool. Slow: the scene took six minutes; a fast

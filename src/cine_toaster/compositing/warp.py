@@ -147,3 +147,137 @@ def procedural(image: np.ndarray, kind: str, amount: float, frequency: float, ce
     else:
         raise ValueError(f"no procedural warp {kind!r}")
     return from_fractions(image, du / aspect + cx, dv + cy, edge)
+
+
+# --- a picture on a 3D surface (SPEC-0012 warp.surface) -------------------------------
+
+SHAPES = ("plane", "sphere", "cylinder", "page")
+
+
+def _surface_points(shape: str, morph: float, u: np.ndarray, v: np.ndarray, aspect: float) -> np.ndarray:
+    """Where each (u, v) of the picture sits in 3D, in units of the picture's height, its centre at the origin.
+
+    ``morph`` goes from 0 (the flat picture) to 1 (the full shape): the picture is bent around a radius that
+    shrinks as it grows, so it wraps itself onto the shape rather than jumping to it -- a ball forming, a
+    tube rolling up, a page turning.
+    """
+
+    x, y = (u - 0.5) * aspect, (v - 0.5)
+    t = float(np.clip(morph, 0.0, 1.0))
+    if shape == "plane" or t <= 1e-4:
+        return np.stack([x, y, np.zeros_like(x)], axis=-1)
+    if shape == "sphere":
+        radius = (aspect / (2 * np.pi)) / t  # at 1 the picture's width goes once round the ball
+        lon, lat = x / radius, np.clip(y / radius, -np.pi / 2, np.pi / 2)
+        return np.stack([radius * np.sin(lon) * np.cos(lat), radius * np.sin(lat),
+                         radius - radius * np.cos(lon) * np.cos(lat)], axis=-1)
+    if shape == "cylinder":
+        radius = (aspect / (2 * np.pi)) / t
+        angle = x / radius
+        return np.stack([radius * np.sin(angle), y, radius - radius * np.cos(angle)], axis=-1)
+    if shape == "page":  # turned from the right edge: the fold line travels across as the morph grows
+        radius = 0.08
+        fold = aspect / 2 - t * (aspect + np.pi * radius)
+        beyond = np.maximum(x - fold, 0.0)
+        angle = np.minimum(beyond / radius, np.pi)
+        flat_part = np.maximum(beyond - np.pi * radius, 0.0)  # past half a turn the page lies back, reversed
+        px = np.where(x > fold, fold + radius * np.sin(angle) - flat_part, x)
+        pz = np.where(x > fold, -(radius - radius * np.cos(angle)), 0.0)  # lifted toward the camera
+        pz = np.where(beyond > np.pi * radius, -2 * radius, pz)
+        return np.stack([px, y, pz], axis=-1)
+    raise ValueError(f"no surface {shape!r}")
+
+
+def _rotation(angles: Any) -> np.ndarray:
+    rx, ry, rz = (np.asarray(angles, dtype=np.float64).reshape(-1).tolist() + [0.0, 0.0, 0.0])[:3]
+    a, b, c = np.radians([rx, ry, rz])
+    turn_x = np.array([[1, 0, 0], [0, np.cos(a), -np.sin(a)], [0, np.sin(a), np.cos(a)]])
+    turn_y = np.array([[np.cos(b), 0, np.sin(b)], [0, 1, 0], [-np.sin(b), 0, np.cos(b)]])
+    turn_z = np.array([[np.cos(c), -np.sin(c), 0], [np.sin(c), np.cos(c), 0], [0, 0, 1]])
+    return turn_z @ turn_y @ turn_x
+
+
+def surface(image: np.ndarray, *, shape: str, morph: float, rotate: Any, translate: Any, scale: float,
+            perspective: float, light: float, detail: int, supersample: int, aspect: float) -> tuple[np.ndarray, np.ndarray]:
+    """The picture mapped onto a 3D surface and seen through a camera: (picture with alpha, depth).
+
+    The surface is a mesh of ``detail`` cells across, turned about its own centre, moved (x and y in
+    fractions of the frame, z in picture heights away from the camera), and rasterised with a depth buffer,
+    so a ball's far side is hidden and a tube shows its inside where it should. ``light`` darkens faces
+    turned away from the camera, as a lamp beside the lens would. Drawn ``supersample`` times larger and
+    reduced, so its edge has coverage.
+    """
+
+    height, width = image.shape[:2]
+    big_w, big_h = width * supersample, height * supersample
+    columns = max(8, int(detail))
+    rows = max(4, int(round(columns / aspect)))
+    gu, gv = np.meshgrid(np.linspace(0, 1, columns + 1), np.linspace(0, 1, rows + 1))
+    points = _surface_points(shape, morph, gu, gv, aspect)
+    centre = points.reshape(-1, 3).mean(axis=0) if shape in ("sphere", "cylinder") else np.zeros(3)
+    points = (points - centre) * float(scale)
+    points = points @ _rotation(rotate).T
+    move = (list(np.asarray(translate, dtype=np.float64).reshape(-1)) + [0.0, 0.0, 0.0])[:3]
+    distance = 0.5 / np.tan(np.radians(perspective) / 2) if perspective else 1e6
+    z = points[..., 2] + move[2] + (centre[2] * float(scale) if shape in ("sphere", "cylinder") else 0.0)
+    factor = distance / np.maximum(distance + z, 1e-6)
+    sx = ((points[..., 0] * factor) / aspect + 0.5 + move[0]) * big_w
+    sy = ((points[..., 1] * factor) + 0.5 + move[1]) * big_h
+
+    # A normal per vertex, from the mesh's neighbours, for the light.
+    du = np.gradient(points, axis=1)
+    dv = np.gradient(points, axis=0)
+    normal = np.cross(du, dv)
+    normal /= np.maximum(np.linalg.norm(normal, axis=-1, keepdims=True), 1e-9)
+    shade = 1.0 - float(light) * (1.0 - np.abs(normal[..., 2]))
+
+    depth_buffer = np.full((big_h, big_w), np.inf, dtype=np.float64)
+    u_buffer = np.zeros((big_h, big_w), dtype=np.float32)
+    v_buffer = np.zeros((big_h, big_w), dtype=np.float32)
+    s_buffer = np.ones((big_h, big_w), dtype=np.float32)
+    covered = np.zeros((big_h, big_w), dtype=bool)
+
+    def triangle(a: tuple[int, int], b: tuple[int, int], c: tuple[int, int]) -> None:
+        xs = np.array([sx[a], sx[b], sx[c]])
+        ys = np.array([sy[a], sy[b], sy[c]])
+        x0, x1 = max(int(np.floor(xs.min())), 0), min(int(np.ceil(xs.max())), big_w - 1)
+        y0, y1 = max(int(np.floor(ys.min())), 0), min(int(np.ceil(ys.max())), big_h - 1)
+        if x0 > x1 or y0 > y1:
+            return
+        area = (xs[1] - xs[0]) * (ys[2] - ys[0]) - (xs[2] - xs[0]) * (ys[1] - ys[0])
+        if abs(area) < 1e-9:
+            return
+        py, px = np.mgrid[y0:y1 + 1, x0:x1 + 1].astype(np.float64)
+        px += 0.5
+        py += 0.5
+        w0 = ((xs[1] - px) * (ys[2] - py) - (xs[2] - px) * (ys[1] - py)) / area
+        w1 = ((xs[2] - px) * (ys[0] - py) - (xs[0] - px) * (ys[2] - py)) / area
+        w2 = 1.0 - w0 - w1
+        inside = (w0 >= 0) & (w1 >= 0) & (w2 >= 0)
+        if not inside.any():
+            return
+        zs = np.array([z[a], z[b], z[c]])
+        here = w0 * zs[0] + w1 * zs[1] + w2 * zs[2]
+        region = (slice(y0, y1 + 1), slice(x0, x1 + 1))
+        nearer = inside & (here < depth_buffer[region])
+        if not nearer.any():
+            return
+        depth_buffer[region][nearer] = here[nearer]
+        for buffer, values in ((u_buffer, (gu[a], gu[b], gu[c])), (v_buffer, (gv[a], gv[b], gv[c])),
+                               (s_buffer, (shade[a], shade[b], shade[c]))):
+            buffer[region][nearer] = (w0 * values[0] + w1 * values[1] + w2 * values[2])[nearer]
+        covered[region][nearer] = True
+
+    for row in range(rows):
+        for column in range(columns):
+            a, b = (row, column), (row, column + 1)
+            c, d = (row + 1, column), (row + 1, column + 1)
+            triangle(a, b, d)
+            triangle(a, d, c)
+
+    # The picture read where each covered pixel of the surface falls on it; then reduced to the frame.
+    big_picture = from_fractions(image, u_buffer, v_buffer, "extend") * covered[..., None]
+    big_picture[..., :3] *= s_buffer[..., None]
+    reduced = big_picture.reshape(height, supersample, width, supersample, -1).mean(axis=(1, 3))
+    depth = depth_buffer.reshape(height, supersample, width, supersample).min(axis=(1, 3))  # inf where empty
+    return reduced.astype(np.float32), depth.astype(np.float32)

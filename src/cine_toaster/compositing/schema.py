@@ -106,6 +106,12 @@ OPS: dict[str, Op] = {
     "warp.corner_pin": Op({"in": P(*EITHER), "track": P(*TRK, required=False)}, {"out": SAME}, {"corners": "vector"}),
     "warp.displace": Op({"in": P(*EITHER), "map": P(*SIG)}, {"out": SAME},
                         {"strength": "number", "direction": "vector", "edge": "enum:transparent|extend|mirror"}),
+    # The picture mapped onto a 3D surface that may form itself (morph) and move in perspective (SPEC-0012):
+    # the Toaster's and the ADO's warps.
+    "warp.surface": Op({"in": P(*PIC)}, {"out": "picture", "depth": "signal"},
+                       {"shape": "enum:plane|sphere|cylinder|page", "morph": "number", "rotate": "vector",
+                        "translate": "vector", "scale": "number", "perspective": "number", "light": "number",
+                        "detail": "int", "supersample": "int", "camera": "text"}, kind="depth"),
     "warp.procedural": Op({"in": P(*EITHER)}, {"out": SAME},
                           {"kind": "enum:ripple|swirl|bend|lens", "amount": "number", "frequency": "number",
                            "centre": "vector", "edge": "enum:transparent|extend|mirror"}),
@@ -147,7 +153,8 @@ OPS: dict[str, Op] = {
     "track.measure": Op({"in": P(*PIC)}, {"out": "track"},
                         {"kind": "enum:point|plane|camera", "region": "vector", "tracker": "text"}),
     "track.read": Op({}, {"out": "track"}, {"file": "file"}),
-    "curve.keys": Op({}, {"out": "curve"}, {"keys": "vector"}),
+    # Keys over time, or -- given `in` -- over another curve's value (a join's progress, 0 to 1).
+    "curve.keys": Op({"in": P(*CRV, required=False)}, {"out": "curve"}, {"keys": "vector"}),
     "curve.beats": Op({}, {"out": "curve"}, {"attack": "number", "decay": "number", "every": "int", "low": "number",
                                              "high": "number"}),
     "curve.from_track": Op({"track": P(*TRK)}, {"out": "curve"}, {"field": "enum:x|y|rotation|scale"}),
@@ -169,7 +176,7 @@ REQUIRED_PARAMS: dict[str, tuple[str, ...]] = {
     "signal.channel": ("channel",), "signal.read": ("file", "kind"), "signal.estimate": ("kind", "model"),
     "matte.shape": ("shape",), "matte.combine": ("how",), "matte.label": ("labels",),
     "merge.porter_duff": ("how",), "merge.blend": ("mode",),
-    "warp.procedural": ("kind",), "warp.corner_pin": ("corners|track",),
+    "warp.procedural": ("kind",), "warp.surface": ("shape",), "warp.corner_pin": ("corners|track",),
     "colour.lut": ("file|look",), "colour.posterise": ("levels",), "colour.solarise": ("threshold",),
     "filter.morphology": ("operation", "radius"), "filter.blur": ("radius",),
     "time.remap": ("map",), "time.offset": ("frames",), "time.blend": ("frames",), "time.echo": ("count",),

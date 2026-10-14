@@ -171,15 +171,22 @@ it. Next: the `composite:` record in an assembly, and FFmpeg as a renderer.
 
 ### C5. Transitions as recipes, and the warp wipe
 
+Started early, inside C2 (`CT-0071`): transitions of kind `graph`, the
+`warp.surface` primitive and three warp wipes (`warp-ball`, `warp-roll`,
+`page-turn`) drawn by the reference; GL and the preview's own drawing remain.
+
 - What: the transition catalog filed by family (dissolve, wipe -- geometric,
-  luma, custom --, warp, warp wipe, move); a join may warp each picture as it
-  is revealed (the **warp wipe** the user asked for); mattes generated from a
+  luma, custom --, warp, warp wipe, move); the **warp wipe** the user asked
+  for: the playing picture mapped onto a 3D object (ball, tube, page, tiles)
+  that moves in perspective, revealing the next shot behind it -- as the
+  Toaster's and the ADO's warps did (the tape, 12:09-12:22); mattes generated from a
   generator or a VFX recipe, cached; shaders that read moving textures. The
   **GL renderer of the graph** starts here, for the recipes transitions need,
   each run whole on GL and whole on FFmpeg and compared by the C2 suite.
-- Done when: a warp wipe -- the outgoing picture bending along a map while the
-  incoming one is revealed through a luma matte -- runs the same in the
-  preview, on GL and in FFmpeg; no transition reimplements luma or a merge.
+- Done when: a warp wipe -- the outgoing picture wrapped into a ball (or rolled
+  into a tube, or turned as a page) that spins and flies away while still
+  playing -- runs the same in the reference, on GL and in the preview; no
+  transition reimplements luma, a merge or a surface.
 
 ### C6. The catalogs re-expressed
 

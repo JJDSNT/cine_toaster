@@ -1,0 +1,28 @@
+schema_version = 1
+id = "page-turn"
+name = "Page turn"
+kind = "graph"
+category = "warp-wipe"
+description = "The outgoing picture turns like a page from its right edge, still playing on both sides, and the next shot lies beneath."
+guidance = "A chapter, a memory, a story told: the picture as something held in the hand."
+energy = "medium"
+motion = "leftward"
+duration_ms = 1800
+tags = ["warp", "3d", "page", "dve"]
+use_when = ["A chapter changes", "A told story, an album, a book"]
+avoid_when = ["Fast action"]
+license = "MIT"
+preview = "preview.webm"
+
+[render]
+ffmpeg = "graph"
+ffmpeg_note = "Drawn by the compositing reference from its graph: the picture on a 3D surface needs a mesh, which no FFmpeg filter draws."
+
+[graph]
+ports = {from = "picture", to = "picture", progress = "curve"}
+output = "out"
+
+[graph.nodes]
+turn = {op = "curve.map", in = "progress", how = "ease", ease = "in-out"}
+page = {op = "warp.surface", in = "from", shape = "page", morph = {curve = "turn"}, rotate = [8, -6, 0], perspective = 35, light = 0.5, camera = "join"}
+out = {op = "merge.over", front = "page", back = "to"}

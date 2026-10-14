@@ -143,6 +143,7 @@ A matte on `merge.over` multiplies the front's alpha before the merge.
 |---|---|---|---|
 | `warp.transform` | picture (or matte) | same | `translate`, `scale`, `rotate` (three axes), `pivot`, `perspective` (field of view), `depth` (for 2.5D, §8) |
 | `warp.corner_pin` | picture, optional track | same | four corners, or a plane track |
+| `warp.surface` | picture | picture, and a `depth` signal | `shape`: plane, sphere, cylinder, page; `morph` (0 the flat picture, 1 the full shape: the picture bends onto it), `rotate` (three axes, about the shape's centre), `translate` (x, y in frame fractions, z in picture heights away), `scale`, `perspective`, `light`, `detail` (mesh cells across), `supersample`, `camera` (names the depth) -- the playing picture on a 3D object: the Toaster's and the ADO's warps |
 | `warp.displace` | picture, signal (vectors or one channel) | same | `strength`, `direction` |
 | `warp.procedural` | picture | same | `kind`: ripple, swirl, bend, lens; its parameters |
 
@@ -195,7 +196,7 @@ or procedural warp says `edge: extend` (the border repeated) or `edge: mirror`
 |---|---|---|---|
 | `track.measure` | picture | track | `kind` (point, plane, camera), a starting region; deterministic per tracker version |
 | `track.read` | -- | track | a file in the track format (§1) |
-| `curve.keys` | -- | curve | keyframes `[{t, value, ease}]`; `ease`: linear, in, out, in-out, hold, bezier handles |
+| `curve.keys` | optional curve `in` | curve | keyframes `[{t, value, ease}]`; `ease`: linear, in, out, in-out, hold, bezier handles. With `in`, `t` is that curve's value, not seconds: a join's recipe keys along its `progress` (0 to 1), whatever the join's length |
 | `curve.beats` | -- | curve | the scene's music beats (CT-0067): a value per beat with an envelope (`attack`, `decay`) |
 | `curve.from_track` | track | curve | a field of the track (x, y, rotation, scale) |
 | `curve.progress` | -- | curve | 0 at a join's start to 1 at its end; only in recipes for joins |
@@ -427,7 +428,11 @@ its size or angle a curve of progress; `out: merge.over(to over from; matte shap
 `wb: warp.displace(to, noise; strength = curve.map(progress; invert))`,
 `out: merge.mix(wa, wb; progress)`.
 
-**Warp wipe** (new, the user's): `wa: warp.displace(from, map; strength rising)`,
+**Warp wipe** (the user's, as the Toaster did it): the playing picture on a 3D
+object that moves away -- `ball: warp.surface(from; sphere, morph and spin and
+away as curves keyed along progress)`, `out: merge.over(ball over to)`
+(`warp-wipe-ball.yaml`). What this appendix first called a warp wipe is a
+**displace wipe**: `wa: warp.displace(from, map; strength rising)`,
 `reveal: matte.threshold(matte.from_signal(signal.luma(texture)), progress)`,
 `out: merge.over(to over wa; matte reveal)`.
 

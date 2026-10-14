@@ -114,8 +114,10 @@ renderer in use never becomes the definition of correct.
   reference, both pictures playing (`_graph_join`); the quick build refuses
   it with a reason; the Transitions room plays its preview, a clip the
   reference made from the same graph.
-- **The warp wipe** the user asked for, the first recipe: the outgoing
-  picture displaced along a map while the incoming one is revealed through a
+- **A displace wipe** -- made first as the warp wipe the user asked for, and
+  renamed when the user corrected it: a warp wipe maps the playing picture
+  onto a 3D object, as the Toaster's warps did (the tape, 12:09-12:22). The
+  recipe: the outgoing picture displaced along a map while the incoming one is revealed through a
   radial luma order. Used for real in the organic trial (Heat v3), replacing
   `undulating-burn-out`.
 - **Edges of a warp**: a displacement or procedural warp may say `edge:
@@ -123,6 +125,31 @@ renderer in use never becomes the definition of correct.
   the picture, which a full-frame warp in a join never wants.
 - **Tracking holds two frames**, not the clip; **beats inside a shot's
   composite**: the scene music's beats in the shot's own seconds.
+
+# Done (the warp wipe, corrected)
+
+The user corrected the first "warp wipe" (2026-10-14): a warp wipe is not a
+2D deformation; the playing picture is mapped onto a 3D object -- the effect's
+mesh -- that moves in perspective, as the Toaster's warps did (the tape,
+12:09-12:22: two balls carrying the picture, a tube rolling up, a ball
+shrinking to a wireframe). The gl-transitions shaders used earlier
+(`inverted-page-curl`, `cube`, `doorway`) already did this inside closed
+programs; now it is a primitive.
+
+- **`warp.surface`** (SPEC-0012): the picture on a mesh of a plane, a ball, a
+  tube or a page; `morph` bends the flat picture onto the shape (a radius that
+  shrinks as it grows, so the ball forms rather than appears); turned about its
+  own centre, moved, seen through a camera; rasterised with a depth buffer (a
+  ball's far side hidden), lit from the lens, drawn at twice the size and
+  reduced for its edge. A second output gives its depth for `merge.depth`.
+- **`curve.keys` along another curve**: with `in`, keys are placed along that
+  curve's value -- a recipe keys along its join's `progress`, whatever the
+  join's length. The first recipes had keys in seconds, so the ball stopped
+  halfway and stayed on screen.
+- **Recipes**: `warp-ball` (wraps into a ball, spins, flies off), `warp-roll`
+  (rolls into a tube, tilts, flies off), `page-turn` (turns from the right
+  edge); each ends on the incoming picture alone, previews made by the
+  reference. The mistaken recipe kept, renamed `displace-wipe`.
 
 # To do
 
@@ -135,6 +162,12 @@ renderer in use never becomes the definition of correct.
   what it can do correctly, GL for the rest) checked against the reference is
   the next piece of C2; real time is C9b.
 - The other gl-transitions worth it re-expressed as recipes (C5, C6).
+- `page-turn` folds along a vertical line only; a diagonal fold (an angle),
+  and the back of the page showing something else, are open.
+- `warp.surface` has four shapes; tiles (the picture breaking into flying
+  squares, also on the tape) and a cube need their own meshes.
+- Mesh rasterisation in the reference is slow at 1080p (a Python loop over
+  triangles, at twice the size): the GL renderer is where meshes belong.
 - FFmpeg as a renderer of the graph for the ops it can do correctly, with a
   manifest; conformance cases for each, at more sizes, rates, bit depths and
   both alphas.
@@ -155,4 +188,4 @@ renderer in use never becomes the definition of correct.
   know files by content; the cache's hits and misses; every runnable example.
 - Full suite: 665 tests pass (2026-10-14, at b87342d); 679 after the second
   slice; 688 after composite shots and memory; 691 after recipes and the warp
-  wipe.
+  wipe; 697 after warp.surface and the warp wipes.

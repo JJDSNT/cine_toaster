@@ -327,7 +327,7 @@ IMPLEMENTED = {
     "signal.luminance", "signal.luma", "signal.channel", "signal.read", "signal.align_depth",
     "matte.from_signal", "matte.threshold", "matte.combine", "matte.shape", "matte.key", "matte.label",
     "merge.over", "merge.mix", "merge.blend", "merge.porter_duff", "merge.channels", "merge.depth",
-    "warp.transform", "warp.corner_pin", "warp.displace", "warp.procedural",
+    "warp.transform", "warp.corner_pin", "warp.displace", "warp.procedural", "warp.surface",
     "colour.grade", "colour.invert", "colour.curve", "colour.lut", "colour.posterise", "colour.solarise",
     "colour.cycle",
     "filter.blur", "filter.sharpen", "filter.glow", "filter.edges", "filter.morphology", "filter.noise",
@@ -466,7 +466,12 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
         if op == "curve.progress":
             made = lambda seconds: seconds / length if length else 0.0  # noqa: E731
         elif op == "curve.keys":
-            made = keys_curve(node["keys"])
+            keyed = keys_curve(node["keys"])
+            if node.get("in"):  # keys placed along another curve: a recipe's keys follow its join's progress
+                along = curve(node["in"])
+                made = lambda seconds: keyed(float(along(seconds)))  # noqa: E731
+            else:
+                made = keyed
         elif op == "curve.noise":
             made = noise_curve(int(node.get("seed", 0)), float(node.get("frequency", 1.0)),
                                float(node.get("amplitude", 1.0)), float(node.get("offset", 0.0)))
@@ -558,6 +563,12 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
         if key in context.cache:
             counts["hits"] += 1
             return context.cache[key]
+        base, _, output = reference.partition(".")
+        if output and base in nodes:  # a second output: made with its node's first
+            value(base, frame)
+            if key in context.cache:
+                return context.cache[key]
+            raise ValidationError(f"{base} gives no {output!r} the reference can make")
         counts["misses"] += 1
         if key in made_once:
             counts["recomputed"] += 1  # dropped by the window or the budget, and asked for again
@@ -723,6 +734,17 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
 
             return displace(value(node["in"], frame), value(node["map"], frame), float(param("strength", 0.1)),
                             param("direction"), str(node.get("edge", "transparent")))
+        if op == "warp.surface":
+            from .warp import surface
+
+            picture, depth = surface(_picture(value(node["in"], frame)), shape=node["shape"],
+                                     morph=float(param("morph", 1.0)), rotate=param("rotate", [0, 0, 0]),
+                                     translate=param("translate", [0, 0, 0]), scale=float(param("scale", 1.0)),
+                                     perspective=float(param("perspective", 35.0) or 0.0),
+                                     light=float(param("light", 0.4)), detail=int(param("detail", 48)),
+                                     supersample=int(param("supersample", 2)), aspect=aspect)
+            context.cache[(f"{name}.depth", frame)] = depth
+            return picture
         if op == "warp.procedural":
             from .warp import procedural
 

@@ -1,0 +1,31 @@
+schema_version = 1
+id = "warp-roll"
+name = "Warp: roll"
+kind = "graph"
+category = "warp-wipe"
+description = "The outgoing picture rolls itself up into a tube, still playing, tilts and flies off, uncovering the next shot."
+guidance = "Like a poster rolled up and thrown: overt, light, a little comic."
+energy = "high"
+motion = "away"
+duration_ms = 2000
+tags = ["warp", "3d", "cylinder", "toaster", "dve"]
+use_when = ["A light, overt change", "Reels and promos"]
+avoid_when = ["A change that should go unnoticed"]
+license = "MIT"
+preview = "preview.webm"
+
+[render]
+ffmpeg = "graph"
+ffmpeg_note = "Drawn by the compositing reference from its graph: the picture on a 3D surface needs a mesh, which no FFmpeg filter draws."
+
+[graph]
+ports = {from = "picture", to = "picture", progress = "curve"}
+output = "out"
+
+[graph.nodes]
+form = {op = "curve.map", in = "progress", how = "remap", low = 0.0, high = 0.45, out_low = 0.0, out_high = 1.0}
+tilt = {op = "curve.keys", in = "progress", keys = [[0.0, [0, 0, 0]], [1.0, [0, 200, 40]]]}
+away = {op = "curve.keys", in = "progress", keys = [{t = 0.35, value = [0.0, 0.0, 0.0], ease = "in"}, [1.0, [-0.8, 0.55, 2.6]]]}
+tube = {op = "warp.surface", in = "from", shape = "cylinder", morph = {curve = "form"}, rotate = {curve = "tilt"}, translate = {curve = "away"}, perspective = 35, light = 0.45, camera = "join"}
+gone = {op = "curve.map", in = "progress", how = "remap", low = 0.88, high = 1.0, out_low = 1.0, out_high = 0.0}
+out = {op = "merge.over", front = "tube", back = "to", mix = {curve = "gone"}}

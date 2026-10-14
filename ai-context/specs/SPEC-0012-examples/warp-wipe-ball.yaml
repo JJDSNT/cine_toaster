@@ -1,0 +1,11 @@
+# The warp wipe, as the Toaster and the ADO did it: the outgoing picture, still playing, wraps itself into a
+# ball that spins and flies away, uncovering the next shot. Keys follow the join's progress, not seconds.
+ports: {from: picture, to: picture, progress: curve}
+nodes:
+  form: {op: curve.map, in: progress, how: remap, low: 0.0, high: 0.45, out_low: 0.0, out_high: 1.0}
+  spin: {op: curve.keys, in: progress, keys: [[0.0, [0, 0, 0]], [1.0, [25, 420, 0]]]}
+  away: {op: curve.keys, in: progress, keys: [{t: 0.35, value: [0, 0, 0], ease: in}, [1.0, [0.75, -0.62, 3.0]]]}
+  ball: {op: warp.surface, in: from, shape: sphere, morph: {curve: form}, rotate: {curve: spin}, translate: {curve: away}, perspective: 35, camera: join}
+  gone: {op: curve.map, in: progress, how: remap, low: 0.88, high: 1.0, out_low: 1.0, out_high: 0.0}
+  out:  {op: merge.over, front: ball, back: to, mix: {curve: gone}}
+output: out

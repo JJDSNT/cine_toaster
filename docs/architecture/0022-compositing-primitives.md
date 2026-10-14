@@ -45,7 +45,8 @@ Eight operations on pictures:
 - **Merge**: how two layers combine -- over, under, in, out, atop
   (Porter-Duff) and blend modes (screen, add, multiply, overlay, difference).
 - **Warp**: a spatial transformation -- move, scale, rotate in perspective,
-  corner pin, displace along a map, ripple, bend -- with parameters that may
+  corner pin, a picture mapped onto a 3D surface (a plane, a ball, a tube, a
+  page), displace along a map, ripple, bend -- with parameters that may
   change over time.
 - **Colour**: a function of each pixel's colour -- a LUT, curves, levels, a hue
   shift, posterise, solarise, colour cycling (the Toaster's ChromaFX).
@@ -68,7 +69,12 @@ Two that are data, not operations on pixels, and feed every operation:
 
 A **wipe** merges two pictures through a matte whose coverage is driven by
 the join's progress: geometric (a formula), luma (a picture's signal as the
-order), custom (a moving matte). A **warp wipe** is a wipe with a warp on each
+order), custom (a moving matte). A **warp wipe** maps a playing picture onto a
+3D object -- a ball, a tube, a page, a cube, a set of tiles -- which moves in
+perspective while the picture keeps playing on its surface and the next shot is
+seen behind it: the Video Toaster's and the ADO's warps (corrected by the user,
+2026-10-14; a first reading took it for a 2D deformation, which is a
+**displace wipe**). A displace wipe is a wipe with a warp on each
 picture driven by the same progress. A luma key is a layer whose matte is its
 own luma, inverted; a matte painting a layer whose matte isolates a window.
 Transitions, effects, keys and titles in the catalogs are **recipes**: they
