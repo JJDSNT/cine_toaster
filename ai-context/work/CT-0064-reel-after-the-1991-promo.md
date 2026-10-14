@@ -187,6 +187,35 @@ What making it showed is missing:
   against 41.42 computed). Nobody has listened to it: whether the joins are
   felt on the beat is for the user to say.
 
+# What the user said of the first piece (2026-10-14)
+
+He liked the montage. What he missed: **video with more movement inside an
+organic transition**. The first piece joined slow pictures (the Earth
+drifting) in one second, so nothing was seen to move inside a join.
+
+A second scene, `SC-020 Heat`, in the same production answers with what
+exists: pictures that move hard (a solar flare, vapour off an RS-25 engine, a
+launch plume slowed, exhaust across a test stand) joined by 2.9 s transitions
+whose shape is procedural noise (`perlin`, `luminance-melt`, `water-drop`,
+`swirl`; `undulating-burn-out` turned out a jagged star, not organic). Kept at
+`~/cine-toaster-references/trials/organic-trial-v1.mp4`.
+
+What it cannot do yet, and the Toaster and an ADO could:
+
+- **A join shaped by a moving matte** -- smoke, ink, liquid, fire, an
+  animated object -- rather than by a formula. This is the matte input of
+  step 6; the procedural shaders above are the nearest thing without it.
+- **A graphic riding the join** (the Toaster's sheep and falling objects): the
+  overlay with alpha, same step.
+- **A picture flown while it plays, outside a join**: sized, placed, rotated
+  in perspective on keyframes over another picture, held, then released. An
+  ADO's whole purpose; here it needs layers (step 7).
+- **Borders, drop shadows and trails on the flown picture.**
+- **In real time.** Unmeasured (step 5).
+
+The ADO list is from memory of the machine, not from its manual: a search
+found no operator's guide for the ADO 1000 online.
+
 # Order agreed (2026-10-14)
 
 The music-driven piece (Demo 4 in `docs/production-validation.md`) comes
