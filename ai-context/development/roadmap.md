@@ -431,6 +431,24 @@ Neither changes the direction; each is used at the edges (`references.md`).
   among valid neighbours on the same side of a depth discontinuity (a
   threshold on the relative jump), +inf and labels never blended.
 
+### Depth compositing: what it does not do yet (CT-0081 step 5)
+
+- **A cut-out's fringe carries the plate's background** (the person layer
+  is the plate times its matte, so its edge pixels hold the wall too). How:
+  estimate the foreground colour at the edge (closed-form matting's
+  foreground, or the plate's colour pulled from inside the matte), recorded
+  as the layer's.
+- **Inside an opaque layer a silhouette has no coverage.** How: Cryptomatte
+  from Blender for renders; for footage, cut every occluder out as a layer.
+- **One depth per object is a constant**: an object long in depth (a
+  table, a person reaching out) is not one number. How: `statistic: plane`
+  -- a plane fitted to the object's interior depth, carried over its matte.
+- **SAM 2's mattes are hard labels** (its soft logits dropped, step 3), so a
+  cut-out from them aliases. How: the logits kept as an `alpha` signal per
+  object.
+- **Coverage reaches 2 pixels**, a fixed choice from one measurement. How:
+  the reach from the picture's own filter width (a render records it).
+
 ### Aligned depth: what it does not do yet (CT-0081 step 4)
 
 - **Proven on synthetic scenes only.** How: the done-when films of step 8

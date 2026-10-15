@@ -56,7 +56,13 @@ else:
             made.scale = (item["size"][0], item["size"][1], 1.0)
         material = bpy.data.materials.new(item["name"])
         material.use_nodes = True
-        material.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = list(item["colour"]) + [1.0]
+        if item.get("shader") == "emission":  # flat: its own colour, no light, no shadow
+            nodes = material.node_tree.nodes
+            emission = nodes.new("ShaderNodeEmission")
+            emission.inputs["Color"].default_value = list(item["colour"]) + [1.0]
+            material.node_tree.links.new(emission.outputs["Emission"], nodes["Material Output"].inputs["Surface"])
+        else:
+            material.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = list(item["colour"]) + [1.0]
         made.data.materials.append(material)
         for key in item.get("keys", []):  # an object that moves: into the frame, out of it
             made.location = key["location"]
@@ -88,6 +94,8 @@ if scene.render.engine == "CYCLES":
     scene.cycles.use_denoising = False
 scene.render.resolution_x, scene.render.resolution_y = int(spec["width"]), int(spec["height"])
 scene.render.resolution_percentage = 100
+if spec.get("filter_size") is not None:  # the pixel filter's width, in pixels
+    scene.render.filter_size = float(spec["filter_size"])
 scene.render.film_transparent = True
 layer = scene.view_layers[0]
 layer.use_pass_z = True

@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -23,6 +24,9 @@ from cine_toaster import estimates, models, signals
 from cine_toaster.errors import ValidationError
 from cine_toaster.state import Actor
 from cine_toaster.titles import blender_binary
+
+sys.path.insert(0, str(Path(__file__).parent))
+from heavy import heavy  # noqa: E402
 
 TOOL = Actor(id="estimator", kind="system")
 W, H = 64, 36
@@ -219,6 +223,7 @@ def _models_here() -> str:
     return f"models not fetched: {', '.join(missing)}" if missing else ""
 
 
+@heavy("renders with Blender and runs three models")
 @unittest.skipIf(_models_here(), _models_here())
 class OnAKnownScene(unittest.TestCase):
     """The three models on a rendered scene (tests/test_renders.py's: a wall, a ball, a box, a post and a

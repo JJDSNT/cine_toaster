@@ -32,7 +32,7 @@ import numpy as np
 
 from ..errors import ValidationError
 from ..timebase import ffmpeg_rate, seek
-from .schema import validate
+from .schema import OPS, validate
 from .semantics import blur_kernel, hue_turn, pixels, screen_channel, threshold_spread
 from .semantics import default as semantic_default
 
@@ -601,7 +601,7 @@ def _shape(node: dict[str, Any], size: tuple[int, int], scale: float) -> np.ndar
 
 IMPLEMENTED = {
     "generate.source", "generate.solid", "generate.gradient", "generate.noise", "generate.text",
-    "signal.luminance", "signal.luma", "signal.channel", "signal.read", "signal.align_depth",
+    "signal.luminance", "signal.luma", "signal.channel", "signal.read", "signal.align_depth", "signal.object_depth",
     "matte.from_signal", "matte.threshold", "matte.combine", "matte.shape", "matte.key", "matte.label",
     "merge.over", "merge.mix", "merge.blend", "merge.porter_duff", "merge.channels", "merge.depth",
     "warp.transform", "warp.corner_pin", "warp.displace", "warp.procedural", "warp.surface",
@@ -1229,7 +1229,13 @@ def read_signal(name: str, node: dict[str, Any], book: "TrackBook", frame: int, 
         held[key] = reader
     reader = held[key]
     index = _signal_index(name, node, reader, book, frame, fps)
-    data = resize_signal(reader.frame(index), reader.record["kind"], width, height)
+    data = reader.frame(index)
+    unknown = reader.unknown(index)
+    if unknown is not None and unknown.any():
+        # In the graph a depth has three states: a number (known), +inf (nothing there), NaN (unknown) --
+        # NaN only here, from a record's unknown mask; only merge.depth decides what it means (CT-0081 step 5).
+        data = np.where(unknown, np.nan, data.astype(np.float32))
+    data = resize_signal(data, reader.record["kind"], width, height)
     return data.astype(np.int64 if reader.record["kind"] == "segmentation" else np.float32)
 
 
@@ -1241,15 +1247,107 @@ def _signal_index(name: str, node: dict[str, Any], reader: Any, book: "TrackBook
     return frame
 
 
-def read_signal_unknown(name: str, node: dict[str, Any], book: "TrackBook", frame: int, fps: float, width: int,
-                        height: int, held: dict[str, Any]) -> np.ndarray | None:
-    """Where a signal read by `name` has no value at this frame (resized to the nearest), or None."""
+def _fill_from_neighbours(depth: np.ndarray, where: np.ndarray, reach: int) -> np.ndarray:
+    """`where` given the nearest depth of its known neighbours (3x3), `reach` pixels out at most."""
 
-    reader = held.get(f"signal:{name}")
-    if reader is None:
-        return None
-    mask = reader.unknown(_signal_index(name, node, reader, book, frame, fps))
-    return None if mask is None else resize_signal(mask, "segmentation", width, height)
+    depth = depth.copy()
+    for _ in range(reach):
+        need = where & ~np.isfinite(depth)
+        if not need.any():
+            break
+        padded = np.pad(np.where(np.isfinite(depth), depth, np.inf), 1, constant_values=np.inf)
+        nearest = np.min([padded[dy:dy + depth.shape[0], dx:dx + depth.shape[1]]
+                          for dy in range(3) for dx in range(3)], axis=0)
+        found = need & np.isfinite(nearest)
+        depth[found] = nearest[found]
+    return depth
+
+
+def object_depth(name: str, depth: np.ndarray, matte: np.ndarray, *, statistic: str = "median",
+                 inset: int = 2) -> np.ndarray:
+    """One depth for an object over all of its matte (alpha > 0), +inf elsewhere: the median of its depth
+    inside the matte's solid interior (alpha >= 0.99, `inset` pixels in from its edge), or `near` (its 10th
+    percentile: the object's front). Where a depth is soft at an object's silhouette -- an estimate's
+    always is -- a per-pixel order dissolves the object into what is behind it exactly where it meets
+    something else; one depth for the whole object keeps it whole (CT-0081 step 5). Unknown depths inside
+    are left out; when too few are known (fewer than 16 pixels), the object's depth is unknown (NaN)."""
+
+    solid = matte >= 0.99
+    for _ in range(max(int(inset), 0)):
+        grown = ~solid
+        step = grown.copy()
+        step[1:] |= grown[:-1]
+        step[:-1] |= grown[1:]
+        step[:, 1:] |= grown[:, :-1]
+        step[:, :-1] |= grown[:, 1:]
+        solid = ~step
+    values = depth[solid & np.isfinite(depth)]
+    if values.size < 16:
+        value_here = np.nan
+    else:
+        value_here = float(np.median(values) if statistic == "median" else np.percentile(values, 10))
+    return np.where(matte > 0, np.float32(value_here), np.float32(np.inf)).astype(np.float32)
+
+
+def merge_by_depth(name: str, frame: int, pictures: np.ndarray, depths: np.ndarray, labels: list[str], *,
+                   near_is_small: bool = True, unknown: str = "refuse", edges: str = "coverage",
+                   reach: int = 2) -> tuple[np.ndarray, np.ndarray]:
+    """Pictures merged by their depths, and the merged depth -- three states kept apart (CT-0081 step 5): a
+    depth known (a number), nothing there (+inf), unknown (NaN).
+
+    - **Unknown** where a picture shows is refused, unless `unknown` says `behind` or `front`; where its
+      picture does not show, it decides nothing.
+    - **Edges** (`coverage`, the default): a layer's picture covers part of an edge pixel while its one depth
+      sample may have missed it (+inf there) -- ordered behind everything, its soft edge lost (the halo).
+      Its depth is carried into the pixels its picture covers from its nearest covered neighbour, `reach`
+      pixels at most. Measured against a truth (CT-0081): an edge band's error 0.0106 -> 0.0013 with an opaque
+      background, 0.0100 -> 0.0001 with every occluder its own layer -- better than supersampling 4x. `hard`
+      keeps the depths as given.
+    - Then per pixel, far to near, each picture over what is behind it.
+    - **The merged depth**: at each pixel the nearest layer's whose picture is there (alpha > 0): its number,
+      or NaN where that layer's depth is unknown; +inf where no layer's picture is there.
+    """
+
+    if edges not in ("coverage", "hard"):
+        raise ValidationError(f"{name}: edges are `coverage` or `hard`, not {edges!r}")
+    depths = depths.copy()
+    alphas = pictures[..., 3]
+    unknown_masks = np.isnan(depths)
+    for position, label in enumerate(labels):
+        seen = unknown_masks[position] & (alphas[position] > 0)
+        if seen.any() and unknown == "refuse":
+            raise ValidationError(f"{name}: {label} has no depth on {int(seen.sum())} pixels of frame {frame} where "
+                                  "its picture shows -- not far, unknown. Say `unknown: behind` or `unknown: front` "
+                                  "on the merge, or fix the depth")
+    if not near_is_small:
+        depths = -depths  # nearest smallest from here on; +inf stays "nothing there" only for near-small depths
+    if edges == "coverage" and near_is_small:
+        for position in range(len(depths)):
+            covered_but_empty = (alphas[position] > 0) & np.isposinf(depths[position]) & ~unknown_masks[position]
+            if covered_but_empty.any():
+                depths[position] = _fill_from_neighbours(np.where(unknown_masks[position], np.inf, depths[position]),
+                                                         covered_but_empty, reach)
+                depths[position][unknown_masks[position]] = np.nan
+    ordering = depths.copy()
+    for position in range(len(depths)):
+        ordering[position][unknown_masks[position]] = np.inf if unknown == "behind" else -np.inf
+    order = np.argsort(ordering, axis=0, kind="stable")  # nearest first, per pixel
+    out = np.zeros(pictures.shape[1:], dtype=np.float32)
+    for rank in range(pictures.shape[0] - 1, -1, -1):  # far to near, each over what is behind it
+        layer = np.take_along_axis(pictures, order[rank][None, ..., None].repeat(4, axis=-1), axis=0)[0]
+        out = layer + out * (1 - layer[..., 3:4])
+    merged_depth = np.full(depths.shape[1:], np.inf, np.float32)
+    decided = np.zeros(depths.shape[1:], bool)
+    for rank in range(len(depths)):  # near to far: the first layer whose picture is there decides
+        index = order[rank]
+        here = np.take_along_axis(alphas, index[None], axis=0)[0] > 0
+        value_here = np.take_along_axis(depths, index[None], axis=0)[0]
+        take = here & ~decided
+        merged_depth[take] = value_here[take]
+        decided |= here
+    if not near_is_small:
+        merged_depth = -merged_depth
+    return out, merged_depth
 
 
 def depth_conventions_agree(name: str, node: dict[str, Any], nodes: dict[str, Any], held: dict[str, Any]) -> bool:
@@ -1567,6 +1665,18 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
         node = nodes[name]
         op = node["op"]
         seconds = (frame + 0.5) / fps
+        if op not in ("merge.depth", "signal.object_depth") and op in OPS:
+            # An unknown depth (NaN) is for merge.depth to decide about, by its policy -- never a value that
+            # flows into a matte or a warp (CT-0081 step 5); signal.object_depth leaves it out, by name.
+            for port, spec in OPS[op].inputs.items():
+                if "signal" not in spec.types or not node.get(port):
+                    continue
+                for reference in node[port] if isinstance(node[port], list) else [node[port]]:
+                    given = value(str(reference), frame)
+                    if isinstance(given, np.ndarray) and given.dtype.kind == "f" and np.isnan(given).any():
+                        raise ValidationError(f"{name} ({op}) reads {reference}, a depth unknown on "
+                                              f"{int(np.isnan(given).sum())} pixels of frame {frame}: only "
+                                              "merge.depth decides what an unknown depth means")
 
         def param(key: str, default: Any = None) -> Any:
             # An author's value, else the op's default as decided once in `semantics` (CT-0072).
@@ -1870,6 +1980,9 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
                     data = data[..., :channels] if channels > 1 else data[..., 0]
                 clips[key] = data.astype(np.float32 if kind != "segmentation" else np.int64)
             return clips[key]
+        if op == "signal.object_depth":
+            return object_depth(name, value(node["signal"], frame), _matte(value(node["matte"], frame)),
+                                statistic=str(node.get("statistic", "median")), inset=int(node.get("inset", 2)))
         if op == "signal.align_depth":
             relative = value(node["signal"], frame).astype(np.float64)
             if node.get("inverse"):
@@ -1887,35 +2000,15 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
                 np.float32)
         if op == "merge.depth":
             pictures = np.stack([_picture(value(item, frame)) for item in node["pictures"]])
-            depths = np.stack([value(item, frame) for item in node["depths"]])
+            depths = np.stack([value(item, frame) for item in node["depths"]]).astype(np.float32)
             if f"conventions:{name}" not in clips:
                 clips[f"conventions:{name}"] = depth_conventions_agree(name, node, nodes, clips)
-            # A pixel whose depth is unknown (not "far": unknown) cannot be ordered. Where it decides what is
-            # seen -- its picture shows there -- the merge says what to do, or refuses (CT-0081 step 4).
-            policy = node.get("unknown", "refuse")
-            for position, item in enumerate(node["depths"]):
-                base = str(item).split(".")[0]
-                source = nodes.get(base, {})
-                if source.get("op") != "signal.read" or not source.get("signal"):
-                    continue
-                mask = read_signal_unknown(base, source, book, frame, fps, width, height, clips)
-                if mask is None or not mask.any():
-                    continue
-                seen = mask & (pictures[position][..., 3] > 0)
-                if seen.any() and policy == "refuse":
-                    raise ValidationError(f"{name}: {item} has no depth on {int(seen.sum())} pixels of frame {frame} "
-                                          "where its picture shows -- not far, unknown. Say `unknown: behind` or "
-                                          "`unknown: front` on the merge, or fix the depth")
-                far = np.inf if node.get("near_is_small", True) else -np.inf
-                depths[position] = np.where(mask, far if policy == "behind" else -far, depths[position])
-            if not node.get("near_is_small", True):
-                depths = -depths
-            order = np.argsort(depths, axis=0)  # nearest first, per pixel
-            out = np.zeros(pictures.shape[1:], dtype=np.float32)
-            for rank in range(pictures.shape[0] - 1, -1, -1):  # far to near, each over what is behind it
-                layer = np.take_along_axis(pictures, order[rank][None, ..., None].repeat(4, axis=-1), axis=0)[0]
-                out = layer + out * (1 - layer[..., 3:4])
-            return out
+            merged, depth = merge_by_depth(name, frame, pictures, depths, [str(item) for item in node["depths"]],
+                                           near_is_small=node.get("near_is_small", True),
+                                           unknown=node.get("unknown", "refuse"),
+                                           edges=node.get("edges", "coverage"), reach=int(node.get("reach", 2)))
+            context.cache[(f"{name}.depth", frame)] = depth
+            return merged
         if op == "colour.curve":
             given = value(node["in"], frame)
             points = np.asarray(node.get("points") or [[0, 0], [1, 1]], dtype=np.float32)

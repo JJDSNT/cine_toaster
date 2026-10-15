@@ -24,6 +24,7 @@ import subprocess
 import tarfile
 import urllib.request
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable
 
@@ -95,13 +96,25 @@ def vision_python() -> Path | None:
     return candidate if candidate.is_file() and os.access(candidate, os.X_OK) else None
 
 
+def environment_stamp(python: Path) -> tuple:
+    """What changes when an environment is installed into: its packages' folders' times. A probe of it is
+    asked again only then -- importing torch takes seconds, and the doctor asks often."""
+
+    folders = sorted(Path(python).resolve().parent.parent.glob("lib/python*/site-packages"))
+    return (str(python), *(folder.stat().st_mtime_ns for folder in folders))
+
+
+@lru_cache(maxsize=8)
+def _probe(stamp: tuple, modules: str) -> int:
+    return subprocess.run([stamp[0], "-c", f"import {modules}"], capture_output=True, text=True,
+                          timeout=180).returncode
+
+
 def vision_unavailable_reason() -> str:
     python = vision_python()
     if python is None:
         return "no vision environment (make install-vision, or set CINE_TOASTER_VISION_PYTHON)"
-    probe = subprocess.run([str(python), "-c", "import torch, transformers, torchvision, cv2, einops"],
-                           capture_output=True, text=True, timeout=180)
-    if probe.returncode:
+    if _probe(environment_stamp(python), "torch, transformers, torchvision, cv2, einops"):
         return f"{python} lacks torch, transformers, torchvision, OpenCV or einops (make install-vision)"
     return ""
 

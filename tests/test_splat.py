@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import math
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 from cine_toaster.splat import ASSETS, available, plan_to_splat, quaternion, shot_poses, turntable_poses
+
+sys.path.insert(0, str(Path(__file__).parent))
+from heavy import heavy  # noqa: E402
 
 DEMO = Path(__file__).parents[1] / "examples" / "demo-project"
 
@@ -40,6 +44,7 @@ class PoseTests(unittest.TestCase):
         self.assertEqual(distances, {2.0})
 
 
+@heavy("renders splats in a headless browser")
 @unittest.skipIf(available() or not (ASSETS / "butterfly.spz").is_file(),
                  "needs Playwright's Chromium and Spark's sample splat")
 class RenderTests(unittest.TestCase):

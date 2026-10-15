@@ -385,7 +385,11 @@ Blender's own passes. Step 4 done: alignment over a stretch
 (`align.py`) -- regularized in time by default, the modes compared, residuals
 held out by pixels, frames and a final stretch; unknown pixels apart from
 far; occlusions inverted flagged by object pair, and refused by the
-compositor until accepted.
+compositor until accepted. Step 5 done: `merge.depth` carries each
+layer's depth into its coverage (the halo gone, measured against rendered
+truths), keeps three depth states (known, nothing there, unknown) and gives
+its depth out; `signal.object_depth` keeps a cut-out object whole where an
+estimated depth is soft.
 
 - What: depth and segmentation as signals, from a model run on a picture
   (depth estimation, a segment-anything model) or from Blender passes (Z,

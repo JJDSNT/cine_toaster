@@ -72,6 +72,10 @@ OPS: dict[str, Op] = {
                                               "range": "vector", "camera": "text", "layer": "text",
                                               "estimated": "bool", "inversions": "enum:refuse|accept"},
                       kind="@kind"),
+    # One depth for a whole object -- its matte's -- where a per-pixel depth is soft at the object's edge (an
+    # estimate's, mostly): measured in CT-0081 step 5, the contact of two objects 7x nearer the truth.
+    "signal.object_depth": Op({"signal": P(*SIG, kinds=("depth",)), "matte": P(*MAT)}, {"out": "signal"},
+                              {"statistic": "enum:median|near", "inset": "int", "camera": "text"}, kind="depth"),
     "signal.estimate": Op({"picture": P(*PIC)}, {"out": "signal"},
                           {"kind": "enum:depth_relative|vectors|normals|segmentation", "model": "text", "seed": "int"},
                           kind="@kind", deterministic=False),
@@ -102,7 +106,9 @@ OPS: dict[str, Op] = {
     "merge.channels": Op({"red": P("signal", "matte", required=False), "green": P("signal", "matte", required=False),
                           "blue": P("signal", "matte", required=False), "alpha": P("signal", "matte", required=False)}),
     "merge.depth": Op({"pictures": P(*PIC, many=True), "depths": P(*SIG, kinds=("depth",), many=True)},
-                      params={"near_is_small": "bool", "unknown": "enum:refuse|behind|front"}),
+                      {"out": "picture", "depth": "signal"},
+                      params={"near_is_small": "bool", "unknown": "enum:refuse|behind|front",
+                              "edges": "enum:coverage|hard", "reach": "int"}, kind="depth"),
     # -- warp
     "warp.transform": Op({"in": P(*EITHER)}, {"out": SAME},
                          {"translate": "vector", "scale": "vector", "rotate": "vector", "pivot": "vector",
@@ -191,6 +197,7 @@ KEY_NEEDS = {"luminance": ("low", "high"), "luma": ("low", "high"), "colour": ("
 #: Parameters an op cannot run without; "a|b" means one of them (SPEC-0012 §9, composite_param_missing).
 REQUIRED_PARAMS: dict[str, tuple[str, ...]] = {
     "signal.channel": ("channel",), "signal.read": ("file|signal", "kind"), "signal.estimate": ("kind", "model"),
+    "signal.object_depth": ("camera",),
     "matte.shape": ("shape",), "matte.combine": ("how",), "matte.label": ("labels",),
     "merge.porter_duff": ("how",), "merge.blend": ("mode",),
     "warp.procedural": ("kind",), "warp.surface": ("shape",), "warp.corner_pin": ("corners|track",),
@@ -408,6 +415,10 @@ def validate(graph: dict[str, Any]) -> list[tuple[str, str]]:
                     if not camera and op_name == "signal.align_depth" and _ref(node.get("reference")):
                         reference = resolve(node["reference"], f"{name}.reference")
                         camera = reference.camera if reference else ""
+                    if not camera and op_name == "merge.depth":  # the merged depth: its inputs' one camera
+                        found = {resolved.camera for item in node.get("depths") or [] if _ref(item)
+                                 for resolved in [resolve(item, f"{name}.depths")] if resolved is not None}
+                        camera = next(iter(found - {""}), "") if len(found - {""}) == 1 else ""
                 value = _Value(kind, signal_kind, camera)
             if output == next(iter(op.outputs)):
                 values[name] = value

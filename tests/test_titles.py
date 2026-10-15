@@ -5,12 +5,16 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 from cine_toaster.errors import ValidationError
 from cine_toaster.titles import CATEGORIES, EFFECTS, ENGINES, blender_binary, expand, list_titles, preview
+
+sys.path.insert(0, str(Path(__file__).parent))
+from heavy import heavy  # noqa: E402
 
 DEMO = Path(__file__).parents[1] / "examples" / "demo-project"
 HAS_FFMPEG = shutil.which("ffmpeg") is not None
@@ -57,6 +61,7 @@ class DrawingTests(unittest.TestCase):
             if item["engine"] == "ffmpeg":
                 self.assertTrue(preview(item, text="It's 03:13, Geneva").startswith(PNG), item["id"])
 
+    @heavy("renders a title with Blender")
     @unittest.skipUnless(blender_binary(), "Blender is not installed")
     def test_a_blender_title_draws(self) -> None:
         item = next(item for item in list_titles() if item["id"] == "letters-turn-in")

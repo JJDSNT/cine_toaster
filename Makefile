@@ -12,7 +12,7 @@ RUN = $(VENV)/bin/python
 TOAST = $(VENV)/bin/toast
 
 .DEFAULT_GOAL := setup
-.PHONY: ui ui-test setup environment submodules install install-media install-audio install-gpu install-voice install-vision install-agents install-mcp install-vfx install-usd install-splat test check demo doctor serve clean help voice build
+.PHONY: ui ui-test test-fast test-heavy setup environment submodules install install-media install-audio install-gpu install-voice install-vision install-agents install-mcp install-vfx install-usd install-splat test check demo doctor serve clean help voice build
 
 help:
 	@echo "make setup     install and report what works"
@@ -20,7 +20,9 @@ help:
 	@echo "make build     speak the reel's narration and render it to mp4"
 	@echo "make serve     open the control room on the reel"
 	@echo "make check     continuity and schema findings for the demos"
-	@echo "make test      the full suite"
+	@echo "make test      the full suite (the final authority)"
+	@echo "make test-fast every test but the heavy ones (Blender, models): while working"
+	@echo "make test-heavy only the heavy ones: after changing an adapter"
 	@echo "make ui        build the production canvas (needs Node 20+)"
 	@echo "make doctor    what works on this machine, and how to fix what does not"
 
@@ -161,8 +163,18 @@ build: install-media install-audio
 
 # ---- Development ----
 
+# The whole suite is the final authority: before a step closes, and after a structural change.
 test: install
-	@PYTHONPATH=src $(RUN) -m unittest discover -s tests
+	@PYTHONPATH=src $(RUN) tests/run.py
+
+# Every test but those marked heavy (Blender, a model's inference, a long render): while working. It keeps
+# every contract, invalidation and composition check -- on synthetic or recorded data.
+test-fast: install
+	@PYTHONPATH=src $(RUN) tests/run.py fast
+
+# Only the heavy tests: after changing an adapter, or chasing a regression in one.
+test-heavy: install
+	@PYTHONPATH=src $(RUN) tests/run.py heavy
 	@$(MAKE) --no-print-directory ui-test
 
 clean:

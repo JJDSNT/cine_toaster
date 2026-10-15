@@ -52,8 +52,9 @@ def voice_unavailable_reason() -> str:
     python = voice_python()
     if python is None:
         return "no voice environment (make install-voice, or set CINE_TOASTER_VOICE_PYTHON)"
-    probe = subprocess.run([str(python), "-c", "import chatterbox, demucs"], capture_output=True, text=True, timeout=120)
-    if probe.returncode:
+    from .models import _probe, environment_stamp
+
+    if _probe(environment_stamp(python), "chatterbox, demucs"):
         return f"{python} lacks chatterbox or demucs (make install-voice)"
     return ""
 

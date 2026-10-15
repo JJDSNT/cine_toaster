@@ -6,6 +6,7 @@ where a ball crosses behind a pillar."""
 
 from __future__ import annotations
 
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,6 +17,9 @@ from cine_toaster import align, signals
 from cine_toaster.compositing.reference import evaluate
 from cine_toaster.errors import ValidationError
 from cine_toaster.state import Actor
+
+sys.path.insert(0, str(Path(__file__).parent))
+from heavy import heavy  # noqa: E402
 
 TOOL = Actor(id="aligner", kind="system")
 W, H, FRAMES = 80, 48, 6
@@ -336,6 +340,49 @@ class Synthetic(unittest.TestCase):
             run(self.graph({"estimated": True}, unknown="behind"))
 
 
+class RecordedWrongOcclusion(unittest.TestCase):
+    """Real model output kept as a fixture (fixtures/c8/da2-occlusion.md): the fast suite checks, without
+    Blender or a model, that Depth Anything V2's wrong occlusion is still found and refused."""
+
+    def setUp(self) -> None:
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        (self.root / "project.yaml").write_text("id: t\ntitle: T\n")
+        recorded = np.load(Path(__file__).parent / "fixtures" / "c8" / "da2-occlusion.npz")
+        signals.record_signal(self.root, signal_id="occ-depth", kind="depth", origin="geometric", rate=24,
+                              actor=TOOL, frames=list(recorded["depth"].astype(np.float32)), camera="occ/cam",
+                              depth={**GEOMETRY, "empty": "inf"})
+        signals.record_signal(self.root, signal_id="occ-da2", kind="depth_relative", origin="estimated", rate=24,
+                              actor=TOOL, frames=list(recorded["estimate"].astype(np.float32)), depth=RELATIVE)
+        signals.record_signal(self.root, signal_id="occ-objects", kind="segmentation", origin="geometric", rate=24,
+                              actor=TOOL, frames=list(recorded["objects"].astype(np.int32)), camera="occ/cam",
+                              labels={0: "nothing", 1: "ball", 2: "floor", 3: "pillar", 4: "wall"},
+                              labels_are="instances")
+
+    def test_the_wrong_occlusion_is_found_where_the_two_meet_and_only_there(self) -> None:
+        made = align.align_depth(self.root, signal_id="occ-z", estimate="occ-da2", reference="occ-depth",
+                                 camera="occ/cam", actor=TOOL, objects="occ-objects")
+        self.assertEqual(made["occlusions_inverted"], {"floor/pillar": [0, 1, 2, 7]})
+        self.assertEqual(made["order_by_objects"]["ball/pillar"]["apart_inverted"], [0, 1, 2, 6, 7])
+        self.assertEqual(made["order_by_objects"]["ball/pillar"]["occlusion_inverted"], [])
+        self.assertLess(made["residual"]["abs_rel"], 0.15)  # the average passes; the occlusion does not
+        signals.record_signal(self.root, signal_id="card-z", kind="depth", origin="authored", rate=24, actor=TOOL,
+                              frames=[np.full((180, 320), 6.0, np.float32)] * 8, camera="occ/cam",
+                              depth=GEOMETRY)
+        graph = {"output": "out", "nodes": {
+            "a": {"op": "generate.solid", "colour": [1, 0, 0, 1]},
+            "card": {"op": "generate.solid", "colour": [0, 1, 0, 1]},
+            "z": {"op": "signal.read", "signal": "occ-z", "kind": "depth", "camera": "occ/cam", "estimated": True},
+            "zc": {"op": "signal.read", "signal": "card-z", "kind": "depth", "camera": "occ/cam"},
+            "out": {"op": "merge.depth", "pictures": ["a", "card"], "depths": ["z", "zc"], "unknown": "refuse"}}}
+        with self.assertRaisesRegex(ValidationError, "floor/pillar on frames \\[0, 1, 2, 7\\]"):
+            evaluate(graph, {}, frames=8, size=(320, 180), fps=24, root=self.root)
+        graph["nodes"]["z"]["inversions"] = "accept"
+        self.assertEqual(evaluate(graph, {}, frames=8, size=(320, 180), fps=24, root=self.root).shape,
+                         (8, 180, 320, 4))
+
+
 def _models_and_blender() -> str:
     import sys
 
@@ -361,6 +408,7 @@ OCCLUSION = {
 }
 
 
+@heavy("renders with Blender and runs two models")
 @unittest.skipIf(_models_and_blender(), _models_and_blender())
 class OnARenderedDolly(unittest.TestCase):
     @classmethod

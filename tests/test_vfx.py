@@ -5,11 +5,15 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 from cine_toaster.vfx import BLENDS, CATEGORIES, EFFECTS, expand, list_effects, list_elements, preview, render
+
+sys.path.insert(0, str(Path(__file__).parent))
+from heavy import heavy  # noqa: E402
 
 DEMO = Path(__file__).parents[1] / "examples" / "demo-project"
 HAS_FFMPEG = shutil.which("ffmpeg") is not None
@@ -226,6 +230,7 @@ class ModalityTests(unittest.TestCase):
         # ACES 2.0's tone scale compresses the highlights: display white comes out below white.
         self.assertTrue(0.6 < float(white[0]) < 0.95, white)
 
+    @heavy("renders every modality, Blender's among them")
     @unittest.skipUnless(shutil.which("ffmpeg") and __import__("cine_toaster.titles").titles.blender_binary(),
                          "Blender is not installed")
     def test_every_example_modality_is_built_and_composited(self) -> None:
@@ -242,6 +247,7 @@ class ModalityTests(unittest.TestCase):
 VDB = Path.home() / ".local" / "share" / "cine-toaster" / "assets" / "openvdb" / "smoke.vdb"
 
 
+@heavy("renders a volume with Blender")
 @unittest.skipUnless(HAS_FFMPEG and VDB.is_file() and __import__("cine_toaster.titles").titles.blender_binary(),
                      "needs Blender and OpenVDB's smoke.vdb (toast vfx examples downloads it)")
 class OpenVdbTests(unittest.TestCase):
@@ -299,6 +305,7 @@ class OpenFxTests(unittest.TestCase):
             self.assertGreater(difference, 2)
 
 
+@heavy("renders effects with Blender")
 @unittest.skipUnless(HAS_FFMPEG and __import__("cine_toaster.titles").titles.blender_binary(), "Blender is not installed")
 class BlenderEffectTests(unittest.TestCase):
     """Weather, electricity, destruction and liquids, rendered by Blender for the shot (CT-0047)."""
@@ -324,6 +331,7 @@ class BlenderEffectTests(unittest.TestCase):
                     os.environ["XDG_STATE_HOME"] = previous
 
 
+@heavy("renders Alembic with Blender")
 @unittest.skipUnless(HAS_FFMPEG and __import__("cine_toaster.titles").titles.blender_binary(), "Blender is not installed")
 class AlembicTests(unittest.TestCase):
     def test_an_alembic_cache_is_played_and_composited(self) -> None:

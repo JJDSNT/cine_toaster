@@ -7,6 +7,7 @@ frame, lands on the surface its object index names."""
 from __future__ import annotations
 
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,10 +17,13 @@ import numpy as np
 
 from cine_toaster import renders, signals
 from cine_toaster.color import exr_layers
-from cine_toaster.compositing.reference import evaluate
+from cine_toaster.compositing.reference import _fill_from_neighbours, evaluate
 from cine_toaster.errors import ValidationError
 from cine_toaster.state import Actor
 from cine_toaster.titles import blender_binary
+
+sys.path.insert(0, str(Path(__file__).parent))
+from heavy import heavy  # noqa: E402
 
 TOOL = Actor(id="renderer", kind="system")
 W, H = 96, 54
@@ -189,6 +193,7 @@ class ExrFiles(unittest.TestCase):
         self.assertTrue(np.isinf(signals.frame(self.root, "z", 0)[:, 8:]).all())
 
 
+@heavy("renders a scene's passes with Blender")
 @unittest.skipUnless(blender_binary(), "Blender is not installed")
 class BlenderPasses(unittest.TestCase):
     @classmethod
@@ -292,20 +297,26 @@ class BlenderPasses(unittest.TestCase):
             "cz": {"op": "signal.read", "signal": "card-z", "kind": "depth", "camera": "room/cam"},
             "out": {"op": "merge.depth", "pictures": ["r", "card"], "depths": ["r.depth", "cz"]}}}
         out = evaluate(graph, {}, frames=3, size=(W, H), fps=24, root=self.root)
-        soft = 0
+        soft = kept = 0
         for index in range(3):
             labels, picture = self.objects.frame(index), renders.RenderReader(self.root, "room").picture(index)
             depth = self.depth.frame(index)
-            nearer, alpha = depth < 7.0, picture[..., 3:]
-            # In front of the card at 7 m: the render, over the card by its alpha (soft at a silhouette, where
-            # the depth is not); behind it: the card.
+            alpha = picture[..., 3:]
+            # The render's depth carried into the pixels its picture covers where its one sample missed (CT-0081
+            # step 5): a silhouette's soft edge stays with its object instead of falling behind the card.
+            missed = (alpha[..., 0] > 0) & np.isinf(depth)
+            covered = _fill_from_neighbours(depth, missed, 2)
+            nearer = covered < 7.0
+            # In front of the card at 7 m: the render, over the card by its alpha; behind it: the card.
             np.testing.assert_allclose(out[index][nearer], (picture + (1 - alpha) * [0, 1, 0, 1])[nearer], atol=1e-6)
-            # Behind, the background included: nothing hit is +inf, farther than the card.
+            # Behind, the background included: nothing hit and nothing covering is +inf, farther than the card.
             self.assertTrue(np.isinf(depth[labels == 0]).all())
             self.assertLess(float(np.abs(out[index][~nearer] - [0, 1, 0, 1]).max()), 1e-6)
             self.assertFalse(np.isnan(out[index]).any())
             soft += int(((alpha[..., 0] > 0) & (alpha[..., 0] < 1) & nearer).sum())
+            kept += int((missed & nearer).sum())
         self.assertGreater(soft, 0)  # such edges were there to test
+        self.assertGreater(kept, 0)  # edge pixels whose sample missed, kept with their object: no halo
         # Its alpha and depth come with the picture, of the same frame.
         graph = {"output": "out", "nodes": {"r": {"op": "generate.render", "render": "room"},
                                            "white": {"op": "generate.solid", "colour": [1, 1, 1, 1]},
@@ -350,6 +361,7 @@ def png(path: Path, value: int) -> None:
     Image.new("RGB", (4, 4), (value, value, value)).save(path)
 
 
+@heavy("renders scenes with Blender, several times")
 @unittest.skipUnless(blender_binary(), "Blender is not installed")
 class Invalidation(unittest.TestCase):
     def render(self, root: Path, **scene) -> None:

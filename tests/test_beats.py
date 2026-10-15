@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
@@ -13,6 +14,9 @@ from pathlib import Path
 from cine_toaster.beats import detect
 from cine_toaster.project import load_production
 from cine_toaster.voice import voice_python
+
+sys.path.insert(0, str(Path(__file__).parent))
+from heavy import heavy  # noqa: E402
 
 HAS_LIBROSA = bool(voice_python()) and shutil.which("ffmpeg") is not None and subprocess.run(
     [str(voice_python()), "-c", "import librosa"], capture_output=True).returncode == 0 if voice_python() else False
@@ -92,6 +96,7 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(self.codes(), [("join_off_beat", "warning")])
 
 
+@heavy("detects beats with librosa in the voice environment")
 @unittest.skipUnless(HAS_LIBROSA, "the voice environment with librosa is missing")
 class DetectionTests(unittest.TestCase):
     def test_a_click_track_at_120_bpm_is_heard_as_120(self) -> None:

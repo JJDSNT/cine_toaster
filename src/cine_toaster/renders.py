@@ -107,7 +107,8 @@ def _relative(root: Path, given: str | Path, what: str) -> str:
 
 def render_passes(root: Path, *, render_id: str, camera: str, first: int, last: int, size: tuple[int, int],
                   fps: Any, actor: Actor, blend: str | Path | None = None, recipe: str | Path | None = None,
-                  engine: str = "CYCLES", samples: int = 16, blender: str | None = None,
+                  engine: str = "CYCLES", samples: int = 16, filter_size: float | None = None,
+                  blender: str | None = None,
                   run: Callable[[list[str]], Any] | None = None) -> dict[str, Any]:
     """Render a scene's passes with Blender (frames `first`..`last` of the scene, at `size`, `fps`) and record
     them: the picture and `render.json` under `renders/passes/<id>/`, the signals `<id>-depth` and
@@ -142,6 +143,7 @@ def render_passes(root: Path, *, render_id: str, camera: str, first: int, last: 
         work = Path(work)
         spec = {scene_key: str(root / scene_file), "camera": camera, "first": int(first), "last": int(last),
                 "width": int(size[0]), "height": int(size[1]), "engine": engine, "samples": int(samples),
+                "filter_size": filter_size,
                 "output": str(work / "out")}
         (work / "spec.json").write_text(json.dumps(spec), encoding="utf-8")
         try:

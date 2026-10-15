@@ -69,6 +69,11 @@ also meant to be "recorded" (SPEC-0012 §5) with nowhere to record it.
   its record and refused until accepted. The aligner measures and flags;
   the compositor decides, by a policy it states. A signal with a camera
   says the window of that camera's image its pixels cover.
+- In a composite a depth has three states, never folded into one another:
+  known (a number), nothing there (+inf), unknown (NaN, only in the graph,
+  from a record's `unknown` mask). Only `merge.depth` decides what an
+  unknown depth means, by a policy it states; its own depth out keeps the
+  three states (CT-0081 step 5).
 - What a maker's depth measures is declared per maker as it was measured,
   never assumed from another: Cycles' Z is z along the axis (CT-0081 step
   2); a renderer not measured is refused.

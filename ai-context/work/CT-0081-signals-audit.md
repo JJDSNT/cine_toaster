@@ -415,6 +415,111 @@ flags `floor/pillar`; a composite with it is refused until `inversions:
 accept`. The video model's calibration flags nothing, and its composite
 runs.
 
+## Step 5 -- depth compositing at edges: the audit (2026-10-15)
+
+The user's rule for it: the compositor keeps three states apart -- a depth
+known, a geometric "nothing there" (+inf), a depth unknown -- and uses the
+quality signals of step 4. The Depth Anything V2 scene of step 4 stays as a
+permanent fixture (`tests/fixtures/c8/da2-occlusion.npz`, read by the fast
+suite).
+
+Measured with a truth: the step-4 dolly rendered flat (emission shaders, no
+light or shadow, so layers composite exactly but for their edges), the ball,
+the pillar and the room each alone, and the whole scene as the truth -- all
+at 4x with a 1-pixel filter, brought to 320x180 by averaging; each layer's
+depth one sample a pixel, as a renderer gives it. Mean error (RGB) in a band
+of 2 pixels round the ball's silhouette, its 99th percentile, and where the
+ball meets the pillar:
+
+| Merge | Band | p99 | Ball/pillar |
+|---|---|---|---|
+| ball over an opaque room-with-pillar, per pixel (today) | 0.0106 | 0.145 | 0.0182 |
+| the same, the occlusion filtered 3x3 (PCF) | 0.0304 | 0.116 | 0.0407 |
+| the same, each layer's depth carried into its coverage | 0.0013 | 0.023 | 0.0161 |
+| the same, supersampled 2x / 4x | 0.0062 / 0.0032 | 0.067 / 0.020 | 0.0168 / 0.0035 |
+| ball, pillar and room as three layers, per pixel | 0.0100 | 0.145 | 0.0119 |
+| three layers, each depth carried into its coverage | **0.0001** | **0.0012** | **0.0005** |
+| three layers, supersampled 4x | 0.0032 | 0.021 | 0.0033 |
+
+What it says:
+
+- The halo is not aliasing: a layer's picture covers part of an edge pixel
+  (its alpha) while its one depth sample missed it (+inf there), so the
+  layer is ordered behind whatever is there and its soft edge is lost.
+  Carrying each layer's depth into the pixels its picture covers (from its
+  nearest covered neighbour) removes it -- better than supersampling 4x.
+- Filtering the comparison (PCF) blurs where nothing was wrong: worse.
+- Inside an **opaque** layer, a silhouette has no coverage of its own: the
+  pillar's edge in the room picture is a mix of pillar and wall under one
+  depth, and nothing in a merge can split it. The pillar as its own layer
+  (its own alpha) makes the merge exact. For a render, objects that occlude
+  others are layers -- or Cryptomatte gives each its coverage; for footage,
+  a matte (segmentation, a key) cuts the occluder out as a layer.
+
+The plan, in that order:
+
+1. `merge.depth` carries each layer's depth into its coverage (`edges:
+   coverage`, the default; `hard` kept, for what it was).
+2. Three states in the graph: known (finite), nothing there (+inf), unknown
+   -- a merge's own depth out (`name.depth`) keeps them: the front layer's
+   depth where it is known, unknown where the deciding layer's is.
+3. Layers from a picture and a matte: the done-when film's shape -- a
+   plate's person cut by a segmentation as its own layer, a Blender object,
+   the plate behind -- measured against a truth: an estimated, aligned depth
+   ordered per pixel against per object (an object's robust depth carried
+   over its matte), where a model's depth is soft at edges.
+4. Every decision recorded (what the merge did at edges), GL later (step 6).
+
+## Step 5 -- depth compositing at edges (done 2026-10-15)
+
+- **`merge.depth`** (`reference.merge_by_depth`): `edges: coverage` by
+  default -- each layer's depth carried into the pixels its picture covers
+  where its one sample missed (+inf there), from its nearest covered
+  neighbour, `reach` 2 pixels; `hard` as before. Three states: unknown
+  depths (NaN, from a record's `unknown` mask through `signal.read`) are
+  never filled, never far; where one decides what shows the merge refuses
+  unless `unknown: behind|front`. Its own `depth` out keeps the three states,
+  so merges chain (its camera passed on in validation).
+- **No other op takes an unknown depth**: the reference refuses a NaN signal
+  anywhere but `merge.depth` and `signal.object_depth`.
+- **`signal.object_depth`**: one depth for an object over all of its matte
+  -- the median (or `near`, the 10th percentile) of its depth inside the
+  matte's solid interior, unknown pixels left out, unknown when too few are
+  known, +inf outside the matte.
+- Recipes may ask flat emission shaders and a pixel filter (`renders`,
+  `passes.py`): the truth scenes of these measurements.
+- **Tests split** (the user's ask): `@heavy("why")` marks 37 tests needing
+  Blender, models or a voice engine; `make test-fast` (950 tests, about 10
+  minutes here), `make test-heavy`, `make test` (all, the final authority);
+  `tests/run.py --times` finds the slow classes. The time is mostly not in
+  the heavy tests (retimed sound, deliveries, generation lead); the doctor's
+  tests fell from 106 s to 15 s by probing the vision and voice environments
+  once a process, again only when their packages change. The Depth Anything
+  V2 scene of step 4 is a fixture the fast suite reads.
+
+Measured, in addition to the audit's table -- the done-when film's shape: a
+plate (the stage rendered flat, standing for footage) with Video Depth
+Anything's depth aligned to its floor alone, the pillar cut out by a soft
+matte as "the person", a CG ball crossing behind it, the whole scene
+rendered at once as the truth; error where the ball meets the pillar:
+
+| Merge | Band | Ball/pillar |
+|---|---|---|
+| ball over the plate, per pixel, hard | 0.0142 | 0.0639 |
+| the same, coverage | 0.0050 | 0.0630 |
+| ball, person (matte) and plate, the person's depth per pixel | 0.0050 | 0.0630 |
+| the same, the person's depth one for the object | **0.0008** | **0.0093** |
+| the same, the geometric depth per pixel | 0.0013 | 0.0161 |
+
+An estimated depth is soft at a silhouette: per pixel, the person dissolves
+into what is behind it exactly where it meets the ball. One depth for the
+cut-out object keeps it whole -- better here than the true geometry per
+pixel, whose remaining error is the matte's colour at its edge (the plate's
+wall mixed into the person's fringe). With Depth Anything V2 instead, the
+contact is wrong whatever the edges (0.157): it sets the pillar behind --
+and the alignment flags `floor/pillar`. No edge method mends an order; the
+flag is what saves the composite.
+
 # Done
 
 - Read SPEC-0012's signal types and ops, the schema's kind and camera
@@ -439,7 +544,18 @@ runs.
   node declaring another kind or camera is refused; a relative depth cannot
   reach `merge.depth`; labels are resized to the nearest; one signal serves
   two readers.
-- Full suite after step 1: 934 tests pass; after step 2 and its review: 954; after step 3: 966; after step 4: 984.
+- Full suite after step 1: 934 tests pass; after step 2 and its review: 954; after step 3: 966; after step 4: 984; after step 5: 997.
+- Step 5 (`tests/test_depth_edges.py`, 13): a disc's soft edge kept exactly
+  where its one depth sample missed (the halo measured, then gone); coverage
+  never putting a layer before what is nearer; the merged depth's three
+  states; an unknown depth never made known by coverage, refused unless a
+  policy is said; one depth for a cut-out object exact where a soft
+  estimated depth was not; an object's unknown depth unknown; merges
+  chained; an unknown depth refused by any other op; `hard` still there. On
+  renders (heavy): the halo gone over an opaque background (0.0170 ->
+  0.0083) and the merge near exact with every occluder its own layer
+  (0.0091 -> 0.0004); on an estimated plate, one depth for the person at least 3x
+  better at the contact than per pixel (the test's bar; measured 7x).
 - Step 4 (`tests/test_align.py`, 15): on synthetic fields of known scale
   and shift -- found exactly in every mode, an alignment beating a
   constant depth on frames it did not see; the record still estimated,
