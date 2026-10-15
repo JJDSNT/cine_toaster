@@ -406,10 +406,30 @@ def render(effects: list[dict[str, Any]], duration: float, output: Path, *, back
             rest = [effect for effect in effects if effect["effect"] != "ofx"]
             return render(rest, duration, output, background=treated, start=0.0, width=width, height=height,
                           fps=fps, run=run)
-    effects = [dict(effect, prepared=prepare_element(effect, duration, width, height, fps, run))
-               if effect["effect"] == "element" else effect for effect in effects]
-    return render_graph(effects, duration, output, background=background, start=start, width=width, height=height,
-                        fps=fps, run=run)
+    return render_graph(prepared(effects, duration, width, height, fps, run), duration, output,
+                        background=background, start=start, width=width, height=height, fps=fps, run=run)
+
+
+def prepared(effects: list[dict[str, Any]], duration: float, width: int, height: int, fps: int,
+             run) -> list[dict[str, Any]]:
+    """The effects with their elements turned into clips the graph reads (`prepare_element`)."""
+
+    return [dict(effect, prepared=prepare_element(effect, duration, width, height, fps, run))
+            if effect["effect"] == "element" else effect for effect in effects]
+
+
+def effects_graph(effects: list[dict[str, Any]], duration: float, *, width: int = 1280, height: int = 720,
+                  fps: int = 24, run=None) -> dict[str, Any]:
+    """The effects, in order, as a graph with one port, `picture`: what a shot's graph chains after its picture.
+    OpenFX plugins are Natron's, which reads and writes files: they are not in it (`render` runs them first)."""
+
+    from .compositing.effects import graph_for
+
+    run = run or (lambda command: subprocess.run(command, check=True, capture_output=True))
+    if any(effect["effect"] == "ofx" for effect in effects):
+        raise ValidationError("OpenFX plugins are drawn by Natron, outside the graph")
+    width, height = width // 2 * 2, height // 2 * 2
+    return graph_for(prepared(effects, duration, width, height, fps, run), duration, fps)
 
 
 def prepare_element(effect: dict[str, Any], duration: float, width: int, height: int, fps: int,

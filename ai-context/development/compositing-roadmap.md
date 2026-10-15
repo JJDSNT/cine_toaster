@@ -428,17 +428,22 @@ prescribed here.
 - ~~The frame-access contract keeps a source's whole range~~: met (CT-0077) --
   float sources read as float, EXR and Blender elements kept float in the
   working space. C8's `generate.render` results must enter the same way.
-- **A shot drawn in one graph**: its composite, its effects and its title are
-  three passes through the same engine, each written and read back (an
-  encode between each). Chain them into one graph -- the effects' and the
-  title's fragments after the composite's output -- so the shot is drawn
-  once (CT-0077).
+- ~~**A shot drawn in one graph**~~: done (CT-0078, at the user's request) --
+  the shot's picture (composite, take, still or card), its effects and its
+  title are one graph (`compositing/shot.py` chains each fragment's port
+  `picture` after the picture so far), drawn once and written once as the
+  cut's piece, joined without another encode; the take's sound laid under
+  it by copy. Left: **a shot with OpenFX effects** is still drawn in passes,
+  since Natron reads and writes files. How: an `opaque.natron` node fed by
+  the graph's frames (a pipe or a frame sequence the node owns), so Natron
+  is one node of the shot's graph rather than a pass around it.
 - A **screen-correction plate** for colour keys on unevenly lit screens (as
   dedicated keyers have): the key's excess measured against the plate's, pixel
   by pixel, instead of one screen colour.
-- (high) A still of a shot **cut from a take** is the take's frame; `toast still`
-  refuses it today: read the take at the cut's instant through the same
-  conform and display rules.
+- ~~(high) A still of a shot **cut from a take**~~: done with the shot drawn
+  once (CT-0078) -- `toast still` runs the shot's graph, so a take is read at
+  the cut's instant through the same conform, and a still now holds the
+  shot's title and effects too.
 - `rig`, `remotion`, `hyperframes`: a renderer each, or out of the vocabulary.
 - A scene's own frame; a stretch's frame-accurate trim.
 - `transition_overlay_without_alpha` and `transition_matte_incomplete` as

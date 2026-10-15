@@ -297,8 +297,14 @@ def write_still(picture: Any, destination: Path, *, working: str = LINEAR, displ
     return destination
 
 
+#: How a drawing is written: kept for further work (4:4:4, near lossless), or as a piece of the cut, in the
+#: format the cut joins its pieces in -- the shot's one encode before the film's.
+MASTER = ("yuv444p", "12")
+PIECE = ("yuv420p", "18")
+
+
 def write(pictures: Any, destination: Path, fps: float, *, working: str = LINEAR,
-          display: str = ENCODED) -> Path:
+          display: str = ENCODED, quality: tuple[str, str] = MASTER) -> Path:
     """Frames (an array or any sequence of (H, W, 4)), linear premultiplied, to H.264 in the display encoding.
 
     Written as they come, so a long composite never has to be in memory at once.
@@ -309,7 +315,7 @@ def write(pictures: Any, destination: Path, fps: float, *, working: str = LINEAR
     height, width = first.shape[:2]
     process = subprocess.Popen(
         [_ffmpeg(), "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb48le", "-s", f"{width}x{height}",
-         "-r", f"{fps:g}", "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", "12", "-pix_fmt", "yuv444p",
+         "-r", f"{fps:g}", "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", quality[1], "-pix_fmt", quality[0],
          str(destination)], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         for picture in _chain(first, frames):

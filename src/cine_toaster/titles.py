@@ -214,20 +214,11 @@ def _blender_clip(title: dict[str, Any], duration: float, width: int, height: in
     return str(clip)
 
 
-def render(title: dict[str, Any], duration: float, output: Path, *, width: int = 1280, height: int = 720,
-           background: Path | None = None, start: float = 0.0, root: Path | None = None, run=None,
-           fps: int = 24) -> Path:
-    """Draw the title over a picture (a clip from `start`) or over its background colour; write `output`.
+def title_graph(title: dict[str, Any], duration: float, *, width: int = 1280, height: int = 720, fps: int = 24,
+                root: Path | None = None, run=None) -> dict[str, Any]:
+    """The title as a graph with one port, `picture`, the shot it is laid over: its font resolved, a Blender
+    title's letters rendered and kept (CT-0077). One graph for a title alone or inside a shot's graph."""
 
-    Drawn by the compositing graph (C6, CT-0077): GL when it can, the reference otherwise; a Blender title's
-    letters are rendered by Blender and laid by the graph. `run(command)` runs a process (a job's runner, or
-    subprocess by default). The picture's sound, if any, is kept.
-    """
-
-    import numpy as np
-
-    from .compositing.drawing import over_picture
-    from .compositing.effects import _linear
     from .compositing.title_graphs import graph_for
 
     run = run or (lambda command: subprocess.run(command, check=True, capture_output=True))
@@ -239,15 +230,41 @@ def render(title: dict[str, Any], duration: float, output: Path, *, width: int =
     params = {**title["params"], "font": font}
     prepared = ({"_clip": _blender_clip(title, duration, width, height, font, run)}
                 if title["engine"] == "blender" else {})
-    still = None
-    if background is None:
-        colour = str(title["params"].get("background") or "black")
-        named = {"black": "#000000", "white": "#FFFFFF"}.get(colour.lower(), "#" + colour.lower().removeprefix("0x").lstrip("#"))
-        still = np.zeros((height, width, 4), np.float32)
-        still[..., :3], still[..., 3] = _linear(named, "#000000"), 1.0
-    graph = graph_for({**title, "params": params, "prepared": prepared}, duration, fps)
-    return over_picture(graph, duration, output, background=background, still=still, start=start, width=width,
-                        height=height, fps=fps, root=root, run=run)
+    return graph_for({**title, "params": params, "prepared": prepared}, duration, fps)
+
+
+def card_picture(title: dict[str, Any], width: int, height: int):
+    """The card a title stands on when it has no shot: its background colour, linear, opaque."""
+
+    import numpy as np
+
+    from .compositing.effects import _linear
+
+    colour = str(title["params"].get("background") or "black")
+    named = {"black": "#000000", "white": "#FFFFFF"}.get(colour.lower(), "#" + colour.lower().removeprefix("0x").lstrip("#"))
+    still = np.zeros((height // 2 * 2, width // 2 * 2, 4), np.float32)
+    still[..., :3], still[..., 3] = _linear(named, "#000000"), 1.0
+    return still
+
+
+def render(title: dict[str, Any], duration: float, output: Path, *, width: int = 1280, height: int = 720,
+           background: Path | None = None, start: float = 0.0, root: Path | None = None, run=None,
+           fps: int = 24) -> Path:
+    """Draw the title over a picture (a clip from `start`) or over its background colour; write `output`.
+
+    Drawn by the compositing graph (C6, CT-0077): GL when it can, the reference otherwise; a Blender title's
+    letters are rendered by Blender and laid by the graph. `run(command)` runs a process (a job's runner, or
+    subprocess by default). The picture's sound, if any, is kept. A shot in a cut draws its title inside its
+    own graph instead (`assembly`, one drawing per shot).
+    """
+
+    from .compositing.drawing import over_picture
+
+    run = run or (lambda command: subprocess.run(command, check=True, capture_output=True))
+    graph = title_graph(title, duration, width=width, height=height, fps=fps, root=root, run=run)
+    still = card_picture(title, width, height) if background is None else None
+    return over_picture(graph, duration, output, background=background, still=still, start=start,
+                        width=width // 2 * 2, height=height // 2 * 2, fps=fps, root=root, run=run)
 
 
 def preview(item: dict[str, Any], *, text: str = "", root: Path | None = None, at: float = 0.6) -> bytes:

@@ -314,7 +314,20 @@ Neither changes the direction; each is used at the edges (`references.md`).
   had to anchor a beat to its frame's centre, and 29.97 frames are inexact.
   How: measure where float time drifts (long shots, 29.97, sample-accurate
   sound); if it does, ticks as FilmCraft's (254,016,000,000 a second) in the
-  plan and the curves, seconds only at the edges.
+  plan and the curves, seconds only at the edges. The user's reading of
+  FilmCraft's and EffectCraft's architecture (section 2, "Time base" /
+  "Time"; 2026-10-15), to compare our contract with before C7, since
+  tracking, retiming and audio-visual sync depend on it: a shared base of
+  254,016,000,000 ticks a second as `Tick(i64)` -- 10,584,000,000 a frame at
+  24 fps, 8,475,667,200 at 30000/1001, 5,292,000 a sample at 48 kHz,
+  5,760,000 at 44.1 kHz, all exact; intervals half-open (a start and a
+  duration, the end never in doubt); in multicamera sync, video placed on
+  frame boundaries and sound kept sample-accurate; the sound's clock the
+  master in playback. Compare: the canonical form of instants and lengths,
+  fps-to-sample-rate conversion, interval bounds, rounding where sound
+  segments are aligned in the assembly, and 24000/1001 and 30000/1001. Not
+  to adopt the ticks before showing that a seen problem comes from the time
+  representation rather than from how segments are aligned and encoded.
 - **Research -- spill suppression and text animators** from EffectCraft's
   code (permissive licence, attribution): spill for C4's keys (recorded in
   the compositing roadmap), per-character animators with range selectors

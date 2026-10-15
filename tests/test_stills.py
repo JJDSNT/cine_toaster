@@ -91,12 +91,14 @@ class StillTests(unittest.TestCase):
             cut = picture(out, round((starts[[s.shot for s in plan.segments].index(shot)] + at) * 24))
             # The cut is H.264 with its colour subsampled. Measured: the right frame is within 1.3/255 on
             # average, a frame off is 3 to 7/255 on the moving shot; every 10x10 region within 4.6/255, so a
-            # local divergence a global mean would hide is caught; a pixel within 24/255 (letter edges only).
+            # local divergence a global mean would hide is caught. A single pixel is x264's at a letter's edge
+            # in this 160x90 frame: one encode of the same still at crf 18 gives 28 to 50/255 by the path it
+            # takes (CT-0078, the shot drawn once) -- bounded at 64, a pixel off, not a picture off.
             error = np.abs(picture(drawn) - cut)
             self.assertLess(float(error.mean()), 2 / 255, (shot, at))
             regions = error.reshape(9, 10, 16, 10, 3).mean(axis=(1, 3, 4))
             self.assertLess(float(regions.max()), 6 / 255, (shot, at))
-            self.assertLess(float(error.max()), 32 / 255, (shot, at))
+            self.assertLess(float(error.max()), 64 / 255, (shot, at))
         early = picture(self.root / "P2-0.25.png").mean()
         late = picture(self.root / "P2-1.5.png").mean()
         self.assertGreater(late, early + 0.3)  # the instant is the shot's own, not its first frame

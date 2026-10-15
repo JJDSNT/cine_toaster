@@ -130,6 +130,34 @@ lacked:
   what our primitives express into the graph), looping, which of the two
   engines is right where they differ, fonts for text layers.
 
+## A shot drawn once (the user, 2026-10-15)
+
+The limitation recorded in C6 ("a shot drawn in one graph"), asked for by the
+user to close C6b: remove the three passes, keep one graph, no intermediate
+encodes.
+
+- Before: composite -> mp4 (4:4:4, crf 12); effects over it -> `.fx.mp4`;
+  title over that -> mp4; then the cut re-encoded each piece (4:2:0, crf
+  18): up to four encodes of a shot before the film's.
+- Now: `compositing/shot.py` chains fragments -- each effect list and title
+  is a graph with one port, `picture` -- after the shot's picture, renaming
+  their nodes so none meets the base's (`chain`, `shot_graph`). The picture
+  is the composite, or the take, the still, or the title's card as the port.
+  A take is treated, then titled; a card titled, then treated (as before).
+- `assembly._shot_drawing` builds and draws it once, by GL when it holds
+  every op; `_draw_shot` writes it once, straight in the cut's piece format
+  (`reference.PIECE`), and lays the take's sound (or the converted voice)
+  under it by copy. The cut joins that piece as it is (`Segment.piece`).
+- `titles.title_graph`/`card_picture` and `vfx.effects_graph` give the
+  fragments; `titles.render` and `vfx.render` use them for previews and
+  single renders, so there is one way to build each.
+- `toast still` runs the same graph: a still holds the title and effects,
+  and a shot cut from a take now has a still (a recorded limitation closed).
+- Kept stills: every shot drawn by a graph now keeps its middle frame, not
+  only composites.
+- Left: shots with OpenFX effects (Natron reads files) keep the passes,
+  recorded with how in the compositing roadmap.
+
 ## Review of stages B and C (the user, 2026-10-15) -- to return to
 
 The user's observations, kept with ours so the work comes back to them:
@@ -220,3 +248,13 @@ What to do when this is taken up:
   ThorVG it says what to install. GL draws a Lottie layer as the reference
   does (mean difference 1e-7, by hand).
 - Full suite after stage D: 815 tests pass.
+- A shot drawn once (`tests/test_shot_graph.py`): a fragment reads the
+  picture so far and keeps its own names (ports, curves); fragments follow
+  in order; with no base the picture stays a port; in a cut, a take with a
+  vignette and a caption is drawn in one graph -- no composite, effects or
+  title file, not cut again -- and its still is the cut's frame with the
+  vignette. `test_stills`' per-pixel bound re-measured: x264 at a letter's
+  edge in a 160x90 frame gives 28 to 50/255 for one encode of the same
+  still by the path taken (the old two encodes happened to stay under 32);
+  bounded at 64, the mean and regional bounds unchanged. Full suite: 819
+  tests pass.

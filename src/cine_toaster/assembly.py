@@ -103,6 +103,9 @@ class Segment:
     effects: list[dict[str, Any]] = field(default_factory=list)
     #: The file actually cut, when it is not the take itself (a rendered card or titled piece).
     source: str = ""
+    #: The shot drawn by its graph, already a piece of the cut (its frame, rate and format): joined as it is,
+    #: not encoded again.
+    piece: str = ""
     #: Speech heard within a scene version, in its own seconds (a sequence's segments): music ducks under it.
     speech_spans: list[tuple[float, float]] = field(default_factory=list)
     #: A format's frame in the take ({x, y}, CT-0049), and the captions spoken in it, in the take's seconds.
@@ -658,36 +661,109 @@ def _scene_beats(root: Path, scene: dict[str, Any]) -> list[float]:
 
 def _composite_pictures(root: Path, segment: Segment, size: tuple[int, int], fps: float,
                         beats: list[float] | None = None, at: float = 0.0) -> tuple[Any, Any, bool]:
-    """The shot's composite drawn (SPEC-0012, ADR 0022 §5): (pictures, the GL renderer or None, cached).
+    """The shot's composite alone, drawn (SPEC-0012, ADR 0022 §5): for a shot whose OpenFX effects Natron
+    draws after it, from a file. Every other shot is drawn whole by `_shot_drawing`."""
 
-    One drawing for the cut and for a still of it: GL when it draws every op of the composite (checked
-    against the reference by the conformance tests), the reference otherwise, exact and slow.
-    """
+    import dataclasses
+
+    return _shot_drawing(root, dataclasses.replace(segment, effects=[], title=None), size, fps, beats, at)
+
+
+def _drawn(segment: Segment) -> bool:
+    """Whether the shot is drawn by one graph: a composite, or a picture with effects or a title. OpenFX
+    plugins are Natron's, which reads files: a shot with them is still drawn in passes."""
+
+    if any(effect.get("effect") == "ofx" for effect in segment.effects):
+        return False
+    return bool(segment.composite or segment.title or segment.effects)
+
+
+def _shot_drawing(root: Path, segment: Segment, size: tuple[int, int], fps: float, beats: list[float] | None = None,
+                  at: float = 0.0, run_process=None) -> tuple[Any, Any, bool]:
+    """The shot as one graph, drawn (CT-0078): its picture -- a composite, a take, a still, or a title's card
+    -- then its effects and its title chained after it, so nothing is written between them. A take is
+    treated by its effects, then titled; a card is titled, then treated, text included.
+    (pictures, the GL renderer or None, cached)."""
 
     from .compositing import reference
     from .compositing.gl import renderer_for
+    from .compositing.shot import shot_graph
+    from .titles import card_picture, title_graph
+    from .vfx import effects_graph
 
     length = segment.end - segment.start
     frames = max(1, round(length * fps))
-    graph = segment.composite
+    width, height = size
+    run = (lambda command: run_process(command, expected_seconds=length, message=f"{segment.shot}: its elements")) \
+        if run_process else None
     inputs: dict[str, Any] = {}
-    for name, node in graph["nodes"].items():
-        if node.get("op") != "generate.source" or not node.get("take"):
-            continue
-        media = segment.composite_takes.get(str(node["take"]))
-        if media is None:
-            raise ValidationError(f"{segment.shot}: its composite names the take {node['take']!r}, which the shot "
-                                  f"does not have ({', '.join(segment.composite_takes) or 'none'})")
-        # The cut's stretch of the take, unless the node asks for another start.
-        start = float(node["start"]) if node.get("start") is not None else segment.start
-        inputs[name] = reference.read(root / media, frames, size, fps, start=start,
-                                      colorspace=node.get("colorspace"), alpha=node.get("alpha"))
-    # The music's beats in the shot's own seconds: a composite pulses with the cut, not with its take.
+    base = None
+    if segment.composite:
+        base = segment.composite
+        for name, node in base["nodes"].items():
+            if node.get("op") != "generate.source" or not node.get("take"):
+                continue
+            media = segment.composite_takes.get(str(node["take"]))
+            if media is None:
+                raise ValidationError(f"{segment.shot}: its composite names the take {node['take']!r}, which the "
+                                      f"shot does not have ({', '.join(segment.composite_takes) or 'none'})")
+            # The cut's stretch of the take, unless the node asks for another start.
+            start = float(node["start"]) if node.get("start") is not None else segment.start
+            inputs[name] = reference.read(root / media, frames, size, fps, start=start,
+                                          colorspace=node.get("colorspace"), alpha=node.get("alpha"))
+    elif segment.media:
+        inputs["picture"] = reference.read(root / segment.media, frames, size, fps, start=segment.start)
+    else:
+        inputs["picture"] = card_picture(segment.title or {"params": {}}, width, height)
+    whole = dict(width=width, height=height, fps=fps, run=run)
+    effects = [("fx-", effects_graph(segment.effects, length, **whole))] if segment.effects else []
+    title = [("title-", title_graph(segment.title, length, root=root, **whole))] if segment.title else []
+    fragments = title + effects if not (segment.media or segment.composite) else effects + title
+    if base is None and not fragments:  # a take as it is: its own frames
+        clip = inputs["picture"]
+        return (clip[index] for index in range(frames)), None, False
+    graph = shot_graph(base, fragments)
+    # The music's beats in the shot's own seconds: a shot pulses with the cut, not with its take.
     local = [beat - at for beat in beats or [] if -1.0 <= beat - at <= length + 1.0]
     fast = renderer_for(graph)
     pictures, _identity, cached = reference.render(graph, inputs, frames=frames, size=size, fps=fps, root=root,
                                                    beats=local, renderer=fast)
     return pictures, fast, cached
+
+
+def _draw_shot(root: Path, segment: Segment, destination: Path, first: dict[str, Any], fps: float, run_process,
+               notes: list[str], beats: list[float] | None = None, at: float = 0.0,
+               still: Path | None = None) -> None:
+    """The shot drawn once by its graph and written once, as a piece of the cut; its take's sound laid under
+    it by copy, not by encoding the picture again. With ``still``, the middle frame the cut shows."""
+
+    from .compositing import reference
+
+    length = segment.end - segment.start
+    size = (first["width"] // 2 * 2, first["height"] // 2 * 2)
+    pictures, fast, cached = _shot_drawing(root, segment, size, fps, beats, at, run_process)
+    notes.append(f"{segment.shot}: drawn in one graph by "
+                 + (f"GL ({fast.name.split(' (')[0]})." if fast else "the NumPy reference (exact, slow)."))
+    if cached:
+        notes.append(f"{segment.shot}: its drawing was found in the cache.")
+    kept: list[Any] = []
+    piece = destination.with_suffix(".piece.mp4")
+    reference.write(_frames_keeping(pictures, max(1, round(length * fps)) // 2, kept), piece, fps,
+                    quality=reference.PIECE)
+    if still is not None and kept:
+        reference.write_still(kept[0], still)
+    # A take whose voice was converted is heard converted.
+    heard = Path(segment.sound) if segment.sound else (root / segment.media if segment.media else None)
+    if heard is not None and probe(heard).get("audio"):
+        sound = ["-ss", f"{segment.start:.3f}", "-t", f"{length:.3f}", "-i", str(heard)]
+    else:
+        sound = ["-f", "lavfi", "-t", f"{length:.3f}", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"]
+    run_process(["ffmpeg", "-y", "-loglevel", "error", "-i", str(piece), *sound, "-map", "0:v:0", "-map", "1:a:0",
+                 "-c:v", "copy", "-c:a", "aac", "-shortest", str(destination)],
+                expected_seconds=length, message=f"{segment.shot}: its sound under its drawing")
+    if segment.speech:
+        segment.speech = (segment.speech[0] - segment.start, segment.speech[1] - segment.start)
+    segment.source, segment.piece, segment.start, segment.end = str(destination), str(piece), 0.0, length
 
 
 def _frames_keeping(pictures: Any, index: int, kept: list[Any]):
@@ -761,12 +837,11 @@ def _starts(plan: Plan) -> list[float]:
 
 
 def still(root: Path, plan: Plan, shot: str, destination: Path, at: float | None = None) -> Path:
-    """A shot's frame at ``at`` seconds into it (its middle when not given), as the cut draws it: its graph
-    run at that instant, at the cut's frame and rate, with the cut's beats (CT-0072).
-
-    A shot drawn by a graph -- a card, a composite -- only. Titles and effects drawn over a composite are
-    still FFmpeg's (P1-P3 of the audit, owned by C6) and are not in it; an instant inside a join belongs to
-    the sequence, not to one shot (recorded in the compositing roadmap).
+    """A shot's frame at ``at`` seconds into it (its middle when not given), as the cut draws it: the shot's
+    one graph -- its picture, effects and title (CT-0078) -- run at that instant, at the cut's frame and rate,
+    with the cut's beats (CT-0072). A shot cut from a take with nothing over it is the take's frame, read
+    through the same conform. An instant inside a join belongs to the sequence, not to one shot (recorded in
+    the compositing roadmap); OpenFX plugins are Natron's and are not in a still.
     """
 
     from .compositing import reference
@@ -775,11 +850,13 @@ def still(root: Path, plan: Plan, shot: str, destination: Path, at: float | None
     if index is None:
         raise ValidationError(f"{shot} is not in this cut")
     segment = plan.segments[index]
-    if not segment.composite:
-        raise ValidationError(f"{shot} is cut from a take, not drawn by a graph: its frame is the take's")
-    if segment.title or segment.effects:
-        plan.notes.append(f"{shot}: its title and effects are drawn over the composite by FFmpeg and are not "
-                          "in this still yet (C6).")
+    if segment.method.startswith("solid:") or not (segment.media or segment.composite or segment.title):
+        raise ValidationError(f"{shot} has no picture to draw a still from")
+    if any(effect.get("effect") == "ofx" for effect in segment.effects):
+        import dataclasses
+
+        plan.notes.append(f"{shot}: its OpenFX effects are drawn by Natron and are not in this still.")
+        segment = dataclasses.replace(segment, effects=[e for e in segment.effects if e.get("effect") != "ofx"])
     first, fps = _source_frame(root, plan)
     if plan.format.get("aspect"):
         from .formats import target_size
@@ -790,7 +867,7 @@ def still(root: Path, plan: Plan, shot: str, destination: Path, at: float | None
     frames = max(1, round(length * fps))
     wanted = frames // 2 if at is None else min(frames - 1, max(0, round(float(at) * fps)))
     size = (first["width"] // 2 * 2, first["height"] // 2 * 2)
-    pictures, _fast, _cached = _composite_pictures(root, segment, size, fps, plan.beats, _starts(plan)[index])
+    pictures, _fast, _cached = _shot_drawing(root, segment, size, fps, plan.beats, _starts(plan)[index])
     for number, picture in enumerate(pictures):
         if number == wanted:
             return reference.write_still(picture, destination)
@@ -846,6 +923,13 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
                         expected_seconds=length, message=f"{segment.shot}: {segment.method.split(':', 1)[1]} screen")
             segment.source = str(solid)
         held = None
+        if _drawn(segment) and not segment.source:
+            # One graph, drawn once, written once as the cut's piece (CT-0078).
+            kept = work / "stills" / f"{segment.shot}.png"
+            _draw_shot(root, segment, work / f"shot-{index:03d}.mp4", first, fps, run_process, plan.notes,
+                       plan.beats, starts[index], still=kept)
+            if kept.is_file():
+                plan.stills[segment.shot] = str(kept)
         if segment.composite and not segment.source:
             kept = work / "stills" / f"{segment.shot}.png"
             composed = _render_composite(root, segment, work / f"composite-{index:03d}.mp4", first, fps, run_process,
@@ -873,6 +957,10 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
         source = Path(segment.source) if segment.source else root / segment.media
         length = segment.end - segment.start
         picture = work / f"picture-{index:03d}.mp4"
+        if segment.piece:  # drawn by its graph as a piece of the cut: joined as it is
+            pictures.append(Path(segment.piece))
+            count[index] = _frames_in(Path(segment.piece)) or max(1, round(length * fps))
+            continue
         run_process([ffmpeg, "-y", "-loglevel", "error", "-ss", f"{segment.start:.3f}", "-t", f"{length:.3f}",
                      "-i", str(source), "-map", "0:v:0",
                      "-vf", conform_filter(width, height, transparent=False) + f",fps={fps},format=yuv420p",
