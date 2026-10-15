@@ -2,7 +2,7 @@
 id: CT-0080
 title: C7 -- time and track, the audit before building
 type: work
-status: doing
+status: done
 owner: unassigned
 created_at: 2026-10-15
 updated_at: 2026-10-15
@@ -541,6 +541,56 @@ default -- how: pick the hardware driver when present, behind the doctor's
 report (C9b); the eleven ops outside C7's scope still send a graph to the
 reference.
 
+## Step 7 -- the done-when films (done 2026-10-15)
+
+In the music-piece production (`scripts/research/c7_films.py`), each drawn in
+one graph by GL on the Intel GPU (D3D12), logged in `docs/trials.md`:
+
+1. **A speed ramp lands on a beat** (SC-060 v2): the launch at 1x to the
+   music's third beat, ramping and landing at 2x on the fifth (`{beat: n}`
+   keys). Measured on the delivered film by identifying the take frame each
+   film frame shows: 100 of 101 within one frame of the map; mean speed 0.96
+   / 1.54 / 2.00 before, through and after the ramp (1.00 / 1.50 / 2.00
+   asked).
+2. **Trails follow a moving layer** (SC-070 v1): a launch flown across the
+   Earth, `echo` after its move.
+3. **A replaced window follows a moving camera** (SC-080 v2): SC-040's real
+   cabin footage under a known camera move (synthetic, so its truth is
+   known; the picture never shows its edges); the middle display becomes a
+   window on the Earth, pinned by a plane track measured once on the plate.
+   The track against the true move: 1.3 px mean, 2.3 px worst at 1920x1080,
+   confidence 1.0 throughout.
+
+Found by the films, each fixed with a test:
+- **a shot made only of layers never read its `retime`** -- v1 of the ramp
+  was not retimed, which only measuring the delivered film showed; the plan
+  now carries it on that path too;
+- **`layers` (since C4) and the new `retime`, `retime_sound`,
+  `stretch_with` were undeclared shot fields** (a `shot_field_undeclared`
+  advice on every layered scene); declared;
+- a plane track could only fill its plane with the pinned picture; **with
+  `corners` given, it now carries them as the plane moves** (the homography
+  from its first corners to its current ones), one rule in
+  `pinned_corners` for both renderers -- what a window on a moving wall
+  needs.
+- My first window film failed its own claim (the move too wide for its zoom,
+  windows pushed out of the picture): redone with a contained move and the
+  middle display.
+
+Still to do, recorded: the same with real hand-held footage (a cabin or a
+room filmed moving, its window tracked) -- the synthetic move proves the
+chain and gives a truth to measure against, not the tracker's behaviour on
+real motion blur and parallax.
+
+## C7 closed
+
+Done-when met (the three films). What C7 leaves, each recorded above with
+how: a layer's retime without beats or reverse; a ramp's map sampled at
+1/240 s; re-acquisition by translation only; corrections one entry at a
+time; a remap alone transfer-bound on GL; the GL device left to Mesa's
+default; eleven ops outside C7 still off GL; a listening review of retimed
+sound; the moving window with real footage.
+
 # Done
 
 - Read every time and track node, its tests, SPEC-0012 §6, the assembly's
@@ -635,5 +685,8 @@ reference.
 - Step 6: `tests/test_gl_time.py` (above), on llvmpipe and on the Intel GPU;
   the GL refusal test now names an op GL still lacks (`colour.posterise`).
 - Full suite after step 6: 918 tests pass.
+- Step 7: the films measured as above; `PlanTests` (a shot of layers alone
+  keeps its retime, its fields known) and the plane-pin carrying test.
+- Full suite after step 7: 920 tests pass.
 - The probes above (reproducible with a ten-frame clip whose red channel is
   its frame number). No code changed.

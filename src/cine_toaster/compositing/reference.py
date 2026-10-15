@@ -1287,13 +1287,23 @@ class TrackBook:
 
 
 def pinned_corners(book: TrackBook, node: dict[str, Any], name: str, seconds: float, fps: float) -> list[list[float]]:
-    """A corner pin's corners from its track at `seconds`: a plane's corners, or the given corners moved as a
-    point track has moved since the shot's first frame -- one rule for every renderer."""
+    """A corner pin's corners from its track at `seconds` -- one rule for every renderer:
+    - a plane track with no corners given: the picture fills the tracked plane (a screen replaced);
+    - a plane track with corners given: those corners carried as the plane has moved since the shot's first frame
+      -- the homography from its first corners to its current ones (a window kept on a moving wall, C7);
+    - a point track: the given corners moved as the point has moved since the shot's first frame."""
 
     entry = book.entry(node["track"], name, seconds)
-    if "corners" in entry:
-        return [list(map(float, corner)) for corner in entry["corners"]]
     first = book.entry(node["track"], name, 0.5 / fps)
+    if "corners" in entry:
+        if not node.get("corners"):
+            return [list(map(float, corner)) for corner in entry["corners"]]
+        from .warp import homography
+
+        moved = homography(first["corners"], entry["corners"])
+        given = np.asarray(node["corners"], np.float64)
+        points = np.c_[given, np.ones(len(given))] @ np.asarray(moved, np.float64).T
+        return (points[:, :2] / points[:, 2:3]).tolist()
     shift = np.mean(entry["points"], axis=0) - np.mean(first["points"], axis=0)
     return (np.asarray(node.get("corners") or [[0, 0], [1, 0], [1, 1], [0, 1]]) + shift).tolist()
 

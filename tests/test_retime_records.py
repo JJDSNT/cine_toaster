@@ -152,6 +152,26 @@ class LayerTests(unittest.TestCase):
         lefts = [int(np.nonzero(frame[2, :, 0] > 0.5)[0].min()) for frame in out]
         self.assertEqual(lefts, list(range(10)))  # one pixel a frame, as the track moves one hundredth
 
+    def test_a_plane_track_carries_given_corners_or_fills_its_plane(self) -> None:
+        """With corners, a layer moves as the plane moves (a window kept on a moving wall); without, it fills the
+        tracked plane (a screen replaced)."""
+
+        track = self.root / "plane.track.json"
+        track.write_text(json.dumps({"kind": "plane", "clock": {"rate": "10", "origin": {"ticks": 0}}, "frames": [
+            {"corners": [[0.4 + i / 100, 0.3], [0.6 + i / 100, 0.3], [0.6 + i / 100, 0.7], [0.4 + i / 100, 0.7]]}
+            for i in range(40)]}))
+        lefts = {}
+        for name, corners in (("carried", [[0, 0], [0.1, 0], [0.1, 1], [0, 1]]), ("filled", None)):
+            pin = {"track": str(track), **({"corners": corners} if corners else {})}
+            graph, problems = compile_layers([{"source": "plate"}, {"source": "window", "pin": pin}])
+            self.assertEqual(problems, [])
+            graph["nodes"]["L1"] = {"op": "generate.solid", "colour": [0, 0, 0, 1]}
+            graph["nodes"]["L2"] = {"op": "generate.solid", "colour": [1, 1, 1, 1]}
+            out = evaluate(graph, {}, frames=6, size=(100, 4), fps=FPS)
+            lefts[name] = [int(np.nonzero(frame[2, :, 0] > 0.5)[0].min()) for frame in out]
+        self.assertEqual(lefts["carried"], [0, 1, 2, 3, 4, 5])  # from the frame's left edge, moved with the plane
+        self.assertEqual(lefts["filled"], [40, 41, 42, 43, 44, 45])  # the plane's own place
+
     def test_a_pin_says_what_it_follows(self) -> None:
         for spec, wanted in (({"track": "t.json", "of": 2}, "layer below"), ({"measure": "camera"}, "point or a plane"),
                              ({"of": 1}, "track: file")):
@@ -160,6 +180,28 @@ class LayerTests(unittest.TestCase):
         _, problems = compile_layers([{"source": "plate"}, {"source": "w", "pin": {"track": "t.json"},
                                                             "place": {"scale": 0.5}}])
         self.assertTrue(any("pinned or placed" in problem for problem in problems))
+
+
+class PlanTests(unittest.TestCase):
+    """Found by C7's films (step 7): a shot made only of layers never read its retime, and its fields were taken
+    for unknown ones."""
+
+    def test_a_shot_of_layers_alone_keeps_its_retime_and_its_fields_are_known(self) -> None:
+        from cine_toaster.assembly import plan_scene
+        from cine_toaster.project import load_production
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "project.yaml").write_text("id: t\ntitle: T\npaths:\n  scenes: scenes\n")
+            (root / "plates").mkdir()
+            (root / "scenes" / "010").mkdir(parents=True)
+            (root / "scenes" / "010" / "scene.yaml").write_text(
+                "scene: S1\nshots:\n  - n: 1\n    duration: 2\n    label: Layers alone.\n"
+                "    layers:\n      - source: plates/a.mp4\n    retime: {speed: 2}\n    retime_sound: stretch\n"
+                "    stretch_with: anchored\n")
+            scene = load_production(root)["scenes"][0]
+            self.assertFalse([f for f in scene["findings"] if f["code"] == "shot_field_undeclared"], scene["findings"])
+            self.assertEqual(plan_scene(root, scene).segments[0].retime, {"speed": 2})
 
 
 @unittest.skipUnless(HAS_FFMPEG, "FFmpeg is missing")

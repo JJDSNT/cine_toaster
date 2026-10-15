@@ -44,9 +44,9 @@ is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
 CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
 
-- `CT-0080` — C7: time and track, the audit -- what the graph supports, what
-  is exposed, what is new; source time against timeline time; a sequence
-  (`doing`)
+- `CT-0080` — C7: time and track -- the audit, the remap's meaning, source
+  against timeline time, retimed sound, exposure, tracks as records, GL, and
+  the three done-when films (`done`)
 - `CT-0079` — the time base: three faults measured and fixed (cut points on
   the frame grid, rates as fractions, sound in samples, `timebase.py`); every
   click within half a sample over an hour at 30000/1001; ADR 0023 --

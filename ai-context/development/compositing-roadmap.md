@@ -353,6 +353,10 @@ their media with a confidence per entry, reseeded and re-acquired, corrected
 apart and revertible, refused when stale, reused by any shot and retime.
 Step 6 done: time operations and tracks on GL through the shared contract
 (9-19x on the combined graph; a remap alone stays transfer-bound).
+**Done** (2026-10-15): the three films -- a ramp landing on a beat (measured
+on the film: 1.00 / 1.50 / 2.00x as asked), trails following a moving
+layer, a display kept on a moving camera by a plane track (2.3 px worst
+against the true move). Its leftovers are listed in `CT-0080`.
 
 - What: retime, speed ramp, freeze, reverse, frame blending, an offset
   between layers, trails and echoes (the ADO's Infinity). Point and planar

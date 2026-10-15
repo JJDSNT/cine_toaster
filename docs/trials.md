@@ -8,6 +8,9 @@ work records named here hold the detail.
 
 | Date | Piece | Length | File | Published |
 |---|---|---|---|---|
+| 2026-10-15 | Ramp v2: a speed ramp landing on a beat (C7) | 3.4 s | `trials/c7-ramp-on-beat-v2.mp4` | not yet |
+| 2026-10-15 | Trails v1: a launch flown across the Earth, its past behind it (C7) | 4 s | `trials/c7-trails-v1.mp4` | not yet |
+| 2026-10-15 | Window, moving v2: a display replaced under a camera move (C7) | 4 s | `trials/c7-window-moving-v2.mp4` | not yet |
 | 2026-10-14 | Presenter v4: layers, a key, grain and a lower third, one engine | 4 s | `trials/presenter-layers-v4.mp4` | not yet |
 | 2026-10-14 | Heat v6: its luma join as a recipe | 42 s | `trials/organic-trial-v6.mp4` | not yet |
 | 2026-10-14 | Presenter v2: the presented launch in motion | 4 s | `trials/presenter-layers-v2.mp4` | not yet |
@@ -27,6 +30,30 @@ work records named here hold the detail.
 
 `trials/` is `~/cine-toaster-references/trials/` on the machine they were made
 on. A link is added when a piece is published.
+
+## 2026-10-15 · Ramp, Trails, Window: time and track (C7)
+
+C7's three done-when films, in the music-piece production (CT-0080 step 7),
+each drawn in one graph on the GPU (Intel UHD 620 through D3D12).
+
+- **Ramp** (SC-060): the launch at 1x to "Circuit Synthwave"'s third beat,
+  ramping and landing at 2x on the fifth -- written as `retime: {speed: [...]}`
+  with `{beat: n}` keys. Measured on the delivered film: 100 of 101 frames
+  show the take frame the map names (within one; the take repeats frames);
+  mean speed 0.96, 1.54 and 2.00 before, through and after the ramp
+  (1.00, 1.50, 2.00 asked). v1 was not retimed: a shot made only of layers
+  never read its `retime` -- found by measuring it, fixed in the plan.
+- **Trails** (SC-070): a launch flown across the Earth with `echo` after
+  its move: the trail follows where it went, fading.
+- **Window, moving** (SC-080): the real footage of SC-040's cabin under a
+  camera move made here (a known homography -- synthetic, so its truth is
+  known); its middle display shows the Earth, pinned by a plane track
+  measured once on the plate (a production record, `tracks/cabin`). The
+  track against the true move: 1.3 px mean, 2.3 px worst, at 1920x1080. v1
+  moved too far for its zoom (black wedges at the edges) and replaced the
+  windows, which the zoom pushed out of the picture.
+- By hand: the camera move and the display's outline. Still to do: the same
+  with real hand-held footage.
 
 ## 2026-10-14 · Presenter: a person keyed (C4)
 

@@ -366,6 +366,8 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
             segment.composite = shot["composite"]
             segment.composite_takes = {take["id"]: take["media"] for take in shot.get("takes") or []}
             segment.voice_over = _voices_of(root, scene, shot)
+            # Its picture retimed too (C7, CT-0080): a composite of files is retimed as a take is.
+            segment.retime = shot.get("retime") if isinstance(shot.get("retime"), dict) else None
             if plan.segments:
                 _resolve_join(root, plan, cut, segment, joins)
             plan.segments.append(segment)

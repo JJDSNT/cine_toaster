@@ -82,9 +82,11 @@ base (CT-0079: three faults measured and fixed -- cut points on the frame
 grid, rates as fractions, sound in samples, through one `timebase` module;
 every click within half a sample over an hour at 30000/1001) and ADR 0023
 (fractions to compute, ticks to store and exchange, the media clock's
-contract for C9b). C7 opened (CT-0080) with its audit: what the graph
-supports, what is exposed, what is new, and how source and timeline time
-are told apart; nothing built before the user reads the diagnosis.
+contract for C9b). C7 is done (CT-0080): the remap's meaning, source and timeline
+time composed (`clock`), retimed sound by policy (the anchored WSOLA),
+retimes, offsets, trails and pins in the records, tracks as production
+records (`tracks/<id>`), all on GL, and its three films. Next: C8 (signals
+from models and 3D), or the C6b review the user recorded.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional
