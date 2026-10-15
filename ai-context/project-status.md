@@ -85,8 +85,8 @@ every click within half a sample over an hour at 30000/1001) and ADR 0023
 contract for C9b). C7 is done (CT-0080): the remap's meaning, source and timeline
 time composed (`clock`), retimed sound by policy (the anchored WSOLA),
 retimes, offsets, trails and pins in the records, tracks as production
-records (`tracks/<id>`), all on GL, and its three films. Next: C8 (signals
-from models and 3D), or the C6b review the user recorded.
+records (`tracks/<id>`), all on GL, and its three films. C8 opened
+(CT-0081) with its audit; the C6b review stays in the backlog.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional

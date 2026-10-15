@@ -366,6 +366,13 @@ against the true move). Its leftovers are listed in `CT-0080`.
 
 ### C8. Signals from models and from 3D
 
+In progress (`CT-0081`): the audit done first -- the contract already tells
+metric from relative depth by camera, but not geometric from estimated once
+aligned; `signal.read` reads one frame; no adapter runs a model or renders
+Blender into the graph; alignment flickers per frame; depth merges per pixel;
+nothing on GL; nothing exposed. A sequence from it. The C6b review stays in
+the backlog (the user, 2026-10-15).
+
 - What: depth and segmentation as signals, from a model run on a picture
   (depth estimation, a segment-anything model) or from Blender passes (Z,
   object index, alpha); the user's "integrate Blender renders into the

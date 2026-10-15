@@ -44,6 +44,9 @@ is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
 CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
 
+- `CT-0081` — C8: signals from models and from 3D, the audit -- the
+  contract (geometric, estimated, aligned depth), records with provenance,
+  the Blender and model adapters, a sequence (`doing`)
 - `CT-0080` — C7: time and track -- the audit, the remap's meaning, source
   against timeline time, retimed sound, exposure, tracks as records, GL, and
   the three done-when films (`done`)
