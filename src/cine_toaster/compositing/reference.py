@@ -30,6 +30,7 @@ from typing import Any, Callable
 import numpy as np
 
 from ..errors import ValidationError
+from ..timebase import ffmpeg_rate, seek
 from .schema import validate
 from .semantics import blur_kernel, hue_turn, pixels, screen_channel, threshold_spread
 from .semantics import default as semantic_default
@@ -185,8 +186,8 @@ def _input(path: Path, fps: float, start: float, still: bool) -> list[str]:
 
         found = _frames(target)
         first = int(re.findall(r"(\d+)", found[0].stem)[-1]) if found else 1
-        return ["-framerate", f"{fps:g}", "-start_number", str(first), "-i", target]
-    return (["-loop", "1", "-framerate", f"{fps:g}"] if still else ["-ss", f"{start:.4f}"]) + ["-i", target]
+        return ["-framerate", ffmpeg_rate(fps), "-start_number", str(first), "-i", target]
+    return (["-loop", "1", "-framerate", ffmpeg_rate(fps)] if still else ["-ss", seek(start)]) + ["-i", target]
 
 
 def read(path: Path, frames: int, size: tuple[int, int], fps: float, *, start: float = 0.0,
@@ -226,11 +227,11 @@ def read(path: Path, frames: int, size: tuple[int, int], fps: float, *, start: f
         # rule (`conform_box`).
         fitted_width, fitted_height, x, y = conform_box(source_width, source_height, width, height)
         command = [_ffmpeg(), "-loglevel", "error", *_input(Path(path), fps, start, still), "-frames:v", str(frames),
-                   "-vf", f"{retime}fps={fps:g},format=gbrapf32le", "-f", "rawvideo", "-pix_fmt", "gbrapf32le", "-"]
+                   "-vf", f"{retime}fps={ffmpeg_rate(fps)},format=gbrapf32le", "-f", "rawvideo", "-pix_fmt", "gbrapf32le", "-"]
         frame_bytes, dtype = source_width * source_height * 4 * 4, "<f4"
     else:
         command = [_ffmpeg(), "-loglevel", "error", *_input(Path(path), fps, start, still), "-frames:v", str(frames),
-                   "-vf", f"{retime}fps={fps:g},format=rgba64le,{conform_filter(width, height, transparent=True)}",
+                   "-vf", f"{retime}fps={ffmpeg_rate(fps)},format=rgba64le,{conform_filter(width, height, transparent=True)}",
                    "-f", "rawvideo", "-pix_fmt", "rgba64le", "-"]
         frame_bytes, dtype = width * height * 4 * 2, "<u2"
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -315,7 +316,7 @@ def write(pictures: Any, destination: Path, fps: float, *, working: str = LINEAR
     height, width = first.shape[:2]
     process = subprocess.Popen(
         [_ffmpeg(), "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb48le", "-s", f"{width}x{height}",
-         "-r", f"{fps:g}", "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", quality[1], "-pix_fmt", quality[0],
+         "-r", ffmpeg_rate(fps), "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", quality[1], "-pix_fmt", quality[0],
          str(destination)], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         for picture in _chain(first, frames):

@@ -58,6 +58,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from . import timebase
 from .cards import is_card, recipe as card_recipe
 from .errors import ValidationError
 
@@ -191,13 +192,13 @@ def probe(path: Path) -> dict[str, Any]:
     streams = data.get("streams") or []
     video = next((s for s in streams if s.get("codec_type") == "video"), {})
     rate = video.get("r_frame_rate") or f"{FPS}/1"
-    numerator, _, denominator = rate.partition("/")
     return {
         "duration": float((data.get("format") or {}).get("duration") or 0.0),
         "audio": any(s.get("codec_type") == "audio" for s in streams),
         "width": int(video.get("width") or 1280),
         "height": int(video.get("height") or 720),
-        "fps": round(float(numerator) / float(denominator or 1), 3) if numerator else FPS,
+        # The rate as the file says it, a fraction: 30000/1001 stays NTSC (CT-0079), never 29.97 rounded.
+        "fps": float(timebase.rate(rate)) if not rate.startswith("0") else FPS,
     }
 
 
@@ -439,6 +440,14 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         plan.segments.append(segment)
     if not plan.segments:
         raise ValidationError(f"{scene['id']} has no shot with a take to assemble")
+    for segment in plan.segments:
+        if segment.media and not segment.still:
+            # A cut point is a frame boundary of the take (CT-0079): the picture starts on a whole frame, so the
+            # sound must start at that frame too, not at the second the shot names.
+            grid = probe(root / segment.media)["fps"]
+            start, end = timebase.snap(segment.start, grid), timebase.snap(segment.end, grid)
+            if end > start:
+                segment.start, segment.end = start, end
     if framed:
         plain = [note.replace(" is reframed on ", ": ").replace(", from the plan", "") for note in framed if ";" not in note]
         plan.notes.append("Reframed on each shot's subject, from the plan -- " + ", ".join(plain) + ".")
@@ -694,7 +703,7 @@ def _draw_shot(root: Path, segment: Segment, destination: Path, first: dict[str,
     # A take whose voice was converted is heard converted.
     heard = Path(segment.sound) if segment.sound else (root / segment.media if segment.media else None)
     if heard is not None and probe(heard).get("audio"):
-        sound = ["-ss", f"{segment.start:.3f}", "-t", f"{length:.3f}", "-i", str(heard)]
+        sound = ["-ss", timebase.seek(segment.start), "-t", f"{length:.6f}", "-i", str(heard)]
     else:
         sound = ["-f", "lavfi", "-t", f"{length:.3f}", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"]
     run_process(["ffmpeg", "-y", "-loglevel", "error", "-i", str(piece), *sound, "-map", "0:v:0", "-map", "1:a:0",
@@ -817,7 +826,7 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
             length = segment.end - segment.start
             run_process(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i",
                          f"color=c={segment.method.split(':', 1)[1]}:s={first['width'] // 2 * 2}x{first['height'] // 2 * 2}"
-                         f":r={round(fps) or FPS}:d={length:.3f}", "-f", "lavfi", "-t", f"{length:.3f}", "-i",
+                         f":r={timebase.ffmpeg_rate(fps)}:d={length:.6f}", "-f", "lavfi", "-t", f"{length:.3f}", "-i",
                          "anullsrc=channel_layout=stereo:sample_rate=48000", "-shortest", "-c:v", "libx264",
                          "-pix_fmt", "yuv420p", "-c:a", "aac", str(solid)],
                         expected_seconds=length, message=f"{segment.shot}: {segment.method.split(':', 1)[1]} screen")
@@ -836,9 +845,10 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
             pictures.append(Path(segment.piece))
             count[index] = _frames_in(Path(segment.piece)) or max(1, round(length * fps))
             continue
-        run_process([ffmpeg, "-y", "-loglevel", "error", "-ss", f"{segment.start:.3f}", "-t", f"{length:.3f}",
-                     "-i", str(source), "-map", "0:v:0",
-                     "-vf", conform_filter(width, height, transparent=False) + f",fps={fps},format=yuv420p",
+        # From the frame the cut point is (snapped when planned); the frame count bounds the piece.
+        run_process([ffmpeg, "-y", "-loglevel", "error", "-ss", timebase.seek(segment.start),
+                     "-t", f"{length + 2 / fps:.6f}", "-i", str(source), "-map", "0:v:0",
+                     "-vf", conform_filter(width, height, transparent=False) + f",fps={timebase.ffmpeg_rate(fps)},format=yuv420p",
                      "-frames:v", str(max(1, round(length * fps))), "-an", "-c:v", "libx264", "-preset", "veryfast",
                      "-crf", "18", str(picture)],
                     expected_seconds=length, message=f"Cutting {segment.shot}",
@@ -877,12 +887,13 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
             lead[index] = split
         else:
             trail[index - 1] = split
-    starts, clock = [], 0.0
+    # Where each piece starts, counted in frames and turned into seconds once: exact at any rate (CT-0079).
+    starts, frames_in = [], 0
     for index in range(total):
-        clock -= overlap[index] / fps
-        starts.append(clock)
-        clock += count[index] / fps
-    duration = clock
+        frames_in -= overlap[index]
+        starts.append(float(timebase.seconds_of(frames_in, fps)))
+        frames_in += count[index]
+    duration = float(timebase.seconds_of(frames_in, fps))
     plan_duration_frames = round(duration * fps)
     for index, segment in enumerate(plan.segments):
         source = Path(segment.source) if segment.source else root / segment.media
@@ -913,15 +924,17 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
         fades += [f"volume=0:enable='between(t,{a - clip_start:.3f},{b - clip_start:.3f})'" for a, b in segment.mute
                   if b > clip_start]
         clip = work / f"sound-{index:03d}.wav"
+        # The span in samples, from the same frame boundaries as the picture (CT-0079).
+        span_samples = timebase.samples(span_seconds)
         if has_audio:
-            command = [ffmpeg, "-y", "-loglevel", "error", "-ss", f"{segment.start - before:.3f}",
-                       "-t", f"{span_seconds:.3f}", "-i", str(sound or source), "-map", "0:a:0"]
+            command = [ffmpeg, "-y", "-loglevel", "error", "-ss", timebase.seek(segment.start - before),
+                       "-t", f"{span_seconds + 0.1:.6f}", "-i", str(sound or source), "-map", "0:a:0"]
         else:
-            command = [ffmpeg, "-y", "-loglevel", "error", "-f", "lavfi", "-t", f"{span_seconds:.3f}",
+            command = [ffmpeg, "-y", "-loglevel", "error", "-f", "lavfi", "-t", f"{span_seconds + 0.1:.6f}",
                        "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"]
         run_process(command + ["-af", ",".join([f"volume={gain}dB", "aresample=48000",
                                                  "aformat=sample_fmts=fltp:channel_layouts=stereo",
-                                                 f"apad=whole_dur={span_seconds:.3f}", f"atrim=0:{span_seconds:.3f}",
+                                                 f"apad=whole_len={span_samples}", f"atrim=end_sample={span_samples}",
                                                  *fades]),
                                "-ar", "48000", "-ac", "2", str(clip)],
                     expected_seconds=span_seconds, message=f"{segment.shot}: its sound",
@@ -974,12 +987,13 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
         picture = captioned
     mixed = work / "sound.wav"
     inputs = [part for clip, _ in sounds for part in ("-i", str(clip))]
-    delays = ";".join(f"[{index}:a]adelay={int(round(at * 1000))}:all=1[s{index}]"
+    # Each sound at its sample, not its millisecond (CT-0079).
+    delays = ";".join(f"[{index}:a]adelay={timebase.samples(at)}S:all=1[s{index}]"
                       for index, (_, at) in enumerate(sounds))
     labels = "".join(f"[s{index}]" for index in range(len(sounds)))
     run_process([ffmpeg, "-y", "-loglevel", "error", *inputs, "-filter_complex",
                  f"{delays};{labels}amix=inputs={len(sounds)}:normalize=0:duration=longest,"
-                 f"apad=whole_dur={duration:.3f},atrim=0:{duration:.3f}[a]",
+                 f"apad=whole_len={timebase.samples(duration)},atrim=end_sample={timebase.samples(duration)}[a]",
                  "-map", "[a]", "-ar", "48000", "-ac", "2", str(mixed)],
                 message="Laying the takes' sound", span=within(0.9, 0.92))
     joined = work / "joined.mp4" if plan.cues else output
@@ -1135,7 +1149,7 @@ def _join_pictures(ffmpeg: str, plan: Plan, pictures: list[Path], count: list[in
     """The pieces joined: straight cuts, and each transition as its own clip between the bodies."""
 
     destination = work / "picture.mp4"
-    encode = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-r", f"{fps:g}"]
+    encode = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-r", timebase.ffmpeg_rate(fps)]
     pieces: list[Path] = []
     total = len(pictures)
     for index, picture in enumerate(pictures):

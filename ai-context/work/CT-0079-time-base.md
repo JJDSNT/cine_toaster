@@ -124,16 +124,102 @@ a 30000/1001 take in a 24 fps cut, 44.1 kHz sound in a 48 kHz film, OTIO
 exchange with FilmCraft -- to be decided after the remeasurement, as the
 user's review recommends.
 
-# Proposal (to do before C7, if the user agrees)
+# The fixes (done 2026-10-15, authorised by the user)
 
-1. `probe` keeps `r_frame_rate` as a `Fraction`; the cut is written at it.
-2. The plan's cut points snapped to the take's frame grid when planned
-   (whole frames, half-open: a start and a length); picture and sound cut
-   from the same snapped instants -- the picture by frame count, the sound
-   by sample count (`atrim` by samples, `adelay=...S`).
-3. The regression tests of the table, from `scripts/research/time_drift.py`.
-4. Remeasure; then decide on ticks (`TICKS_PER_SECOND = 254_016_000_000`,
-   half-open `TimeRange`) for mixed rates and exchange.
+The user: implement the three fixes with their regression tests and a new
+measurement, validating the engine on PCM before any lossy codec; keep one
+time interface so ticks could replace it without touching the operators; and
+**do not close the time-base question because Fraction passed the tests** --
+decide it explicitly before C7.
+
+- `cine_toaster/timebase.py`, the one interface: `rate` (an exact fraction
+  from "30000/1001", "29.97", 29.97 or a float of a fraction -- the nearest
+  fraction with a denominator up to 1001, NTSC recognised), `ffmpeg_rate`,
+  `frame_at`, `seconds_of`, `snap`, `samples_of_frames` (positions from the
+  frame count, rounded once: never summed per frame), `samples`, `seek`
+  (floored to the microsecond, so the frame starting there is read).
+- Rate: `probe` keeps the file's fraction; every rate handed to FFmpeg in
+  the assembly and the reference (`-r`, `fps=`, `-framerate`) is a fraction.
+- Frame grid: `plan_scene` snaps every take's cut points to the take's grid;
+  pieces start where counted in frames (`seconds_of`), and every seek is
+  `seek`.
+- Samples: each shot's sound trimmed and padded by samples
+  (`atrim=end_sample`, `apad=whole_len`) and laid with `adelay=...S`; the
+  mix's length in samples.
+
+# Remeasured
+
+The engine (the joined picture's frame numbers against the PCM mix) and the
+delivery (the cut's AAC) agree in every run: FFmpeg's decoder removes AAC's
+priming, so the codec adds nothing measurable here.
+
+| Rate | Film | Rate written | Click minus flash (samples) | Trend |
+|---|---|---|---|---|
+| 24 | 10 shots | 24 | **0** in every shot (was -800) | 0 |
+| 30000/1001 | 40 shots | **30000/1001** (was 2997/100) | **-0.4 to +0.4** (was -780) | none |
+| 30000/1001 | **an hour**: 6 takes of 10 min, a flash every 300 frames (360) | 30000/1001 | the assembly adds **-0.4 to +0.4** per click | 0.3 samples an hour |
+| 25, 20 (on the grid), 24000/1001 | 4 shots each (tests) | as given | within 0.5 | -- |
+
++/-0.4 samples is the grid's own limit: an NTSC frame is 1601.6 samples, so
+its boundaries fall between samples, and a shot's sound can only start on a
+whole one.
+
+**The instrument made exact** (the user's review: the meter must be more
+precise than what it measures; the one-sample goal kept, not loosened). The
+first hour-long run showed a 1.4-sample maximum; the takes themselves
+carried up to one sample, from `aevalsrc`'s `mod(t, 10.01)` in floating
+point. The clicks are now made by whole sample index (`n`): frame 20 and
+every 300 frames after fall on whole samples at every rate measured (32,032
++ 480,480 k at 30000/1001), and a rate where they would not is refused.
+Re-run: the takes exact (0 samples); the cut's clicks take exactly five
+values, -0.4, -0.2, 0, +0.2, +0.4 -- the fractional parts of 1601.6 per
+frame -- so **every click is within half a sample, by construction**: each
+shot's sound is placed from its frame count, rounded once.
+
+A fitted "trend" of 0.33 +/- 0.04 samples an hour remains, and is not a
+drift: the errors are not noise but a deterministic pattern bounded by
++/-0.5 (positions are computed absolutely, never summed), so a line fitted
+through it reflects where the pattern's values fall in the hour, and its
+standard error -- which assumes independent noise -- does not apply. Over
+any length the error cannot leave +/-0.5 samples (10.4 microseconds).
+
+# Fraction or ticks -- to decide before C7
+
+Open, as the user asked. What each would be in Cine Toaster:
+
+| | `Fraction` (now, behind `timebase`) | FilmCraft's ticks (254,016,000,000 a second) |
+|---|---|---|
+| Exact for | any rate and any instant | every broadcast rate and common sample rate; not, say, 11 fps |
+| Mixed rates (a 25 take in a 24 cut; 44.1 kHz in 48 kHz) | exact, by construction | exact, one integer for both |
+| Records and caches | needs a text form ("1001/30000") in YAML and JSON | one integer: sortable, hashable, compact |
+| Exchange | OTIO's RationalTime is (value, rate) -- converts from either; with FilmCraft/EffectCraft, ticks are theirs, lossless | |
+| Speed | slow per operation, at planning scale irrelevant; not in per-pixel code | integer arithmetic |
+| Where it would live | in memory, at the boundaries of `timebase` | in records and in memory |
+
+What C7 adds to weigh: tracks (a sample per frame, often at the source's
+own rate), retiming (`time.remap`: an instant per output frame, not on the
+input's grid), sync of several sources -- all instants that are stored, compared
+and exchanged, not only computed. That is where an integer is worth more
+than a fraction: a track written today and read by FilmCraft tomorrow.
+
+**Coverage of FilmCraft's base**, checked: 254,016,000,000 = 2^12 x 3^4 x
+5^6 x 7^2. Exact for every frame rate Cine Toaster meets -- 8, 10, 12 (the
+demo), 15, 16 (generated video), 20, 24, 25, 30, 48, 50, 60, 120 and the
+/1001 family -- and every common sample rate (8 to 192 kHz, the 44.1 family
+included). Not for rates with another prime (11 or 13 fps): a take at such a
+rate would be read at its own fraction and placed on the film's grid, never
+stored in its own ticks.
+
+The user's review agreed on keeping both (Fraction to compute exactly,
+ticks to store and exchange), with the decision taken on the whole graph's
+time model -- curves, keys, layer offsets and tracks in C7 -- not only the
+assembly's. A recommendation, for the user to decide: **ticks as the stored and
+exchanged form** -- records machines write (tracks, retime curves, cut
+points of a version, cache identities) and OTIO/FilmCraft exchange --
+**exact fractions in memory**, both only through `timebase` (`to_ticks`,
+`from_ticks`); a person's YAML keeps seconds, frames or timecode, converted
+once on reading, as FilmCraft does. The graph's curves keep sampling at frame
+centres in seconds: they draw pictures, they are not edit points.
 
 # Done
 
@@ -144,8 +230,19 @@ user's review recommends.
 - Natron (CT-0078), checked again at the review's request: its round-trip
   test already uses premultiplied random alpha (transparent edges included)
   and values to 3x white; exact to half-float precision.
+- The three fixes, the regression tests (`tests/test_timebase.py`) and the
+  remeasurement, including an hour at 30000/1001.
 
 # Validation
 
-- The measurement script reproduces the table; the full suite (823 tests)
-  passed before this record, which changes no code.
+- `tests/test_timebase.py`: a rate is an exact fraction however written;
+  FFmpeg is told the fraction; cut points snap; sound positions from frames
+  stay within half a sample over an hour; a seek never passes its instant;
+  a cut at 24, 25, 20 (a trim on the grid), 24000/1001 and 30000/1001 keeps
+  its rate and lays every click within half a sample of its flash, in the
+  PCM mix and in the delivered AAC.
+- Full suite: 829 tests; `test_stems` failed once more at exactly its 0.5 dB
+  bound (the intermittent test recorded in the roadmap) and passed three
+  runs alone.
+- `scripts/research/time_drift.py` reproduces the tables (an hour: `<folder>
+  6 30000/1001 600 300`).

@@ -78,9 +78,10 @@ styles as recipes with a bevel, colour fonts, and Lottie read as a source by
 ThorVG are done; the user's review of the chrome and colour fonts (the
 ColorFonts look, not emoji; glints optional) is recorded to return to.
 Then (the user's order): OpenFX into the shot's one graph (done), the time
-base researched (CT-0079: measured -- cut points off the frame grid put the
-sound half a frame ahead, and NTSC rates are rounded; a proposal of integer
-ticks, rational rates and snapped half-open ranges awaits the user), then C7.
+base (CT-0079: three faults measured and fixed -- cut points on the frame
+grid, rates as fractions, sound in samples, through one `timebase` module;
+every click within half a sample over an hour at 30000/1001), then the
+Fraction-or-ticks decision, open by the user's wish, then C7.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional

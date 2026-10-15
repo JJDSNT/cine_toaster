@@ -44,10 +44,10 @@ is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
 CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
 
-- `CT-0079` — research: the time base -- FilmCraft's integer ticks against
-  our seconds; measured: every take's 0.35 s trim puts the sound half a frame
-  ahead of the picture, and 30000/1001 is written as 2997/100; a proposal
-  before C7 (`doing`)
+- `CT-0079` — the time base: three faults measured and fixed (cut points on
+  the frame grid, rates as fractions, sound in samples, `timebase.py`); every
+  click within half a sample over an hour at 30000/1001; Fraction or ticks
+  to decide before C7 (`doing`)
 - `CT-0078` — C6b: rich typography; stages A-D done (letters with their
   own time, styles, colour fonts, Lottie as a source); the user's review of
   B and C to return to (`doing`)
