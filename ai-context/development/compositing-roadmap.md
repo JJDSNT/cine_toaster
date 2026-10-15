@@ -294,8 +294,12 @@ In progress (`CT-0078`), in stages: A per-letter animation (done: an animator
 on `generate.text`, three title items); B styles (done: fills, outlines,
 cycling, glow, shadow exposed from the graph, a bevel primitive, gradients
 with stops; `chrome`, `colour-font`); C colour fonts (done: COLR and bitmap
-glyphs -- emoji -- in their own colours, any title by its `font`); D Lottie
-as an input.
+glyphs in their own colours, any title by its `font`); D Lottie as an
+input (done: a format every source reads, drawn by ThorVG -- layers,
+elements, fills, both renderers). **To return to** (the user's review, 2026-10-15, in `CT-0078`): the
+goal is the ColorFonts *look* (material lettering), not emoji nor the Amiga
+format; demonstrate with decorative OFL colour typefaces; `chrome` still by
+default, glints an option; check the chrome against real Kara images.
 
 Also to investigate here: **Lottie as an input** -- ready motion graphics
 as a layer source with alpha, then a partial conversion into the graph

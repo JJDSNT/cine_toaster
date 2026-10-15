@@ -44,8 +44,9 @@ is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
 CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
 
-- `CT-0078` — C6b: rich typography; stage A done (letters with their own
-  time), B-D to come (`doing`)
+- `CT-0078` — C6b: rich typography; stages A-D done (letters with their
+  own time, styles, colour fonts, Lottie as a source); the user's review of
+  B and C to return to (`doing`)
 - `CT-0077` — C6: the catalogs re-expressed -- effects, looks, elements and
   titles drawn by the one engine, on GL; no FFmpeg compositing chain left
   (`done`)

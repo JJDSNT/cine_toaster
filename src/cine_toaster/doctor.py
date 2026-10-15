@@ -440,6 +440,25 @@ def _colour_fonts() -> Capability:
     )
 
 
+def _lottie() -> Capability:
+    from .compositing.lottie import REMEDY, available
+
+    ok = available()
+    version = ""
+    if ok:
+        from importlib.metadata import version as installed
+
+        version = f"thorvg-python {installed('thorvg-python')}"
+    return Capability(
+        name="Lottie",
+        what_it_enables="Lottie animations (JSON, dotLottie) as a source: a layer, an element, a title's fill",
+        required=False,
+        status=OK if ok else MISSING,
+        detail=version,
+        remedy="" if ok else REMEDY,
+    )
+
+
 def _beats() -> Capability:
     from .voice import voice_python
 
@@ -477,6 +496,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _sound_sources,
     _beats,
     _colour_fonts,
+    _lottie,
     # Detected, not yet used. See `report`.
     _sox,
     _blender,

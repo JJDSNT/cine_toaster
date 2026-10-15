@@ -202,6 +202,12 @@ def read(path: Path, frames: int, size: tuple[int, int], fps: float, *, start: f
 
     import tempfile
 
+    from . import lottie
+
+    if lottie.is_lottie(Path(path)):
+        # Motion graphics drawn by their own renderer (C6b stage D): the clip a PNG sequence would be.
+        return Clip(lottie.read(Path(path), frames, size, fps, start=start, stretch_to=stretch_to, hold=hold),
+                    colorspace or ENCODED, alpha or "straight", working)
     width, height = size
     still = Path(path).suffix.lower() in (".png", ".jpg", ".jpeg", ".webp", ".exr", ".tif", ".tiff") \
         and "%" not in str(path)

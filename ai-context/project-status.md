@@ -73,7 +73,11 @@ titles all draw through one compositing engine, on GL; no FFmpeg filter chain
 composites a picture; Blender stays a renderer whose clips the graph lays.
 ADR 0022 separates what the graph supports from what the records expose.
 The frame-access range rule is met: float sources keep their light above white
-into the graph. Next: C6b or C7.
+into the graph. C6b (CT-0078) is in progress: letters with their own time,
+styles as recipes with a bevel, colour fonts, and Lottie read as a source by
+ThorVG are done; the user's review of the chrome and colour fonts (the
+ColorFonts look, not emoji; glints optional) is recorded to return to.
+Next: that review, then C7.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional

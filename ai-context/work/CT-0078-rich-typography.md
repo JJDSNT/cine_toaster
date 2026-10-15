@@ -101,6 +101,65 @@ lacked:
   (OT-SVG fonts draw as plain ones), and a colour font's letters under the
   letter animator (drawn in `colour`).
 
+## Stage D -- Lottie as an input (spike, then adopted)
+
+- **The spike**: three engines on ten files -- a probe made here (an eased
+  square fading in) and nine samples from rlottie's and lottie-web's
+  repositories (MIT): fills, masks, strokes, a gradient background, a
+  loader, confetti, a star, an illustration, two lottie-web demos.
+  - ThorVG (`thorvg-python` 1.1.3, LGPL 2.1 binding of the MIT engine):
+    read all ten; 0.7 to 6 ms a frame at 480 pixels; draws text layers.
+  - rlottie (`rlottie-python`, LGPL): read all ten, agreed with ThorVG on
+    the probe to the pixel; slower on heavy files (confetti 37 ms against
+    6); leaves text layers out; differs from ThorVG on a mask sample, the
+    confetti's opacity and the star's stroke.
+  - Skottie: `skia-python` (BSD) does not expose it -- out.
+  - `python-lottie` stays out (AGPL).
+- **Adopted: ThorVG, as a source format**, not a node: every file a graph
+  reads goes through `reference.read`, which now hands a Lottie file (JSON,
+  or a dotLottie archive's first animation) to the adapter
+  `compositing/lottie.py`. It draws each frame with straight alpha in the
+  display encoding -- the clip a PNG sequence becomes -- fitted by
+  `conform_box`. So layers, elements, a title's fill and both renderers take
+  it with nothing new to expose (ADR 0022). It plays at its own frame rate;
+  `start`, `hold` and `stretch_to` work as for a clip.
+- `toast doctor`: "Lottie", with the remedy; the extra `motion`.
+- A demonstration: rlottie's confetti and star as two layers over the demo's
+  sun (scratch, not committed: samples from LottieFiles, through rlottie).
+- Left, recorded in `development/roadmap.md` with how: step 2 (converting
+  what our primitives express into the graph), looping, which of the two
+  engines is right where they differ, fonts for text layers.
+
+## Review of stages B and C (the user, 2026-10-15) -- to return to
+
+The user's observations, kept with ours so the work comes back to them:
+
+- **Colour fonts were mixed up with emoji support.** The reference is the
+  Kara ColorFonts look: lettering drawn with a material -- chrome, gold,
+  stone -- its gradients, reflections, bevel and rim part of the type's own
+  drawing. Emoji use the same technology (COLR, CBDT) for another purpose;
+  they come free with stage C but are not its goal, and the demonstration
+  should not have been made with them.
+- **The glints are not part of such fonts** (interesting, but not standard):
+  ColorFonts were still; animation belonged to AnimFonts or to the edit.
+  Putting them in `chrome` by default went past the reference.
+- **The goal is the look, not the format**: reading the Amiga's original
+  ColorFont files (bitplane bitmaps) is not wanted.
+- Ours: the three references sent (Google image searches for 1980s chrome
+  and Kara Fonts chrome) could not be read by the tools, so the chrome was
+  built from known traits -- which widened the drift. Images sent as files
+  would serve as the reference.
+
+What to do when this is taken up:
+
+1. Demonstrate and test stage C with real decorative colour typefaces under
+   the OFL (Nabla, Bungee Spice, Honk), not emoji; documentation names emoji
+   a by-product.
+2. `chrome` still by default, as a ColorFont is; glints stay a style option
+   (`glints`), in an item of their own (say `chrome-sparkle`) or off.
+3. Compare our `chrome` with real Kara chrome lettering (images from the
+   user) before calling the look right.
+
 # Decisions
 
 - **The animator belongs to the node**, not to curve nodes: each letter needs
@@ -110,6 +169,9 @@ lacked:
 - **A style is recipes, not an effect**: only the bevel was missing from the
   engine; the rest is the letters as a matte and their alpha blurred, moved
   and filled.
+- **Lottie is a format a source reads, not a node**: the graph already
+  reads files with alpha; a node of its own would have been a second way
+  in (ADR 0022). ThorVG over rlottie for speed and text layers.
 - **A colour font keeps its colours** and takes only the text colour's
   opacity: a title's default colour is an off-white that would otherwise
   dim every colour font (found by the title test); browsers do the same.
@@ -150,3 +212,11 @@ lacked:
   places an outline by the glyph's left side bearing, which the script had
   left at zero.
 - Full suite after stage C: 806 tests pass.
+- Stage D (`tests/test_lottie.py`): a Lottie file is told from other JSON;
+  it plays with its transparency, eased fade and move, its colour decoded;
+  it keeps its own frame rate under the film's; it holds its last frame or
+  is gone; it stretches over another length; it is fitted as any picture;
+  a dotLottie archive is read; a layer takes it over a picture; without
+  ThorVG it says what to install. GL draws a Lottie layer as the reference
+  does (mean difference 1e-7, by hand).
+- Full suite after stage D: 815 tests pass.

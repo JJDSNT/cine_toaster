@@ -336,6 +336,22 @@ Neither changes the direction; each is used at the edges (`references.md`).
   primitives express (shapes, transforms, keys and their Bézier eases,
   masks) into the graph, so it can be changed and combined -- never a second
   animation engine beside the graph. Export stays out of scope.
+  **Step 1 done** (CT-0078 stage D): a Lottie file is a format every source
+  reads, drawn by ThorVG. Left from it, each with how:
+  - *Step 2*, as above: start with shape layers (paths, fills, strokes,
+    transforms, keys with their eases) into `matte.shape`, `generate.solid`,
+    `warp.transform` and `curve.keys`; whatever is not converted stays drawn
+    by ThorVG as a source, so a file is never half lost.
+  - *Looping*: an animation shorter than its layer holds or ends; a `loop`
+    on the source (frames taken modulo its length in the adapter) would
+    repeat it.
+  - *Which engine is right where ThorVG and rlottie differ* (a mask sample,
+    the confetti's opacity, a star's stroke): draw the same frames with
+    lottie-web in headless Chromium (Playwright is already the splat
+    extra) and compare, before trusting either on masks.
+  - *Text layers' fonts*: ThorVG draws text layers whose glyphs the file
+    carries; one naming a system font needs the font loaded into ThorVG
+    (its font loader) -- not checked yet.
 
 ### An intermittent test (found 2026-10-15, CT-0078)
 
