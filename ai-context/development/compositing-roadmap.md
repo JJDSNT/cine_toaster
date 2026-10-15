@@ -336,6 +336,10 @@ prescribed here.
 
 ### C7. Time and track
 
+In progress (`CT-0080`): the audit done first -- the remap stutters and reads
+no further than the shot, there is no blending between source frames, tracks
+have no clock, sound ignores a retime, nothing is exposed; a sequence from it.
+
 - What: retime, speed ramp, freeze, reverse, frame blending, an offset
   between layers, trails and echoes (the ADO's Infinity). Point and planar
   tracking (OpenCV, permissive) whose data drives a warp or a matte.

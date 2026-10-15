@@ -82,7 +82,9 @@ base (CT-0079: three faults measured and fixed -- cut points on the frame
 grid, rates as fractions, sound in samples, through one `timebase` module;
 every click within half a sample over an hour at 30000/1001) and ADR 0023
 (fractions to compute, ticks to store and exchange, the media clock's
-contract for C9b). Next: C7, its time records in ticks.
+contract for C9b). C7 opened (CT-0080) with its audit: what the graph
+supports, what is exposed, what is new, and how source and timeline time
+are told apart; nothing built before the user reads the diagnosis.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional
