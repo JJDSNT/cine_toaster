@@ -1,3 +1,17 @@
+---
+id: CT-0091
+title: Creative context Core inventory and UX contract
+type: work
+status: review
+owner: unassigned
+created_at: 2026-10-08
+updated_at: 2026-10-15
+tags:
+  - ux
+  - creative-context
+  - core
+  - audit
+---
 # CT-0091 — Creative context Core inventory and UX contract
 
 Status: investigation, not implementation approval. 2026-10-08.

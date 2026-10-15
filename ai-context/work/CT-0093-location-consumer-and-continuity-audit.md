@@ -1,3 +1,17 @@
+---
+id: CT-0093
+title: Location consumer trace and spatial continuity (CT-0092's addendum)
+type: work
+status: review
+owner: unassigned
+created_at: 2026-10-08
+updated_at: 2026-10-15
+tags:
+  - locations
+  - continuity
+  - audit
+  - research
+---
 # CT-0092 addendum — Location consumer trace and spatial continuity
 
 Date: 2026-10-08. Research only; no schema change.

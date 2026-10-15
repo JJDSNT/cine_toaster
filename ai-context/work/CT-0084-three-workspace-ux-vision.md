@@ -2,10 +2,10 @@
 id: CT-0084
 title: Three-workspace UX vision and validation
 type: work
-status: proposed
+status: ready
 owner: unassigned
 created_at: 2026-10-08
-updated_at: 2026-10-08
+updated_at: 2026-10-15
 tags:
   - ux
   - workspaces

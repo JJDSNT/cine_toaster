@@ -1,6 +1,20 @@
+---
+id: CT-0094
+title: Model-dependent mood and visual identity
+type: work
+status: review
+owner: unassigned
+created_at: 2026-10-08
+updated_at: 2026-10-15
+tags:
+  - visual-identity
+  - mood
+  - models
+  - research
+---
 # CT-0094 — Model-dependent mood and visual identity
 
-Status: research / discovery, 2026-10-08. Parent research: contextual filmmaker UX (CT-0084–CT-0091). Related: CT-0092/75, moodboard visual style investigation.
+Status: research / discovery, 2026-10-08. Parent research: contextual filmmaker UX (CT-0084–CT-0091). Related: CT-0092/93, moodboard visual style investigation.
 
 ## Production observation
 

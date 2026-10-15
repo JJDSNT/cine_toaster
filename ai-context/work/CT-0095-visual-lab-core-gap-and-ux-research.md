@@ -1,6 +1,20 @@
+---
+id: CT-0095
+title: "Visual Lab: Core gap and UX research"
+type: work
+status: review
+owner: unassigned
+created_at: 2026-10-08
+updated_at: 2026-10-15
+tags:
+  - visual-lab
+  - ux
+  - core
+  - research
+---
 # CT-0095 — Visual Lab: Core gap and UX research
 
-Status: research, 2026-10-08. UX-first; no feature/schema approved. Related CT-0084–73, CT-0094.
+Status: research, 2026-10-08. UX-first; no feature/schema approved. Related CT-0084–91, CT-0094.
 
 ## Goal
 

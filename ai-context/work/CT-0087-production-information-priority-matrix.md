@@ -2,10 +2,10 @@
 id: CT-0087
 title: Production workspace — task and information priority matrix
 type: work
-status: proposed
+status: review
 owner: unassigned
 created_at: 2026-10-08
-updated_at: 2026-10-08
+updated_at: 2026-10-15
 tags:
   - ux
   - production

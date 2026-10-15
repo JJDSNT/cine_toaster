@@ -2,10 +2,10 @@
 id: CT-0088
 title: Production Awareness — human situation awareness and explainable status
 type: work
-status: proposed
+status: review
 owner: unassigned
 created_at: 2026-10-08
-updated_at: 2026-10-08
+updated_at: 2026-10-15
 tags:
   - ux
   - human-factors
@@ -104,7 +104,7 @@ Track correctness, time-to-find, false alarms, missed blockers, wrong-target act
 - [ ] Test a compact status-only variant against a state+consequence+action variant on real workflows.
 - [ ] Define attention rules, grouping and freshness; permit users to defer nonblocking notifications.
 - [ ] Test with representative filmmakers and record rejected patterns, not only successes.
-- [ ] Update CT-0085/0068/0069 and roadmap; create implementation work and ADRs only if results warrant.
+- [ ] Update CT-0085/0086/0069 and roadmap; create implementation work and ADRs only if results warrant.
 
 ## Explicit non-goals
 

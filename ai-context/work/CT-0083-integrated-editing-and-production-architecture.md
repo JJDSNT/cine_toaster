@@ -2,10 +2,10 @@
 id: CT-0083
 title: Integrated editing and production architecture — research and vision
 type: work
-status: proposed
+status: ready
 owner: unassigned
 created_at: 2026-10-08
-updated_at: 2026-10-08
+updated_at: 2026-10-15
 tags:
   - editing
   - post-production

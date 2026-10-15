@@ -2,10 +2,10 @@
 id: CT-0085
 title: Three-workspace low-fidelity wireframe — first UX study
 type: work
-status: proposed
+status: ready
 owner: unassigned
 created_at: 2026-10-08
-updated_at: 2026-10-08
+updated_at: 2026-10-15
 tags:
   - ux
   - wireframe

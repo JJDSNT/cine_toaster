@@ -2,10 +2,10 @@
 id: CT-0082
 title: Investigate Blender MCP and DCC-MCP as an agent-operated DCC interface
 type: work
-status: backlog
+status: ready
 owner: unassigned
 created_at: 2026-10-07
-updated_at: 2026-10-07
+updated_at: 2026-10-15
 tags:
   - blender
   - mcp

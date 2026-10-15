@@ -2,10 +2,10 @@
 id: CT-0086
 title: Human-centered information visibility and cognitive ergonomics research
 type: work
-status: proposed
+status: ready
 owner: unassigned
 created_at: 2026-10-08
-updated_at: 2026-10-08
+updated_at: 2026-10-15
 tags:
   - ux
   - research

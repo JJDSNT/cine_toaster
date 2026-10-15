@@ -1,3 +1,17 @@
+---
+id: CT-0090
+title: Contextual creative decisions and navigation research
+type: work
+status: review
+owner: unassigned
+created_at: 2026-10-08
+updated_at: 2026-10-15
+tags:
+  - ux
+  - creative-decisions
+  - navigation
+  - research
+---
 # CT-0090 — Contextual creative decisions and navigation research
 
 Status: research, not approved redesign. Date: 2026-10-08.

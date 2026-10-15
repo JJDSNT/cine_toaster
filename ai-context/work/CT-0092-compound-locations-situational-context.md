@@ -1,3 +1,17 @@
+---
+id: CT-0092
+title: Compound locations and situational context (Singular hospital)
+type: work
+status: review
+owner: unassigned
+created_at: 2026-10-08
+updated_at: 2026-10-15
+tags:
+  - locations
+  - continuity
+  - singular
+  - research
+---
 # CT-0092 — Compound locations and situational context (Singular hospital)
 
 Status: investigation; no Core schema or UX change approved. Date: 2026-10-08.

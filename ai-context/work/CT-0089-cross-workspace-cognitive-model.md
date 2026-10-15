@@ -1,3 +1,17 @@
+---
+id: CT-0089
+title: Cognitive ergonomics across the three workspaces
+type: work
+status: review
+owner: unassigned
+created_at: 2026-10-08
+updated_at: 2026-10-15
+tags:
+  - ux
+  - cognitive-ergonomics
+  - workspaces
+  - research
+---
 # CT-0089 — Cognitive ergonomics across the three workspaces
 
 Status: research proposal (2026-10-08). Complements CT-0084 through CT-0088. This is not a validated UX design.

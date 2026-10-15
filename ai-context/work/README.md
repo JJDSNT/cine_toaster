@@ -47,8 +47,10 @@ CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
 UX and creative-context research, made on `main` while the compositing
 work ran on its branch; renumbered on the merge of 2026-10-15 from
 CT-0064..CT-0077, which the branch had already used (each id keeps its
-meaning in the commits and code that cite it). Their frontmatter is as
-written there: some have none, some use `backlog` or `proposed`.
+meaning in the commits and code that cite it). Their frontmatter was
+normalised the same day: CT-0082..CT-0086 are `ready` (proposed, not
+started); CT-0087..CT-0095 are `review` (first findings written, awaiting
+the user's validation).
 
 - `CT-0095` — Visual Lab: Core gap and UX research
 - `CT-0094` — model-dependent mood and visual identity
