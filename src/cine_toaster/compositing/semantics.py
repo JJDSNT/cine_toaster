@@ -29,7 +29,8 @@ DEFAULTS: dict[str, dict[str, Any]] = {
     "colour.grade": {"lift": 0.0, "gain": 1.0, "gamma": 1.0, "saturation": 1.0},
     "filter.blur": {"radius": 0.0, "kind": "gaussian"},
     "generate.gradient": {"kind": "linear", "colours": [[0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0, 1.0]], "angle": 0.0},
-    "generate.source": {"colorspace": "sRGB Encoded Rec.709 (sRGB)", "alpha": "straight", "start": 0.0},
+    # A source's colour space and alpha are its file's convention unless said (`reference.read`, CT-0077).
+    "generate.source": {"start": 0.0},
     # A pulse per beat: rising over `attack` before it, falling over `decay` after it, each with its ease;
     # pulses that meet keep the higher (`max`) or add up to a full one (`add`) (C3, CT-0074).
     "curve.beats": {"attack": 0.02, "decay": 0.2, "every": 1, "low": 0.0, "high": 1.0,

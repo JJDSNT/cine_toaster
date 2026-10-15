@@ -140,6 +140,52 @@ def exr_to_display(pattern: str, output: Path, *, colorspace: str = LINEAR_SPACE
     return str(target), 1
 
 
+def exr_to_working(pattern: str, output: Path, *, colorspace: str = LINEAR_SPACE, lead: int = 0,
+                   loop_to: int = 0) -> str:
+    """A scene-linear EXR sequence in the compositing graph's working space, still float, its light above white
+    kept (SPEC-0012's range rule, CT-0077); `lead` transparent frames first (an element that starts later), and
+    the frames repeated until there are `loop_to` (a looping element).
+    Alpha stays premultiplied. Cached by the frames' names, sizes and times. Returns the new pattern."""
+
+    import numpy as np
+    import OpenEXR
+
+    frames = _frames(pattern)
+    if not frames:
+        raise ValidationError(f"No EXR frames match {pattern}")
+    hashed = hashlib.sha256(f"{colorspace}|{lead}|{loop_to}|working".encode())
+    for frame in frames:
+        stat = frame.stat()
+        hashed.update(f"{frame.name}{stat.st_size}{stat.st_mtime_ns}".encode())
+    folder = output / hashed.hexdigest()[:16]
+    target = folder / "f_%04d.exr"
+    if (folder / "done").is_file():
+        return str(target)
+    folder.mkdir(parents=True, exist_ok=True)
+    convert = None if colorspace == LINEAR_SPACE else _processor(colorspace, target=LINEAR_SPACE)
+
+    def write(index: int, pixels) -> None:
+        OpenEXR.File({"type": OpenEXR.scanlineimage, "compression": OpenEXR.ZIP_COMPRESSION},
+                     {"RGBA": pixels.astype(np.float16)}).write(str(folder / f"f_{index:04d}.exr"))
+
+    first = read_exr(frames[0])
+    for index in range(1, lead + 1):
+        write(index, np.zeros_like(first))
+    if loop_to > len(frames):
+        frames = [frames[index % len(frames)] for index in range(loop_to)]
+    for index, frame in enumerate(frames, lead + 1):
+        pixels = read_exr(frame)
+        if convert is not None:  # a transform need not be linear: applied to the straight colour
+            alpha = pixels[..., 3:4]
+            colour = np.ascontiguousarray(np.where(alpha > 1e-6, pixels[..., :3] / np.maximum(alpha, 1e-6), 0.0),
+                                          dtype=np.float32)
+            convert.applyRGB(colour)
+            pixels = np.concatenate([colour * alpha, alpha], axis=2)
+        write(index, pixels)
+    (folder / "done").write_text(str(len(frames) + lead), encoding="utf-8")
+    return str(target)
+
+
 def bake_look(output: Path, *, source: str = PICTURE_SPACE, working: str = "ACEScg", display: str = DISPLAY,
               view: str = "ACES 2.0 - SDR 100 nits (Rec.709)", size: int = 33) -> Path:
     """A 3D LUT (.cube) taking a display picture through a scene-referred look back to the display.

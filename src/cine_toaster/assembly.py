@@ -681,8 +681,7 @@ def _composite_pictures(root: Path, segment: Segment, size: tuple[int, int], fps
         # The cut's stretch of the take, unless the node asks for another start.
         start = float(node["start"]) if node.get("start") is not None else segment.start
         inputs[name] = reference.read(root / media, frames, size, fps, start=start,
-                                      colorspace=node.get("colorspace", reference.ENCODED),
-                                      alpha=node.get("alpha", "straight"))
+                                      colorspace=node.get("colorspace"), alpha=node.get("alpha"))
     # The music's beats in the shot's own seconds: a composite pulses with the cut, not with its take.
     local = [beat - at for beat in beats or [] if -1.0 <= beat - at <= length + 1.0]
     fast = renderer_for(graph)

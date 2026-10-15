@@ -390,8 +390,7 @@ class GLRenderer:
                 path = Path(node.get("file") or node.get("take"))
                 path = (root / path) if root and not path.is_absolute() else path
                 clips[name] = read(path, frames, size, fps, start=float(node.get("start", 0.0)),
-                                   colorspace=node.get("colorspace", "sRGB Encoded Rec.709 (sRGB)"),
-                                   alpha=node.get("alpha", "straight"), working=working)
+                                   colorspace=node.get("colorspace"), alpha=node.get("alpha"), working=working)
             return self.upload(clips[name][frame])
         if op == "generate.solid":
             colour = np.asarray(p("colour"), np.float32)

@@ -259,11 +259,14 @@ One rule each, used by every renderer and by the assembly (CT-0072):
 - **Range**: every source enters the graph in linear light **with its whole
   range** -- nothing is clipped before compositing, so a fire, a Blender
   render or a model's frame above white keeps the light a glow, an exposure
-  change or a look's roll-off acts on. *Not met yet* (CT-0077): the reference
-  reads frames as 16-bit integers (0 to 1), and `vfx.prepare_element` turns
-  EXR into display-encoded 8-bit clips. To be met before C8 by reading float
-  sources (EXR, float TIFF, a renderer's own frames) as float, linear, and
-  keeping an element's prepared clip in float.
+  change or a look's roll-off acts on. Met (CT-0077): a float source (OpenEXR,
+  a float TIFF, an element or a Blender render prepared as EXR) is read as
+  float at its own size -- FFmpeg's scaler clips floats -- and fitted by the
+  same `conform_box` as everything else. A file's colour space and alpha are,
+  unless the node says, its convention: an integer picture is display encoded
+  with straight alpha, a float one scene-linear with premultiplied alpha.
+  What still ends at white is the delivery -- `write` encodes for display --
+  and stock elements delivered as 8-bit video, which never held more.
 - **A still** of a shot drawn by a graph is that graph run at one instant of
   the shot, at the cut's frame, rate and beats -- the frame the cut shows
   there. Titles and effects still drawn over a composite by FFmpeg are not in

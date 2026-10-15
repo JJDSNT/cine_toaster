@@ -72,8 +72,8 @@ C6 (CT-0077) is done: transitions, effects, looks, stock elements and
 titles all draw through one compositing engine, on GL; no FFmpeg filter chain
 composites a picture; Blender stays a renderer whose clips the graph lays.
 ADR 0022 separates what the graph supports from what the records expose.
-Next: the frame-access range rule (float sources keep their light) before C8,
-then C6b or C7.
+The frame-access range rule is met: float sources keep their light above white
+into the graph. Next: C6b or C7.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional

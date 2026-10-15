@@ -127,10 +127,27 @@ record that would compile into them.
   and a lower third -- all drawn by the graph.
 - `media/grading.ffmpeg_filter` (a `lut3d` string nobody called) removed.
 
+## After C6 -- the range rule (agreed with the user, before C8)
+
+The user's point: clipping HDR before compositing is a limitation of the
+frame-access contract, not of EXR. Now:
+
+- `reference.read` reads a float source (`gbrapf32` and kin) as float, at its
+  own size -- FFmpeg 6's scaler clips floats at white, found by probing -- and
+  fits it with `conform_box`, the same geometry `conform_filter` gives FFmpeg
+  (a test reads one picture both ways and finds the same box). Clips of
+  floats are kept as half floats on disk.
+- A source's colour space and alpha follow its file unless the node says:
+  integer pictures display encoded with straight alpha, float ones
+  scene-linear with premultiplied alpha. The default was written three times
+  (the assembly, GL, the reference) -- one decision now, in `read`.
+- `color.exr_to_working`: EXR elements and Blender renders kept float in the
+  working space (with an element's delay as leading transparent frames, and
+  its loop), instead of display-encoded PNGs.
+- Sequences are found by one helper (`color._frames`) for both.
+
 # Remaining (recorded in the roadmap)
 
-- The frame-access range rule (SPEC-0012): float sources clipped at white --
-  before C8.
 - A shot drawn in one graph rather than three passes.
 - The exposures in the roadmap's table "supported by the graph, not yet
   exposed".
@@ -169,4 +186,8 @@ record that would compile into them.
 - `tests/test_composite_shots.py`: a composite with a title is drawn as a
   composite.
 - Full suite after stage A: 759 tests pass (2026-10-14); after B and C: 761;
-  at the close: 776.
+  at the close: 776; with the range rule: 780.
+- `tests/test_range.py`: an EXR at four times white arrives at 4.0, with its
+  file's colour space and alpha, in the reference and on GL; a look tells
+  4.0 from 1.0 and rolls it off below white; a float picture is fitted where
+  an integer one is.

@@ -85,8 +85,8 @@ class Clip:
     """A clip read once into a file on disk, each frame converted to the working space when it is asked for.
 
     At 1080 lines a second of float RGBA is a gigabyte; held whole, a few clips and every node's frame
-    exhausted memory (CT-0071). Here the decoded 16-bit frames live in a memory-mapped file, and only the
-    frames in use are ever floats.
+    exhausted memory (CT-0071). Here the decoded frames live in a memory-mapped file -- 16-bit integers, or half
+    floats for a float source, its light above white kept -- and only the frames in use are full floats.
     """
 
     def __init__(self, raw: np.ndarray, colorspace: str, alpha: str, working: str) -> None:
@@ -102,7 +102,9 @@ class Clip:
         _drop_pages(self.raw, frame)
 
     def frame(self, index: int) -> np.ndarray:
-        data = np.asarray(self.raw[min(index, len(self) - 1)], dtype=np.float32) / 65535.0
+        data = np.asarray(self.raw[min(index, len(self) - 1)], dtype=np.float32)
+        if self.raw.dtype == np.uint16:  # an integer picture, 0 to 1; a float one is kept as it is
+            data = data / 65535.0
         rgb = convert(data[..., :3], self.colorspace, self.working)
         if self.alpha == "straight":
             rgb = rgb * data[..., 3:4]
@@ -132,11 +134,22 @@ def _drop_pages(array: np.ndarray, frame: int) -> None:
             pass
 
 
-def conform_filter(width: int, height: int, *, transparent: bool) -> str:
-    """How a picture of any size is fitted to the frame -- one rule for every path (CT-0072, B3).
+def conform_box(source_width: int, source_height: int, width: int, height: int) -> tuple[int, int, int, int]:
+    """Where a picture of any size lands in the frame -- one rule for every path (CT-0072, B3): scaled to fit
+    within it, keeping its shape, and centred; never stretched. (width, height, x, y) of the fitted picture.
+    The FFmpeg filter below and the float path of `read` both follow it."""
 
-    Scaled to fit within the frame, keeping its shape, and centred; what is left is transparent in a
-    composite (it can be merged over something) and black in a cut. Never stretched.
+    scale = min(width / source_width, height / source_height)
+    fitted_width = min(width, max(1, int(round(source_width * scale))))
+    fitted_height = min(height, max(1, int(round(source_height * scale))))
+    return fitted_width, fitted_height, (width - fitted_width) // 2, (height - fitted_height) // 2
+
+
+def conform_filter(width: int, height: int, *, transparent: bool) -> str:
+    """`conform_box` as an FFmpeg filter, for pictures FFmpeg scales (integer ones: its scaler clips floats).
+
+    What is left around the picture is transparent in a composite (it can be merged over something) and black
+    in a cut.
     """
 
     border = "black@0" if transparent else "black"
@@ -144,37 +157,95 @@ def conform_filter(width: int, height: int, *, transparent: bool) -> str:
             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color={border},setsar=1")
 
 
+FLOAT_PIXELS = ("f32", "f16")  # pixel formats whose values may pass white (OpenEXR, float TIFF)
+
+
+def _probe_picture(path: Path) -> tuple[int, int, str]:
+    """(width, height, pixel format) of a file, or of the first frame of a sequence named by a pattern."""
+
+    from ..color import _frames
+
+    target = str(path)
+    if "%" in target:
+        found = _frames(target)
+        target = str(found[0]) if found else target
+    completed = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                                "stream=width,height,pix_fmt", "-of", "csv=p=0", target],
+                               capture_output=True, text=True)
+    width, height, pixels = (completed.stdout.strip().split(",") + ["0", "0", ""])[:3]
+    return int(width or 0), int(height or 0), pixels
+
+
+def _input(path: Path, fps: float, start: float, still: bool) -> list[str]:
+    target = str(path)
+    if "%" in target:  # a sequence of frames: read from its first number, at the rate asked
+        import re
+
+        from ..color import _frames
+
+        found = _frames(target)
+        first = int(re.findall(r"(\d+)", found[0].stem)[-1]) if found else 1
+        return ["-framerate", f"{fps:g}", "-start_number", str(first), "-i", target]
+    return (["-loop", "1", "-framerate", f"{fps:g}"] if still else ["-ss", f"{start:.4f}"]) + ["-i", target]
+
+
 def read(path: Path, frames: int, size: tuple[int, int], fps: float, *, start: float = 0.0,
-         colorspace: str = ENCODED, alpha: str = "straight", working: str = LINEAR,
+         colorspace: str | None = None, alpha: str | None = None, working: str = LINEAR,
          stretch_to: float | None = None, hold: bool = True) -> Clip:
-    """A clip or a still, `frames` long, in the working space and premultiplied when used (SPEC-0012 §2)."""
+    """A clip, a still or a sequence, `frames` long, in the working space and premultiplied when used
+    (SPEC-0012 §2).
+
+    A file's colour space and alpha are, unless said, the file's convention: an integer picture is display
+    encoded with straight alpha; a float one (OpenEXR) is scene-linear light with premultiplied alpha, and is
+    read as float, its values above white kept (SPEC-0012's range rule, CT-0077).
+    """
 
     import tempfile
 
     width, height = size
-    still = Path(path).suffix.lower() in (".png", ".jpg", ".jpeg", ".webp", ".exr", ".tif", ".tiff")
-    source = ["-loop", "1", "-framerate", f"{fps:g}"] if still else ["-ss", f"{start:.4f}"]
+    still = Path(path).suffix.lower() in (".png", ".jpg", ".jpeg", ".webp", ".exr", ".tif", ".tiff") \
+        and "%" not in str(path)
+    source_width, source_height, pixels = _probe_picture(Path(path))
+    floating = any(mark in pixels for mark in FLOAT_PIXELS)
+    colorspace = colorspace or (LINEAR if floating else ENCODED)
+    alpha = alpha or ("premultiplied" if floating else "straight")
     retime = ""
     if stretch_to and not still:
         # A clip played over another length: its whole run fitted to `stretch_to` seconds (a matte to its join).
         length = _duration(path) - start
         if length > 0:
             retime = f"setpts=(PTS-STARTPTS)*{stretch_to / length:.6f},"
-    process = subprocess.Popen(
-        [_ffmpeg(), "-loglevel", "error", *source, "-i", str(path), "-frames:v", str(frames),
-         "-vf", f"{retime}fps={fps:g},format=rgba64le,{conform_filter(width, height, transparent=True)}",
-         "-f", "rawvideo", "-pix_fmt", "rgba64le", "-"],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if floating:
+        # Read at its own size as float (FFmpeg's scaler clips floats at white), then fitted here by the same
+        # rule (`conform_box`).
+        fitted_width, fitted_height, x, y = conform_box(source_width, source_height, width, height)
+        command = [_ffmpeg(), "-loglevel", "error", *_input(Path(path), fps, start, still), "-frames:v", str(frames),
+                   "-vf", f"{retime}fps={fps:g},format=gbrapf32le", "-f", "rawvideo", "-pix_fmt", "gbrapf32le", "-"]
+        frame_bytes, dtype = source_width * source_height * 4 * 4, "<f4"
+    else:
+        command = [_ffmpeg(), "-loglevel", "error", *_input(Path(path), fps, start, still), "-frames:v", str(frames),
+                   "-vf", f"{retime}fps={fps:g},format=rgba64le,{conform_filter(width, height, transparent=True)}",
+                   "-f", "rawvideo", "-pix_fmt", "rgba64le", "-"]
+        frame_bytes, dtype = width * height * 4 * 2, "<u2"
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     handle = tempfile.NamedTemporaryFile(prefix="clip-", suffix=".raw", delete=False)
-    stored = np.lib.format.open_memmap(handle.name, mode="w+", dtype="<u2", shape=(frames, height, width, 4))
+    stored = np.lib.format.open_memmap(handle.name, mode="w+", dtype="<f2" if floating else "<u2",
+                                       shape=(frames, height, width, 4))
     Path(handle.name).unlink()  # the mapping keeps it; nothing is left behind
     handle.close()
-    size_bytes, count = width * height * 4 * 2, 0
+    count = 0
     while count < frames:
-        chunk = process.stdout.read(size_bytes)
-        if len(chunk) < size_bytes:
+        chunk = process.stdout.read(frame_bytes)
+        if len(chunk) < frame_bytes:
             break
-        stored[count] = np.frombuffer(chunk, dtype="<u2").reshape(height, width, 4)
+        if floating:
+            planes = np.frombuffer(chunk, dtype=dtype).reshape(4, source_height, source_width)
+            rgba = np.stack([planes[2], planes[0], planes[1], planes[3]], axis=-1)  # g, b, r, a -> r, g, b, a
+            frame = np.zeros((height, width, 4), dtype=np.float32)
+            frame[y:y + fitted_height, x:x + fitted_width] = Image_resize(rgba, fitted_width, fitted_height)
+            stored[count] = frame
+        else:
+            stored[count] = np.frombuffer(chunk, dtype=dtype).reshape(height, width, 4)
         count += 1
         if count % 16 == 0:  # written frames are flushed to the file and their pages let go
             stored.flush()
@@ -844,7 +915,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
                 path = Path(node.get("file") or node.get("take"))
                 path = (root / path) if root and not path.is_absolute() else path
                 clips[name] = read(path, frames, size, fps, start=float(node.get("start", 0.0)),
-                                   colorspace=node.get("colorspace", ENCODED), alpha=node.get("alpha", "straight"),
+                                   colorspace=node.get("colorspace"), alpha=node.get("alpha"),
                                    working=working)
             return clips[name][frame]
         if op == "generate.solid":

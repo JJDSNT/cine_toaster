@@ -446,8 +446,24 @@ def prepare_element(effect: dict[str, Any], duration: float, width: int, height:
             partial.replace(clip)
         return str(clip)
 
-    prepared = {"_clip": made("picture", element.get("file") or "", False), "_blend": element.get("blend", "alpha"),
-                "_key_color": element.get("key_color") or "0x00FF00"}
+    kind = element.get("format")
+    if kind in ("generated", "blender-project", "openvdb", "openusd", "alembic", "exr", "exr-sequence"):
+        # Scene-linear light stays float in the working space, its highlights kept (SPEC-0012's range rule).
+        from .color import LINEAR_SPACE, exr_to_working
+
+        if kind in ("exr", "exr-sequence"):
+            pattern = element.get("file") or ""
+        else:
+            frames = element.get("frames") or max(2, round(duration * fps))
+            pattern = _blender_element(element, effect["params"], frames, width, height, fps,
+                                       state_root() / "vfx-elements", run)
+        delay = max(0.0, float(effect["params"].get("start", 0.0) or 0.0))
+        clip = exr_to_working(pattern, state_root() / "vfx-elements" / "working",
+                              colorspace=element.get("colorspace") or LINEAR_SPACE, lead=round(delay * fps),
+                              loop_to=round(duration * fps) if element.get("loop") else 0)
+    else:
+        clip = made("picture", element.get("file") or "", False)
+    prepared = {"_clip": clip, "_blend": element.get("blend", "alpha"), "_key_color": element.get("key_color") or "0x00FF00"}
     if element.get("matte"):
         prepared["_matte"] = made("matte", element["matte"], True)
     return prepared

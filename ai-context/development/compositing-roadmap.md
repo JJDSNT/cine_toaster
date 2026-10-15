@@ -414,12 +414,9 @@ prescribed here.
   and its FFmpeg stand-in goes (CT-0076).
 - A **sheet for `film-burn`** re-expressing its look with generate.noise,
   colour and merge, or keeping it as a shader for good (CT-0076).
-- **The frame-access contract keeps a source's whole range** (SPEC-0012,
-  Frames in and out): today the reference reads 16-bit integers and
-  `vfx.prepare_element` keeps 8-bit display-encoded clips, so anything above
-  white -- EXR elements, Blender renders, a model's frames -- is clipped before
-  compositing. A contract limitation, not an EXR one: read float sources as
-  float, keep prepared clips in float. Before C8 (CT-0077).
+- ~~The frame-access contract keeps a source's whole range~~: met (CT-0077) --
+  float sources read as float, EXR and Blender elements kept float in the
+  working space. C8's `generate.render` results must enter the same way.
 - **A shot drawn in one graph**: its composite, its effects and its title are
   three passes through the same engine, each written and read back (an
   encode between each). Chain them into one graph -- the effects' and the
