@@ -108,11 +108,13 @@ def _relative(root: Path, given: str | Path, what: str) -> str:
 def render_passes(root: Path, *, render_id: str, camera: str, first: int, last: int, size: tuple[int, int],
                   fps: Any, actor: Actor, blend: str | Path | None = None, recipe: str | Path | None = None,
                   engine: str = "CYCLES", samples: int = 16, filter_size: float | None = None,
-                  blender: str | None = None,
+                  camera_id: str | None = None, blender: str | None = None,
                   run: Callable[[list[str]], Any] | None = None) -> dict[str, Any]:
     """Render a scene's passes with Blender (frames `first`..`last` of the scene, at `size`, `fps`) and record
     them: the picture and `render.json` under `renders/passes/<id>/`, the signals `<id>-depth` and
-    `<id>-objects`. The scene is a .blend or a recipe (JSON), in the production."""
+    `<id>-objects`. The scene is a .blend or a recipe (JSON), in the production. `camera_id` states which camera
+    of the production this render's camera is -- a shot's, matched by a solve or by hand -- so its depth is
+    compared with that camera's other depths (CT-0081 step 7); left out, the render's own `<id>/<camera>`."""
 
     from . import timebase
     from .color import exr_layers
@@ -197,7 +199,8 @@ def render_passes(root: Path, *, render_id: str, camera: str, first: int, last: 
         "resolution": [width, height], "working_space": made["working_space"], "filter_size": made["filter_size"],
         "picture": {"frames": "rgba/f_NNNN.exr", "alpha": "premultiplied", "colorspace": made["working_space"],
                     "hashes": hashes},
-        "camera": {"name": camera, "id": f"{render_id}/{camera}", "conventions": made["conventions"],
+        "camera": {"name": camera, "id": camera_id or f"{render_id}/{camera}",
+                   **({"stated_by": actor.public_dict()} if camera_id else {}), "conventions": made["conventions"],
                    "matrix": "camera to world, rows", "unit": {"metres_per_unit": metres}, "frames": cameras},
         "objects": {str(key): name for key, name in made["objects"].items()},
         "depth": {**depth_meaning, "measured": "CT-0081: a wall square to the camera reads its distance down the "

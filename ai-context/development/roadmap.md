@@ -431,6 +431,18 @@ Neither changes the direction; each is used at the edges (`references.md`).
   among valid neighbours on the same side of a depth discontinuity (a
   threshold on the relative jump), +inf and labels never blended.
 
+### Depth in layers: what it does not do yet (CT-0081 step 7)
+
+- **A layer with a depth cannot move, pin, trail, shadow or border.** How:
+  the same warp applied to its depth (`warp.transform` and
+  `warp.corner_pin` of a two-channel signal, nearest-sampled), a shadow cast
+  by depth (a shadow layer at the depth of what it falls on).
+- **A constant depth for a layer** (a card at 4 m) needs a signal record.
+  How: `depth: {value: metres, camera}` compiled to an object depth of a
+  constant over the layer's alpha.
+- **A cut is a hard segmentation.** How: SAM 2's logits kept as a soft
+  alpha signal (step 3's item), `cut` taking it.
+
 ### Signals on GL: what is not there yet (CT-0081 step 6)
 
 - **Reading a signal costs more than drawing it**: a 1080p frame is a

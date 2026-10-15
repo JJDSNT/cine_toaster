@@ -574,6 +574,52 @@ On the GPU the drawing is nearly free; what costs is reading the records
 against 2.6 ms as .npy) and the transfers -- the pictures up, the matte for
 an object's depth and the output down.
 
+## Step 7 -- signals in a shot's layers (done 2026-10-15)
+
+The user's three results: layers ordered by depth, compiled into
+`merge.depth`; a model's segmentation as a matte; Blender and models in one
+composition under the colour, alpha and depth contract -- a declarative
+extension of the records compiled into the existing graph, no second
+compositor; a depth refused stays refused whether a layer, a person or an
+agent asks.
+
+Audit first: the layers (C4) compile bottom to top with `merge.over`; their
+`depth` key only passed an unread parameter to `warp.transform` (room kept
+for 2.5D). And a gap no layer could cross: a render's depth named its camera
+`<render>/<camera>`, so a CG object could never be merged by depth with a
+plate's depth -- `merge.depth` refuses two cameras. In production a CG
+camera is matched to the plate's (a solve, by hand); that is a statement.
+
+- **`render_passes(camera_id=...)`** (`toast render passes --camera-id`):
+  the production's camera this render's camera is, recorded with who stated
+  it; its depth and objects carry it.
+- **Layer keys** (`compositing/layers.py`): `render: id` as a source (a
+  render's record); `cut: {signal, labels}` -- a segmentation of the
+  source's pixels, read where the source shows, as a matte with the key and
+  garbage; `depth: {signal | render: true, camera, object, statistic,
+  estimated, inversions, unknown}`.
+- **Compiled**: layers with a depth wait in a group and are merged by it --
+  one `merge.depth` (coverage, three states) -- at the place of the lowest of
+  them; a layer without one flushes the group and goes over it, keeping its
+  place (a title over everything). A depth read from its source's records
+  `of` the source (its instant, through retimes and offsets); `object: true`
+  is `signal.object_depth` over the layer's own alpha (after its cut);
+  `estimated`, `inversions`, `unknown` go to the nodes that check them.
+- **Said, not guessed**: a depth without a camera, with a move, a pin, an
+  echo, a shadow or a border (its depth would have to follow), blending
+  other than over, a render's depth on a source layer, a cut without labels,
+  two policies for the unknown in one group -- each a problem at compile; two
+  cameras a problem of validation.
+
+Measured with sources meeting in declared layers (heavy test): the stage
+rendered flat as the plate, Video Depth Anything's depth aligned to a floor
+proxy, the pillar cut out by **SAM 2's** segmentation, a CG ball from its
+own render with its camera stated to be the plate's; error where the ball
+meets the pillar against the whole scene rendered at once: **0.0151** with
+one depth for the cut-out person, 0.0524 per pixel; GL equal to the
+reference. A segmentation's cut is hard (one label a pixel), so the
+person's edge is not soft -- the soft-matte limitation of step 3.
+
 # Done
 
 - Read SPEC-0012's signal types and ops, the schema's kind and camera
@@ -598,7 +644,18 @@ an object's depth and the output down.
   node declaring another kind or camera is refused; a relative depth cannot
   reach `merge.depth`; labels are resized to the nearest; one signal serves
   two readers.
-- Full suite after step 1: 934 tests pass; after step 2 and its review: 954; after step 3: 966; after step 4: 984; after step 5: 997; after step 6: 1006.
+- Full suite after step 1: 934 tests pass; after step 2 and its review: 954; after step 3: 966; after step 4: 984; after step 5: 997; after step 6: 1006; after step 7: 1016.
+- Step 7 (`tests/test_layer_depth.py`, 10): the layers compile into one
+  graph with one `merge.depth`, an object depth, a label matte, every read
+  `of` its source; she covers the square inside her cut and the square
+  covers the wall; one depth keeps her whole where per pixel she falls
+  behind the square; GL draws the layers alike; a title without depth keeps
+  its place; through the layers the records' refusals hold -- an estimated
+  depth not said, an inverted occlusion not accepted, an unknown with no
+  policy, a stale record; what cannot be written is said; in a scene's file
+  (as a person or an agent writes it) the layers become the shot's composite
+  and are refused alike. Heavy: Blender and the models in one composition
+  (above).
 - Step 6 (`tests/test_gl_signals.py`, 9, on llvmpipe and again on the Intel
   GPU with `GALLIUM_DRIVER=d3d12`): GL equal to the reference at partial
   alpha with coverage and without; the three states through a chain of

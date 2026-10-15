@@ -939,7 +939,8 @@ def command_render(args: argparse.Namespace) -> int:
     if args.render_command == "passes":
         done = renders.render_passes(root, render_id=args.id, camera=args.camera, first=args.first, last=args.last,
                                      size=tuple(args.size), fps=args.fps, actor=_resolve_actor(args),
-                                     blend=args.blend, recipe=args.recipe, samples=args.samples)
+                                     blend=args.blend, recipe=args.recipe, samples=args.samples,
+                                     camera_id=args.camera_id)
         print(f"{args.id}: {done['frames']} frames by Blender {done['blender']}; signals {', '.join(done['signals'])}")
         return 0
     print(json.dumps(renders.status(root, args.id), indent=2, default=str))
@@ -2412,6 +2413,8 @@ def build_parser() -> argparse.ArgumentParser:
     render_passes.add_argument("--size", type=int, nargs=2, default=[1280, 720], metavar=("WIDTH", "HEIGHT"))
     render_passes.add_argument("--fps", default="24")
     render_passes.add_argument("--samples", type=int, default=16)
+    render_passes.add_argument("--camera-id", help="The production's camera this render's camera is (a shot's, "
+                                                   "matched); default <id>/<camera>")
     render_passes.add_argument("--actor", help="Who is deciding (default: current user)")
     render_passes.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
     render_status = render_sub.add_parser("status", help="Whether a render still follows from its scene")

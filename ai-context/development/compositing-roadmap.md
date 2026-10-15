@@ -392,7 +392,11 @@ its depth out; `signal.object_depth` keeps a cut-out object whole where an
 estimated depth is soft. Step 6 done: those signal ops on GL, a depth held
 in two channels (value, unknown) -- never NaN in a shader, never filtered --
 conformant with the reference on llvmpipe and the GPU, 2.1-2.5x faster at
-1080p, the cost now in reading records and transfers.
+1080p, the cost now in reading records and transfers. Step 7 done: a shot's
+layers declare depth (a signal, a render's own, one depth for a cut-out
+object) and cuts by segmentation, compiled into one `merge.depth`; a render
+states which production camera it is; Blender and models meet in one
+composition, GL equal to the reference.
 
 - What: depth and segmentation as signals, from a model run on a picture
   (depth estimation, a segment-anything model) or from Blender passes (Z,

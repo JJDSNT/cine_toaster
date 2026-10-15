@@ -7,6 +7,21 @@ frame), how it meets what is below (a mode and an opacity), and a border and
 a drop shadow. Any number can change over time, by keys or by the music's
 beats (C3).
 
+A layer may say its depth (C8 step 7, CT-0081): layers with a depth are ordered
+among themselves by it (`merge.depth`: each one's depth carried into its
+coverage, three depth states, the records' refusals kept), at the place of the
+lowest of them; a layer without one keeps its place in the stack, over
+everything below it. A layer's source may be a Blender render's record
+(`render`), and what of it is seen may be cut by a segmentation (`cut`):
+
+      - source: plates/street.mp4                 # the plate, its estimated depth per pixel
+        depth: {signal: street-z, camera: shot-cam, estimated: true}
+      - source: plates/street.mp4                 # the person, cut out, one depth for all of her
+        cut: {signal: street-people, labels: [1]}
+        depth: {signal: street-z, camera: shot-cam, estimated: true, object: true}
+      - render: lamp                              # a Blender object, its own depth
+        depth: {render: true, camera: shot-cam}
+
 The layers are a way of writing a composite, not a second way of drawing
 one: they become nodes of the one graph, checked, cached and drawn by the
 same renderers as any composite (ADR 0022, CT-0072).
@@ -37,8 +52,13 @@ from __future__ import annotations
 
 from typing import Any
 
-LAYER_KEYS = ("source", "start", "place", "key", "garbage", "matte", "border", "shadow", "mode", "opacity", "depth",
-              "retime", "offset", "echo", "pin")
+LAYER_KEYS = ("source", "render", "start", "place", "key", "garbage", "cut", "matte", "border", "shadow", "mode",
+              "opacity", "depth", "retime", "offset", "echo", "pin")
+#: A layer's depth (C8 step 7, CT-0081): a signal record of its source, the render's own, or a constant -- each
+#: from a named camera -- and what the merge may do with it.
+DEPTH_KEYS = ("signal", "render", "camera", "object", "statistic", "estimated", "inversions", "unknown")
+#: What a layer with a depth cannot have yet: its depth would have to move, shadow or blend with it.
+NOT_WITH_DEPTH = ("place", "pin", "echo", "shadow", "border")
 ECHO_KEYS = ("count", "spacing", "decay")
 PIN_KEYS = ("track", "measure", "region", "of", "corners")
 PLACE_KEYS = ("translate", "scale", "rotate", "pivot", "perspective")
@@ -67,6 +87,70 @@ class _Compiler:
     def __init__(self) -> None:
         self.nodes: dict[str, Any] = {}
         self.problems: list[str] = []
+        #: Layers with a depth, waiting to be ordered among themselves: (picture, depth, its spec).
+        self.group: list[tuple[str, str, dict[str, Any]]] = []
+
+    def flush(self, below: str | None) -> str | None:
+        """The layers with a depth merged by it, over what is below them (C8 step 7)."""
+
+        if not self.group:
+            return below
+        policies = {spec.get("unknown") for _, _, spec in self.group if spec.get("unknown")}
+        if len(policies) > 1:
+            self.problems.append(f"layers merged by depth say different things of an unknown depth: "
+                                 f"{', '.join(sorted(policies))}")
+        index = len([name for name in self.nodes if name.startswith("depth-merge")]) + 1
+        merged = self.add(f"depth-merge{index}", {
+            "op": "merge.depth", "pictures": [picture for picture, _, _ in self.group],
+            "depths": [depth for _, depth, _ in self.group], **({"unknown": next(iter(policies))} if policies else {})})
+        self.group = []
+        if below is None:
+            return merged
+        return self.add(f"depth-merge{index}-over", {"op": "merge.over", "front": merged, "back": below})
+
+    def cut(self, n: str, spec: Any, where: str) -> str | None:
+        """A segmentation of the source's own pixels, its labels kept: a matte (C8 step 7)."""
+
+        if not isinstance(spec, dict) or not isinstance(spec.get("signal"), str) \
+                or not isinstance(spec.get("labels"), list) or not spec["labels"] or set(spec) - {"signal", "labels"}:
+            self.problems.append(f"{where} is {{signal: a segmentation's id, labels: [numbers]}}")
+            return None
+        source = self.nodes.get(n, {})
+        labels = self.add(f"{n}-cut-labels", {"op": "signal.read", "signal": spec["signal"], "kind": "segmentation",
+                                              **({"of": n} if source.get("op") == "generate.source" else {})})
+        return self.add(f"{n}-cut", {"op": "matte.label", "signal": labels, "labels": spec["labels"]})
+
+    def depth_of(self, n: str, current: str, spec: Any, where: str) -> str | None:
+        """A layer's depth node: a signal record of its source (read at the instant the source shows), or the
+        render's own; one depth for the whole object when asked."""
+
+        if not isinstance(spec, dict) or set(spec) - set(DEPTH_KEYS):
+            self.problems.append(f"{where}'s depth is {{signal: id | render: true, camera, object, estimated, "
+                                 "inversions, unknown}}")
+            return None
+        if not spec.get("camera"):
+            self.problems.append(f"{where}'s depth names its camera: depths are compared within one camera")
+            return None
+        source = self.nodes.get(n, {})
+        if spec.get("render"):
+            if source.get("op") != "generate.render":
+                self.problems.append(f"{where}'s depth is its render's only when its source is a `render`")
+                return None
+            depth = f"{n}.depth"
+        elif isinstance(spec.get("signal"), str):
+            depth = self.add(f"{n}-depth", {
+                "op": "signal.read", "signal": spec["signal"], "kind": "depth", "camera": spec["camera"],
+                **({"of": n} if source.get("op") == "generate.source" else {}),
+                **({"estimated": True} if spec.get("estimated") else {}),
+                **({"inversions": spec["inversions"]} if spec.get("inversions") else {})})
+        else:
+            self.problems.append(f"{where}'s depth is a signal's (`signal: id`) or its render's (`render: true`)")
+            return None
+        if spec.get("object"):
+            depth = self.add(f"{n}-object-depth", {
+                "op": "signal.object_depth", "signal": depth, "matte": self.alpha(f"{n}-object", current),
+                "camera": spec["camera"], **({"statistic": spec["statistic"]} if spec.get("statistic") else {})})
+        return depth
 
     def add(self, name: str, node: dict[str, Any]) -> str:
         self.nodes[name] = node
@@ -124,14 +208,23 @@ class _Compiler:
         if unknown:
             self.problems.append(f"{where} has no {', '.join(unknown)} (a layer has {', '.join(LAYER_KEYS)})")
         source = layer.get("source")
-        if not isinstance(source, str) or not source:
-            self.problems.append(f"{where} says no `source` (a take of the shot, or a file)")
-            return below
         n = f"L{index + 1}"
-        reads = {"take": source} if "/" not in source and "." not in source else {"file": source}
-        current = self.add(n, {"op": "generate.source", **reads,
-                               **({"start": float(layer["start"])} if layer.get("start") is not None else {})})
-        current = self.timed(n, current, layer, where)
+        depth = layer.get("depth")
+        if layer.get("render") is not None:
+            if source is not None or not isinstance(layer["render"], str):
+                self.problems.append(f"{where} has a `source` or a `render` (a render's record by its id), not both")
+                return below
+            camera = depth.get("camera") if isinstance(depth, dict) else None
+            current = self.add(n, {"op": "generate.render", "render": layer["render"],
+                                   **({"camera": camera} if camera else {})})
+        elif not isinstance(source, str) or not source:
+            self.problems.append(f"{where} says no `source` (a take of the shot, or a file) or `render`")
+            return below
+        else:
+            reads = {"take": source} if "/" not in source and "." not in source else {"file": source}
+            current = self.add(n, {"op": "generate.source", **reads,
+                                   **({"start": float(layer["start"])} if layer.get("start") is not None else {})})
+            current = self.timed(n, current, layer, where)
 
         # What of the source is seen, in the source's own frame: a keyer, cut down by a garbage shape.
         seen = None
@@ -143,6 +236,12 @@ class _Compiler:
                 seen = self.add(f"{n}-kept", {"op": "matte.combine", "a": seen, "b": garbage, "how": "intersect"})
             else:
                 seen = seen or garbage
+        if layer.get("cut") is not None:  # a segmentation of the source's own pixels (C8 step 7)
+            cut = self.cut(n, layer["cut"], f"{where}'s cut")
+            if cut and seen:
+                seen = self.add(f"{n}-cut-kept", {"op": "matte.combine", "a": seen, "b": cut, "how": "intersect"})
+            else:
+                seen = seen or cut
         key = layer.get("key")
         if seen and isinstance(key, dict) and key.get("by") == "colour" and key.get("despill", True):
             # The screen taken out with the key (CT-0075): its share of each edge pixel subtracted, and its light
@@ -163,8 +262,6 @@ class _Compiler:
                         self.problems.append(f"{where}'s place has no {key} ({', '.join(PLACE_KEYS)})")
                         continue
                     params[key] = self.animated(f"{n}-{key}", value, f"{where}'s {key}")
-                if layer.get("depth") is not None:  # the record keeps room for 2.5D (ADR 0022 §8)
-                    params["depth"] = layer["depth"]
                 current = self.add(f"{n}-placed", {"op": "warp.transform", "in": current,
                                                    **{k: v for k, v in params.items() if v is not None}})
 
@@ -203,6 +300,25 @@ class _Compiler:
             matte = self.shape(f"{n}-matte", layer["matte"], f"{where}'s matte")
             if matte:
                 current = self.masked(f"{n}-framed", current, matte)
+
+        if layer.get("depth") is not None:
+            # Ordered among the layers with a depth by it, not by its place: kept for the merge (`flush`).
+            for key in NOT_WITH_DEPTH:
+                if layer.get(key) is not None:
+                    self.problems.append(f"{where} has a depth and a {key}: its depth would have to follow it, "
+                                         "which is not done yet")
+            if layer.get("mode", "over") != "over":
+                self.problems.append(f"{where} has a depth: it meets the others by it, over -- not {layer['mode']}")
+            depth = self.depth_of(n, current, layer["depth"], where)
+            if depth is None:
+                return below
+            if "opacity" in layer:
+                mix = self.animated(f"{n}-opacity", layer["opacity"], f"{where}'s opacity")
+                current = self.add(f"{n}-faded", {"op": "merge.over", "front": current, "back": self.clear(),
+                                                  **({"mix": mix} if mix is not None else {})})
+            self.group.append((current, depth, layer["depth"]))
+            return below
+        below = self.flush(below)
 
         if below is None:
             if any(layer.get(key) is not None for key in ("mode", "opacity", "shadow")):
@@ -333,6 +449,7 @@ def compile_layers(layers: Any) -> tuple[dict[str, Any] | None, list[str]]:
     top = None
     for index, layer in enumerate(layers):
         top = compiler.layer(index, layer, top)
+    top = compiler.flush(top)
     if top is None:
         return None, compiler.problems or ["no layer has a source"]
     return {"ports": {}, "nodes": compiler.nodes, "output": top}, compiler.problems
