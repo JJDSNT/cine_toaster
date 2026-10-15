@@ -310,7 +310,7 @@ Neither changes the direction; each is used at the edges (`references.md`).
   node, its project file known by content (identity), a doctor capability;
   adopted only if it renders headless and repeatably. Not before: it is
   alpha and changes daily.
-- **Research -- an integer time base.** Our curves run on float seconds; C3
+- **Research -- an integer time base** (in progress: `CT-0079`, measured -- see there). Our curves run on float seconds; C3
   had to anchor a beat to its frame's centre, and 29.97 frames are inexact.
   How: measure where float time drifts (long shots, 29.97, sample-accurate
   sound); if it does, ticks as FilmCraft's (254,016,000,000 a second) in the
