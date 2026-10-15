@@ -419,6 +419,27 @@ def _whisper() -> Capability:
     )
 
 
+def _colour_fonts() -> Capability:
+    """A title in a colour font's own colours: FreeType, inside Pillow, draws layered (COLR) and bitmap glyphs
+    (CBDT, sbix) from 2.10, COLR's gradients (version 1) from 2.13."""
+
+    version = ""
+    if _module("PIL"):
+        from PIL import features
+
+        version = features.version("freetype2") or ""
+    numbers = tuple(int(part) for part in version.split(".")[:2] if part.isdigit())
+    ok = numbers >= (2, 10)
+    return Capability(
+        name="Colour fonts",
+        what_it_enables="titles in a colour font's own colours -- layered (COLR), bitmap (CBDT, sbix) and emoji",
+        required=False,
+        status=OK if ok else MISSING,
+        detail=f"FreeType {version}" + ("" if numbers >= (2, 13) else ", COLR version 0 only") if ok else "",
+        remedy="" if ok else "pip install -U pillow   (its wheels carry a FreeType that draws colour glyphs)",
+    )
+
+
 def _beats() -> Capability:
     from .voice import voice_python
 
@@ -455,6 +476,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _splat,
     _sound_sources,
     _beats,
+    _colour_fonts,
     # Detected, not yet used. See `report`.
     _sox,
     _blender,

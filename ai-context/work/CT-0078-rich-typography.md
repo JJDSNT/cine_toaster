@@ -78,6 +78,29 @@ lacked:
   (four-pointed stars of stretched soft glow, twinkling in turn, upright after
   the letters lean). `chrome` is now the horizon chrome.
 
+## Stage C -- colour fonts
+
+- `generate.text` draws a colour font in its own colours: layered glyphs
+  (COLR, versions 0 and 1) and bitmap ones (CBDT, Apple's sbix -- emoji),
+  told by the font's table directory (`reference.colour_glyphs`). Pillow's
+  FreeType draws them; GL uploads the reference's drawing, as for every text.
+- A bitmap font has only the sizes it was drawn at: it is read at one of
+  them and its drawing scaled (`_colour_font`).
+- Of `colour` it takes the opacity, as a browser does; `glyph_colours:
+  false` draws it in `colour`, as a plain font. Its outline is the drawing
+  grown round (a round stroke) in `colour` beneath it; `hollow`, the outline
+  alone. Its alpha is the text as a matte, so styles, fades and every title
+  take a colour font as they take a plain one -- no title item needed: a
+  title's `font` is enough.
+- `toast doctor`: "Colour fonts" (FreeType 2.10 for COLR 0, CBDT and sbix;
+  2.13 for COLR 1), with the remedy.
+- A test font made for the purpose (`tests/fixtures/fonts/colour-test.ttf`,
+  COLR: red below, blue above, a yellow diamond), with the script that
+  builds it with fontTools -- needed only to remake it, not a dependency.
+- Not drawn yet, recorded in `development/roadmap.md` with how: SVG glyphs
+  (OT-SVG fonts draw as plain ones), and a colour font's letters under the
+  letter animator (drawn in `colour`).
+
 # Decisions
 
 - **The animator belongs to the node**, not to curve nodes: each letter needs
@@ -87,6 +110,10 @@ lacked:
 - **A style is recipes, not an effect**: only the bevel was missing from the
   engine; the rest is the letters as a matte and their alpha blurred, moved
   and filled.
+- **A colour font keeps its colours** and takes only the text colour's
+  opacity: a title's default colour is an off-white that would otherwise
+  dim every colour font (found by the title test); browsers do the same.
+  The outline keeps `colour`, which is what it is for.
 
 # Validation
 
@@ -112,3 +139,14 @@ lacked:
   tests, one failing once -- `test_stems`' loudness of a stretch at exactly its
   0.5 dB bound (sound, untouched here); it passed three runs alone. Recorded
   in the roadmap as an intermittent test to make deterministic.
+- Stage C (`ColourFontTests`): a colour font is told from a plain one; its
+  glyphs keep their colours (blue above, red below, yellow at the centre);
+  the text colour gives only its opacity, `glyph_colours: false` one colour
+  throughout; an outline rings it in the text colour, the glyph intact over
+  it, `hollow` the ring alone; a `fade` title in a colour font keeps red and
+  blue; Noto Color Emoji draws at any size and in several colours; GL draws
+  a colour font with an outline as the reference does.
+- Found on the way: the test font's layers stood off-centre -- TrueType
+  places an outline by the glyph's left side bearing, which the script had
+  left at zero.
+- Full suite after stage C: 806 tests pass.

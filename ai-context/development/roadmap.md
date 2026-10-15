@@ -346,6 +346,17 @@ Neither changes the direction; each is used at the edges (`references.md`).
   PCM render of the mix), or measure where the limiter is idle, so the test
   holds the claim -- the stems make the mix -- without a margin at its edge.
 
+### Colour fonts not drawn yet (found 2026-10-15, CT-0078 stage C)
+
+- **SVG glyphs** (OpenType SVG fonts) draw as plain fonts: FreeType draws
+  them only through a renderer hook Pillow does not give. How: read the
+  glyph's SVG document from the font's `SVG ` table (fontTools) and render it
+  with resvg or CairoSVG into the same tile the colour path places, behind a
+  doctor capability.
+- **A colour font under the letter animator** draws in `colour`: the
+  per-letter path draws coverage. How: give `_letters_coverage` an RGBA tile
+  from `_colour_text`'s drawing for each glyph, the same placement kept.
+
 ### Later
 
 - Sound: generated sound and music, stems, spatial phases 2-4 (`CT-0048`,

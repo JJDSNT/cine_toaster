@@ -158,7 +158,7 @@ OPS: dict[str, Op] = {
     "generate.text": Op({}, params={"text": "text", "font": "file", "size": "number", "colour": "vector",
                                     "position": "vector", "reveal": "number", "reveal_by": "enum:letter|word",
                                     "align": "enum:centre|left|right", "line_spacing": "number", "outline": "number",
-                                    "hollow": "bool", "letters": "letters"}),
+                                    "hollow": "bool", "letters": "letters", "glyph_colours": "bool"}),
     "generate.render": Op({}, {"out": "picture", "depth": "signal", "alpha": "matte"},
                           {"renderer": "text", "scene": "file", "recipe": "text", "seed": "int", "camera": "text"},
                           kind="depth", deterministic=False),

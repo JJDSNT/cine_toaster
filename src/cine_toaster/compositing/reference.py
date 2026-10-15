@@ -640,6 +640,83 @@ def _text_coverage(text: str, shown: str, font_path: str, size_px: int, position
     return coverage
 
 
+#: The tables an OpenType font draws its glyphs' own colours from that FreeType draws: layered (COLR) and bitmap
+#: (CBDT, Apple's sbix). SVG glyphs need a renderer FreeType is not given: such a font draws as a plain one (a
+#: limitation recorded in the roadmap).
+COLOUR_TABLES = (b"COLR", b"CBDT", b"sbix")
+
+
+@lru_cache(maxsize=32)
+def colour_glyphs(font_path: str) -> bool:
+    """Whether the font carries its glyphs' own colours (C6b stage C, CT-0078): read from the font's table
+    directory, the first face of a collection."""
+
+    try:
+        with open(font_path, "rb") as handle:
+            head = handle.read(12)
+            start = 0
+            if head[:4] == b"ttcf":
+                handle.seek(12)
+                start = int.from_bytes(handle.read(4), "big")
+                handle.seek(start)
+                head = handle.read(12)
+            count = int.from_bytes(head[4:6], "big")
+            directory = handle.read(16 * count)
+    except OSError:
+        return False
+    return any(directory[16 * index: 16 * index + 4] in COLOUR_TABLES for index in range(count))
+
+
+def _colour_font(font_path: str, size_px: int) -> tuple[Any, float]:
+    """The font at `size_px`, and the scale its drawing needs: a bitmap colour font (CBDT, sbix) has only the
+    sizes it was drawn at, so it is read at one of them and its drawing scaled."""
+
+    from PIL import ImageFont
+
+    try:
+        return ImageFont.truetype(font_path, size_px), 1.0
+    except OSError:
+        for strike in (109, 136, 128, 160, 96, 72, 64, 48, 32, 20):
+            try:
+                return ImageFont.truetype(font_path, strike), size_px / strike
+            except OSError:
+                continue
+        raise
+
+
+@lru_cache(maxsize=64)
+def _colour_text(shown: str, text: str, font_path: str, size_px: int, position: tuple[float, float], width: int,
+                 height: int, align: str = "centre", spacing_px: int = 0) -> np.ndarray:
+    """The text in its font's own colours, premultiplied, placed as `_text_coverage` places it -- by the whole
+    text's extent -- and drawn four times over, then averaged."""
+
+    from PIL import Image, ImageDraw
+
+    font, scale = _colour_font(font_path, size_px)
+    anchor = {"centre": "center", "left": "left", "right": "right"}[align]
+    spacing = int(round(spacing_px / scale))
+    probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    box = probe.multiline_textbbox((0, 0), text, font=font, spacing=spacing)
+    tile = Image.new("RGBA", (max(1, box[2] - box[0]), max(1, box[3] - box[1])), (0, 0, 0, 0))
+    if shown:
+        ImageDraw.Draw(tile).multiline_text((-box[0], -box[1]), shown, font=font, spacing=spacing, align=anchor,
+                                            embedded_color=True)
+    if scale != 1.0:
+        tile = tile.resize((max(1, round(tile.width * scale)), max(1, round(tile.height * scale))), Image.LANCZOS)
+    data = np.asarray(tile, dtype=np.float32) / 255.0
+    # The font's colours are display colours: into linear light, then premultiplied.
+    data = np.concatenate([decode_srgb(data[..., :3]) * data[..., 3:], data[..., 3:]], axis=-1)
+    drawn = np.zeros((height * 4, width * 4, 4), np.float32)
+    x = int(round(position[0] * width * 4 - {"center": tile.width / 2, "left": 0.0, "right": float(tile.width)}[anchor]))
+    y = int(round(position[1] * height * 4 - tile.height / 2))
+    ys, xs = slice(max(0, y), min(height * 4, y + tile.height)), slice(max(0, x), min(width * 4, x + tile.width))
+    if ys.start < ys.stop and xs.start < xs.stop:
+        drawn[ys, xs] = data[ys.start - y:ys.stop - y, xs.start - x:xs.stop - x]
+    picture = drawn.reshape(height, 4, width, 4, 4).mean(axis=(1, 3)).astype(np.float32)
+    picture.setflags(write=False)
+    return picture
+
+
 LETTER_PROPERTIES = {"offset": [0.0, 0.0], "rotate": 0.0, "scale": 1.0, "opacity": 1.0}
 
 
@@ -781,17 +858,56 @@ def text_picture(node: dict[str, Any], param: Callable[..., Any], width: int, he
     align = str(param("align", "centre"))
     spacing_px = int(round(pixels(param("line_spacing", 0.0), height) * 4))
     outline_px = int(round(pixels(param("outline", 0.0), height) * 4))
-    if node.get("letters"):
-        # Letter by letter, each with its own time (C6b): the animator is the node's, not a curve.
-        coverage = _letters_coverage(text, font_path, size_px, (float(position[0]), float(position[1])), width,
-                                     height, align, spacing_px, outline_px, bool(param("hollow", False)),
-                                     node["letters"], seconds, pixels(1.0, height))
-    else:
-        coverage = _text_coverage(text, shown, font_path, size_px, (float(position[0]), float(position[1])), width,
-                                  height, align, spacing_px, outline_px, bool(param("hollow", False)))
     colour = np.asarray(param("colour", [1, 1, 1, 1]), dtype=np.float32).reshape(-1)
-    alpha = coverage * (float(colour[3]) if colour.size > 3 else 1.0)
-    return np.concatenate([colour[:3] * alpha[..., None], alpha[..., None]], axis=-1).astype(np.float32)
+    tint = np.concatenate([colour[:3], colour[3:4] if colour.size > 3 else [1.0]]).astype(np.float32)
+    if colour_glyphs(font_path) and node.get("glyph_colours", True) and not node.get("letters"):
+        # A colour font draws in its own colours (C6b stage C): of `colour` it takes the opacity, as a browser
+        # does (`glyph_colours: false` draws it in `colour`, a plain font). Its outline is the drawing grown
+        # round, in `colour`, beneath it (`hollow`: the outline alone). Its alpha is the text as a matte (a
+        # style's fill, rings, glow and shadow), as a plain font's is.
+        glyphs = _colour_text(shown, text, font_path, size_px, (float(position[0]), float(position[1])), width,
+                              height, align, spacing_px)
+        if not outline_px:
+            return (glyphs * tint[3]).astype(np.float32)
+        grown = _grown(glyphs[..., 3], outline_px / 4)
+        ring = np.clip(grown - glyphs[..., 3], 0, 1) if param("hollow", False) else grown
+        under = np.concatenate([tint[:3] * ring[..., None], ring[..., None]], axis=-1) * tint[3]
+        if param("hollow", False):
+            return under.astype(np.float32)
+        faded = glyphs * tint[3]
+        return (faded + under * (1.0 - faded[..., 3:])).astype(np.float32)
+    try:
+        if node.get("letters"):
+            # Letter by letter, each with its own time (C6b): the animator is the node's, not a curve. A colour
+            # font's letters are drawn in `colour` here (a limitation recorded in the roadmap).
+            coverage = _letters_coverage(text, font_path, size_px, (float(position[0]), float(position[1])), width,
+                                         height, align, spacing_px, outline_px, bool(param("hollow", False)),
+                                         node["letters"], seconds, pixels(1.0, height))
+        else:
+            coverage = _text_coverage(text, shown, font_path, size_px, (float(position[0]), float(position[1])),
+                                      width, height, align, spacing_px, outline_px, bool(param("hollow", False)))
+    except OSError as error:  # a bitmap font has only the sizes it was drawn at
+        raise ValidationError(f"The font {Path(font_path).name} cannot draw this text ({error}); a bitmap colour "
+                              "font draws only in its own colours, letter by letter not yet") from error
+    alpha = coverage * tint[3]
+    return np.concatenate([tint[:3] * alpha[..., None], alpha[..., None]], axis=-1).astype(np.float32)
+
+
+def _grown(alpha: np.ndarray, radius: float) -> np.ndarray:
+    """A matte grown round by `radius` pixels -- a round stroke, as a font's outline is drawn."""
+
+    reach = int(math.ceil(radius))
+    if reach <= 0:
+        return alpha
+    padded = np.pad(alpha, reach)
+    height, width = alpha.shape
+    out = alpha.copy()
+    for dy in range(-reach, reach + 1):
+        for dx in range(-reach, reach + 1):
+            weight = float(np.clip(radius + 0.5 - math.hypot(dx, dy), 0.0, 1.0))
+            if weight > 0:
+                out = np.maximum(out, padded[reach + dy:reach + dy + height, reach + dx:reach + dx + width] * weight)
+    return out
 
 
 def Image_resize(data: np.ndarray, width: int, height: int) -> np.ndarray:

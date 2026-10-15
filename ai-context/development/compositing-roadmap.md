@@ -293,7 +293,9 @@ CT-0028's Toaster-style shaders -- are additions, not convergence: with C6b.
 In progress (`CT-0078`), in stages: A per-letter animation (done: an animator
 on `generate.text`, three title items); B styles (done: fills, outlines,
 cycling, glow, shadow exposed from the graph, a bevel primitive, gradients
-with stops; `chrome`, `colour-font`); C colour fonts; D Lottie as an input.
+with stops; `chrome`, `colour-font`); C colour fonts (done: COLR and bitmap
+glyphs -- emoji -- in their own colours, any title by its `font`); D Lottie
+as an input.
 
 Also to investigate here: **Lottie as an input** -- ready motion graphics
 as a layer source with alpha, then a partial conversion into the graph

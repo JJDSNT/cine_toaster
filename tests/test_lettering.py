@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 import numpy as np
 
 from cine_toaster.compositing.gl import gl_unavailable_reason
-from cine_toaster.compositing.reference import evaluate, letter_ranks
+from cine_toaster.compositing.reference import colour_glyphs, evaluate, letter_ranks
 from cine_toaster.compositing.schema import validate
 from cine_toaster.titles import list_titles
 
 W, H, FPS = 320, 180, 12
+#: A COLR font made for these tests (`tests/fixtures/fonts/make_colour_font.py`): A, B and C are squares, red below,
+#: blue above, a yellow diamond in the middle.
+COLOUR_FONT = str(Path(__file__).parent / "fixtures" / "fonts" / "colour-test.ttf")
 DROP = {"keys": [{"t": 0.0, "offset": [0, -60], "rotate": -30, "opacity": 0.0, "ease": "out"},
                  {"t": 0.4, "offset": [0, 0], "rotate": 0, "opacity": 1.0}], "stagger": 0.1}
 
@@ -191,6 +195,75 @@ class StyleTests(unittest.TestCase):
         self.assertIn("colour.cycle", catalog["colour-font"]["primitives"])
 
 
+def square(frame: np.ndarray) -> tuple[slice, slice]:
+    ys, xs = np.nonzero(frame[..., 3] > 0.99)
+    return slice(ys.min(), ys.max() + 1), slice(xs.min(), xs.max() + 1)
+
+
+class ColourFontTests(unittest.TestCase):
+    """C6b stage C: a colour font draws in its own colours, and is still the text as a matte."""
+
+    def colour(self, **more) -> np.ndarray:
+        return text(text="A", font=COLOUR_FONT, size=400, **more)[0]
+
+    def test_a_colour_font_is_told_from_a_plain_one(self) -> None:
+        from cine_toaster.titles import font_file
+
+        self.assertTrue(colour_glyphs(COLOUR_FONT))
+        self.assertFalse(colour_glyphs(font_file({})))
+
+    def test_its_glyphs_keep_their_colours(self) -> None:
+        frame = self.colour()
+        rows, cols = square(frame)
+        top, bottom, left, right = rows.start, rows.stop - 1, cols.start, cols.stop - 1
+        np.testing.assert_allclose(frame[top + 3, right - 3], [0, 0, 1, 1], atol=1e-3)  # blue above
+        np.testing.assert_allclose(frame[bottom - 3, right - 3], [1, 0, 0, 1], atol=1e-3)  # red below
+        np.testing.assert_allclose(frame[(top + bottom) // 2, (left + right) // 2], [1, 1, 0, 1], atol=1e-3)
+
+    def test_the_text_colour_gives_them_its_opacity_only_unless_they_are_set_aside(self) -> None:
+        """As a browser draws a colour font: the glyphs' colours are the font's; the text's colour fades them."""
+
+        np.testing.assert_allclose(self.colour(colour=[0.2, 0.9, 0.3, 1.0]), self.colour(), atol=1e-6)
+        np.testing.assert_allclose(self.colour(colour=[1, 1, 1, 0.5]), self.colour() * 0.5, atol=1e-6)
+        plain = self.colour(colour=[0.0, 1.0, 0.0, 1.0], glyph_colours=False)
+        rows, cols = square(plain)
+        self.assertTrue(np.allclose(plain[rows, cols], [0, 1, 0, 1], atol=1e-3))  # one colour throughout
+
+    def test_an_outline_rings_it_in_the_text_colour(self) -> None:
+        bare, ringed = self.colour(), self.colour(outline=6)
+        grown = (ringed[..., 3] > 0.5) & ~(bare[..., 3] > 0.5)
+        self.assertGreater(int(grown.sum()), 0)
+        self.assertTrue(np.allclose(ringed[grown][:, :3], ringed[grown][:, 3:], atol=1e-4))  # white, the colour
+        inside = bare[..., 3] > 0.99
+        np.testing.assert_allclose(ringed[inside], bare[inside], atol=1e-4)  # the glyph over its ring
+        hollow = self.colour(outline=6, hollow=True)
+        self.assertLess(float(hollow[inside][:, 3].mean()), 0.05)  # the ring alone
+
+    def test_a_title_in_a_colour_font_keeps_its_colours(self) -> None:
+        from cine_toaster.compositing.title_graphs import graph_for
+        from cine_toaster.titles import BASE_PARAMS
+
+        title = {"engine": "graph", "effect": "fade",
+                 "params": {**BASE_PARAMS, "text": "ABC", "size": 160, "font": COLOUR_FONT, "enter_at": 0.0,
+                            "fade_in": 0.1, "fade_out": 0.1}}
+        backdrop = np.zeros((H, W, 4), np.float32) + [0, 0, 0, 1]
+        frame = evaluate(graph_for(title, 1.0, FPS), {"picture": backdrop}, frames=12, size=(W, H), fps=FPS)[6]
+        reds = (frame[..., 0] > 0.9) & (frame[..., 2] < 0.1)
+        blues = (frame[..., 2] > 0.9) & (frame[..., 0] < 0.1)
+        self.assertGreater(int(reds.sum()), 50)
+        self.assertGreater(int(blues.sum()), 50)
+
+    def test_an_emoji_font_draws_at_any_size(self) -> None:
+        """A bitmap colour font has only the sizes it was drawn at: read at one, its drawing scaled."""
+
+        emoji = Path("/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf")
+        if not emoji.is_file():
+            self.skipTest("Noto Color Emoji is not installed")
+        small, large = (text(text="\U0001F35E", font=str(emoji), size=size)[0] for size in (60, 180))
+        self.assertGreater(float(large[..., 3].sum()), 6 * float(small[..., 3].sum()))
+        self.assertGreater(float(np.ptp(large[large[..., 3] > 0.99][:, 0])), 0.2)  # more than one colour
+
+
 @unittest.skipIf(gl_unavailable_reason(), "no GL context here")
 class StyleConformanceTests(unittest.TestCase):
     def test_gl_draws_styled_titles_as_the_reference_does(self) -> None:
@@ -232,6 +305,18 @@ class LetteringConformanceTests(unittest.TestCase):
         exact = evaluate(graph, {}, frames=8, size=(W, H), fps=FPS)
         fast = np.stack(list(renderer_for(graph).evaluate(graph, {}, frames=8, size=(W, H), fps=FPS, stream=True)))
         self.assertLess(float(np.abs(exact - fast).max()), 1e-5)
+
+
+@unittest.skipIf(gl_unavailable_reason(), "no GL context here")
+class ColourFontConformanceTests(unittest.TestCase):
+    def test_gl_draws_a_colour_font_as_the_reference_does(self) -> None:
+        from cine_toaster.compositing.gl import renderer_for
+
+        graph = {"ports": {}, "output": "t", "nodes": {"t": {"op": "generate.text", "text": "AB C", "font": COLOUR_FONT,
+                                                              "size": 160, "outline": 4, "colour": [1, 1, 1, 1]}}}
+        exact = evaluate(graph, {}, frames=1, size=(W, H), fps=FPS)
+        fast = np.stack(list(renderer_for(graph).evaluate(graph, {}, frames=1, size=(W, H), fps=FPS, stream=True)))
+        self.assertLess(float(np.abs(exact - fast).mean()), 0.005)
 
 
 if __name__ == "__main__":
