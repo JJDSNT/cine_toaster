@@ -49,8 +49,8 @@ CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
   the Blender and model adapters, a sequence; step 1 (signal records, ADR
   0024), step 2 (a Blender scene's passes as records, read by
   `generate.render`), step 3 (models as adapters) and step 4 (alignment
-  with residuals, inverted occlusions flagged) and step 5 (depth compositing
-  at edges) done (`doing`)
+  with residuals, inverted occlusions flagged), step 5 (depth compositing
+  at edges) and step 6 (signal ops on GL) done (`doing`)
 - `CT-0080` — C7: time and track -- the audit, the remap's meaning, source
   against timeline time, retimed sound, exposure, tracks as records, GL, and
   the three done-when films (`done`)

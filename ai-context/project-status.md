@@ -100,8 +100,9 @@ inverted occlusions flagged per object pair and refused by `merge.depth`
 until accepted; `merge.depth` also checks camera, quantity, unit and pixel
 grid. Step 5: depth compositing at edges -- each layer's depth carried into
 its coverage, three depth states kept, one depth per cut-out object; tests
-split into `make test-fast` and `make test-heavy`. Next: step 6, GL for the
-signal ops.
+split into `make test-fast` and `make test-heavy`. Step 6: the signal ops on
+GL, conformant on llvmpipe and the Intel GPU. Next: step 7, exposure in
+layers.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional

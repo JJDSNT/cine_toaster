@@ -431,6 +431,24 @@ Neither changes the direction; each is used at the edges (`references.md`).
   among valid neighbours on the same side of a depth discontinuity (a
   threshold on the relative jump), +inf and labels never blended.
 
+### Signals on GL: what is not there yet (CT-0081 step 6)
+
+- **Reading a signal costs more than drawing it**: a 1080p frame is a
+  ZIP-compressed float EXR, 36 ms to decode. How: a disposable cache of
+  decoded frames (.npy, keyed by the record's data hash) beside the
+  composite cache -- 2.6 ms a frame; or a lighter EXR compression for
+  records read often.
+- **A surface's depth is drawn by the reference only.** How: the mesh pass
+  writes its depth buffer as linear z into a second target.
+- **An object's depth reads its matte back** (one transfer a frame). How: a
+  GPU histogram of the interior's depths (a reduction in two passes), kept
+  only if measured faster than the transfer.
+- **A merge takes 8 layers on GL.** How: merge in groups of 8 by depth
+  order, the partial result carried as a layer with its depth.
+- **The graph's `signal.align_depth` is the reference's**: the recorded
+  alignment (`toast signal align`) is the one to use; the graph op stays a
+  sketch until it reads a calibration's parameters.
+
 ### Depth compositing: what it does not do yet (CT-0081 step 5)
 
 - **A cut-out's fringe carries the plate's background** (the person layer

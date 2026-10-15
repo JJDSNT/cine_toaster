@@ -7,8 +7,12 @@ surface's mesh) and its curves from the very functions the reference uses, so
 only the drawing differs.
 
 It implements a subset (`IMPLEMENTED`); a graph with anything else is refused
-by name and goes to the reference. Time operations are not in it yet: each
-frame here is made from that frame's inputs alone.
+by name and goes to the reference (`renderer_for`), and which drew is part of the
+result's identity. Signals (C8 step 6): read on the CPU by the reference's own
+readers, a depth held in two channels -- its value, and whether it is unknown --
+never as NaN in a shader, never filtered; `merge.depth`, `signal.object_depth`
+(its median on the CPU, drawn here) and `matte.label` drawn by the reference's
+rules, refusals word for word.
 
 On this machine GL is Mesa's llvmpipe (or, with `GALLIUM_DRIVER=d3d12`, the
 Intel GPU through Windows): measured, a 1080p float pass is 1.5 ms on llvmpipe,
@@ -44,7 +48,18 @@ IMPLEMENTED = {
     # Time and tracks (C7 step 6, CT-0080): which frames, with what weights, and where a track is read are the
     # shared contract's (`clock`, `semantics.remap_samples`, `reference.TrackBook`); GL draws what it decides.
     "time.remap", "time.offset", "time.blend", "time.echo", "track.read", "track.measure", "curve.from_track",
+    # Signals (C8 step 6, CT-0081): read on the CPU by the reference's own readers, drawn here. A depth is two
+    # channels -- R its value (a number, or +inf: nothing there), G its state (1: unknown) -- never NaN in a
+    # shader, whose meaning GLSL does not promise; read texel by texel (texelFetch), never filtered: a filter
+    # at a texel's centre still multiplies +inf by 0.
+    "signal.read", "generate.render", "merge.depth", "signal.object_depth", "matte.label",
 }
+
+#: Ops whose unknown depths (G = 1) they read and decide about; any other op given one refuses, as the reference.
+DECIDES_UNKNOWN = ("merge.depth", "signal.object_depth")
+#: The most layers one GL merge takes: a picture and a depth each, within the 16 texture units GL promises.
+MERGE_LAYERS = 8
+POS_INF = float("inf")
 
 # A gl-transitions shader, run inside this renderer as an opaque node (SPEC-0012 §3; CT-0072, B1). The
 # shaders were written for display-encoded pictures with uv (0, 0) at the bottom left: the picture is
@@ -96,6 +111,26 @@ vec3 decode(vec3 c) { return vec3(decode1(c.r), decode1(c.g), decode1(c.b)); }
 
 _SHADERS = {
     "solid": "uniform vec4 colour; void main() { result = colour; }",
+    # A depth's coverage (CT-0081 step 5): where the picture covers a pixel its depth sample missed (+inf, not
+    # unknown), the nearest depth of the known neighbours; one pass a pixel of reach.
+    "depth_fill": """uniform sampler2D picture; uniform sampler2D depth;
+        void main() { ivec2 at = ivec2(gl_FragCoord.xy); vec2 d = texelFetch(depth, at, 0).rg;
+          if (texelFetch(picture, at, 0).a > 0.0 && isinf(d.r) && d.r > 0.0 && d.g < 0.5) {
+            ivec2 last = textureSize(depth, 0) - 1; float nearest = d.r;
+            for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
+              vec2 n = texelFetch(depth, clamp(at + ivec2(dx, dy), ivec2(0), last), 0).rg;
+              if (n.g < 0.5 && !isinf(n.r)) nearest = min(nearest, n.r); }
+            d.r = nearest; }
+          result = vec4(d, 0.0, 1.0); }""",
+    "as_depth": """uniform sampler2D a;
+        void main() { result = vec4(texelFetch(a, ivec2(gl_FragCoord.xy), 0).r, 0.0, 0.0, 1.0); }""",
+    "object_depth": """uniform sampler2D matte; uniform float depth; uniform int unknown;
+        void main() { bool in_matte = texelFetch(matte, ivec2(gl_FragCoord.xy), 0).r > 0.0;
+          result = in_matte ? vec4(depth, float(unknown), 0.0, 1.0) : vec4(uintBitsToFloat(0x7f800000u), 0.0, 0.0, 1.0); }""",
+    "label": """uniform sampler2D a; uniform float labels[32]; uniform int count;
+        void main() { float v = floor(texelFetch(a, ivec2(gl_FragCoord.xy), 0).r + 0.5); float m = 0.0;
+          for (int i = 0; i < 32; i++) { if (i < count && v == labels[i]) m = 1.0; }
+          result = vec4(m, 0.0, 0.0, 1.0); }""",
     "gradient": """uniform vec4 stops[8]; uniform float places[8]; uniform int count; uniform int radial; uniform float angle;
         uniform float aspect; uniform float repeats;
         void main() {
@@ -273,6 +308,7 @@ class GLRenderer:
         self.vaos = {name: self.context.vertex_array(program, [(self.quad, "2f", "position")])
                      for name, program in self.programs.items()}
         self.mesh_program = self.context.program(vertex_shader=_MESH_VERTEX, fragment_shader=_MESH_FRAGMENT)
+        self.stats: dict[str, float] = {}
         self.opaque: dict[str, Any] = {}
         self.pool: dict[tuple, list] = {}
         self.shapes: dict[str, np.ndarray] = {}  # shapes drawn by the shared rasteriser, by what they are
@@ -300,6 +336,10 @@ class GLRenderer:
             return texture
         texture = self.context.texture(size, components, data, dtype="f4")
         texture.repeat_x = texture.repeat_y = False
+        if components == 2:
+            # A depth (or vectors): never filtered -- at a texel's centre a linear filter still weighs its
+            # neighbour by 0, and 0 x +inf is NaN (found in CT-0081 step 6, a matte of a merged depth).
+            texture.filter = (self.gl.NEAREST, self.gl.NEAREST)
         return texture
 
     def recycle(self, texture) -> None:
@@ -313,17 +353,56 @@ class GLRenderer:
             texture.extra.release()
         texture.release()
 
+    def _count(self, what: str, started: float) -> None:
+        import time
+
+        self.stats[f"{what}_s"] = self.stats.get(f"{what}_s", 0.0) + time.perf_counter() - started
+        self.stats[what] = self.stats.get(what, 0) + 1
+
     def upload(self, array: np.ndarray):
+        import time
+
+        started = time.perf_counter()
         array = np.ascontiguousarray(array, dtype=np.float32)
         components = 1 if array.ndim == 2 else array.shape[-1]
-        return self.texture((array.shape[1], array.shape[0]), components, array.tobytes())
+        texture = self.texture((array.shape[1], array.shape[0]), components, array.tobytes())
+        self._count("upload", started)
+        return texture
 
     def download(self, texture, components: int) -> np.ndarray:
+        import time
+
+        started = time.perf_counter()
         data = np.frombuffer(texture.read(), dtype=np.float32)
-        return data.reshape(texture.height, texture.width, texture.components)[..., :components].copy()
+        array = data.reshape(texture.height, texture.width, texture.components)[..., :components].copy()
+        self._count("download", started)
+        return array
+
+    def upload_depth(self, depth: np.ndarray):
+        """A depth as GL holds it: R its value (unknown pixels 0, their value meaningless), G 1 where unknown."""
+
+        unknown = np.isnan(depth)
+        return self.upload(np.stack([np.where(unknown, 0.0, depth), unknown], axis=-1).astype(np.float32))
+
+    def download_depth(self, texture) -> np.ndarray:
+        """Back to the reference's form: NaN where unknown."""
+
+        data = self.download(texture, 2)
+        return np.where(data[..., 1] > 0.5, np.nan, data[..., 0]).astype(np.float32)
+
+    def merge_program(self, count: int):
+        name = f"merge_{count}"
+        if name not in self.programs:
+            self.programs[name] = self.context.program(vertex_shader=_VERTEX,
+                                                       fragment_shader=_HEAD + _merge_shader(count))
+            self.vaos[name] = self.context.vertex_array(self.programs[name], [(self.quad, "2f", "position")])
+        return name
 
     def draw(self, program: str, size: tuple[int, int], components: int, textures: dict[str, Any],
              **uniforms: Any):
+        import time
+
+        started = time.perf_counter()
         target = self.texture(size, components)
         frame = getattr(target, "extra", None)
         if frame is None:  # a framebuffer kept with its texture (moderngl's `extra`): made once, not every draw
@@ -339,6 +418,7 @@ class GLRenderer:
             if name in shader:
                 shader[name].value = value
         self.vaos[program].render()
+        self._count("draw", started)
         return target
 
     # --- the graph ------------------------------------------------------------------
@@ -382,7 +462,13 @@ class GLRenderer:
 
                 clips[name] = read(Path(value), extent, size, fps, working=working)
         kept: dict[tuple[str, int], Any] = {}  # (node, frame) -> its texture
+        # Signals (C8 step 6): the records' readers (checked once), the CPU copies a signal was uploaded from
+        # (an object's depth reads them back without a transfer), and what may hold unknown depths.
+        signal_state = {"held": {}, "cpu": {}, "unknown": set(), "nodes": nodes,
+                        "wanted": {str(item) for node in nodes.values() for item in _references(node)}}
+        self.stats = {}
         temporary: list[Any] = []  # textures made on the way (a blend's steps), let go after each frame
+        signal_state["temporary"] = temporary
         book = TrackBook(graph, inputs, fps=fps, frames=frames, root=root, origins=origins or {}, working=working,
                          picture_at=lambda name, index: self._picture(value_at(name, index)))
         curve = curve_factory(nodes, curves, fps=fps, length=length, beats=beats, tracks=book.track,
@@ -420,11 +506,13 @@ class GLRenderer:
             kept[key] = self._compute(reference, nodes[reference], lambda name: value_at(name, frame),
                                       param_at(frame), size, aspect, root, frames, fps, working, clips, frame,
                                       _Made(kept, frame), value_at=value_at, book=book, spans=spans, extent=extent,
-                                      temporary=temporary)
+                                      temporary=temporary, signal_state=signal_state)
             return kept[key]
 
         def let_go(keep_from: int, keep_to: int) -> None:
             held = {id(texture) for (name, frame), texture in kept.items() if keep_from <= frame <= keep_to}
+            for key in [key for key in signal_state["cpu"] if not keep_from <= key[1] <= keep_to]:
+                del signal_state["cpu"][key]
             for key in [key for key in kept if not keep_from <= key[1] <= keep_to]:
                 texture = kept.pop(key)
                 if hasattr(texture, "release") and id(texture) not in held:
@@ -455,9 +543,14 @@ class GLRenderer:
         return self.download(texture, 4) if texture.components == 4 else _grey(self.download(texture, 1))
 
     def _compute(self, name, node, value, param, size, aspect, root, frames, fps, working, clips, frame, made, *,
-                 value_at=None, book=None, spans=None, extent=None, temporary=None):
+                 value_at=None, book=None, spans=None, extent=None, temporary=None, signal_state=None):
         op = node["op"]
         width, height = size
+        if signal_state is not None:
+            done = self._signals(name, node, op, value, param, size, root, fps, clips, frame, made, book,
+                                 signal_state)
+            if done is not None:
+                return done
         p = lambda key, default=None: param(node, key, default)  # noqa: E731
         if op == "generate.source":
             if name not in clips:
@@ -724,6 +817,128 @@ class GLRenderer:
         frame.release()
         return target
 
+    def _signals(self, name, node, op, value, param, size, root, fps, clips, frame, made, book, state):
+        """Signals in GL (C8 step 6): the reference's readers on the CPU, the reference's rules drawn here.
+        None for any other op (after refusing it an unknown depth, as the reference does)."""
+
+        from .reference import object_depth, read_render, read_signal, read_signal_file
+        from .schema import OPS
+
+        width, height = size
+        unknown = state["unknown"]
+        if op not in DECIDES_UNKNOWN and op in OPS:
+            for port, spec in OPS[op].inputs.items():
+                if "signal" not in spec.types or not node.get(port):
+                    continue
+                for reference in node[port] if isinstance(node[port], list) else [node[port]]:
+                    texture = value(str(reference))  # made first: whether it may hold unknown is known then
+                    if (str(reference), frame) in unknown:
+                        flags = self.download(texture, 2)[..., 1] if texture.components >= 2 else None
+                        if flags is not None and (flags > 0.5).any():
+                            raise ValidationError(f"{name} ({op}) reads {reference}, a depth unknown on "
+                                                  f"{int((flags > 0.5).sum())} pixels of frame {frame}: only "
+                                                  "merge.depth decides what an unknown depth means")
+        if op == "signal.read":
+            kind = node.get("kind")
+            if node.get("signal"):
+                data = read_signal(name, node, book, frame, fps, width, height, root, state["held"])
+                kind = state["held"][f"signal:{name}"].record["kind"]
+            else:
+                if f"read:{name}" not in clips:
+                    clips[f"read:{name}"] = read_signal_file(name, node, root, size, fps)
+                data = clips[f"read:{name}"]
+            state["cpu"][(name, frame)] = data
+            if kind in ("depth", "depth_relative"):
+                if np.isnan(data).any():
+                    unknown.add((name, frame))
+                return self.upload_depth(data.astype(np.float32))
+            return self.upload(data.astype(np.float32))
+        if op == "generate.render":
+            if not node.get("render"):
+                raise ValidationError(f"{name}: a renderer's own scene is rendered apart: give it a render's record "
+                                      "(`render`, renders.render_passes)")
+            picture, depth, alpha = read_render(name, node, state["held"], root, (frame + 0.5) / fps, width, height)
+            made[f"{name}.depth"] = self.upload_depth(depth)
+            made[f"{name}.alpha"] = self.upload(alpha)
+            state["cpu"][(f"{name}.depth", frame)] = depth
+            return self.upload(picture)
+        if op == "matte.label":
+            labels = [float(label) for label in node["labels"]]
+            if len(labels) > 32:
+                raise ValidationError(f"{name}: the GL renderer takes up to 32 labels, not {len(labels)}")
+            return self.draw("label", size, 1, {"a": value(node["signal"])},
+                             labels=tuple(labels + [0.0] * (32 - len(labels))), count=len(labels))
+        if op == "signal.object_depth":
+            depth = state["cpu"].get((str(node["signal"]), frame))
+            if depth is None:
+                depth = self.download_depth(self._as_depth(value(str(node["signal"])), size, state))
+            matte = self.download(self._matte(value(str(node["matte"])), size), 1)[..., 0]
+            # The reduction is the reference's own (a median over the matte's interior): on the CPU, where it is
+            # one sort; the object's depth then drawn over its matte here.
+            whole = object_depth(name, depth, matte, statistic=str(node.get("statistic", "median")),
+                                 inset=int(node.get("inset", 2)))
+            shown = whole[matte > 0]
+            constant = float(shown[0]) if shown.size else POS_INF
+            if np.isnan(constant):
+                unknown.add((name, frame))
+            state["cpu"][(name, frame)] = whole
+            return self.draw("object_depth", size, 2, {"matte": self._matte(value(str(node["matte"])), size)},
+                             depth=0.0 if np.isnan(constant) else constant, unknown=int(np.isnan(constant)))
+        if op == "merge.depth":
+            return self._merge_depth(name, node, value, size, frame, made, state)
+        return None
+
+    def _as_depth(self, texture, size, state):
+        """A depth in two channels: a one-channel signal (a file read as R, a matte) given state 0."""
+
+        if texture.components >= 2:
+            return texture
+        made = self.draw("as_depth", size, 2, {"a": texture})
+        state["temporary"].append(made)
+        return made
+
+    def _merge_depth(self, name, node, value, size, frame, made, state):
+        from .reference import depth_conventions_agree
+
+        pictures = [value(str(item)) for item in node["pictures"]]
+        depths = [self._as_depth(value(str(item)), size, state) for item in node["depths"]]
+        labels = [str(item) for item in node["depths"]]
+        if f"conventions:{name}" not in state["held"]:
+            state["held"][f"conventions:{name}"] = depth_conventions_agree(name, node, state["nodes"], state["held"])
+        near_small = bool(node.get("near_is_small", True))
+        policy = node.get("unknown", "refuse")
+        edges = node.get("edges", "coverage")
+        if edges not in ("coverage", "hard"):
+            raise ValidationError(f"{name}: edges are `coverage` or `hard`, not {edges!r}")
+        maybe_unknown = any((label, frame) in state["unknown"] for label in labels)
+        program = self.merge_program(len(pictures))
+        textures = {}
+        for index, (picture, depth) in enumerate(zip(pictures, depths)):
+            textures[f"p{index}"], textures[f"d{index}"] = picture, depth
+        if maybe_unknown and policy == "refuse":
+            for index, label in enumerate(labels):
+                flag = self.draw(program, size, 1, textures, policy=1, mode=2, near_small=int(near_small), which=index)
+                shown = int((self.download(flag, 1) > 0.5).sum())
+                self.recycle(flag)
+                if shown:
+                    raise ValidationError(f"{name}: {label} has no depth on {shown} pixels of frame {frame} where its "
+                                          "picture shows -- not far, unknown. Say `unknown: behind` or `unknown: "
+                                          "front` on the merge, or fix the depth")
+        if edges == "coverage" and near_small:
+            for index in range(len(depths)):
+                filled = textures[f"d{index}"]
+                for _ in range(int(node.get("reach", 2))):
+                    filled = self.draw("depth_fill", size, 2, {"picture": pictures[index], "depth": filled})
+                    state["temporary"].append(filled)
+                textures[f"d{index}"] = filled
+        code = {"behind": 1, "front": 2}.get(policy, 0)
+        if f"{name}.depth" in state["wanted"]:
+            made[f"{name}.depth"] = self.draw(program, size, 2, textures, policy=code, mode=1,
+                                              near_small=int(near_small), which=-1)
+            if maybe_unknown:
+                state["unknown"].add((f"{name}.depth", frame))
+        return self.draw(program, size, 4, textures, policy=code, mode=0, near_small=int(near_small), which=-1)
+
     def _matte(self, texture, size):
         """A picture used as a matte is its alpha (SPEC-0012 §1)."""
 
@@ -811,6 +1026,47 @@ class GLRenderer:
         return reduced
 
 
+def _references(node: dict[str, Any]) -> list[str]:
+    """Every value a node reads (its inputs), as references -- to know which second outputs are wanted."""
+
+    found = []
+    for value in node.values():
+        for item in value if isinstance(value, list) else [value]:
+            if isinstance(item, str) and "." in item:
+                found.append(item)
+    return found
+
+
+def _merge_shader(count: int) -> str:
+    """`merge.depth` for `count` layers (CT-0081 steps 5-6): the reference's `merge_by_depth`, pixel by pixel --
+    each layer's picture and depth (R value, G unknown), ordered nearest first (stable: ties keep the layers'
+    order), unknown placed by `policy` (1 behind, 2 front), composited far to near. `mode` 0 gives the picture,
+    1 the merged depth (the nearest shown layer's: R value, G unknown; +inf where none shows), 2 a flag where
+    layer `which` (or any, -1) is unknown and its picture shows."""
+
+    samplers = "".join(f"uniform sampler2D p{i}; uniform sampler2D d{i};\n" for i in range(count))
+    loads = "".join(f"P[{i}] = texelFetch(p{i}, at, 0); D[{i}] = texelFetch(d{i}, at, 0).rg;\n" for i in range(count))
+    return f"""{samplers}uniform int policy; uniform int mode; uniform int near_small; uniform int which;
+        void main() {{ ivec2 at = ivec2(gl_FragCoord.xy); vec4 P[{count}]; vec2 D[{count}];
+          {loads}
+          float INF = uintBitsToFloat(0x7f800000u);
+          if (mode == 2) {{ float flag = 0.0;
+            for (int i = 0; i < {count}; i++) if ((which < 0 || which == i) && D[i].g > 0.5 && P[i].a > 0.0) flag = 1.0;
+            result = vec4(flag, 0.0, 0.0, 1.0); return; }}
+          float key[{count}]; int order[{count}];
+          for (int i = 0; i < {count}; i++) {{
+            key[i] = D[i].g > 0.5 ? (policy == 1 ? INF : -INF) : (near_small == 1 ? D[i].r : -D[i].r);
+            order[i] = i; }}
+          for (int i = 1; i < {count}; i++) {{ int j = i;
+            while (j > 0 && key[order[j]] < key[order[j - 1]]) {{ int t = order[j]; order[j] = order[j - 1]; order[j - 1] = t; j--; }} }}
+          if (mode == 1) {{ result = vec4(near_small == 1 ? INF : -INF, 0.0, 0.0, 1.0);
+            for (int r = {count} - 1; r >= 0; r--) {{ int i = order[r]; if (P[i].a > 0.0) result = vec4(D[i], 0.0, 1.0); }}
+            return; }}
+          vec4 out_ = vec4(0.0);
+          for (int r = {count} - 1; r >= 0; r--) {{ vec4 l = P[order[r]]; out_ = l + out_ * (1.0 - l.a); }}
+          result = out_; }}"""
+
+
 def _grey(matte: np.ndarray) -> np.ndarray:
     return np.concatenate([matte, matte, matte, np.ones_like(matte)], axis=-1)
 
@@ -859,8 +1115,16 @@ def renderer_for(graph: dict[str, Any]) -> "GLRenderer | None":
     """
 
     # An OpenFX plugin is Natron's, staged before any renderer draws (`natron.stage`): not GL's to refuse.
-    if any(node.get("op") not in IMPLEMENTED and node.get("op") != "opaque.natron"
-           for node in (graph.get("nodes") or {}).values()):
+    nodes = graph.get("nodes") or {}
+    if any(node.get("op") not in IMPLEMENTED and node.get("op") != "opaque.natron" for node in nodes.values()):
+        return None
+    # Two texture units a layer, and 16 is all GL promises: a merge of more than 8 layers is the reference's.
+    if any(node.get("op") == "merge.depth" and len(node.get("pictures") or []) > MERGE_LAYERS
+           for node in nodes.values()):
+        return None
+    # A surface's depth is the reference's alone yet (GL draws the surface, not its depth).
+    if any(nodes.get(item.split(".")[0], {}).get("op") == "warp.surface" and item.endswith(".depth")
+           for node in nodes.values() for item in _references(node)):
         return None
     renderer = getattr(_SHARED, "renderer", None)
     if renderer is None:

@@ -389,7 +389,10 @@ compositor until accepted. Step 5 done: `merge.depth` carries each
 layer's depth into its coverage (the halo gone, measured against rendered
 truths), keeps three depth states (known, nothing there, unknown) and gives
 its depth out; `signal.object_depth` keeps a cut-out object whole where an
-estimated depth is soft.
+estimated depth is soft. Step 6 done: those signal ops on GL, a depth held
+in two channels (value, unknown) -- never NaN in a shader, never filtered --
+conformant with the reference on llvmpipe and the GPU, 2.1-2.5x faster at
+1080p, the cost now in reading records and transfers.
 
 - What: depth and segmentation as signals, from a model run on a picture
   (depth estimation, a segment-anything model) or from Blender passes (Z,

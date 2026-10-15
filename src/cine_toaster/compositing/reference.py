@@ -1239,6 +1239,62 @@ def read_signal(name: str, node: dict[str, Any], book: "TrackBook", frame: int, 
     return data.astype(np.int64 if reader.record["kind"] == "segmentation" else np.float32)
 
 
+def read_signal_file(name: str, node: dict[str, Any], root: Path | None, size: tuple[int, int],
+                     fps: float) -> np.ndarray:
+    """A signal from a file, read once -- one reading for every renderer: an EXR's layer named, or its only one,
+    its channels the kind's (never the first of several that happens to be there, CT-0081); a .npy; or the
+    first frame of a picture. Resized to the frame (`resize_signal`)."""
+
+    width, height = size
+    path = Path(node["file"])
+    path = (root / path) if root and not path.is_absolute() else path
+    kind = node["kind"]
+    channels = {"vectors": 2, "normals": 3}.get(kind, 1)
+    if path.suffix.lower() == ".exr":
+        from ..color import exr_layer
+
+        data = exr_layer(path, node.get("layer"))
+        found = 1 if data.ndim == 2 else data.shape[2]
+        if found != channels:
+            raise ValidationError(f"{name} reads a {kind} ({channels} value(s) a pixel) from a layer of "
+                                  f"{found} channels in {path.name}: name a layer of {channels} (`layer`)")
+        data = resize_signal(data, kind, width, height)
+    elif path.suffix.lower() == ".npy":
+        data = np.load(path).astype(np.float32)
+    else:
+        data = read(path, 1, size, fps, colorspace=LINEAR, alpha="premultiplied", working=LINEAR)[0]
+    if data.ndim == 3:
+        data = data[..., :channels] if channels > 1 else data[..., 0]
+    return data.astype(np.float32 if kind != "segmentation" else np.int64)
+
+
+def read_render(name: str, node: dict[str, Any], held: dict[str, Any], root: Path | None, seconds: float,
+                width: int, height: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """A render's record at an instant -- picture, depth, alpha of one frame of its clock (C8 step 2), the one
+    reading every renderer makes: checked once (stale, camera), resized -- the picture smoothly, the depth to
+    the nearest."""
+
+    from ..renders import RenderReader
+
+    key = f"render:{name}"
+    if key not in held:
+        if root is None:
+            raise ValidationError(f"{name} reads the production's render {node['render']!r}: give the graph its "
+                                  "production")
+        held[key] = RenderReader(root, str(node["render"]))
+        if node.get("camera") and node["camera"] != held[key].camera:
+            raise ValidationError(f"{name} reads {node['render']} as from the camera {node['camera']!r}, but it "
+                                  f"is from {held[key].camera!r}")
+    reader = held[key]
+    index = reader.index(seconds)
+    picture = reader.picture(index)
+    depth = reader.depth.frame(index)
+    if picture.shape[:2] != (height, width):
+        picture = Image_resize(picture, width, height)
+        depth = resize_signal(depth, "depth", width, height)
+    return picture.astype(np.float32), depth.astype(np.float32), picture[..., 3].astype(np.float32)
+
+
 def _signal_index(name: str, node: dict[str, Any], reader: Any, book: "TrackBook", frame: int, fps: float) -> int:
     if node.get("of"):
         seconds = (frame + 0.5) / fps
@@ -1927,58 +1983,17 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
         if op == "generate.render" and node.get("render"):
             # A render's record (C8 step 2): its picture out, its depth and alpha beside -- one frame of one
             # clock, read, never rendered here.
-            from ..renders import RenderReader
-
-            key = f"render:{name}"
-            if key not in clips:
-                if root is None:
-                    raise ValidationError(f"{name} reads the production's render {node['render']!r}: give the graph "
-                                          "its production")
-                clips[key] = RenderReader(root, str(node["render"]))
-                if node.get("camera") and node["camera"] != clips[key].camera:
-                    raise ValidationError(f"{name} reads {node['render']} as from the camera {node['camera']!r}, but "
-                                          f"it is from {clips[key].camera!r}")
-            reader = clips[key]
-            index = reader.index(seconds)
-            picture = reader.picture(index)
-            depth = reader.depth.frame(index)
-            if picture.shape[:2] != (height, width):
-                # The picture resized smoothly; the depth to the nearest (`resize_signal`).
-                picture = Image_resize(picture, width, height)
-                depth = resize_signal(depth, "depth", width, height)
-            context.cache[(f"{name}.depth", frame)] = depth.astype(np.float32)
-            context.cache[(f"{name}.alpha", frame)] = picture[..., 3].astype(np.float32)
-            return picture.astype(np.float32)
+            picture, depth, alpha = read_render(name, node, clips, root, seconds, width, height)
+            context.cache[(f"{name}.depth", frame)] = depth
+            context.cache[(f"{name}.alpha", frame)] = alpha
+            return picture
         if op == "signal.read" and node.get("signal"):
             # A production's signal (C8 step 1): checked once, read at the instant its source shows.
             return read_signal(name, node, book, frame, fps, width, height, root, clips)
         if op == "signal.read":
-            path = Path(node["file"])
-            path = (root / path) if root and not path.is_absolute() else path
             key = f"read:{name}"
             if key not in clips:
-                kind = node["kind"]
-                channels = {"vectors": 2, "normals": 3}.get(kind, 1)
-                if path.suffix.lower() == ".exr":
-                    # A layer named, or the file's only one; its channels the kind's -- never the first of
-                    # several that happens to be there (CT-0081).
-                    from ..color import exr_layer
-
-                    data = exr_layer(path, node.get("layer"))
-                    found = 1 if data.ndim == 2 else data.shape[2]
-                    if found != channels:
-                        raise ValidationError(f"{name} reads a {kind} ({channels} value(s) a pixel) from a layer of "
-                                              f"{found} channels in {path.name}: name a layer of {channels} (`layer`)")
-                    data = resize_signal(data, kind, width, height)
-                elif path.suffix.lower() == ".npy":
-                    data = np.load(path).astype(np.float32)
-                else:
-                    data = read(path, 1, size, fps, colorspace=LINEAR, alpha="premultiplied", working=LINEAR)[0]
-                kind = node["kind"]
-                channels = {"vectors": 2, "normals": 3}.get(kind, 1)
-                if data.ndim == 3:
-                    data = data[..., :channels] if channels > 1 else data[..., 0]
-                clips[key] = data.astype(np.float32 if kind != "segmentation" else np.int64)
+                clips[key] = read_signal_file(name, node, root, size, fps)
             return clips[key]
         if op == "signal.object_depth":
             return object_depth(name, value(node["signal"], frame), _matte(value(node["matte"], frame)),

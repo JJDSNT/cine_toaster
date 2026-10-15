@@ -520,6 +520,60 @@ contact is wrong whatever the edges (0.157): it sets the pillar behind --
 and the alignment flags `floor/pillar`. No edge method mends an order; the
 flag is what saves the composite.
 
+## Step 6 -- the signal ops on GL (done 2026-10-15)
+
+The user's scope: `signal.read`, `merge.depth`, `signal.object_depth`, their
+chains, transfers measured; the same results, no second interpretation of
+the data; a hybrid where a reduction is better on the CPU; GL never a race to
+put everything on the GPU.
+
+Audit first: GL drew none of C8's ops, so any graph with a depth went to the
+reference; a graph is drawn whole by GL or whole by the reference
+(`renderer_for`), the one that drew in the result's identity; textures are
+float, sampled with a linear filter -- and a linear filter at a texel's
+centre still weighs its neighbour by 0, and 0 x +inf is NaN.
+
+- **A depth in GL is two channels**: R its value (a number, or +inf: nothing
+  there), G its state (1: unknown) -- never NaN in a shader (GLSL does not
+  promise its meaning). Two-channel textures are never filtered (`NEAREST`,
+  set where textures are made); the new shaders read texel by texel.
+- **One reading for both renderers**: `read_signal`, `read_signal_file` and
+  `read_render` (the last two drawn out of the reference's evaluation for
+  it) read records and files on the CPU; GL uploads what they give.
+- **`merge.depth`**: a program per number of layers (up to 8: two texture
+  units a layer, 16 promised; more goes to the reference), the reference's
+  `merge_by_depth` pixel by pixel -- coverage passes, ordering stable on
+  ties, unknown placed by policy, the merged depth out (only when a node
+  reads it), and the refusal of an unknown shown, word for word (a flag pass
+  read back only when an input may hold unknown).
+- **`signal.object_depth`, hybrid**: the median on the CPU (one sort; the
+  depth from the CPU copy it was uploaded from, the matte read back once),
+  the object's depth drawn over its matte here.
+- **`matte.label`**: up to 32 labels in a shader.
+- **The unknown refusal** for any other op reading a depth: the same rule
+  and message (its input made first, then checked).
+- **Still the reference's**: a surface's depth (GL draws the surface, not
+  its depth); the graph `signal.align_depth`; merges of more than 8 layers
+  -- `renderer_for` sends such graphs there, and the identity says so.
+
+Measured (`scripts/research/gl_signal_bench.py`, 1920x1080, three layers
+with coverage, an object's depth, unknown pixels, a label matte), ms a frame:
+
+| | llvmpipe (CPU) | Intel UHD 620 (d3d12) |
+|---|---|---|
+| the reference | 835 | 871 |
+| GL | 394 (2.1x) | 345 (2.5x) |
+| reading the records (CPU) | 134 | 139 |
+| uploads (7) | 46 | 67 |
+| draws (13), submitted | 91 | 3 |
+| downloads (3, waiting on the GPU) | 48 | 61 |
+| largest difference | 3.9e-5 | 6.0e-8 |
+
+On the GPU the drawing is nearly free; what costs is reading the records
+(a 1080p signal frame is a ZIP-compressed float EXR, 36 ms to decode
+against 2.6 ms as .npy) and the transfers -- the pictures up, the matte for
+an object's depth and the output down.
+
 # Done
 
 - Read SPEC-0012's signal types and ops, the schema's kind and camera
@@ -544,7 +598,17 @@ flag is what saves the composite.
   node declaring another kind or camera is refused; a relative depth cannot
   reach `merge.depth`; labels are resized to the nearest; one signal serves
   two readers.
-- Full suite after step 1: 934 tests pass; after step 2 and its review: 954; after step 3: 966; after step 4: 984; after step 5: 997.
+- Full suite after step 1: 934 tests pass; after step 2 and its review: 954; after step 3: 966; after step 4: 984; after step 5: 997; after step 6: 1006.
+- Step 6 (`tests/test_gl_signals.py`, 9, on llvmpipe and again on the Intel
+  GPU with `GALLIUM_DRIVER=d3d12`): GL equal to the reference at partial
+  alpha with coverage and without; the three states through a chain of
+  merges, both policies; the same refusals word for word (an unknown shown,
+  an unknown into a matte); a merged depth (known, +inf) into a matte; five
+  layers with ties, near small and far small; an object's depth, known and
+  unknown; labels; a render, its depth and its objects at its own size and
+  resized (heavy); +inf and NaN surviving the way to the GPU and back; what
+  GL cannot draw whole (the graph alignment, a surface's depth, nine
+  layers) sent to the reference.
 - Step 5 (`tests/test_depth_edges.py`, 13): a disc's soft edge kept exactly
   where its one depth sample missed (the halo measured, then gone); coverage
   never putting a layer before what is nearer; the merged depth's three
