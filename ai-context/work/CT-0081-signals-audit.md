@@ -324,6 +324,97 @@ frame; Video Depth Anything about 15 s for one window at input 252 (170 s at
 518); SAM 2 about 6 s a frame. A box prompt drawn loosely by hand gave the
 box an IoU of 0.56 -- the measured quality shows it, which is the point.
 
+## Step 4 -- alignment over a stretch, with its residuals (done 2026-10-15)
+
+The user's requirements (two reviews): an explicit transformation; time
+shared or regularized, not fitted free per frame; residuals beyond a
+correlation (MAE, RMSE, percentiles, coverage); occlusions and missing
+values excluded, never made 0; provenance kept, an aligned depth still an
+estimate; `merge.depth` not taking it just because it has metres -- camera,
+coordinates, Z convention, time and calibration checked; unknown not
+background; coordinates beyond resolution (origin, orientation, crop, scale);
+independent validation in space, alternate frames and a continuous stretch;
+regularization by real time; inversions of order by object pair -- and the
+decisive test, that a wrong occlusion is detected and signalled even when it
+cannot be corrected. The user's caution kept: the measurements are on
+synthetic scenes; they show the adapters and the alignment work there, not
+that they generalize to real footage, hard occlusions or complex camera
+moves.
+
+- **`align.py`** (`align_depth`, `toast signal align`): 1/z = s e + t,
+  least squares, trimmed (a spread floor so exact data is not trimmed at
+  random); `regularized` by default -- the change of (s, t) penalized over
+  the real interval between frames fitted -- or `shared`, or `per_frame`;
+  the three always fitted and compared, beside a constant depth (what an
+  alignment must beat). Excluded: reference +inf, non-finite or not
+  positive; a band at the reference's depth jumps; an optional region.
+  s <= 0 refused (it would turn near into far). Where s e + t <= 0 the
+  pixel is **unknown** (`signals`' new `unknown` masks, kept apart from the
+  data). Residuals in sample, on held-out 8-pixel blocks, on alternate
+  interior frames (parameters interpolated in time) and on the last quarter
+  held out (parameters held from the past), beyond a region where the
+  reference has values; temporal agreement; the depth range calibrated.
+  With `objects` (instances), every pair ordered **where the two meet**
+  (each one's pixels within 3 of the other, medians compared) -- an
+  extended surface's own median says nothing of what stands on it -- and
+  occlusions inverted flagged; pairs apart reported apart.
+- **The record**: a `depth` derived from the estimate, origin `estimated`,
+  `align_depth` in its provenance (reference pinned, region and objects
+  pinned, parameters, exclusions, every measure, the modes compared, the
+  occlusions inverted), the camera stated by the caller and checked against
+  the reference, the reference's window, `outside: refuse` (a calibration
+  holds on its stretch only), `unknown` masks.
+- **The compositor's side**: `signal.read` of an estimated depth requires
+  `estimated: true`; a flagged one also `inversions: accept`; neither lifts
+  stale, camera or stretch refusals. `merge.depth` checks, where records
+  say, camera, quantity, unit, size, coordinates and the window of the
+  camera's image (`signals`' new `window`), refusing rather than
+  resampling; an unknown pixel where its picture shows is refused unless
+  the merge says `unknown: behind` or `front`.
+
+Measured on a rendered dolly (2.5 m in, 8 frames, 320x180) where a ball
+crosses behind a pillar on a floor before a wall; AbsRel, the regularized
+default:
+
+| Estimate | Calibrated on | In sample | Alternate frames out | Last stretch out | Constant depth |
+|---|---|---|---|---|---|
+| Depth Anything V2 | everything | 0.124 | 0.110 | 0.276 | 0.365 |
+| Video Depth Anything | everything | 0.084 | 0.077 | 0.188 | 0.365 |
+| Depth Anything V2 | the floor | 0.020 | 0.057 | 0.051 | 0.180 |
+| Video Depth Anything | the floor | 0.037 | 0.039 | 0.057 | 0.180 |
+
+Calibrated on the floor, the objects standing on it are an extrapolation:
+AbsRel 0.17-0.21 there. Temporal agreement (mean error of the
+frame-to-frame change, metres): `shared` was the worst in every case
+(0.12-0.39) -- Depth Anything V2 renormalizes each frame, its own fitted
+scale moving 4x (0.006-0.027), and a shared fit carries that into metres;
+`per_frame` the best in three cases (0.055-0.076); `regularized` between
+(0.095-0.146), and the best for the video model on the floor alone (0.100
+against 0.103 and 0.121). Held-out 8-pixel blocks barely differ from the
+sample (neighbouring blocks are alike); alternate frames are alike too --
+a video model's above all -- so their gain is favourable evidence on this
+scene, not a guarantee; the last stretch held out is the hardest measure
+(AbsRel 0.19-0.28 with the whole reference). The three kinds of measure
+stay apart -- metric error, stability in time, order of occlusion: here a
+mode better on one was worse on another.
+
+Found while closing, and fixed: outliers were judged against the
+regularized compromise (a frame the smooth fit could not follow lost its
+good pixels, and the fit drifted); they are now judged against each frame's
+own fit. The edge band measured a jump against the frame's median inverse
+depth (a floor near the camera read as edges); it is now relative to the
+pixels' own. The regularization penalizes the change of the map itself,
+(Δs e + Δt)² over the stretch's estimates, not s and t apart.
+
+The decisive case: Depth Anything V2 sets the pillar behind the floor along
+its silhouette (frames 0, 1, 2, 7) and the pillar behind the ball where they
+are apart (an inversion of the estimate itself: the alignment, monotone,
+cannot make or mend one) -- reported apart, not flagged: they do not meet
+there. Its average error passes (0.12); the record
+flags `floor/pillar`; a composite with it is refused until `inversions:
+accept`. The video model's calibration flags nothing, and its composite
+runs.
+
 # Done
 
 - Read SPEC-0012's signal types and ops, the schema's kind and camera
@@ -348,7 +439,24 @@ box an IoU of 0.56 -- the measured quality shows it, which is the point.
   node declaring another kind or camera is refused; a relative depth cannot
   reach `merge.depth`; labels are resized to the nearest; one signal serves
   two readers.
-- Full suite after step 1: 934 tests pass; after step 2 and its review: 954; after step 3: 966.
+- Full suite after step 1: 934 tests pass; after step 2 and its review: 954; after step 3: 966; after step 4: 984.
+- Step 4 (`tests/test_align.py`, 15): on synthetic fields of known scale
+  and shift -- found exactly in every mode, an alignment beating a
+  constant depth on frames it did not see; the record still estimated,
+  its history and measures, stale when the reference changes; the sky
+  unknown, never far or 0; a drifting scale carried into metres by a
+  shared fit, regularized between; alternate frames catching a fit that
+  holds only where it looked, the last stretch catching one that does not
+  hold forward; regularization by real time; refusals (camera, kind,
+  stretch, quantity, pixel grid, s <= 0); an inverted occlusion flagged and
+  refused unless accepted, a correct estimate not flagged; the composite
+  refusing an aligned depth unless `estimated: true`, an unknown pixel
+  unless told, past its stretch, of another camera, quantity, size or
+  window, or stale. On the rendered dolly with the models: alignment beats
+  a constant by 2x on held-out frames; the default flickers less than a
+  shared fit; no frame reordered; the floor does not vouch for the
+  objects; Depth Anything V2's wrong occlusion caught and refused, the
+  video model's composite run.
 - Step 3 (`tests/test_estimates.py`): without models, with a stand-in
   worker -- the catalog refuses CC-BY-NC models and unknown ones; nothing
   is fetched implicitly (the store stays absent); a fetch of the wrong

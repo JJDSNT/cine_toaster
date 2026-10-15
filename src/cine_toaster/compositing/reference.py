@@ -1215,15 +1215,74 @@ def read_signal(name: str, node: dict[str, Any], book: "TrackBook", frame: int, 
         if node.get("camera") and node["camera"] != record.get("camera"):
             raise ValidationError(f"{name} reads {node['signal']} as from the camera {node['camera']!r}, but it is "
                                   f"from {record.get('camera')!r}")
+        if record["kind"] == "depth" and record["origin"] == "estimated" and not node.get("estimated"):
+            # A depth with metres is not therefore measured (CT-0081 step 4): its use is a decision, said.
+            raise ValidationError(f"{name} reads {node['signal']}, an estimated depth calibrated to metres -- not a "
+                                  "measured one: say `estimated: true` on the node to use it as a depth")
+        flagged = {key: frames for step in record["provenance"] for key, frames in
+                   ((step.get("transformation") or {}).get("occlusions_inverted") or {}).items()}
+        if record["kind"] == "depth" and flagged and node.get("inversions") != "accept":
+            listed = "; ".join(f"{key} on frames {frames}" for key, frames in flagged.items())
+            raise ValidationError(f"{name} reads {node['signal']}, whose calibration found occlusions inverted "
+                                  f"against its reference ({listed}): say `inversions: accept` to use it anyway, "
+                                  "or correct it")
         held[key] = reader
     reader = held[key]
-    seconds = (frame + 0.5) / fps
-    if node.get("of"):
-        data = reader.at(book.media_instant(str(node["of"]).split(".")[0], name, seconds, f"the signal {node['signal']}"))
-    else:
-        data = reader.frame(frame)
-    data = resize_signal(data, reader.record["kind"], width, height)
+    index = _signal_index(name, node, reader, book, frame, fps)
+    data = resize_signal(reader.frame(index), reader.record["kind"], width, height)
     return data.astype(np.int64 if reader.record["kind"] == "segmentation" else np.float32)
+
+
+def _signal_index(name: str, node: dict[str, Any], reader: Any, book: "TrackBook", frame: int, fps: float) -> int:
+    if node.get("of"):
+        seconds = (frame + 0.5) / fps
+        return reader.index(book.media_instant(str(node["of"]).split(".")[0], name, seconds,
+                                               f"the signal {node['signal']}"))
+    return frame
+
+
+def read_signal_unknown(name: str, node: dict[str, Any], book: "TrackBook", frame: int, fps: float, width: int,
+                        height: int, held: dict[str, Any]) -> np.ndarray | None:
+    """Where a signal read by `name` has no value at this frame (resized to the nearest), or None."""
+
+    reader = held.get(f"signal:{name}")
+    if reader is None:
+        return None
+    mask = reader.unknown(_signal_index(name, node, reader, book, frame, fps))
+    return None if mask is None else resize_signal(mask, "segmentation", width, height)
+
+
+def depth_conventions_agree(name: str, node: dict[str, Any], nodes: dict[str, Any], held: dict[str, Any]) -> bool:
+    """The depths a `merge.depth` compares, where their records say what they are (a signal read by id, a
+    render's record): one camera, one quantity, one unit -- a z is not a distance, metres are not scene units --
+    and one pixel grid: the same size, the same coordinates (origin, orientation) and the same window of the
+    camera's image, since two depths in metres from one camera may still be of different pixels -- a crop, a
+    smaller proxy. Refused, never resampled to fit: a known mapping between two grids is a warp, made in the
+    graph where it can be seen (CT-0081 step 4).
+    Depths the graph makes itself (a surface) say nothing more than their node does."""
+
+    known = []
+    for item in node["depths"]:
+        base = str(item).split(".")[0]
+        source = nodes.get(base, {})
+        if source.get("op") == "signal.read" and source.get("signal") and f"signal:{base}" in held:
+            record = held[f"signal:{base}"].record
+            known.append((item, record.get("camera"), record["depth"].get("quantity"), record["depth"].get("unit"),
+                          tuple(record["size"]), (record.get("coordinates"),
+                                                  tuple(record.get("window") or (0.0, 0.0, 1.0, 1.0)))))
+        elif source.get("op") == "generate.render" and source.get("render") and f"render:{base}" in held:
+            manifest = held[f"render:{base}"].manifest
+            depth = held[f"render:{base}"].depth.record
+            known.append((item, manifest["camera"]["id"], manifest["depth"]["quantity"], manifest["depth"]["unit"],
+                          tuple(manifest["resolution"]), (depth.get("coordinates"),
+                                                          tuple(depth.get("window") or (0.0, 0.0, 1.0, 1.0)))))
+    for position, what in ((1, "cameras"), (2, "quantities"), (3, "units"), (4, "pixel grids (sizes)"),
+                           (5, "coordinates or windows of the camera's image")):
+        found = {entry[position] for entry in known}
+        if len(found) > 1:
+            listed = ", ".join(f"{entry[0]}: {entry[position]}" for entry in known)
+            raise ValidationError(f"{name} compares depths of different {what} ({listed})")
+    return True
 
 
 class TrackBook:
@@ -1829,6 +1888,26 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
         if op == "merge.depth":
             pictures = np.stack([_picture(value(item, frame)) for item in node["pictures"]])
             depths = np.stack([value(item, frame) for item in node["depths"]])
+            if f"conventions:{name}" not in clips:
+                clips[f"conventions:{name}"] = depth_conventions_agree(name, node, nodes, clips)
+            # A pixel whose depth is unknown (not "far": unknown) cannot be ordered. Where it decides what is
+            # seen -- its picture shows there -- the merge says what to do, or refuses (CT-0081 step 4).
+            policy = node.get("unknown", "refuse")
+            for position, item in enumerate(node["depths"]):
+                base = str(item).split(".")[0]
+                source = nodes.get(base, {})
+                if source.get("op") != "signal.read" or not source.get("signal"):
+                    continue
+                mask = read_signal_unknown(base, source, book, frame, fps, width, height, clips)
+                if mask is None or not mask.any():
+                    continue
+                seen = mask & (pictures[position][..., 3] > 0)
+                if seen.any() and policy == "refuse":
+                    raise ValidationError(f"{name}: {item} has no depth on {int(seen.sum())} pixels of frame {frame} "
+                                          "where its picture shows -- not far, unknown. Say `unknown: behind` or "
+                                          "`unknown: front` on the merge, or fix the depth")
+                far = np.inf if node.get("near_is_small", True) else -np.inf
+                depths[position] = np.where(mask, far if policy == "behind" else -far, depths[position])
             if not node.get("near_is_small", True):
                 depths = -depths
             order = np.argsort(depths, axis=0)  # nearest first, per pixel

@@ -431,6 +431,30 @@ Neither changes the direction; each is used at the edges (`references.md`).
   among valid neighbours on the same side of a depth discontinuity (a
   threshold on the relative jump), +inf and labels never blended.
 
+### Aligned depth: what it does not do yet (CT-0081 step 4)
+
+- **Proven on synthetic scenes only.** How: the done-when films of step 8
+  on real footage -- a person, hard occlusions, a handheld move -- with a
+  reference from a scanned or modelled set, the same measures recorded.
+- **An inverted occlusion is flagged, not mended.** How: a person's
+  correction of the order (a patch, `correct_signal`), or ordering by
+  object (step 5): a segmentation decides who is in front, the depth only
+  where it agrees.
+- **Calibration only against a metric depth of the same pixels.** How: a
+  depth from another camera brought into these pixels by a known warp in
+  the graph (`warp.*`), its window recorded; sparse references (tracked
+  points with depth, a measured distance) as a reference of a few pixels.
+- **Unknown pixels take `behind` or `front` only.** How: a fill from
+  neighbours of the same object (a segmentation), recorded as such.
+- **A steep surface reads as an edge.** The band left out of a calibration
+  is where the inverse depth jumps by more than 5% between neighbours; at a
+  low resolution a floor at a grazing angle does that on every row and is
+  left out whole. How: tell a discontinuity from a slope by the second
+  difference (a slope's steps are alike, an edge's is alone), or by the
+  segmentation's boundaries when one is given.
+- **Held-out 8-pixel blocks barely differ from the sample.** How: blocks
+  scaled to the frame (an eighth of its height), or held-out objects.
+
 ### Estimated signals: what the model adapters do not do yet (CT-0081 step 3)
 
 - **CPU only, small models.** Video Depth Anything takes about 15 s a

@@ -910,6 +910,18 @@ def command_signal(args: argparse.Namespace) -> int:
               + (f"; a second run {'identical' if repeat['identical'] else 'differed by ' + str(repeat['max_difference'])}"
                  if repeat else ""))
         return 0
+    if args.signal_command == "align":
+        from . import align
+
+        done = align.align_depth(root, signal_id=args.id, estimate=args.estimate, reference=args.reference,
+                                 camera=args.camera, actor=_resolve_actor(args), temporal=args.temporal,
+                                 smoothness=args.smoothness, first=args.first, count=args.count,
+                                 region=args.region, keep_labels=args.keep, leave_labels=args.leave,
+                                 objects=args.objects)
+        print(json.dumps({key: done[key] for key in ("signal", "revision", "residual", "held_out_frames",
+                                                      "held_out_tail", "temporal_agreement", "modes_compared",
+                                                      "occlusions_inverted") if key in done}, indent=2))
+        return 0
     if args.signal_command == "compare":
         done = estimates.compare(root, signal_id=args.id, reference=args.reference, actor=_resolve_actor(args))
         print(json.dumps(done, indent=2))
@@ -2358,6 +2370,21 @@ def build_parser() -> argparse.ArgumentParser:
     signal_estimate.add_argument("--input-size", type=int, help="Video Depth Anything: the model's input size")
     signal_estimate.add_argument("--threads", type=int)
     signal_estimate.add_argument("--repeat", action="store_true", help="Run twice and record what differed")
+    signal_align = signal_sub.add_parser("align", help="Align a relative depth to a metric one over a stretch; "
+                                                       "residuals and inverted occlusions recorded")
+    signal_align.add_argument("project", type=Path)
+    signal_align.add_argument("id")
+    signal_align.add_argument("--estimate", required=True, help="The relative depth")
+    signal_align.add_argument("--reference", required=True, help="The metric depth of the same pixels")
+    signal_align.add_argument("--camera", required=True, help="The reference's camera, stated as seeing the medium")
+    signal_align.add_argument("--temporal", choices=("regularized", "shared", "per_frame"), default="regularized")
+    signal_align.add_argument("--smoothness", type=float, default=1.0)
+    signal_align.add_argument("--first", type=int, default=0)
+    signal_align.add_argument("--count", type=int)
+    signal_align.add_argument("--region", help="A segmentation limiting the calibration")
+    signal_align.add_argument("--keep", type=int, nargs="+", help="Its labels to calibrate on")
+    signal_align.add_argument("--leave", type=int, nargs="+", help="Its labels to leave out")
+    signal_align.add_argument("--objects", help="A segmentation of instances: each pair of objects ordered")
     signal_compare = signal_sub.add_parser("compare", help="Measure a signal against a reference; recorded as "
                                                            "measured quality")
     signal_compare.add_argument("project", type=Path)
@@ -2366,7 +2393,7 @@ def build_parser() -> argparse.ArgumentParser:
     signal_status = signal_sub.add_parser("status", help="What a signal is: stale, quality, transformations")
     signal_status.add_argument("project", type=Path)
     signal_status.add_argument("id")
-    for action in (signal_estimate, signal_compare):
+    for action in (signal_estimate, signal_align, signal_compare):
         action.add_argument("--actor", help="Who is deciding (default: current user)")
         action.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
     signal_parser.set_defaults(function=command_signal)

@@ -94,7 +94,11 @@ every frame, Z depth and object index as signals), read by
 as adapters -- Depth Anything V2 Small, Video Depth Anything Small, SAM 2 --
 in their own environment, fetched explicitly at pinned revisions, recorded
 as estimated signals with their weights by hash, measured against Blender's
-passes. Next: step 4, alignment over a stretch with its residual.
+passes. Step 4: alignment over a stretch with its residuals (held out by
+pixels, frames and a final stretch), unknown pixels apart from far,
+inverted occlusions flagged per object pair and refused by `merge.depth`
+until accepted; `merge.depth` also checks camera, quantity, unit and pixel
+grid. Next: step 5, depth compositing at edges.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional

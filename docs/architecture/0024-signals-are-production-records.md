@@ -61,6 +61,14 @@ also meant to be "recorded" (SPEC-0012 §5) with nowhere to record it.
   the production but are inputs like any other, pinned by hash (`external`):
   changed or gone, the signal is stale. A measurement made later
   (`record_measurement`) joins `measured`, never `declared` (CT-0081 step 3).
+- An aligned depth is an estimate with metres (CT-0081 step 4): read as a
+  depth only when the node says `estimated: true`; pixels beyond its
+  calibration are **unknown** -- a mask beside the data, never +inf (a
+  renderer's "nothing there") and never 0 -- and a merge must say what to
+  do with them; occlusions its calibration found inverted are flagged in
+  its record and refused until accepted. The aligner measures and flags;
+  the compositor decides, by a policy it states. A signal with a camera
+  says the window of that camera's image its pixels cover.
 - What a maker's depth measures is declared per maker as it was measured,
   never assumed from another: Cycles' Z is z along the axis (CT-0081 step
   2); a renderer not measured is refused.

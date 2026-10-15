@@ -196,7 +196,10 @@ def record_signal(root: Path, *, signal_id: str, kind: str, frames: Iterable[np.
                   maker: dict[str, Any] | None = None,
                   inputs: list[dict[str, Any]] | None = None, derived_from: str | None = None,
                   transformation: dict[str, Any] | None = None, declared: list[float] | None = None,
-                  measured: list[dict[str, Any]] | None = None, rationale: str = "") -> dict[str, Any]:
+                  measured: list[dict[str, Any]] | None = None, outside: str = "hold",
+                  unknown: list[np.ndarray] | None = None, unknown_means: str = "",
+                  window: list[float] | None = None,
+                  rationale: str = "") -> dict[str, Any]:
     """Record a signal (or record it again): its data, what it is, where it came from, how good it is known to be.
 
     - `frames`: one array per frame (height, width) or (height, width, channels), at `rate`, the first at the
@@ -209,6 +212,14 @@ def record_signal(root: Path, *, signal_id: str, kind: str, frames: Iterable[np.
       `{"external": absolute path}` for what lives outside the production (a model's weights) -- each recorded
       with its hash or revision, so a change is seen;
     - `labels_are`: a segmentation's numbers are `instances` or `classes` (`LABELS_ARE`);
+    - `unknown`: per frame, where the signal has **no value** -- kept apart from any value, never one: a
+      depth's +inf is "nothing there", an unknown pixel is "not known" (an aligned estimate beyond its
+      reach). Said in `unknown_means`; read with `SignalReader.unknown`;
+    - `window`: for a signal with a camera, the part of that camera's image its pixels cover -- [x0, y0, x1,
+      y1] as shares of the image, top-left first (default the whole image): two signals of one camera and
+      one size are the same pixels only when their windows agree (a crop is not the frame);
+    - `outside`: read before its first frame or past its last, a signal `hold`s its nearest -- or, when it is
+      valid only where it was made (a calibration), it is `refuse`d;
     - `declared`: the maker's confidence per frame, if it gave one; `measured`: errors found, each
       `{"against", "metric", "value", "how"}`. Neither is invented.
     """
@@ -226,6 +237,8 @@ def record_signal(root: Path, *, signal_id: str, kind: str, frames: Iterable[np.
             raise ValidationError("A derived signal says the transformation that made it ({name, ...})")
     if origin is None:
         raise ValidationError("A signal says its origin: geometric, estimated or authored")
+    if outside not in ("hold", "refuse"):
+        raise ValidationError(f"Outside its frames a signal holds or refuses, not {outside!r}")
     problems = contract_problems(kind, origin, camera=camera, depth=depth, labels=labels, labels_are=labels_are)
     if problems:
         raise ValidationError(f"The signal {signal_id} cannot be recorded: {'; '.join(problems)}")
@@ -249,6 +262,11 @@ def record_signal(root: Path, *, signal_id: str, kind: str, frames: Iterable[np.
             elif [int(frame.shape[1]), int(frame.shape[0])] != size:
                 raise ValidationError(f"The signal {signal_id}'s frames are all {size[0]}x{size[1]}")
             _write_frame(target / f"f_{index + 1:04d}", frame, kind)
+            if unknown is not None:
+                mask = np.asarray(unknown[index], bool)
+                if mask.shape != frame.shape[:2]:
+                    raise ValidationError(f"The signal {signal_id}'s unknown pixels of frame {index} are not its size")
+                np.save(target / f"f_{index + 1:04d}.unknown.npy", mask)
             count += 1
         if not count:
             raise ValidationError(f"The signal {signal_id} has no frame")
@@ -274,9 +292,12 @@ def record_signal(root: Path, *, signal_id: str, kind: str, frames: Iterable[np.
             "schema_version": 1, "id": signal_id, "kind": kind, "origin": origin, "media": media,
             "clock": {"rate": timebase.ffmpeg_rate(exact_rate), "origin": timebase.to_record(origin_instant)},
             "frames": count, "size": size, "coordinates": "pixels of the medium, top-left first, rows down",
-            **({"camera": camera} if camera else {}), **({"depth": depth} if depth else {}),
+            **({"camera": camera, "window": [float(v) for v in (window or [0.0, 0.0, 1.0, 1.0])]}
+               if camera else {}), **({"depth": depth} if depth else {}),
             **({"labels": {int(k): str(v) for k, v in labels.items()}} if labels else {}),
             **({"labels_are": labels_are} if labels_are else {}),
+            **({"outside": outside} if outside != "hold" else {}),
+            **({"unknown": unknown_means or "pixels with no value"} if unknown is not None else {}),
             "data": number, "data_hash": _data_hash(target), "revision": int(record.get("revision", 0)) + 1,
             "updated_at": _now(),
         }
@@ -462,6 +483,9 @@ class SignalReader:
         self.origin = timebase.from_record(self.record["clock"]["origin"])
 
     def frame(self, index: int) -> np.ndarray:
+        if self.record.get("outside") == "refuse" and not 0 <= int(index) < int(self.record["frames"]):
+            raise ValidationError(f"The signal {self.id} is valid on its frames 0 to {int(self.record['frames']) - 1} "
+                                  f"only, not {int(index)} (it is a calibration of that stretch)")
         index = int(np.clip(index, 0, int(self.record["frames"]) - 1))
         stem = self.folder / "data" / f"{int(self.record['data']):04d}" / f"f_{index + 1:04d}"
         found = [path for path in (stem.with_suffix(".exr"), stem.with_suffix(".npy")) if path.is_file()]
@@ -474,13 +498,27 @@ class SignalReader:
                 data[where] = values[where]
         return data
 
-    def at(self, media: Any) -> np.ndarray:
-        """The frame showing at a media instant (seconds), by the signal's clock."""
+    def index(self, media: Any) -> int:
+        """The frame showing at a media instant (seconds), by the signal's clock (not clamped)."""
 
         from .compositing.semantics import remap_samples
 
         position = media - self.origin if isinstance(media, Fraction) else float(media) - float(self.origin)
-        return self.frame(remap_samples(position, self.rate, "nearest", clamp=False)[0][0])
+        return int(remap_samples(position, self.rate, "nearest", clamp=False)[0][0])
+
+    def at(self, media: Any) -> np.ndarray:
+        """The frame showing at a media instant (seconds), by the signal's clock."""
+
+        return self.frame(self.index(media))
+
+    def unknown(self, index: int) -> np.ndarray | None:
+        """Where frame `index` has no value (a mask), or None when the signal knows every pixel."""
+
+        if "unknown" not in self.record:
+            return None
+        self.frame(index)  # the same refusals outside its frames
+        index = int(np.clip(index, 0, int(self.record["frames"]) - 1))
+        return np.load(self.folder / "data" / f"{int(self.record['data']):04d}" / f"f_{index + 1:04d}.unknown.npy")
 
 
 def frame(root: Path, signal_id: str, index: int) -> np.ndarray:

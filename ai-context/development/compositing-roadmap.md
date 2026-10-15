@@ -381,7 +381,11 @@ record and never runs Blender. Step 3 done: models as adapters
 (`models.py` catalog at pinned revisions, fetched explicitly; `.venv-vision`;
 `estimates.py`): Depth Anything V2 Small and Video Depth Anything Small give
 `depth_relative`, SAM 2 a segmentation of instances; measured against
-Blender's own passes.
+Blender's own passes. Step 4 done: alignment over a stretch
+(`align.py`) -- regularized in time by default, the modes compared, residuals
+held out by pixels, frames and a final stretch; unknown pixels apart from
+far; occlusions inverted flagged by object pair, and refused by the
+compositor until accepted.
 
 - What: depth and segmentation as signals, from a model run on a picture
   (depth estimation, a segment-anything model) or from Blender passes (Z,
