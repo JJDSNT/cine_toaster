@@ -2,7 +2,7 @@
 id: CT-0079
 title: Research -- the time base (FilmCraft's ticks against our seconds)
 type: work
-status: doing
+status: done
 owner: unassigned
 created_at: 2026-10-15
 updated_at: 2026-10-15
@@ -213,13 +213,25 @@ stored in its own ticks.
 The user's review agreed on keeping both (Fraction to compute exactly,
 ticks to store and exchange), with the decision taken on the whole graph's
 time model -- curves, keys, layer offsets and tracks in C7 -- not only the
-assembly's. A recommendation, for the user to decide: **ticks as the stored and
-exchanged form** -- records machines write (tracks, retime curves, cut
-points of a version, cache identities) and OTIO/FilmCraft exchange --
-**exact fractions in memory**, both only through `timebase` (`to_ticks`,
-`from_ticks`); a person's YAML keeps seconds, frames or timecode, converted
-once on reading, as FilmCraft does. The graph's curves keep sampling at frame
-centres in seconds: they draw pictures, they are not edit points.
+assembly's. **Decided (2026-10-15, the user): ADR 0023.** Fractions to compute, ticks
+to store and exchange, people's YAML in seconds, frames or timecode -- with
+the user's three additions:
+
+1. **Exact and explicit conversions**: `to_ticks` refuses a value that is
+   not a whole number of ticks (`NotRepresentable`); quantising only with a
+   named policy (`floor`, `ceil`, `half_up`, `half_even`).
+2. **Ticks do not limit sources**: an 11 or 13 fps source is accepted; a
+   record of one of its instants keeps the exact fraction beside the
+   quantised ticks (`to_record`/`from_record`).
+3. **Four kinds of time kept apart**: instant (ticks), frame index, sample
+   index, half-open `TimeRange` -- each with its own conversions.
+
+Applied to the new time records of C7 (curves, keys, offsets, retiming,
+cache identities), not as a wholesale migration of existing formats. The
+**media clock** -- which instant is playing now, the sound as master,
+counting the samples actually played (output latency included), a monotonic
+clock without sound, an explicit position frame by frame -- is recorded in
+the same ADR as a contract, to be built with C9b, not before.
 
 # Done
 
@@ -232,6 +244,10 @@ centres in seconds: they draw pictures, they are not edit points.
   and values to 3x white; exact to half-float precision.
 - The three fixes, the regression tests (`tests/test_timebase.py`) and the
   remeasurement, including an hour at 30000/1001.
+- The decision (ADR 0023) and its interface in `timebase.py`:
+  `TICKS_PER_SECOND`, `to_ticks` (exact, or by a named rounding),
+  `from_ticks`, `representable`, `tick_of_frame`/`frame_of_tick`,
+  `tick_of_sample`/`sample_of_tick`, `to_record`/`from_record`, `TimeRange`.
 
 # Validation
 
@@ -244,5 +260,14 @@ centres in seconds: they draw pictures, they are not edit points.
 - Full suite: 829 tests; `test_stems` failed once more at exactly its 0.5 dB
   bound (the intermittent test recorded in the roadmap) and passed three
   runs alone.
+- Ticks (`TickTests`, `RangeTests`): every frame and sample rate we meet is
+  whole ticks; an exact conversion refuses 1/11 s and an 11 fps frame, and
+  an unknown policy; each policy quantises as named; round trips through
+  ticks and through records are exact; an 11 fps instant keeps "5/11" and
+  reads back exactly; frame, sample and tick indices convert as stated
+  (frame 10 at NTSC is sample 16,016); ranges are half-open; a quantised
+  round trip differs while its record keeps the original; stored ticks stay
+  within a quarter of int64 (about 105 days), beyond refused. Full suite:
+  836 tests pass (the bound and its two tests added after, run alone).
 - `scripts/research/time_drift.py` reproduces the tables (an hour: `<folder>
   6 30000/1001 600 300`).

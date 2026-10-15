@@ -366,7 +366,11 @@ Neither changes the direction; each is used at the edges (`references.md`).
     carries; one naming a system font needs the font loaded into ThorVG
     (its font loader) -- not checked yet.
 
-### An intermittent test (found 2026-10-15, CT-0078)
+### An intermittent test (found 2026-10-15, CT-0078; again in CT-0079)
+
+- Still open: passing alone does not resolve it (the user, 2026-10-15). A
+  robustness test of its own -- the same check run many times, or on PCM
+  stems -- should show it fixed, apart from C7's work.
 
 - `tests/test_stems.py` compares a stretch's mean loudness of the summed stems
   with the version's within 0.5 dB, and once measured exactly 0.5. The mix

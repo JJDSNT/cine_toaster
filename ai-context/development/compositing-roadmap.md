@@ -384,7 +384,11 @@ prescribed here.
     playing, scrubbing and time operations -- pages kept, not dropped;
   - planning: nodes fused, run in parallel, or precomputed;
   - degradation by policy when a deadline is missed (lower resolution, a
-    proxy, the previous frame), never in the final render.
+    proxy, the previous frame), never in the final render;
+  - **the media clock** (ADR 0023): the sound as master -- the samples the
+    device has actually played, output latency counted -- the picture
+    following; a monotonic clock without sound; an explicit position frame
+    by frame. Its contract is recorded; it is built here.
 - Done when: the numbers are written down, and what can run live does, in the
   preview, from the same records.
 

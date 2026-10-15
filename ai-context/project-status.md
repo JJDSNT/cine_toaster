@@ -80,8 +80,9 @@ ColorFonts look, not emoji; glints optional) is recorded to return to.
 Then (the user's order): OpenFX into the shot's one graph (done), the time
 base (CT-0079: three faults measured and fixed -- cut points on the frame
 grid, rates as fractions, sound in samples, through one `timebase` module;
-every click within half a sample over an hour at 30000/1001), then the
-Fraction-or-ticks decision, open by the user's wish, then C7.
+every click within half a sample over an hour at 30000/1001) and ADR 0023
+(fractions to compute, ticks to store and exchange, the media clock's
+contract for C9b). Next: C7, its time records in ticks.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional
