@@ -614,7 +614,8 @@ IMPLEMENTED = {
     "curve.progress", "curve.keys", "curve.map", "curve.combine", "curve.noise", "curve.beats", "curve.from_track",
 }
 #: In SPEC-0012 but outside the reference, by definition (opaque) or until a renderer gives them (models, 3D).
-NOT_IN_REFERENCE = {"signal.estimate": "a model's result is recorded, not computed by the reference",
+NOT_IN_REFERENCE = {"signal.estimate": "a model's result is recorded, not computed by the reference: estimate "
+                                       "it apart (`toast signal estimate`) and read it with signal.read's `signal`",
                     "generate.render": "a renderer's own scene, rendered apart: give it a render's record "
                                        "(`render`, renders.render_passes)"}
 

@@ -90,8 +90,11 @@ records (`tracks/<id>`), all on GL, and its three films. C8 opened
 signals as production records (ADR 0024). Step 2: a Blender scene's passes
 rendered apart and recorded (`renders/passes/<id>`: picture, the camera at
 every frame, Z depth and object index as signals), read by
-`generate.render`; Blender 5's multipart EXR now read whole. Next: step 3,
-the model adapter.
+`generate.render`; Blender 5's multipart EXR now read whole. Step 3: models
+as adapters -- Depth Anything V2 Small, Video Depth Anything Small, SAM 2 --
+in their own environment, fetched explicitly at pinned revisions, recorded
+as estimated signals with their weights by hash, measured against Blender's
+passes. Next: step 4, alignment over a stretch with its residual.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional

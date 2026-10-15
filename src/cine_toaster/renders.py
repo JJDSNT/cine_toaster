@@ -219,6 +219,7 @@ def render_passes(root: Path, *, render_id: str, camera: str, first: int, last: 
     record_signal(root, signal_id=f"{render_id}-objects", kind="segmentation", origin="geometric", frames=labels,
                   rate=rate, media=media, camera=manifest["camera"]["id"],
                   labels={0: "nothing", **{int(key): name for key, name in manifest["objects"].items()}},
+                  labels_are="instances",
                   maker={**maker, "pass": "Object Index"}, inputs=inputs, actor=actor,
                   rationale=f"Blender's object index pass of {scene_file}")
     return {"render": render_id, "frames": len(pictures), "manifest": media,

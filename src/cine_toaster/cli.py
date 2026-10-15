@@ -861,6 +861,79 @@ def command_track(args: argparse.Namespace) -> int:
     return 0
 
 
+def _prompted_objects(args: argparse.Namespace) -> list[dict]:
+    """`--object NAME[@FRAME]:X,Y[:X,Y...]` and `--box NAME[@FRAME]:X0,Y0,X1,Y1`, in the order given."""
+
+    objects = []
+    for given, kind in [(item, "points") for item in args.object or []] + [(item, "box") for item in args.box or []]:
+        head, _, rest = given.partition(":")
+        name, _, frame = head.partition("@")
+        try:
+            numbers = [[float(value) for value in pair.split(",")] for pair in rest.split(":") if pair]
+        except ValueError:
+            raise ValidationError(f"Not an object: {given!r} (NAME[@FRAME]:X,Y[:X,Y...])") from None
+        if not name or not numbers:
+            raise ValidationError(f"Not an object: {given!r} (NAME[@FRAME]:X,Y[:X,Y...])")
+        objects.append({"name": name, "frame": int(frame or 0),
+                        **({"points": numbers} if kind == "points" else {"box": numbers[0]})})
+    return objects
+
+
+def command_models(args: argparse.Namespace) -> int:
+    """The models that estimate signals: the catalog, and fetching one -- the only act that downloads."""
+
+    from . import models
+
+    if args.models_command == "list":
+        for item in models.describe():
+            print(f"{item['model']:30} {item['kind']:15} {item['licence']:11} {item['revision']}  "
+                  f"{'fetched' if item['fetched'] else 'not fetched'}")
+        return 0
+    done = models.fetch(args.name, again=args.again)
+    print(f"{args.name}: {'fetched' if done['fetched'] else 'already here'} in {done['directory']}")
+    return 0
+
+
+def command_signal(args: argparse.Namespace) -> int:
+    """Signals as production records (C8, CT-0081): estimate one with a model, compare, see."""
+
+    from . import estimates, signals
+
+    root = args.project.expanduser().resolve()
+    if args.signal_command == "estimate":
+        done = estimates.estimate(root, signal_id=args.id, model=args.model, media=args.media,
+                                  actor=_resolve_actor(args), first=args.first, count=args.count,
+                                  objects=_prompted_objects(args) or None, threads=args.threads, repeat=args.repeat,
+                                  parameters={"input_size": args.input_size} if args.input_size else None)
+        repeat = done["repeat"]
+        print(f"{args.id}: {done['frames']} frames by {args.model}, revision {done['revision']}"
+              + (f"; a second run {'identical' if repeat['identical'] else 'differed by ' + str(repeat['max_difference'])}"
+                 if repeat else ""))
+        return 0
+    if args.signal_command == "compare":
+        done = estimates.compare(root, signal_id=args.id, reference=args.reference, actor=_resolve_actor(args))
+        print(json.dumps(done, indent=2))
+        return 0
+    print(json.dumps(signals.status(root, args.id), indent=2, default=str))
+    return 0
+
+
+def command_render(args: argparse.Namespace) -> int:
+    """A 3D scene's passes rendered apart and recorded (C8 step 2, CT-0081)."""
+
+    from . import renders
+
+    root = args.project.expanduser().resolve()
+    if args.render_command == "passes":
+        done = renders.render_passes(root, render_id=args.id, camera=args.camera, first=args.first, last=args.last,
+                                     size=tuple(args.size), fps=args.fps, actor=_resolve_actor(args),
+                                     blend=args.blend, recipe=args.recipe, samples=args.samples)
+        print(f"{args.id}: {done['frames']} frames by Blender {done['blender']}; signals {', '.join(done['signals'])}")
+        return 0
+    print(json.dumps(renders.status(root, args.id), indent=2, default=str))
+    return 0
+
+
 def command_sound(args: argparse.Namespace) -> int:
     """The sound catalog, and the sources recorded sound and music come from (CT-0048)."""
 
@@ -2260,6 +2333,64 @@ def build_parser() -> argparse.ArgumentParser:
         action.add_argument("--actor", help="Who is deciding (default: current user)")
         action.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
     track_parser.set_defaults(function=command_track)
+
+    models_parser = subparsers.add_parser("models", help="Models that estimate signals: the catalog, and fetching "
+                                                         "one at its pinned revision (C8, CT-0081)")
+    models_sub = models_parser.add_subparsers(dest="models_command", required=True)
+    models_sub.add_parser("list", help="The catalog: kind, licence, revision, fetched or not")
+    models_fetch = models_sub.add_parser("fetch", help="Download a model at its pinned revision, checked by hash")
+    models_fetch.add_argument("name")
+    models_fetch.add_argument("--again", action="store_true", help="Fetch again even when it is here")
+    models_parser.set_defaults(function=command_models)
+
+    signal_parser = subparsers.add_parser("signal", help="Signals of media -- depth, segmentation -- as records "
+                                                         "(C8, CT-0081)")
+    signal_sub = signal_parser.add_subparsers(dest="signal_command", required=True)
+    signal_estimate = signal_sub.add_parser("estimate", help="Estimate a signal of a medium with a model")
+    signal_estimate.add_argument("project", type=Path)
+    signal_estimate.add_argument("id")
+    signal_estimate.add_argument("--model", required=True, help="A model of `toast models list`")
+    signal_estimate.add_argument("--media", required=True, help="The medium, a path in the production")
+    signal_estimate.add_argument("--first", type=int, default=0, help="Its first frame")
+    signal_estimate.add_argument("--count", type=int, help="How many frames (default: to the end)")
+    signal_estimate.add_argument("--object", action="append", help="SAM 2: NAME[@FRAME]:X,Y[:X,Y...] (pixels)")
+    signal_estimate.add_argument("--box", action="append", help="SAM 2: NAME[@FRAME]:X0,Y0,X1,Y1 (pixels)")
+    signal_estimate.add_argument("--input-size", type=int, help="Video Depth Anything: the model's input size")
+    signal_estimate.add_argument("--threads", type=int)
+    signal_estimate.add_argument("--repeat", action="store_true", help="Run twice and record what differed")
+    signal_compare = signal_sub.add_parser("compare", help="Measure a signal against a reference; recorded as "
+                                                           "measured quality")
+    signal_compare.add_argument("project", type=Path)
+    signal_compare.add_argument("id")
+    signal_compare.add_argument("--reference", required=True)
+    signal_status = signal_sub.add_parser("status", help="What a signal is: stale, quality, transformations")
+    signal_status.add_argument("project", type=Path)
+    signal_status.add_argument("id")
+    for action in (signal_estimate, signal_compare):
+        action.add_argument("--actor", help="Who is deciding (default: current user)")
+        action.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
+    signal_parser.set_defaults(function=command_signal)
+
+    render_parser = subparsers.add_parser("render", help="A 3D scene's passes, rendered apart (C8, CT-0081)")
+    render_sub = render_parser.add_subparsers(dest="render_command", required=True)
+    render_passes = render_sub.add_parser("passes", help="Render a scene's picture, Z and object index; record them")
+    render_passes.add_argument("project", type=Path)
+    render_passes.add_argument("id")
+    scene_given = render_passes.add_mutually_exclusive_group(required=True)
+    scene_given.add_argument("--blend", help="A .blend in the production")
+    scene_given.add_argument("--recipe", help="A recipe (JSON) in the production")
+    render_passes.add_argument("--camera", required=True)
+    render_passes.add_argument("--first", type=int, default=1)
+    render_passes.add_argument("--last", type=int, required=True)
+    render_passes.add_argument("--size", type=int, nargs=2, default=[1280, 720], metavar=("WIDTH", "HEIGHT"))
+    render_passes.add_argument("--fps", default="24")
+    render_passes.add_argument("--samples", type=int, default=16)
+    render_passes.add_argument("--actor", help="Who is deciding (default: current user)")
+    render_passes.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
+    render_status = render_sub.add_parser("status", help="Whether a render still follows from its scene")
+    render_status.add_argument("project", type=Path)
+    render_status.add_argument("id")
+    render_parser.set_defaults(function=command_render)
 
     sound_parser = subparsers.add_parser("sound", help="The sound catalog and its sources: Freesound, Sonniss, Openverse (CT-0048)")
     sound_sub = sound_parser.add_subparsers(dest="sound_command", required=True)

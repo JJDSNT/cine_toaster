@@ -57,6 +57,10 @@ ORIGINS = ("geometric", "estimated", "authored")
 #: their inverse (what a monocular model often gives: larger is nearer).
 DEPTH_QUANTITIES = ("distance", "z", "inverse_distance", "inverse_z")
 CHANNELS = {"vectors": 2, "normals": 3}
+#: What a segmentation's numbers are: **instances** -- each number one object, the same object in every frame
+#: (a renderer's object index, a tracker's identities) -- or **classes** -- each number a category, any number
+#: of objects sharing it (a semantic segmenter's).
+LABELS_ARE = ("instances", "classes")
 _ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 
 
@@ -92,7 +96,7 @@ def _write(path: Path, text: str) -> None:
 # --- the contract ---------------------------------------------------------------------------------------------
 
 def contract_problems(kind: str, origin: str, *, camera: str | None, depth: dict[str, Any] | None,
-                      labels: dict[Any, str] | None) -> list[str]:
+                      labels: dict[Any, str] | None, labels_are: str | None = None) -> list[str]:
     """What a signal's declaration lacks or contradicts (SPEC-0012's kinds, CT-0081's origins)."""
 
     problems = []
@@ -113,6 +117,9 @@ def contract_problems(kind: str, origin: str, *, camera: str | None, depth: dict
             problems.append("a relative depth has no unit: its scale is unknown until it is aligned")
     if kind == "segmentation" and not labels:
         problems.append("a segmentation carries its table of labels ({number: name})")
+    if kind == "segmentation" and labels_are not in LABELS_ARE:
+        problems.append("a segmentation says what its numbers are: instances (one object each, the same through "
+                        "time) or classes (a category each)")
     return problems
 
 
@@ -185,7 +192,8 @@ def _data_hash(folder: Path) -> str:
 def record_signal(root: Path, *, signal_id: str, kind: str, frames: Iterable[np.ndarray], rate: Any, actor: Actor,
                   origin: str | None = None, media: str | None = None, start: float | Fraction = 0,
                   camera: str | None = None, depth: dict[str, Any] | None = None,
-                  labels: dict[Any, str] | None = None, maker: dict[str, Any] | None = None,
+                  labels: dict[Any, str] | None = None, labels_are: str | None = None,
+                  maker: dict[str, Any] | None = None,
                   inputs: list[dict[str, Any]] | None = None, derived_from: str | None = None,
                   transformation: dict[str, Any] | None = None, declared: list[float] | None = None,
                   measured: list[dict[str, Any]] | None = None, rationale: str = "") -> dict[str, Any]:
@@ -197,8 +205,10 @@ def record_signal(root: Path, *, signal_id: str, kind: str, frames: Iterable[np.
       never changes it), with `transformation` ({name, method, ...: its parameters, reference, residual})
       added to the parent's provenance;
     - `maker`: what made it ({kind: renderer | model | tool | person, name, version, parameters, ...});
-    - `inputs`: what it was made from -- `{"media": path}`, `{"file": path}`, `{"signal": id}` -- each
-      recorded with its hash or revision, so a change is seen;
+    - `inputs`: what it was made from -- `{"media": path}`, `{"file": path}`, `{"signal": id}`, or
+      `{"external": absolute path}` for what lives outside the production (a model's weights) -- each recorded
+      with its hash or revision, so a change is seen;
+    - `labels_are`: a segmentation's numbers are `instances` or `classes` (`LABELS_ARE`);
     - `declared`: the maker's confidence per frame, if it gave one; `measured`: errors found, each
       `{"against", "metric", "value", "how"}`. Neither is invented.
     """
@@ -216,7 +226,7 @@ def record_signal(root: Path, *, signal_id: str, kind: str, frames: Iterable[np.
             raise ValidationError("A derived signal says the transformation that made it ({name, ...})")
     if origin is None:
         raise ValidationError("A signal says its origin: geometric, estimated or authored")
-    problems = contract_problems(kind, origin, camera=camera, depth=depth, labels=labels)
+    problems = contract_problems(kind, origin, camera=camera, depth=depth, labels=labels, labels_are=labels_are)
     if problems:
         raise ValidationError(f"The signal {signal_id} cannot be recorded: {'; '.join(problems)}")
     exact_rate = timebase.rate(rate)
@@ -266,6 +276,7 @@ def record_signal(root: Path, *, signal_id: str, kind: str, frames: Iterable[np.
             "frames": count, "size": size, "coordinates": "pixels of the medium, top-left first, rows down",
             **({"camera": camera} if camera else {}), **({"depth": depth} if depth else {}),
             **({"labels": {int(k): str(v) for k, v in labels.items()}} if labels else {}),
+            **({"labels_are": labels_are} if labels_are else {}),
             "data": number, "data_hash": _data_hash(target), "revision": int(record.get("revision", 0)) + 1,
             "updated_at": _now(),
         }
@@ -285,11 +296,34 @@ def _pinned(root: Path, item: dict[str, Any]) -> dict[str, Any]:
     if "signal" in item:
         record = load_record(root, str(item["signal"]))
         return {"signal": item["signal"], "revision": record["revision"], "data_hash": record["data_hash"]}
-    key = "media" if "media" in item else "file"
-    path = Path(root) / str(item[key])
+    key = "media" if "media" in item else "external" if "external" in item else "file"
+    path = Path(str(item[key])) if key == "external" else Path(root) / str(item[key])
+    if key == "external" and not path.is_absolute():
+        raise ValidationError(f"An external input is an absolute path, not {item[key]}")
     if not path.is_file():
         raise ValidationError(f"The signal's input {item[key]} is not there")
     return {key: str(item[key]), "hash": _file_hash(path)}
+
+
+def record_measurement(root: Path, *, signal_id: str, against: str, metric: str, value: Any, how: str,
+                       actor: Actor) -> dict[str, Any]:
+    """An error or agreement actually measured on the signal's data in use -- against what, by what metric, how
+    -- added to its quality's `measured`, apart from anything its maker declared. The data is untouched; a
+    signal recorded again starts with no measurement."""
+
+    root = Path(root).expanduser().resolve()
+    folder = directory(root, signal_id)
+    with scene_lock(folder):
+        record = load_record(root, signal_id)
+        quality = record["quality"]
+        quality.setdefault("measured", []).append({"against": against, "metric": metric, "value": value,
+                                                   "how": how, "data": record["data"], "at": _now(),
+                                                   "by": actor.public_dict()})
+        _write(folder / "quality.json", json.dumps(quality, indent=1, default=str))
+        event = append_event(root, Event.create("signal.measured", _project_id(root), signal_id=signal_id,
+                                                against=against, metric=metric, actor=actor.public_dict()))
+    return {"type": "signal.measured", "signal": signal_id, "metric": metric, "value": value,
+            "event": event.public_dict()}
 
 
 def correct_signal(root: Path, *, signal_id: str, frame: int, where: np.ndarray, values: np.ndarray, actor: Actor,
@@ -395,8 +429,8 @@ def status(root: Path, signal_id: str, _seen: frozenset[str] = frozenset()) -> d
             elif status(root, name, _seen | {signal_id})["stale"]:
                 stale.append(f"the signal {name} it was made from is stale")
         else:
-            key = "media" if "media" in item else "file"
-            path = root / item[key]
+            key = "media" if "media" in item else "external" if "external" in item else "file"
+            path = Path(item[key]) if key == "external" else root / item[key]
             if not path.is_file():
                 stale.append(f"its {key} {item[key]} is not there")
             elif _file_hash(path) != item["hash"]:

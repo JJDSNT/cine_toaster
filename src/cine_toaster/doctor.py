@@ -309,6 +309,25 @@ def _voice() -> Capability:
     )
 
 
+def _vision() -> Capability:
+    from .models import describe, vision_unavailable_reason
+
+    reason = vision_unavailable_reason()
+    missing = [item["model"] for item in describe() if not item["fetched"]]
+    detail = reason or ("models not fetched: " + ", ".join(missing) if missing else "all models fetched")
+    remedy = ("make install-vision   (its own environment: torch never enters Cine Toaster's)" if reason else
+              "; ".join(f"toast models fetch {name}" for name in missing))
+    return Capability(
+        name="Vision models",
+        what_it_enables="depth and segmentation estimated as signal records -- Depth Anything V2 Small, Video "
+                        "Depth Anything Small, SAM 2 (`toast signal estimate`, CT-0081)",
+        required=False,
+        status=OK if not reason and not missing else MISSING,
+        detail=detail,
+        remedy=remedy,
+    )
+
+
 def _assistant() -> Capability:
     from .assistant_host import unavailable_reason
 
@@ -532,6 +551,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     # Detected, not yet used. See `report`.
     _sox,
     _blender,
+    _vision,
     _moderngl,
     _compositing,
     _whisper,

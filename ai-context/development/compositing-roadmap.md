@@ -377,7 +377,11 @@ provenance, quality, invalidation, corrections, time. Step 2 done: Blender
 renders a scene's passes apart (`renders.render_passes`), kept as
 `renders/passes/<id>` with its camera per frame and its signals `<id>-depth`
 (z along the axis, measured) and `<id>-objects`; `generate.render` reads the
-record and never runs Blender.
+record and never runs Blender. Step 3 done: models as adapters
+(`models.py` catalog at pinned revisions, fetched explicitly; `.venv-vision`;
+`estimates.py`): Depth Anything V2 Small and Video Depth Anything Small give
+`depth_relative`, SAM 2 a segmentation of instances; measured against
+Blender's own passes.
 
 - What: depth and segmentation as signals, from a model run on a picture
   (depth estimation, a segment-anything model) or from Blender passes (Z,

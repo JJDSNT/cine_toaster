@@ -254,6 +254,76 @@ square pixels only; edges and transparency (Cryptomatte, step 5); Blender's
 version recorded, not checked at reading; no CLI or job yet; files outside
 the production refused (a collect step); not on GL (step 6).
 
+## Step 3 -- models as adapters (done 2026-10-15)
+
+The user's direction: three contracts, `record_signal` for all, versions and
+weights by hash, parameters, input media and environment recorded; the
+model's declared confidence apart from measured quality; a test running the
+same inference twice and changed weights invalidating; non-determinism
+recorded, not promised; no inference in the Core, adapters replaceable, no
+implicit downloads. Also taken: depth resized to the nearest stays for now;
+an interpolation aware of discontinuities and invalid values is planned for
+step 5 (roadmap).
+
+- **`models.py`, the catalog**: each model's hub repository at a **pinned
+  revision**, the files taken, weights by the hub's sha256, licence,
+  kind, how it treats time. Only Apache-2.0: Depth Anything V2 **Small**
+  (Base/Large/Giant named in `EXCLUDED` as CC-BY-NC-4.0), Video Depth
+  Anything **Small** (its model code from the authors' repository at a
+  pinned commit; Apache-2.0), SAM 2.1 hiera tiny. `fetch` is the only act
+  that downloads (`toast models fetch`), checked by hash, nothing kept on a
+  mismatch, into `~/.local/share/cine-toaster/models/<name>/<revision>/`
+  with `model.json`; `require` refuses a model not fetched or whose files
+  changed, naming the command.
+- **`.venv-vision`** (`make install-vision`, `requirements-vision.txt`):
+  torch 2.6 CPU, torchvision, transformers 5.2, OpenCV, einops. torch never
+  enters Cine Toaster's environment. Video Depth Anything's code imports
+  easydict (LGPL-3.0) for attribute access only: the worker gives it a
+  stand-in, so it is not installed.
+- **`vision_worker.py`** runs there, offline by construction
+  (`HF_HUB_OFFLINE`): frames in (sRGB bytes), `result.npy` and `meta.json`
+  out -- versions, device, threads, dtype, seed and deterministic
+  algorithms, the model's input size, how the output was resized, the
+  temporal windows, SAM 2's declared object scores.
+- **`estimates.py`**: `estimate` reads a medium's stretch (FFmpeg rgb24),
+  runs the worker, and records through `record_signal`: the model by name,
+  repository, revision, licence, every file by hash, parameters, prompts,
+  stretch, environment, determinism; every file of the model pinned as an
+  `external` input, so changed weights make the signal stale. `repeat` runs
+  twice and records identical or the largest difference. `compare`
+  measures an estimate against a reference signal at the same media
+  instants (IoU by object name; correlation with the reference's inverse
+  z) and records it with `signals.record_measurement`.
+- **The three contracts**: Depth Anything V2 Small gives `depth_relative`,
+  `inverse_z`, scale `unknown: affine`, no camera, no unit -- refused by
+  `merge.depth` until aligned (step 4). Video Depth Anything Small the
+  same kind, its record keeping the windows (32, overlap 10, key frames),
+  the alignment between them and the stretch estimated together. SAM 2 a
+  `segmentation` of **instances**: label n is the n-th object prompted, the
+  same object in every frame, its name a name; `labels_are` is now part of
+  the signal contract (instances or classes), and the Blender object
+  index says instances too.
+- **CLI**: `toast models list|fetch`, `toast signal estimate|compare|status`
+  (SAM 2's `--object NAME[@FRAME]:X,Y` and `--box`), and `toast render
+  passes|status` (step 2's command, a limitation closed). Doctor: "Vision
+  models", with the commands for what is missing.
+
+Measured on the step-2 scene rendered at 320x180 (the dolly; a plate made
+of the render over grey), against the render's own signals:
+
+| Model | Against | Per frame |
+|---|---|---|
+| Depth Anything V2 Small | correlation with 1/z | 0.851, 0.972, 0.974 |
+| Video Depth Anything Small (input 252) | correlation with 1/z | 0.784, 0.932, 0.952 |
+| SAM 2.1 tiny, one point an object | IoU, ball / box | 0.994/0.992, 0.994/0.989, 0.994/0.999 |
+
+Both depths order the ball, box and wall as the geometry does in every
+frame. Two runs on the CPU with the same threads were bit-identical (Depth
+Anything V2, SAM 2). Times on this CPU: Depth Anything V2 about 2 s a
+frame; Video Depth Anything about 15 s for one window at input 252 (170 s at
+518); SAM 2 about 6 s a frame. A box prompt drawn loosely by hand gave the
+box an IoU of 0.56 -- the measured quality shows it, which is the point.
+
 # Done
 
 - Read SPEC-0012's signal types and ops, the schema's kind and camera
@@ -278,7 +348,21 @@ the production refused (a collect step); not on GL (step 6).
   node declaring another kind or camera is refused; a relative depth cannot
   reach `merge.depth`; labels are resized to the nearest; one signal serves
   two readers.
-- Full suite after step 1: 934 tests pass; after step 2 and its review: 954 pass.
+- Full suite after step 1: 934 tests pass; after step 2 and its review: 954; after step 3: 966.
+- Step 3 (`tests/test_estimates.py`): without models, with a stand-in
+  worker -- the catalog refuses CC-BY-NC models and unknown ones; nothing
+  is fetched implicitly (the store stays absent); a fetch of the wrong
+  bytes keeps nothing; a tampered file is refused by `require`; a relative
+  depth is recorded estimated, `inverse_z`, with no camera or unit, its
+  clock at the stretch's first frame, the model's revision, licence, files
+  and stretch; changed or removed weights make it stale and refused; a
+  second run is recorded identical, or with its difference; SAM 2 objects
+  are instances with their prompts, declared scores kept apart from an IoU
+  measured later against a person's matte; a medium outside the production
+  is refused. With the models and Blender: the three models on the known
+  scene, ordering and correlation, the video model's windows and code
+  commit, objects followed through the dolly above 0.95 IoU, second runs on
+  record.
 - Step 2 (`tests/test_renders.py`, Blender 5.2.2): a recipe scene (wall at
   10 m, ball, box; the camera dollying 2 m over three frames) rendered at
   96x54; the record names Blender's version as installed, engine and

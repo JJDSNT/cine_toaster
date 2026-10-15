@@ -426,6 +426,31 @@ Neither changes the direction; each is used at the edges (`references.md`).
   relinking them (Blender's `file.pack_all` or `make_paths_relative`).
 - **Signals are not on GL yet** (`generate.render` by record sends a graph
   to the reference): C8 step 6.
+- **Depth resized to the nearest** (safe with +inf, but stair-stepped on
+  slanted surfaces). How, in C8 step 5: an interpolation that blends only
+  among valid neighbours on the same side of a depth discontinuity (a
+  threshold on the relative jump), +inf and labels never blended.
+
+### Estimated signals: what the model adapters do not do yet (CT-0081 step 3)
+
+- **CPU only, small models.** Video Depth Anything takes about 15 s a
+  32-frame window at input 252 and 170 s at 518 here. How: a device option
+  (CUDA when present) recorded in the environment, and the Runpod path for
+  long shots (C9), the record unchanged.
+- **One window's memory on a long shot**: Video Depth Anything holds every
+  frame of the stretch. How: its streaming mode (`run_streaming.py` in the
+  pinned code) as a parameter, recorded as a different temporal contract.
+- **SAM 2 keeps hard labels**; its soft per-object logits are dropped. How:
+  record each object's probability as an `alpha` signal beside the
+  segmentation, for soft mattes (step 5).
+- **Prompts are points and boxes on the command line.** How: prompts drawn on
+  a frame in the control room, kept with the record; a person's correction
+  re-prompting a frame.
+- **Frames are FFmpeg's rgb24** of the medium (its default matrix for YUV).
+  How: read through the colour pipeline to sRGB when a medium declares its
+  colour space, recorded in `pixels`.
+- **`compare` gives a correlation, not a residual**; the fitted alignment
+  and its residual are step 4's.
 
 ### Later
 

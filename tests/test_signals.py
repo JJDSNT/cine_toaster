@@ -70,7 +70,8 @@ class RecordTests(SignalCase):
         np.testing.assert_array_equal(signals.frame(self.root, "flow", 2), vectors[2])
         labels = [np.arange(W * H, dtype=np.int32).reshape(H, W) % 3]
         signals.record_signal(self.root, signal_id="people", kind="segmentation", origin="estimated", frames=labels,
-                              rate=24, actor=TOOL, media="plates/shot.mp4", labels={0: "room", 1: "mara", 2: "chair"})
+                              rate=24, actor=TOOL, media="plates/shot.mp4", labels={0: "room", 1: "mara", 2: "chair"},
+                              labels_are="instances")
         got = signals.frame(self.root, "people", 0)
         self.assertTrue(np.issubdtype(got.dtype, np.integer))
         np.testing.assert_array_equal(got, labels[0])
@@ -82,7 +83,10 @@ class RecordTests(SignalCase):
                  "no quantity": dict(kind="depth", origin="geometric", camera="c", depth={"unit": "m"}),
                  "a relative depth with a unit": dict(kind="depth_relative", origin="estimated",
                                                      depth={"quantity": "z", "unit": "m"}),
-                 "a segmentation without labels": dict(kind="segmentation", origin="estimated"),
+                 "a segmentation without labels": dict(kind="segmentation", origin="estimated",
+                                                       labels_are="classes"),
+                 "a segmentation not saying what its labels are": dict(kind="segmentation", origin="estimated",
+                                                                       labels={0: "a"}),
                  "an unknown kind": dict(kind="heat", origin="estimated"),
                  "an unknown origin": dict(kind="luminance", origin="guessed")}
         for name, given in cases.items():
@@ -243,7 +247,8 @@ class GraphTests(SignalCase):
     def test_labels_are_resized_to_the_nearest_never_blended(self) -> None:
         labels = [(np.indices((H, W)).sum(axis=0) % 3).astype(np.int32)]
         signals.record_signal(self.root, signal_id="people", kind="segmentation", origin="estimated", frames=labels,
-                              rate=24, actor=TOOL, media="plates/shot.mp4", labels={0: "a", 1: "b", 2: "c"})
+                              rate=24, actor=TOOL, media="plates/shot.mp4", labels={0: "a", 1: "b", 2: "c"},
+                              labels_are="classes")
         graph = {"ports": {"plate": "picture"}, "output": "out", "nodes": {
             "s": {"op": "signal.read", "signal": "people", "kind": "segmentation"},
             "m": {"op": "matte.label", "signal": "s", "labels": [1]},

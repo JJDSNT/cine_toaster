@@ -12,7 +12,7 @@ RUN = $(VENV)/bin/python
 TOAST = $(VENV)/bin/toast
 
 .DEFAULT_GOAL := setup
-.PHONY: ui ui-test setup environment submodules install install-media install-audio install-gpu install-voice install-agents install-mcp install-vfx install-usd install-splat test check demo doctor serve clean help voice build
+.PHONY: ui ui-test setup environment submodules install install-media install-audio install-gpu install-voice install-vision install-agents install-mcp install-vfx install-usd install-splat test check demo doctor serve clean help voice build
 
 help:
 	@echo "make setup     install and report what works"
@@ -100,6 +100,14 @@ install-voice:
 	@uv venv --quiet --allow-existing --python 3.11 .venv-voice
 	@VIRTUAL_ENV=.venv-voice uv pip install --quiet -r requirements-voice.txt --index-strategy unsafe-best-match
 	@.venv-voice/bin/python -c "import chatterbox, demucs, resemblyzer" && echo "    voice conversion ready"
+
+# Depth and segmentation models (C8 step 3, CT-0081) run in their own environment:
+# torch never enters the main one. Weights are fetched apart: toast models fetch <name>.
+install-vision:
+	@echo "==> Creating .venv-vision (torch CPU, transformers; about 1.5 GB)"
+	@uv venv --quiet --allow-existing --python 3.11 .venv-vision
+	@VIRTUAL_ENV=.venv-vision uv pip install --quiet -r requirements-vision.txt --index-strategy unsafe-best-match
+	@.venv-vision/bin/python -c "import torch, transformers, torchvision, cv2, einops" && echo "    vision models ready (now: toast models fetch <name>)"
 
 # The canvas is React (ADR 0015). Node is needed to build it, never to run
 # Cine Toaster: the build lands in the package and the runtime serves it.
