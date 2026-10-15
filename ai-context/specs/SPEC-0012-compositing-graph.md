@@ -37,7 +37,7 @@ node's extent, sampled at the composite's frame rate.
 | `matte` | how much is seen | one channel, float, 0 to 1 (may exceed for soft operations, clamped at merge) |
 | `signal` | a named value per pixel | one or more channels, float; its `kind` says what (below) |
 | `sound` | audio | samples at the composite's rate; carried, not mixed here (the mix stays the assembly's) |
-| `track` | where something is per frame | a list of frames, each with points, a plane (four corners) or a camera (matrix, focal length), in fractions of the picture; and its **clock** (C7, CT-0080; ADR 0023): `{rate, origin}` -- the rate of its entries and the media instant of its first, as a time record (`{ticks}`, with `exact` when ticks cannot hold it). A track with a clock is read at the media instant its source shows; one without, by its reader's frame (as before) |
+| `track` | where something is per frame | a list of frames, each with points, a plane (four corners) or a camera (matrix, focal length), in fractions of the picture; and its **clock** (C7, CT-0080; ADR 0023): `{rate, origin}` -- the rate of its entries and the media instant of its first, as a time record (`{ticks}`, with `exact` when ticks cannot hold it). A track with a clock is read at the media instant its source shows; one without, by its reader's frame (as before). Each entry may carry `confidence` (0 to 1: of the features followed into it, the share passing a forward-backward check, and for a plane its homography's inliers), `reseeded`, `reacquired` (found again after it was lost) and `corrected` (a person's correction in force) |
 | `curve` | a number per frame | keyframes, or a driven value (§6) |
 | `meta` | facts that ride along | provenance, licence, credit, source timecode |
 
@@ -218,7 +218,7 @@ in the 1080-line cut. A shape's `feather` is a fraction of the frame.
 | Op | In | Out | Parameters |
 |---|---|---|---|
 | `track.measure` | picture | track | `kind` (point, plane, camera), a starting region; deterministic per tracker version |
-| `track.read` | -- | track | a file in the track format (§1); `of`, the source (port or `generate.source`) it describes -- with a clock, it is read where that source is shown. A measured track (`track.measure`) describes its input and is given the input's clock |
+| `track.read` | -- | track | a file in the track format (§1), or a production's track by its id (`track`: `tracks/<id>`, the measurement in use with its corrections, refused when stale); `of`, the source (port or `generate.source`) it describes -- with a clock, it is read where that source is shown. A measured track (`track.measure`) describes its input and is given the input's clock |
 | `curve.keys` | optional curve `in` | curve | keyframes `[{t, value, ease}]`; `ease`: linear, in, out, in-out, hold, bezier handles. With `in`, `t` is that curve's value, not seconds: a join's recipe keys along its `progress` (0 to 1), whatever the join's length |
 | `curve.beats` | -- | curve | the scene's music beats (CT-0067): a pulse per beat with an envelope (`attack`, `decay`, `attack_ease`, `decay_ease`), `low` to `high`, `every`, `overlap` (max, add); §6 |
 | `curve.from_track` | track | curve | a field of the track (x, y, rotation, scale) |

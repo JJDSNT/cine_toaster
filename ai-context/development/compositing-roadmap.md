@@ -348,6 +348,9 @@ moved, a speed stretched with attacks kept to the sample); stretchers
 benchmarked; the anchored WSOLA chosen as the default on measurements (a
 listening review still to do). Step 4 done: `retime` on a shot (keys on
 beats, reverse, freeze) and on layers, with `offset`, `echo` and `pin`.
+Step 5 done: tracks as production records (`tracks/<id>`) -- measured on
+their media with a confidence per entry, reseeded and re-acquired, corrected
+apart and revertible, refused when stale, reused by any shot and retime.
 
 - What: retime, speed ramp, freeze, reverse, frame blending, an offset
   between layers, trails and echoes (the ADO's Infinity). Point and planar

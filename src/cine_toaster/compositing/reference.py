@@ -1327,7 +1327,15 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             track_cache[reference] = inputs[reference]
             return track_cache[reference]
         node = nodes[reference]
-        if node["op"] == "track.read":
+        if node["op"] == "track.read" and node.get("track"):
+            # A production's track (C7 step 5): measured on its media, corrected by a person, refused when stale.
+            from ..tracks import load_track
+
+            if root is None:
+                raise ValidationError(f"{reference} reads the production's track {node['track']!r}: give the graph "
+                                      "its production")
+            track_cache[reference] = load_track(root, str(node["track"]))
+        elif node["op"] == "track.read":
             import json
 
             path = Path(node["file"])

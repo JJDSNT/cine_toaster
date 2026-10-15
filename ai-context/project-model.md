@@ -50,9 +50,17 @@ project/
   scenes/<scene>/scene.yaml       authored: direction, geography, shots
   scenes/<scene>/state.json       runtime-owned: selections, decisions, versions
   scenes/<scene>/work/            the takes, as files
+  tracks/<id>/                    runtime-owned (C7, CT-0080): a track of a medium -- track.yaml (identity,
+                                  media and its hash, the measurement in use), measurements/NNNN.json (each
+                                  automatic measurement, never edited), corrections.json (a person's, apart)
   assets/
   renders/
 ```
+
+A track belongs to its media, not to a shot: any shot cut from that media
+reads it by its clock, whatever its trim or retime. It is refused when stale
+(its media or its measuring has changed), and changed only by the `track`
+commands -- measure, correct, revert -- with an actor and an event.
 
 There is one native format and no import step: the production's own breakdown is
 the scene file (ADR 0010). It holds direction, scene geometry, shots, open

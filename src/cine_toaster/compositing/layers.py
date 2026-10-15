@@ -269,7 +269,10 @@ class _Compiler:
             return current
         source = f"L{of}"
         if spec.get("track"):
-            track = self.add(f"{n}-track", {"op": "track.read", "file": str(spec["track"]), "of": source})
+            given = str(spec["track"])
+            # A production's track by its id (tracks/<id>), or a track file by its path.
+            reads = {"file": given} if "/" in given or given.endswith(".json") else {"track": given}
+            track = self.add(f"{n}-track", {"op": "track.read", **reads, "of": source})
         else:
             if spec["measure"] not in ("point", "plane"):
                 self.problems.append(f"{where}'s pin measures a point or a plane, not {spec['measure']!r}")

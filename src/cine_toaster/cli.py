@@ -831,6 +831,36 @@ def command_vfx(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_track(args: argparse.Namespace) -> int:
+    """Tracks as production records (C7 step 5, CT-0080): measure, see, correct, revert."""
+
+    from . import tracks
+
+    root = args.project.expanduser().resolve()
+    if args.track_command == "measure":
+        done = tracks.measure_track(root, track_id=args.id, media=args.media, kind=args.kind, region=args.region,
+                                    start=args.start, end=args.end, actor=_resolve_actor(args),
+                                    rationale=args.rationale)
+        state = tracks.status(root, args.id)
+        weak = ", ".join(f"{a}-{b}" for a, b in state["weak"]) or "none"
+        print(f"{args.id}: measurement {done['measurement']}, revision {done['revision']}; weak entries: {weak}")
+        return 0
+    if args.track_command == "status":
+        print(json.dumps(tracks.status(root, args.id), indent=2))
+        return 0
+    if args.track_command == "correct":
+        values = [[args.at[i], args.at[i + 1]] for i in range(0, len(args.at), 2)]
+        done = tracks.correct_track(root, track_id=args.id, index=args.index, actor=_resolve_actor(args),
+                                    **({"corners": values} if len(values) == 4 else {"points": values}),
+                                    note=args.rationale, expected_revision=args.expect_revision)
+        print(f"{args.id}: entry {args.index} corrected ({done['correction']}), revision {done['revision']}")
+        return 0
+    done = tracks.revert_corrections(root, track_id=args.id, actor=_resolve_actor(args), correction=args.correction,
+                                     index=args.index, note=args.rationale)
+    print(f"{args.id}: reverted {', '.join(done['reverted'])}, revision {done['revision']}")
+    return 0
+
+
 def command_sound(args: argparse.Namespace) -> int:
     """The sound catalog, and the sources recorded sound and music come from (CT-0048)."""
 
@@ -2199,6 +2229,37 @@ def build_parser() -> argparse.ArgumentParser:
     emotion_face.add_argument("id")
     emotion_face.add_argument("--intensity", default="clear", choices=("subtle", "clear", "overwhelming"))
     emotion_parser.set_defaults(function=command_emotion)
+
+    track_parser = subparsers.add_parser("track", help="Tracks measured on media, kept, corrected and reused (C7, CT-0080)")
+    track_sub = track_parser.add_subparsers(dest="track_command", required=True)
+    track_measure = track_sub.add_parser("measure", help="Measure a track (again) on its media")
+    track_measure.add_argument("project", type=Path)
+    track_measure.add_argument("id")
+    track_measure.add_argument("--media", required=True, help="The media, a path in the production")
+    track_measure.add_argument("--kind", choices=("point", "plane"), required=True)
+    track_measure.add_argument("--region", type=float, nargs=4, default=[0.0, 0.0, 1.0, 1.0],
+                               metavar=("X0", "Y0", "X1", "Y1"))
+    track_measure.add_argument("--start", type=float)
+    track_measure.add_argument("--end", type=float)
+    track_status = track_sub.add_parser("status", help="What a track is: stale, weak stretches, corrections")
+    track_status.add_argument("project", type=Path)
+    track_status.add_argument("id")
+    track_correct = track_sub.add_parser("correct", help="Correct one entry (kept apart from the measurement)")
+    track_correct.add_argument("project", type=Path)
+    track_correct.add_argument("id")
+    track_correct.add_argument("index", type=int)
+    track_correct.add_argument("at", type=float, nargs="+", help="x y (a point) or four corners' x y")
+    track_correct.add_argument("--expect-revision", type=int)
+    track_revert = track_sub.add_parser("revert", help="Take corrections out of force, keeping them")
+    track_revert.add_argument("project", type=Path)
+    track_revert.add_argument("id")
+    track_revert.add_argument("--correction")
+    track_revert.add_argument("--index", type=int)
+    for action in (track_measure, track_correct, track_revert):
+        action.add_argument("--rationale", default="")
+        action.add_argument("--actor", help="Who is deciding (default: current user)")
+        action.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
+    track_parser.set_defaults(function=command_track)
 
     sound_parser = subparsers.add_parser("sound", help="The sound catalog and its sources: Freesound, Sonniss, Openverse (CT-0048)")
     sound_sub = sound_parser.add_subparsers(dest="sound_command", required=True)

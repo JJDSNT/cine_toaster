@@ -414,6 +414,69 @@ retime is), not when the scene loads; a ramp's map is sampled every 1/240 s
 (exact at each sample) rather than exact -- how: a curve op whose segments
 are quadratic, if a use needs more.
 
+## Step 5 -- the track as a production record (done 2026-10-15)
+
+The user's direction: a track belongs to its media and is reused by any
+shot under any retime; a persistent record with a stable identity, the
+media referenced, the source's clock, normalised measurements and a
+confidence per entry; manual review, correction, reseeding and weak
+stretches; corrections kept apart from measurements, revertible without
+losing the original; an explicit invalidation when the media or the
+measuring change.
+
+- `tracks.py`: `tracks/<id>/track.yaml` (identity, media path and content
+  hash, kind, region, stretch, the measurement in use, revision),
+  `measurements/NNNN.json` (each automatic measurement, never edited: its
+  clock -- the media's exact rate, the origin on its frame grid -- its
+  entries in fractions of the picture, what made it: tracker, version,
+  region, media hash, size, when, by whom) and `corrections.json` (each
+  correction: the entry, its value, the measurement it was made on, in force
+  or reverted, by whom, when, why). Commands `measure_track`,
+  `correct_track` (with an expected revision), `revert_corrections` (one,
+  an entry's, or all) -- an actor, an event, a revision; `toast track
+  measure | status | correct | revert`.
+- **Invalidation**: `status` lists every reason a track no longer describes
+  its media -- the media missing or changed (content hash), the tracker or
+  its version changed, the kind, region or stretch asked differing from the
+  measurement's -- and `load_track` refuses a stale track, naming the
+  command that remeasures it. Corrections made on an earlier measurement
+  are kept and counted, not applied to a new one.
+- **The tracker** (`compositing/tracking.py`, version 2): measured at the
+  media's own size; each entry's `confidence` is per step -- the share of
+  the features followed into it that pass a forward-backward check (and a
+  plane's RANSAC inliers), lowered under 16 features -- so features leaving
+  the frame in a pan do not read as doubt, while an occlusion drops to 0;
+  `reseeded` where features thinned out; a lost track held at no confidence
+  and **re-acquired** by its last confident appearance (template matching
+  around where it was), so it resumes where the content really is.
+  `weak_spans` lists the stretches under a threshold.
+- The graph reads a production track by id (`track.read` with `track`);
+  layers' `pin: {track: <id>}` does.
+
+Found on the way, each by a test: confidence first measured since the start
+(features leaving a pan's frame made a clean track look doubtful; now per
+step); a track losing every feature crashed OpenCV on the next frame (now
+held, then re-acquired); reseeding where a lost track had been followed
+another patch of the picture -- the texture had moved 14 px while hidden (now
+re-acquired by appearance, exact).
+
+Impact on the visual editor (C11): the record gives it what it needs without
+another format -- the weak stretches to show (`status.weak`), a correction as
+one command per entry kept apart from the measurement (a layer the editor can
+show, hide or revert), the stale reasons to display before anything is
+drawn, and every change as an event it can follow live. What it will add:
+drawing corrections in the viewer (dragging a point or a corner at an entry),
+interpolating between a person's corrections across a weak stretch (a
+command over a range), and choosing the region by drawing it.
+
+Limitations, recorded with how: re-acquisition matches the last appearance
+by translation only -- a plane turned or scaled while hidden is found by its
+centre, its corners carried, not re-fitted (how: re-seed and fit the
+homography to the last confident appearance's features); a correction
+replaces one entry -- no interpolation across a range yet (how: a
+`correct_track` over `[first, last]` that interpolates between the entries
+either side); a camera solve stays out (C8, Blender).
+
 # Done
 
 - Read every time and track node, its tests, SPEC-0012 §6, the assembly's
@@ -491,5 +554,19 @@ are quadratic, if a use needs more.
   (one pixel a frame); a pin says what it follows; in a cut, a shot's
   `retime: {speed: 2}` with `stretch` lays its click at sample 12,000.
 - Full suite after step 4: 897 tests pass.
+- Step 5 (`tests/test_tracks.py`): a track is a record of its media with its
+  clock (24, origin 0) and a confidence per entry, following a 2 px a frame
+  pan; an occlusion of six frames is the weak stretch (20, 25) and the track
+  is found again where the texture really is (x = 28, for a point and a
+  plane); corrections are kept apart and reverted without touching the
+  measurement, with events measured, corrected, reverted; a correction is
+  checked (index, shape, revision); a track whose media changed is stale and
+  refused, naming the remeasure command, fresh again once remeasured, stale
+  again when its region is changed; a new tracker version makes old tracks
+  stale; corrections on an earlier measurement are kept, not applied; one
+  track serves shots cut at 0 and 10/24 s, an offset, a 2x remap and a
+  reverse, each reading the entry of the media instant it shows; a layer
+  pins by a production track; the command line shows its status.
+- Full suite after step 5: 907 tests pass.
 - The probes above (reproducible with a ten-frame clip whose red channel is
   its frame number). No code changed.

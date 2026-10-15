@@ -165,7 +165,7 @@ OPS: dict[str, Op] = {
     # -- track and curves
     "track.measure": Op({"in": P(*PIC)}, {"out": "track"},
                         {"kind": "enum:point|plane|camera", "region": "vector", "tracker": "text"}),
-    "track.read": Op({}, {"out": "track"}, {"file": "file", "of": "text"}),
+    "track.read": Op({}, {"out": "track"}, {"file": "file", "track": "text", "of": "text"}),
     # Keys over time, or -- given `in` -- over another curve's value (a join's progress, 0 to 1).
     "curve.keys": Op({"in": P(*CRV, required=False)}, {"out": "curve"}, {"keys": "vector"}),
     "curve.beats": Op({}, {"out": "curve"}, {"attack": "number", "decay": "number", "every": "int", "low": "number",
@@ -195,7 +195,7 @@ REQUIRED_PARAMS: dict[str, tuple[str, ...]] = {
     "filter.morphology": ("operation", "radius"), "filter.blur": ("radius",),
     "time.remap": ("map",), "time.offset": ("frames",), "time.blend": ("frames",), "time.echo": ("count",),
     "generate.source": ("take|file",), "generate.solid": ("colour",), "generate.text": ("text",),
-    "generate.render": ("renderer",), "track.measure": ("kind",), "track.read": ("file",),
+    "generate.render": ("renderer",), "track.measure": ("kind",), "track.read": ("file|track",),
     "curve.keys": ("keys",), "curve.map": ("how",), "curve.combine": ("how",), "curve.from_track": ("field",),
 }
 
