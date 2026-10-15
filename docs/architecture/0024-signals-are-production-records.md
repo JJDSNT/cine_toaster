@@ -55,3 +55,6 @@ also meant to be "recorded" (SPEC-0012 §5) with nowhere to record it.
   weigh by measured error -- the distinction is data.
 - The Blender and model adapters (C8 steps 2-3) write records; nothing they
   produce is read any other way.
+- What a maker's depth measures is declared per maker as it was measured,
+  never assumed from another: Cycles' Z is z along the axis (CT-0081 step
+  2); a renderer not measured is refused.

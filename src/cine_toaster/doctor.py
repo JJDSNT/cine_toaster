@@ -203,7 +203,8 @@ def _blender() -> Capability:
     path = blender_binary()
     return Capability(
         name="Blender",
-        what_it_enables="3D titles from the title catalog (letters-turn-in, letters-rise; CT-0031)",
+        what_it_enables="3D titles from the title catalog (letters-turn-in, letters-rise; CT-0031); a scene's "
+                        "passes as records the graph reads -- picture, Z depth, object index (`renders.py`, CT-0081)",
         required=False,
         status=OK if path else MISSING,
         detail=path or "",

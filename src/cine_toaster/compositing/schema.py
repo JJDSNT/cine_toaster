@@ -69,7 +69,7 @@ OPS: dict[str, Op] = {
     "signal.channel": Op({"picture": P(*PIC)}, {"out": "signal"},
                          {"channel": "enum:red|green|blue|alpha|hue|saturation"}, kind="@channel"),
     "signal.read": Op({}, {"out": "signal"}, {"file": "file", "signal": "text", "of": "text", "kind": "enum:" + "|".join(SIGNAL_KINDS),
-                                              "range": "vector", "camera": "text"}, kind="@kind"),
+                                              "range": "vector", "camera": "text", "layer": "text"}, kind="@kind"),
     "signal.estimate": Op({"picture": P(*PIC)}, {"out": "signal"},
                           {"kind": "enum:depth_relative|vectors|normals|segmentation", "model": "text", "seed": "int"},
                           kind="@kind", deterministic=False),
@@ -160,7 +160,8 @@ OPS: dict[str, Op] = {
                                     "align": "enum:centre|left|right", "line_spacing": "number", "outline": "number",
                                     "hollow": "bool", "letters": "letters", "glyph_colours": "bool"}),
     "generate.render": Op({}, {"out": "picture", "depth": "signal", "alpha": "matte"},
-                          {"renderer": "text", "scene": "file", "recipe": "text", "seed": "int", "camera": "text"},
+                          {"renderer": "text", "scene": "file", "recipe": "text", "seed": "int", "camera": "text",
+                           "render": "text"},
                           kind="depth", deterministic=False),
     # -- track and curves
     "track.measure": Op({"in": P(*PIC)}, {"out": "track"},
@@ -195,7 +196,7 @@ REQUIRED_PARAMS: dict[str, tuple[str, ...]] = {
     "filter.morphology": ("operation", "radius"), "filter.blur": ("radius",),
     "time.remap": ("map",), "time.offset": ("frames",), "time.blend": ("frames",), "time.echo": ("count",),
     "generate.source": ("take|file",), "generate.solid": ("colour",), "generate.text": ("text",),
-    "generate.render": ("renderer",), "track.measure": ("kind",), "track.read": ("file|track",),
+    "generate.render": ("render|renderer",), "track.measure": ("kind",), "track.read": ("file|track",),
     "curve.keys": ("keys",), "curve.map": ("how",), "curve.combine": ("how",), "curve.from_track": ("field",),
 }
 

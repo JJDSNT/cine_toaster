@@ -59,7 +59,10 @@ project/
                                   media and its hash, the measurement in use), measurements/NNNN.json (each
                                   automatic measurement, never edited), corrections.json (a person's, apart)
   assets/
-  renders/
+  renders/                        assembled files; renders/passes/<id>/ (C8, CT-0081): a 3D scene's render --
+                                  render.json (renderer, scene and its files by hash, the camera at every
+                                  frame, the object table) and rgba/ (the picture); its depth and object index
+                                  are the signals <id>-depth and <id>-objects
 ```
 
 A track belongs to its media, not to a shot: any shot cut from that media

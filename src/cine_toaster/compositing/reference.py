@@ -615,7 +615,8 @@ IMPLEMENTED = {
 }
 #: In SPEC-0012 but outside the reference, by definition (opaque) or until a renderer gives them (models, 3D).
 NOT_IN_REFERENCE = {"signal.estimate": "a model's result is recorded, not computed by the reference",
-                    "generate.render": "a renderer's own scene; its result is recorded"}
+                    "generate.render": "a renderer's own scene, rendered apart: give it a render's record "
+                                       "(`render`, renders.render_passes)"}
 
 
 @lru_cache(maxsize=64)
@@ -924,6 +925,21 @@ def _grown(alpha: np.ndarray, radius: float) -> np.ndarray:
     return out
 
 
+#: Signals resized to the nearest, never blended: a label between two is neither's, and so is a depth between
+#: two surfaces (and +inf, nothing hit, would turn a blend into inf or nan).
+NEAREST_KINDS = ("segmentation", "depth", "depth_relative")
+
+
+def resize_signal(data: np.ndarray, kind: str, width: int, height: int) -> np.ndarray:
+    if data.shape[:2] == (height, width):
+        return data
+    if kind in NEAREST_KINDS:
+        rows = (np.arange(height) * data.shape[0] // height)[:, None]
+        cols = (np.arange(width) * data.shape[1] // width)[None, :]
+        return data[rows, cols]
+    return Image_resize(data.astype(np.float32), width, height)
+
+
 def Image_resize(data: np.ndarray, width: int, height: int) -> np.ndarray:
     """A float array resized to the frame, channel by channel (signals are not pictures to encode)."""
 
@@ -1182,7 +1198,7 @@ def read_signal(name: str, node: dict[str, Any], book: "TrackBook", frame: int, 
                 height: int, root: Path | None, held: dict[str, Any]) -> np.ndarray:
     """A production signal at this frame -- one reading for every renderer: its record checked against what the
     node says (kind, camera), the frame at the media instant its source (`of`) shows, else the graph's own frame;
-    resized to the picture -- smoothly for values, to the nearest for labels (CT-0081)."""
+    resized to the picture -- smoothly for values, to the nearest for labels and depths (CT-0081)."""
 
     from ..signals import SignalReader
 
@@ -1205,13 +1221,7 @@ def read_signal(name: str, node: dict[str, Any], book: "TrackBook", frame: int, 
         data = reader.at(book.media_instant(str(node["of"]).split(".")[0], name, seconds, f"the signal {node['signal']}"))
     else:
         data = reader.frame(frame)
-    if data.shape[:2] != (height, width):
-        if reader.record["kind"] == "segmentation":
-            rows = (np.arange(height) * data.shape[0] // height)[:, None]
-            cols = (np.arange(width) * data.shape[1] // width)[None, :]
-            data = data[rows, cols]
-        else:
-            data = Image_resize(data.astype(np.float32), width, height)
+    data = resize_signal(data, reader.record["kind"], width, height)
     return data.astype(np.int64 if reader.record["kind"] == "segmentation" else np.float32)
 
 
@@ -1408,7 +1418,8 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
     if problems:
         raise ValidationError("The graph is not valid: " + "; ".join(message for _, message in problems))
     nodes = graph["nodes"]
-    missing = sorted({node["op"] for node in nodes.values() if node["op"] not in IMPLEMENTED})
+    missing = sorted({node["op"] for node in nodes.values() if node["op"] not in IMPLEMENTED
+                      and not (node["op"] == "generate.render" and node.get("render"))})
     if missing:
         why = "; ".join(f"{op}: {NOT_IN_REFERENCE[op]}" for op in missing if op in NOT_IN_REFERENCE)
         raise ValidationError(f"The reference does not implement {', '.join(missing)}" + (f" ({why})" if why else " yet"))
@@ -1743,6 +1754,31 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             return np.stack([grey, grey, grey, np.ones_like(grey)], axis=-1)
         if op == "generate.text":
             return text_picture(node, param, width, height, root, seconds)
+        if op == "generate.render" and node.get("render"):
+            # A render's record (C8 step 2): its picture out, its depth and alpha beside -- one frame of one
+            # clock, read, never rendered here.
+            from ..renders import RenderReader
+
+            key = f"render:{name}"
+            if key not in clips:
+                if root is None:
+                    raise ValidationError(f"{name} reads the production's render {node['render']!r}: give the graph "
+                                          "its production")
+                clips[key] = RenderReader(root, str(node["render"]))
+                if node.get("camera") and node["camera"] != clips[key].camera:
+                    raise ValidationError(f"{name} reads {node['render']} as from the camera {node['camera']!r}, but "
+                                          f"it is from {clips[key].camera!r}")
+            reader = clips[key]
+            index = reader.index(seconds)
+            picture = reader.picture(index)
+            depth = reader.depth.frame(index)
+            if picture.shape[:2] != (height, width):
+                # The picture resized smoothly; the depth to the nearest (`resize_signal`).
+                picture = Image_resize(picture, width, height)
+                depth = resize_signal(depth, "depth", width, height)
+            context.cache[(f"{name}.depth", frame)] = depth.astype(np.float32)
+            context.cache[(f"{name}.alpha", frame)] = picture[..., 3].astype(np.float32)
+            return picture.astype(np.float32)
         if op == "signal.read" and node.get("signal"):
             # A production's signal (C8 step 1): checked once, read at the instant its source shows.
             return read_signal(name, node, book, frame, fps, width, height, root, clips)
@@ -1751,11 +1787,19 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             path = (root / path) if root and not path.is_absolute() else path
             key = f"read:{name}"
             if key not in clips:
+                kind = node["kind"]
+                channels = {"vectors": 2, "normals": 3}.get(kind, 1)
                 if path.suffix.lower() == ".exr":
-                    from ..color import read_exr
+                    # A layer named, or the file's only one; its channels the kind's -- never the first of
+                    # several that happens to be there (CT-0081).
+                    from ..color import exr_layer
 
-                    data = read_exr(path)
-                    data = np.asarray(Image_resize(data, width, height))
+                    data = exr_layer(path, node.get("layer"))
+                    found = 1 if data.ndim == 2 else data.shape[2]
+                    if found != channels:
+                        raise ValidationError(f"{name} reads a {kind} ({channels} value(s) a pixel) from a layer of "
+                                              f"{found} channels in {path.name}: name a layer of {channels} (`layer`)")
+                    data = resize_signal(data, kind, width, height)
                 elif path.suffix.lower() == ".npy":
                     data = np.load(path).astype(np.float32)
                 else:

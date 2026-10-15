@@ -373,7 +373,11 @@ Blender into the graph; alignment flickers per frame; depth merges per pixel;
 nothing on GL; nothing exposed. A sequence from it. The C6b review stays in
 the backlog (the user, 2026-10-15). Step 1 done: signals as production records
 (`signals/<id>`, ADR 0024) -- kind, origin and transformations apart,
-provenance, quality, invalidation, corrections, time.
+provenance, quality, invalidation, corrections, time. Step 2 done: Blender
+renders a scene's passes apart (`renders.render_passes`), kept as
+`renders/passes/<id>` with its camera per frame and its signals `<id>-depth`
+(z along the axis, measured) and `<id>-objects`; `generate.render` reads the
+record and never runs Blender.
 
 - What: depth and segmentation as signals, from a model run on a picture
   (depth estimation, a segment-anything model) or from Blender passes (Z,

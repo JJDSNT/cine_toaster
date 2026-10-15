@@ -77,14 +77,73 @@ def _frames(pattern: str) -> list[Path]:
     return [path for _, path in sorted(found)]
 
 
+def exr_layers(path: Path) -> dict:
+    """Every layer of an EXR, from every part -- Blender 5 writes a multilayer EXR as one part per pass, and
+    reading the first part alone loses the rest (found in CT-0081). Keys are the layers' names without the
+    view layer ("Combined", "Depth", "Object Index", or "RGBA" for a plain file); values float32 arrays,
+    (height, width) for one channel, (height, width, n) for several. Two layers of one name (two view layers'
+    Depth) are refused, never one chosen for the other."""
+
+    import numpy as np
+    import OpenEXR
+
+    found: dict[str, dict[str | None, Any]] = {}
+    with OpenEXR.File(str(path)) as file:
+        for part in file.parts:
+            for name, channel in part.channels.items():
+                pieces, axis = name.split("."), None
+                if len(pieces) > 1 and len(pieces[-1]) == 1:  # a pass's channel: "ViewLayer.Depth.Z", "Normal.X"
+                    pieces, axis = pieces[:-1], pieces[-1]
+                if len(pieces) > 1:  # the view layer: "ViewLayer.Combined"
+                    pieces = pieces[1:]
+                key = ".".join(pieces)
+                if axis in found.setdefault(key, {}):
+                    raise ValidationError(f"{Path(path).name} has two layers called {key!r} (another is {name!r} "
+                                          f"in {part.name()!r}): which one is meant cannot be told")
+                found[key][axis] = np.asarray(channel.pixels, dtype=np.float32)
+    layers: dict = {}
+    order = "RGBAXYZUVW"
+    for key, channels in found.items():
+        if None in channels and len(channels) > 1:
+            raise ValidationError(f"{Path(path).name} has a layer {key!r} both whole and by channel")
+        if len(channels) == 1:
+            layers[key] = next(iter(channels.values()))
+        else:  # one channel a name -- X, Y, Z of a Normal pass -- stacked in their order
+            axes = sorted(channels, key=lambda axis: (order.find(axis) if axis in order else len(order), axis))
+            layers[key] = np.stack([channels[axis] for axis in axes], axis=-1)
+    return layers
+
+
+def exr_layer(path: Path, layer: str | None = None):
+    """One layer of an EXR, named -- or, unnamed, its only one. A file of several layers read without a name is
+    refused with their names: a depth is never the first channel that happens to be there."""
+
+    layers = exr_layers(Path(path))
+    if layer is None:
+        if len(layers) != 1:
+            raise ValidationError(f"{Path(path).name} has the layers {', '.join(sorted(layers))}: say which "
+                                  "(`layer`)")
+        return next(iter(layers.values()))
+    if layer not in layers:
+        raise ValidationError(f"{Path(path).name} has no layer {layer!r}; it has {', '.join(sorted(layers))}")
+    return layers[layer]
+
+
 def read_exr(path: Path):
-    """An EXR's RGBA as float32 (height, width, 4); alpha 1 when it has none."""
+    """An EXR's RGBA as float32 (height, width, 4); alpha 1 when it has none. A multilayer EXR's `Combined` pass
+    is its picture."""
 
     import numpy as np
     import OpenEXR
 
     with OpenEXR.File(str(path)) as file:
         channels = file.channels()
+        if not any(name in channels for name in ("RGBA", "RGB", "R")):
+            combined = {name: layer for name, layer in exr_layers(path).items() if name.endswith("Combined")}
+            if combined:
+                pixels = next(iter(combined.values()))
+                if pixels.ndim == 3 and pixels.shape[2] == 4:
+                    return pixels
         if "RGBA" in channels:
             pixels = np.asarray(channels["RGBA"].pixels, dtype=np.float32)
         elif "RGB" in channels:

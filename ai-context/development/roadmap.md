@@ -400,6 +400,33 @@ Neither changes the direction; each is used at the edges (`references.md`).
   an objective perceptual score where one fits (ViSQOL, Apache 2.0) to
   compare stretchers on the same map.
 
+### A scene's passes: what the Blender adapter does not do yet (CT-0081 step 2)
+
+- **Only Cycles.** What EEVEE's (or another renderer's) Z measures has not
+  been measured, so it is refused. How: render the wall square to the
+  camera with it, as `tests/test_renders.py` does, and add its entry to
+  `renders.Z_MEASURED` (z or distance).
+- **Only perspective cameras, square pixels.** How: an orthographic camera's
+  intrinsics are its `ortho_scale` over the sensor fit (no focal length);
+  panoramic cameras need their own projection named in `render.json`; a
+  pixel aspect other than 1 scales `fy` by it.
+- **Edges and transparency**: Z and the object index are one surface per
+  pixel, not anti-aliased, and a transparent surface writes its own. How:
+  Cryptomatte (Blender writes it; a coverage per object per pixel) for soft
+  object mattes, and depth compositing at edges as C8 step 5 plans.
+- **Blender's version is recorded, not checked at reading.** How: `toast
+  doctor` (or `renders.status(check_renderer=True)`) compares the installed
+  `blender --version` with the record's and says so, without making the
+  render stale by itself -- the scene, not the program, is its input.
+- **Rendering is a Python command, not yet a CLI or job.** How: `toast
+  render passes <id> --scene --camera --frames` and a job kind calling
+  `render_passes`, so the GUI, CLI and agents use the one command.
+- **A file the scene reaches outside the production is refused.** How: a
+  "collect" step copying textures and libraries into the production and
+  relinking them (Blender's `file.pack_all` or `make_paths_relative`).
+- **Signals are not on GL yet** (`generate.render` by record sends a graph
+  to the reference): C8 step 6.
+
 ### Later
 
 - Sound: generated sound and music, stems, spatial phases 2-4 (`CT-0048`,

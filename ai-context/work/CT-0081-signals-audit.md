@@ -175,6 +175,85 @@ values where a mask says, not a soft blend (a feathered patch when a use
 needs it); a maker's own version check (is the model installed still the
 one that made it?) belongs to its adapter (steps 2-3).
 
+## Step 2 -- a scene's passes, rendered apart (done 2026-10-15)
+
+The user's cautions, each answered:
+
+- **A camera contract**, not a name: `render.json` keeps, per frame, the
+  projection, lens and sensor with its fit, shift, clipping, the matrix
+  camera to world, and the intrinsics in pixels derived from them
+  (`renders.intrinsics`), with the conventions (looks down -Z, +Y up; world
+  Z up; rows down) and the unit (metres per scene unit). The signals name the
+  camera `<render>/<camera>`; `generate.render` refuses another.
+- **Independent passes sharing time and space**: the picture (Combined,
+  premultiplied, scene-linear in the recorded working space) is a medium,
+  not a signal; depth and object index are signals of it, with the
+  render's clock, one size; the graph reads all three at one frame.
+- **Z measured, not assumed**: Cycles' Z is **planar** -- on a wall square
+  to the camera at 10 m it is 10.0000 at the centre and the corners, where a
+  distance along the ray would be 11.5016. Declared `quantity: z`; the test
+  unprojects every pixel through the recorded camera and finds the wall's
+  plane, the ball's sphere and the box's faces, every frame of a dolly.
+- **A stable object table**: meshes sorted by name, numbered from 1, 0 for
+  nothing; renaming an object renumbers. Limits documented in `renders.py`:
+  Z and index are not anti-aliased (one surface per pixel while the
+  picture's edge is a filtered mix), and a transparent surface writes its
+  own. Nothing hit is +inf.
+- **Reproducibility and invalidation**: Blender's version, engine, samples,
+  working space, pixel filter, the scene file and every file a .blend
+  reaches (by hash, and refused when outside the production), the script's
+  hash, each picture frame's hash. `renders.status` names every reason a
+  render is stale (and its signals', through `record_signal`'s inputs); a
+  stale render is refused until rendered again.
+- **Rendering and reading apart**: `render_passes` runs Blender (a
+  subprocess, `vfx_assets/_blender/passes.py`); `generate.render` with
+  `render` reads the record through `RenderReader` and never runs anything;
+  without it the reference refuses the op, naming the command.
+- **No second store, no Blender in the Core**: depth and labels go through
+  `record_signal`; the adapter is outside the Core.
+
+Found and fixed: Blender 5 writes a multilayer EXR as **one part per pass**,
+and `color.read_exr` read only the first -- a `signal.read` of such a file
+got Combined's red, not depth. `color.exr_layers` reads every part;
+`read_exr` takes a multilayer file's Combined as its picture.
+
+The user's review of step 2 (2026-10-15), four checks before closing, each
+now held by a test:
+
+- **Multipart reading by name, never by guess.** `color.exr_layers` groups
+  a file's channels into layers across every part (one part a pass, as
+  Blender 5 writes; one part for all, as Blender 4 did; a plain file) and
+  refuses two layers of one name (two view layers' Depth) instead of keeping
+  one. `color.exr_layer` takes a layer by name, or a file's only one;
+  `signal.read` of an EXR takes `layer`, refuses several layers unnamed
+  (listing them) and a layer whose channels are not the kind's (an RGBA file
+  is not a depth by its red).
+- **Object identity across frames**: a post the dolly passes (seen, then
+  less, then gone) and a drone flying in (absent, partial, whole) keep their
+  numbers; every frame uses only the table's; each label's pixels lie on its
+  own object's surface, the moving one at its keyed place; re-rendering
+  gives the same table.
+- **Invalidation of render and signals together**: a moved object, a
+  changed camera (in a recipe), a texture a .blend reaches (pinned by hash;
+  one outside the production refused), and the passes script each make the
+  render and both its signals stale.
+- **Compatibility and special values**: plain one-channel EXR, plain RGBA
+  (refused as depth), single-part and multipart multilayer; +inf for
+  nothing hit survives reading, resizing and `merge.depth` with no NaN;
+  NaN and -inf are refused at recording (`signals._shape_problems`). Depths,
+  like labels, are now resized to the nearest everywhere (a blend of 4 m and
+  +inf is neither, or NaN).
+- **The depth's meaning is per renderer, never assumed**: `renders.Z_MEASURED`
+  holds what each engine's Z measures as measured here (Cycles: z); another
+  engine is refused until measured. The meaning is written into
+  `render.json` (`depth`, with how it was measured) and the signal's record
+  (`depth.quantity`).
+
+Limitations, recorded in the roadmap with how: perspective cameras and
+square pixels only; edges and transparency (Cryptomatte, step 5); Blender's
+version recorded, not checked at reading; no CLI or job yet; files outside
+the production refused (a collect step); not on GL (step 6).
+
 # Done
 
 - Read SPEC-0012's signal types and ops, the schema's kind and camera
@@ -199,7 +278,25 @@ one that made it?) belongs to its adapter (steps 2-3).
   node declaring another kind or camera is refused; a relative depth cannot
   reach `merge.depth`; labels are resized to the nearest; one signal serves
   two readers.
-- Full suite after step 1: 934 tests pass.
+- Full suite after step 1: 934 tests pass; after step 2 and its review: 954 pass.
+- Step 2 (`tests/test_renders.py`, Blender 5.2.2): a recipe scene (wall at
+  10 m, ball, box; the camera dollying 2 m over three frames) rendered at
+  96x54; the record names Blender's version as installed, engine and
+  samples; the object table; the wall's z is 10, 9, 8 to 1e-4 at every
+  pixel; every pixel unprojected through its frame's recorded camera lands
+  on its object's surface (sphere and box within 2 cm away from edges); the
+  ball's projected centre carries its label; nothing hit is +inf and label
+  0; in the graph, `merge.depth` of the render against a card at 7 m keeps
+  what is nearer and lays the render over the card by its alpha at soft
+  silhouettes; `r.alpha` is the picture's alpha; another camera is refused;
+  a moved ball makes render and signals stale and refused until rendered
+  again; a graph without a record refuses `generate.render`; a multipart
+  EXR is read whole; without Blender, the command says what to install.
+- After the user's review (`tests/test_renders.py`, 20 tests): `ExrFiles`
+  (plain, RGBA refused, single-part multilayer by layer, two layers of one
+  name refused, +inf through a resize, NaN and -inf refused), objects
+  entering and leaving, render and signals stale on a camera, a texture, the
+  script; an unmeasured engine refused.
 
 - Nothing built; the audit's claims are from the code read above (the
   reference's `signal.read`, `signal.align_depth`, `merge.depth`; the

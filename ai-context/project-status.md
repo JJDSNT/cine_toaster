@@ -86,7 +86,12 @@ contract for C9b). C7 is done (CT-0080): the remap's meaning, source and timelin
 time composed (`clock`), retimed sound by policy (the anchored WSOLA),
 retimes, offsets, trails and pins in the records, tracks as production
 records (`tracks/<id>`), all on GL, and its three films. C8 opened
-(CT-0081) with its audit; the C6b review stays in the backlog.
+(CT-0081) with its audit; the C6b review stays in the backlog. Step 1:
+signals as production records (ADR 0024). Step 2: a Blender scene's passes
+rendered apart and recorded (`renders/passes/<id>`: picture, the camera at
+every frame, Z depth and object index as signals), read by
+`generate.render`; Blender 5's multipart EXR now read whole. Next: step 3,
+the model adapter.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional

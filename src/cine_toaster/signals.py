@@ -125,6 +125,11 @@ def _shape_problems(kind: str, frame: np.ndarray) -> list[str]:
         return [f"a {kind} is {channels} values per pixel (height, width, {channels}), not {shape}"]
     if kind == "segmentation" and not np.issubdtype(frame.dtype, np.integer):
         return ["a segmentation's values are whole numbers (labels)"]
+    if np.issubdtype(frame.dtype, np.floating):
+        if np.isnan(frame).any():
+            return [f"a {kind} has no NaN: a value unknown is not a value (+inf is a depth where nothing was hit)"]
+        if kind in ("depth", "depth_relative") and np.isneginf(frame).any():
+            return [f"a {kind} is never -inf"]
     return []
 
 
