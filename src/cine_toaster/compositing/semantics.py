@@ -80,6 +80,44 @@ def screen_channel(colour: Any) -> int:
     return max(range(3), key=lambda index: values[index])
 
 
+LETTER_KEYS = ("offset", "rotate", "scale", "opacity")
+LETTER_ORDERS = ("forward", "backward", "centre", "random")
+
+
+def letters_problem(spec: Any) -> str | None:
+    """Why a per-letter animator cannot be drawn, or None (C6b, CT-0078). An animator is `{keys: [{t, offset,
+    rotate, scale, opacity, ease}], stagger, order, start, seed, wave: {amplitude, frequency, phase}}`: each
+    letter plays the keys from its own start, `stagger` seconds after the one before it in `order`."""
+
+    if not isinstance(spec, dict):
+        return "is a mapping: {keys, stagger, order, start, wave}"
+    unknown = set(spec) - {"keys", "stagger", "order", "start", "seed", "wave"}
+    if unknown:
+        return f"has no {', '.join(sorted(unknown))}"
+    if spec.get("order", "forward") not in LETTER_ORDERS:
+        return f"orders letters {spec.get('order')!r}; the orders are {', '.join(LETTER_ORDERS)}"
+    for name in ("stagger", "start"):
+        if not isinstance(spec.get(name, 0.0), (int, float)):
+            return f"gives {name} as a number of seconds"
+    keys = spec.get("keys") or []
+    if not isinstance(keys, list):
+        return "gives its keys as a list"
+    for key in keys:
+        if not isinstance(key, dict) or "t" not in key:
+            return "has a key with no time `t`"
+        extra = set(key) - {"t", "ease", *LETTER_KEYS}
+        if extra:
+            return f"has a key with {', '.join(sorted(extra))}; a key gives {', '.join(LETTER_KEYS)} and an ease"
+        if "ease" in key and ease_problem(key["ease"]):
+            return ease_problem(key["ease"])
+    wave = spec.get("wave")
+    if wave is not None and (not isinstance(wave, dict) or set(wave) - {"amplitude", "frequency", "phase"}):
+        return "gives its wave as {amplitude, frequency, phase}"
+    if not keys and wave is None:
+        return "has neither keys nor a wave: nothing would move"
+    return None
+
+
 def threshold_spread(softness: Any) -> float:
     """The half-width of a threshold's edge, from the softness an author gives (SPEC-0011's rule)."""
 

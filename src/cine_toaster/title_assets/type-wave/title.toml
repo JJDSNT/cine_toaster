@@ -1,0 +1,27 @@
+schema_version = 1
+id = "type-wave"
+name = "Type: wave"
+category = "motion"
+says = "A wave runs along the line, the letters rising and falling after one another."
+energy = "medium"
+use_when = ["Music, play, a light moment; a title that breathes with the soundtrack."]
+avoid_when = ["Drama that should not notice its titles"]
+
+# Per-letter animation (C6b, CT-0078): each letter plays the keys from its own start, `stagger` seconds after the
+# one before it. Offsets are pixels at 720 lines, turns degrees, times seconds from the letter's start.
+[params]
+size = 64
+spaced = false
+enter_at = 0.2
+fade_out = 0.6
+
+[params.letters]
+keys = [{t = 0.0, opacity = 0.0}, {t = 0.3, opacity = 1.0}]
+stagger = 0.04
+wave = {amplitude = 12.0, frequency = 0.8, phase = 0.12}
+
+[render]
+engine = "graph"
+effect = "letters"
+# Drawn by the compositing graph (C6b, CT-0078), of these primitives:
+primitives = ["curve.keys", "generate.text", "merge.over"]

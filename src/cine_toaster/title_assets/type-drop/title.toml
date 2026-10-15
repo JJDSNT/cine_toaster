@@ -1,0 +1,26 @@
+schema_version = 1
+id = "type-drop"
+name = "Type: drop"
+category = "motion"
+says = "Letters fall into place one after another, turning as they land."
+energy = "medium"
+use_when = ["A title with weight and play: an opening, a name that arrives."]
+avoid_when = ["Drama that should not notice its titles"]
+
+# Per-letter animation (C6b, CT-0078): each letter plays the keys from its own start, `stagger` seconds after the
+# one before it. Offsets are pixels at 720 lines, turns degrees, times seconds from the letter's start.
+[params]
+size = 64
+spaced = false
+enter_at = 0.2
+fade_out = 0.6
+
+[params.letters]
+keys = [{t = 0.0, offset = [0, -90], rotate = -28, opacity = 0.0, ease = "out"}, {t = 0.45, offset = [0, 0], rotate = 0, opacity = 1.0}]
+stagger = 0.06
+
+[render]
+engine = "graph"
+effect = "letters"
+# Drawn by the compositing graph (C6b, CT-0078), of these primitives:
+primitives = ["curve.keys", "generate.text", "merge.over"]

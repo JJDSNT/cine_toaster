@@ -41,7 +41,8 @@ BUILTIN = Path(__file__).with_name("title_assets")
 BLENDER_SCRIPT = BUILTIN / "_blender" / "title.py"
 CATEGORIES = ("cards", "reveal", "motion", "lower thirds", "credits", "texture", "3d")
 ENGINES = ("graph", "blender")
-EFFECTS = {"graph": ("fade", "typewriter", "words", "slide", "grow", "roll", "lower-third", "flicker", "neon"),
+EFFECTS = {"graph": ("fade", "typewriter", "words", "slide", "grow", "roll", "lower-third", "flicker", "neon",
+                     "letters"),
            "blender": ("letters-turn-in", "letters-rise")}
 #: Parameters every item has, whatever its own manifest says.
 BASE_PARAMS: dict[str, Any] = {

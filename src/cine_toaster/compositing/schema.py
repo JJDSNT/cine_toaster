@@ -24,7 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from .semantics import ease_problem
+from .semantics import ease_problem, letters_problem
 
 TYPES = ("picture", "matte", "signal", "sound", "track", "curve", "meta")
 #: The only conversions an edge may make (SPEC-0012 §1).
@@ -154,7 +154,7 @@ OPS: dict[str, Op] = {
     "generate.text": Op({}, params={"text": "text", "font": "file", "size": "number", "colour": "vector",
                                     "position": "vector", "reveal": "number", "reveal_by": "enum:letter|word",
                                     "align": "enum:centre|left|right", "line_spacing": "number", "outline": "number",
-                                    "hollow": "bool"}),
+                                    "hollow": "bool", "letters": "letters"}),
     "generate.render": Op({}, {"out": "picture", "depth": "signal", "alpha": "matte"},
                           {"renderer": "text", "scene": "file", "recipe": "text", "seed": "int", "camera": "text"},
                           kind="depth", deterministic=False),
@@ -346,6 +346,8 @@ def validate(graph: dict[str, Any]) -> list[tuple[str, str]]:
                 problems.append(("composite_type_mismatch", f"{name}.{key} is a number, not {value!r}"))
             elif kind == "ease" and ease_problem(value):
                 problems.append(("composite_unknown_param", f"{name}.{key}: {ease_problem(value)}"))
+            elif kind == "letters" and letters_problem(value):
+                problems.append(("composite_unknown_param", f"{name}.{key}: {letters_problem(value)}"))
         if op_name == "curve.keys":
             for key in node.get("keys") or []:
                 if isinstance(key, dict) and "ease" in key and ease_problem(key["ease"]):

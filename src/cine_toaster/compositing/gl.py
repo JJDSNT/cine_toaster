@@ -530,7 +530,7 @@ class GLRenderer:
             # in both renderers (CT-0077).
             from .reference import text_picture
 
-            return self.upload(text_picture(node, p, width, height, root))
+            return self.upload(text_picture(node, p, width, height, root, (frame + 0.5) / fps))
         if op == "generate.noise":
             # The reference's own field, uploaded: noise drawn once, the same in both renderers (CT-0077).
             from .reference import noise_field

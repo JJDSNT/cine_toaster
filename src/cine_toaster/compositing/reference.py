@@ -594,8 +594,128 @@ def _text_coverage(text: str, shown: str, font_path: str, size_px: int, position
     return coverage
 
 
+LETTER_PROPERTIES = {"offset": [0.0, 0.0], "rotate": 0.0, "scale": 1.0, "opacity": 1.0}
+
+
+def letter_state(spec: dict[str, Any], local: float, index: int, seconds: float) -> dict[str, Any]:
+    """One letter's offset (pixels at 720 lines), turn (degrees), scale and opacity at its own time `local` --
+    the animator's keys, eased -- plus a wave running along the line (C6b, CT-0078)."""
+
+    state = {key: np.asarray(value, dtype=np.float64) for key, value in LETTER_PROPERTIES.items()}
+    keys = sorted(spec.get("keys") or [], key=lambda key: float(key.get("t", 0.0)))
+    for key in LETTER_PROPERTIES:
+        points = [(float(k.get("t", 0.0)), np.asarray(k[key], dtype=np.float64), k.get("ease", "linear"))
+                  for k in keys if key in k]
+        if not points:
+            continue
+        if local <= points[0][0]:
+            state[key] = points[0][1]
+        elif local >= points[-1][0]:
+            state[key] = points[-1][1]
+        else:
+            for (t0, v0, ease), (t1, v1, _) in zip(points, points[1:]):
+                if local < t1:
+                    state[key] = v0 + (v1 - v0) * ease_of(ease)((local - t0) / (t1 - t0))
+                    break
+    wave = spec.get("wave")
+    if wave:
+        lift = float(wave.get("amplitude", 10.0)) * math.sin(
+            2 * math.pi * (float(wave.get("frequency", 1.0)) * seconds + index * float(wave.get("phase", 0.15))))
+        state["offset"] = state["offset"] + np.array([0.0, -lift])
+    return state
+
+
+def letter_ranks(text: str, order: str, seed: int = 0) -> list[int]:
+    """Each character's place in the animator's order: forward, backward, from the centre out, or shuffled.
+    Spaces take no place, so a word's letters follow each other without a pause between words."""
+
+    visible = [index for index, char in enumerate(text) if not char.isspace()]
+    count = len(visible)
+    if order == "backward":
+        places = list(range(count - 1, -1, -1))
+    elif order == "centre":
+        places = [int(round(abs(position - (count - 1) / 2))) for position in range(count)]
+    elif order == "random":
+        places = list(np.random.default_rng(seed).permutation(count))
+    else:
+        places = list(range(count))
+    ranks = [0] * len(text)
+    for position, index in enumerate(visible):
+        ranks[index] = int(places[position])
+    return ranks
+
+
+def _letters_coverage(text: str, font_path: str, size_px: int, position: tuple[float, float], width: int,
+                      height: int, align: str, spacing_px: int, outline_px: int, hollow: bool, spec: dict[str, Any],
+                      seconds: float, scale_px: float) -> np.ndarray:
+    """The text drawn letter by letter, each where the whole block would put it, then moved, turned, scaled
+    and faded by the animator at its own time (C6b, CT-0078)."""
+
+    from PIL import Image, ImageDraw, ImageFont
+
+    font = ImageFont.truetype(font_path, size_px)
+    big = (width * 4, height * 4)
+    canvas = np.zeros((big[1], big[0]), dtype=np.float32)
+    probe = ImageDraw.Draw(Image.new("L", (1, 1)))
+    box = probe.multiline_textbbox((0, 0), text, font=font, spacing=spacing_px, stroke_width=outline_px)
+    across = box[2] - box[0]
+    x0 = position[0] * big[0] - {"centre": across / 2, "left": 0.0, "right": across}[align] - box[0]
+    y0 = position[1] * big[1] - (box[3] - box[1]) / 2 - box[1]
+    line_height = probe.textbbox((0, 0), "A", font=font, stroke_width=outline_px)[3] + outline_px + spacing_px
+    lines = text.split("\n")
+    widest = max(probe.textlength(line, font=font) for line in lines) if lines else 0.0
+    ranks = letter_ranks(text.replace("\n", " "), str(spec.get("order") or "forward"), int(spec.get("seed", 0)))
+    stagger, start = float(spec.get("stagger", 0.05)), float(spec.get("start", 0.0))
+    flat_index = 0
+    for row, line in enumerate(lines):
+        width_here = probe.textlength(line, font=font)
+        shift = {"centre": (widest - width_here) / 2, "left": 0.0, "right": widest - width_here}[align]
+        for column, char in enumerate(line):
+            index, flat_index = flat_index, flat_index + 1
+            if char.isspace():
+                continue
+            state = letter_state(spec, seconds - start - ranks[index] * stagger, ranks[index], seconds)
+            opacity = float(np.clip(state["opacity"], 0.0, 1.0))
+            if opacity <= 0.0:
+                continue
+            left = x0 + shift + probe.textlength(line[:column], font=font)
+            top = y0 + row * line_height
+            glyph_box = probe.textbbox((0, 0), char, font=font, stroke_width=outline_px)
+            pad = int(size_px * 0.6) + outline_px
+            tile_size = (int(glyph_box[2] - glyph_box[0]) + 2 * pad, int(glyph_box[3] - glyph_box[1]) + 2 * pad)
+            tile = Image.new("L", tile_size, 0)
+            draw = ImageDraw.Draw(tile)
+            origin = (pad - glyph_box[0], pad - glyph_box[1])
+            draw.text(origin, char, font=font, fill=255, stroke_width=outline_px, stroke_fill=255)
+            if hollow and outline_px:
+                inner = Image.new("L", tile_size, 0)
+                ImageDraw.Draw(inner).text(origin, char, font=font, fill=255)
+                tile = Image.fromarray(np.clip(np.asarray(tile, np.int16) - np.asarray(inner, np.int16), 0, 255)
+                                       .astype(np.uint8), "L")
+            scale = float(np.asarray(state["scale"]).reshape(-1)[0])
+            if abs(scale - 1.0) > 1e-3 and scale > 0:
+                tile = tile.resize((max(1, int(round(tile.width * scale))), max(1, int(round(tile.height * scale)))),
+                                   Image.BILINEAR)
+            angle = float(np.asarray(state["rotate"]).reshape(-1)[0])
+            if abs(angle) > 1e-3:
+                tile = tile.rotate(-angle, resample=Image.BILINEAR, expand=True)
+            offset = np.broadcast_to(np.asarray(state["offset"], dtype=np.float64), (2,)) * scale_px * 4
+            # The glyph's centre, where the block put it, moved by the offset.
+            centre_x = left + glyph_box[0] + (glyph_box[2] - glyph_box[0]) / 2 + offset[0]
+            centre_y = top + glyph_box[1] + (glyph_box[3] - glyph_box[1]) / 2 + offset[1]
+            x, y = int(round(centre_x - tile.width / 2)), int(round(centre_y - tile.height / 2))
+            data = np.asarray(tile, dtype=np.float32) / 255.0 * opacity
+            ys = slice(max(0, y), min(big[1], y + tile.height))
+            xs = slice(max(0, x), min(big[0], x + tile.width))
+            if ys.start < ys.stop and xs.start < xs.stop:
+                part = data[ys.start - y:ys.stop - y, xs.start - x:xs.stop - x]
+                canvas[ys, xs] = np.maximum(canvas[ys, xs], part)
+    reduced = canvas.reshape(height, 4, width, 4).mean(axis=(1, 3))
+    return reduced.astype(np.float32)
+
+
 def text_picture(node: dict[str, Any], param: Callable[..., Any], width: int, height: int,
-                 root: Path | None) -> np.ndarray:
+                 root: Path | None, seconds: float = 0.0) -> np.ndarray:
     """generate.text's picture for one frame: one drawing of a text for every renderer (GL uploads it)."""
 
     from ..titles import font_file
@@ -611,10 +731,18 @@ def text_picture(node: dict[str, Any], param: Callable[..., Any], width: int, he
         shown = text[: int(round(len(text) * float(np.clip(reveal, 0, 1))))]
     size_px = max(4, int(pixels(param("size", 40), height) * 4))
     position = np.broadcast_to(np.asarray(param("position", [0.5, 0.5]), dtype=np.float32), (2,))
-    coverage = _text_coverage(text, shown, font_file({"font": node.get("font") or ""}, root), size_px,
-                              (float(position[0]), float(position[1])), width, height,
-                              str(param("align", "centre")), int(round(pixels(param("line_spacing", 0.0), height) * 4)),
-                              int(round(pixels(param("outline", 0.0), height) * 4)), bool(param("hollow", False)))
+    font_path = font_file({"font": node.get("font") or ""}, root)
+    align = str(param("align", "centre"))
+    spacing_px = int(round(pixels(param("line_spacing", 0.0), height) * 4))
+    outline_px = int(round(pixels(param("outline", 0.0), height) * 4))
+    if node.get("letters"):
+        # Letter by letter, each with its own time (C6b): the animator is the node's, not a curve.
+        coverage = _letters_coverage(text, font_path, size_px, (float(position[0]), float(position[1])), width,
+                                     height, align, spacing_px, outline_px, bool(param("hollow", False)),
+                                     node["letters"], seconds, pixels(1.0, height))
+    else:
+        coverage = _text_coverage(text, shown, font_path, size_px, (float(position[0]), float(position[1])), width,
+                                  height, align, spacing_px, outline_px, bool(param("hollow", False)))
     colour = np.asarray(param("colour", [1, 1, 1, 1]), dtype=np.float32).reshape(-1)
     alpha = coverage * (float(colour[3]) if colour.size > 3 else 1.0)
     return np.concatenate([colour[:3] * alpha[..., None], alpha[..., None]], axis=-1).astype(np.float32)
@@ -1154,7 +1282,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
                                frame, width, height)
             return np.stack([grey, grey, grey, np.ones_like(grey)], axis=-1)
         if op == "generate.text":
-            return text_picture(node, param, width, height, root)
+            return text_picture(node, param, width, height, root, seconds)
         if op == "signal.read":
             path = Path(node["file"])
             path = (root / path) if root and not path.is_absolute() else path

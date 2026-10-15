@@ -245,10 +245,25 @@ def _neon(f: Fragment, src: str, params: dict[str, Any], length: float) -> str:
     return current
 
 
+def _letters(f: Fragment, src: str, params: dict[str, Any], length: float) -> str:
+    """Letters animated one by one (C6b, CT-0078): the item's animator -- keys each letter plays from its own
+    start, `stagger` seconds after the one before it, a wave -- begun at `enter_at`, the whole faded out at the
+    end."""
+
+    text, size = _maybe_spaced(params), float(params["size"])
+    # Without an animator of its own, each letter fades in after the one before it.
+    animator = dict(params.get("letters") or {"keys": [{"t": 0.0, "opacity": 0.0}, {"t": 0.3, "opacity": 1.0}],
+                                               "stagger": 0.05})
+    animator["start"] = float(animator.get("start", 0.0)) + float(params.get("enter_at", 0.0))
+    colour = _coloured(f, "alpha", _linear(params.get("color"), "#E6E6E6"), _alpha(params, length, fade_in=False),
+                       length)
+    return _over(f, _text(f, "text", text, size, colour, [0.5, _y(params, size)], letters=animator), src, "titled")
+
+
 #: The title animations the graph draws, by the `effect` name items give in `[render]`.
 BUILDERS = {
     "fade": _fade, "typewriter": _typewriter, "words": _words, "slide": _slide, "grow": _grow, "roll": _roll,
-    "lower-third": _lower_third, "flicker": _flicker, "neon": _neon,
+    "lower-third": _lower_third, "flicker": _flicker, "neon": _neon, "letters": _letters,
 }
 
 
