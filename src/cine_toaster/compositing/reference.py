@@ -1007,6 +1007,31 @@ def retimed(graph: dict[str, Any], frames: int, fps: float, beats: list[float] |
     return False
 
 
+def shown_instants(graph: dict[str, Any], frames: int, fps: float, source: str, origin: Any,
+                   beats: list[float] | None = None) -> tuple[list[list[Any]], Callable[[Any], Any]]:
+    """The media instants the graph's output shows of `source` at each output frame's centre (one per path), and
+    the map at any output instant (refusing disagreement) -- the shot's sound follows this (CT-0080, step 3)."""
+
+    from . import clock
+
+    nodes = graph.get("nodes") or {}
+    curve = curve_factory(nodes, {}, fps=fps, length=frames / fps if fps else 0.0, beats=beats,
+                          tracks=lambda reference: {"kind": "point", "frames": [{"points": [[0.5, 0.5]]}]},
+                          track_entry=lambda reference, seconds: {"points": [[0.5, 0.5]]})
+    output = str(graph["output"]).split(".")[0]
+    per_frame = [[clock.media(at, origin) for at in clock.instants(nodes, curve, fps, output, source,
+                                                                    clock.centre(frame, fps))]
+                 for frame in range(frames)]
+
+    def at(seconds: Any) -> Any:
+        local = clock.instant(nodes, curve, fps, output, source, seconds)
+        if local is None:
+            raise ValidationError(f"{source} is not shown at {float(seconds):.3f} s")
+        return clock.media(local, origin)
+
+    return per_frame, at
+
+
 class Shifted:
     """A source read from before its local zero: local frame `i` is the read clip's frame `i + preroll`, so
     negative local frames -- a pre-roll -- are frames of the media before the cut point (CT-0080)."""
@@ -1220,7 +1245,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             continue
         if callable(value):
             curves[name] = value
-        elif isinstance(value, Clip):
+        elif isinstance(value, (Clip, Shifted)):
             clips[name] = value
         elif isinstance(value, np.ndarray):
             per_frame = value.ndim == 4 or (port_kind(name) == "signal" and value.ndim == 3 and value.shape[0] == frames)

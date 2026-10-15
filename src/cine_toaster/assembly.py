@@ -107,9 +107,12 @@ class Segment:
     #: The shot drawn by its graph, already a piece of the cut (its frame, rate and format): joined as it is,
     #: not encoded again.
     piece: str = ""
-    #: Its graph shows its take at another time than the cut's (a retime): the take's sound is not laid under
-    #: it -- muted, until a sound policy says otherwise (CT-0080).
-    retime_muted: bool = False
+    #: The media instants its graph shows of its take, frame by frame (C7, CT-0080): what its sound follows when
+    #: the picture is retimed; None when the take is not shown, "ambiguous" when it is shown at several times.
+    timemap: Any = None
+    #: What its take's sound does under a retime (`mute` by default, `preserve`, `stretch`), and with what.
+    retime_sound: str = ""
+    stretch_with: str = ""
     #: Speech heard within a scene version, in its own seconds (a sequence's segments): music ducks under it.
     speech_spans: list[tuple[float, float]] = field(default_factory=list)
     #: A format's frame in the take ({x, y}, CT-0049), and the captions spoken in it, in the take's seconds.
@@ -420,6 +423,8 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
                                                 lambda name: probe(root / Path(scene["file"]).parent / name)["duration"]
                                                 if name and (root / Path(scene["file"]).parent / name).is_file() else 1.4)
         segment.sound_fades_at = shot.get("sound_fades_at")
+        segment.retime_sound = str(shot.get("retime_sound") or "")
+        segment.stretch_with = str(shot.get("stretch_with") or "")
         wants_frame = ((scene.get("style") or {}).get("format") or {}).get("aspect") or scene.get("deliver")
         if not segment.reframe and wants_frame:
             from .formats import subject_window
@@ -688,12 +693,33 @@ def _shot_drawing(root: Path, segment: Segment, size: tuple[int, int], fps: floa
     if graph is None:  # a take as it is: its own frames
         clip = inputs["picture"]
         return (clip[index] for index in range(frames)), None, False
-    # A retimed shot's take sound would drift from its picture: muted until a policy is chosen (CT-0080).
-    segment.retime_muted = bool(segment.media or segment.composite) and reference.retimed(graph, frames, fps, local)
+    # What its take's sound follows: the instants the picture shows of the take (CT-0080).
+    segment.timemap = _sound_map(graph, segment, frames, fps, local, origins) if segment.media else None
     fast = renderer_for(graph)
     pictures, _identity, cached = reference.render(graph, inputs, frames=frames, size=size, fps=fps, root=root,
                                                    beats=local, renderer=fast, origins=origins)
     return pictures, fast, cached
+
+
+def _sound_map(graph: dict[str, Any], segment: Segment, frames: int, fps: float, beats: list[float],
+               origins: dict[str, Any]) -> Any:
+    """The shot's sound map: the take's media instant at each output frame, from the source that is the take."""
+
+    from .compositing import reference
+    from .retime_sound import TimeMap
+
+    names = [name for name in origins
+             if name == "picture" or (graph["nodes"].get(name, {}).get("take")
+                                      and segment.composite_takes.get(str(graph["nodes"][name]["take"])) == segment.media)]
+    if not names:
+        return None
+    source = names[0]
+    per_frame, at = reference.shown_instants(graph, frames, fps, source, origins[source], beats)
+    if any(len(found) > 1 for found in per_frame):
+        return "ambiguous"
+    if any(not found for found in per_frame):
+        return None
+    return TimeMap(timebase.rate(fps), origins[source], tuple(found[0] for found in per_frame), at=at)
 
 
 def _draw_shot(root: Path, segment: Segment, destination: Path, first: dict[str, Any], fps: float, run_process,
@@ -717,17 +743,34 @@ def _draw_shot(root: Path, segment: Segment, destination: Path, first: dict[str,
                     quality=reference.PIECE)
     if still is not None and kept:
         reference.write_still(kept[0], still)
-    # A take whose voice was converted is heard converted; a retimed one is not heard (CT-0080).
+    # A take whose voice was converted is heard converted.
     heard = Path(segment.sound) if segment.sound else (root / segment.media if segment.media else None)
-    if segment.retime_muted:
-        notes.append(f"{segment.shot}: retimed -- its take's sound is muted (a sound policy -- preserve, stretch -- "
-                     "is to come); nothing out of sync is heard.")
-        segment.speech, segment.speech_spans = None, []
-        heard = None
-    if heard is not None and probe(heard).get("audio"):
+    timemap = segment.timemap
+    retimed = timemap == "ambiguous" or (timemap is not None and timemap.kind != "unchanged")
+    silence = ["-f", "lavfi", "-t", f"{length:.6f}", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"]
+    if heard is None or not probe(heard).get("audio"):
+        sound = silence
+    elif not retimed:
         sound = ["-ss", timebase.seek(segment.start), "-t", f"{length:.6f}", "-i", str(heard)]
     else:
-        sound = ["-f", "lavfi", "-t", f"{length:.3f}", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"]
+        # A retimed picture: its take's sound by the shot's policy (C7, CT-0080) -- mute unless it says otherwise.
+        from . import retime_sound
+
+        policy = segment.retime_sound or "mute"
+        made = destination.with_suffix(".sound.wav")
+        try:
+            if timemap == "ambiguous":
+                raise ValidationError("its take is shown at several times at once: which sound to follow is ambiguous")
+            said = retime_sound.build(policy, timemap, heard, made, stretch_with=segment.stretch_with or None)
+            sound = ["-i", str(made)]
+            notes.append(f"{segment.shot}: retimed -- " + (
+                "its take's sound is muted (retime_sound: mute, the default); nothing out of sync is heard."
+                if policy == "mute" else "; ".join(said) + "."))
+        except ValidationError as error:
+            notes.append(f"{segment.shot}: retimed -- {error}; its take's sound is muted.")
+            policy, sound = "mute", silence
+        if policy == "mute":
+            segment.speech, segment.speech_spans = None, []
     run_process(["ffmpeg", "-y", "-loglevel", "error", "-i", str(piece), *sound, "-map", "0:v:0", "-map", "1:a:0",
                  "-c:v", "copy", "-c:a", "aac", "-shortest", str(destination)],
                 expected_seconds=length, message=f"{segment.shot}: its sound under its drawing")

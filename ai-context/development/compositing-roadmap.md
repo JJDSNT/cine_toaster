@@ -342,7 +342,11 @@ have no clock, sound ignores a retime, nothing is exposed; a sequence from it.
 Step 1 done: the remap picks the frame containing its instant, reads its
 source as far as it reaches, and blends source frames when asked. A retimed
 shot is muted. Step 2 done: source and timeline time composed through every
-path, sources' origins and pre-rolls, tracks with their own clock.
+path, sources' origins and pre-rolls, tracks with their own clock. Step 3:
+the sound contract wired (mute by default, preserve, stretch -- a shift
+moved, a speed stretched with attacks kept to the sample); stretchers
+benchmarked; the default stretcher provisional until the user's blind
+listening.
 
 - What: retime, speed ramp, freeze, reverse, frame blending, an offset
   between layers, trails and echoes (the ADO's Infinity). Point and planar

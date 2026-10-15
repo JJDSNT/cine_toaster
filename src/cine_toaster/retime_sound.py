@@ -20,12 +20,14 @@ unchanged; an unchanged shot keeps its take's sound as it always has:
   duration -- padded with silence where the take ends first; in sync only where
   the picture runs at speed 1;
 - `stretch`: the sound follows the map, its pitch kept: a shift is the take's
-  sound moved by the shift, no processing; a speed is each piece stretched to
-  its frames (FFmpeg's `rubberband`, else `atempo`), drawn a little past both
-  ends; at a change of speed the incoming piece meets the outgoing one in
-  phase (moved by at most 5 ms, never accumulating) and they cross-fade, so a
-  ramp has no click and no dip at its changes. A piece that runs backwards or holds still (a reverse,
-  a freeze) cannot be stretched: refused, explicitly, and the shot muted;
+  sound moved by the shift, no processing; a speed is stretched by a stretcher
+  the shot may name (`stretch_with`) -- by default the anchored WSOLA here,
+  every grain read where the map puts it and every attack laid whole on its
+  instant (sample-exact in CT-0080's measurements), provisionally: the choice
+  waits for the user's blind listening. FFmpeg's `rubberband` and `atempo`
+  (pieces joined in phase) are there by name, never as a silent fallback. A
+  map that runs backwards or holds still (a reverse, a freeze) cannot be
+  stretched: refused, explicitly, and the shot muted;
 - `resample` (speed and pitch together) is not built yet: refused by name.
 """
 
@@ -162,28 +164,31 @@ def policy_problem(policy: Any) -> str | None:
     return f"retime_sound is one of {', '.join(POLICIES)}, not {policy!r}"
 
 
-#: The stretchers, measured (CT-0080): `rubberband` keeps the output's length exact and its transients at a
-#: constant, calibrated delay (within +/-1.5 ms; a few lost above 2.5x); `atempo` (WSOLA) is not equivalent --
-#: its length is inexact, its transients drift by up to 50 ms over four seconds and are dropped above 2x. It is
-#: used only when a shot asks for it by name.
-STRETCHERS = ("rubberband", "atempo")
+#: The stretchers (CT-0080, measured in `scripts/research/stretch_bench.py`): `anchored` -- WSOLA on the shot's
+#: own map, attacks laid whole on their instants: length exact, tones level, clicks to the sample -- here, always;
+#: FFmpeg's `rubberband` filter, pieces joined in phase: length exact, but dips steady tones and drifts with
+#: the content; FFmpeg's `atempo`: its timing drifts and it drops transients above 2x. The default is
+#: provisional until the user's blind listening decides.
+STRETCHERS = ("anchored", "rubberband", "atempo")
+DEFAULT_STRETCHER = "anchored"
 
 
 def available() -> list[str]:
-    """The stretchers this FFmpeg has."""
+    """The stretchers here: the anchored one always (NumPy), FFmpeg's when this FFmpeg has them."""
 
+    found = ["anchored"]
     ffmpeg = shutil.which("ffmpeg")
-    if not ffmpeg:
-        return []
-    listed = subprocess.run([ffmpeg, "-hide_banner", "-filters"], capture_output=True, text=True).stdout
-    return [name for name in STRETCHERS if f" {name} " in listed]
+    if ffmpeg:
+        listed = subprocess.run([ffmpeg, "-hide_banner", "-filters"], capture_output=True, text=True).stdout
+        found += [name for name in ("rubberband", "atempo") if f" {name} " in listed]
+    return found
 
 
 def stretcher(asked: str | None = None) -> str:
-    """The stretcher a shot uses: the one it asks for, else `rubberband`. Never another in silence: what is
-    asked and missing is refused, so the same production does not sound different on another machine."""
+    """The stretcher a shot uses: the one it asks for, else the default. Never another in silence: what is asked
+    and missing is refused, so the same production does not sound different on another machine."""
 
-    wanted = asked or "rubberband"
+    wanted = asked or DEFAULT_STRETCHER
     if wanted not in STRETCHERS:
         raise ValidationError(f"stretch_with is one of {', '.join(STRETCHERS)}, not {wanted!r}")
     if wanted not in available():
@@ -313,11 +318,14 @@ def build(policy: str, timemap: TimeMap, heard: Path, destination: Path,
         else:
             pieces = timemap.pieces()
             backwards = [piece for piece in pieces if piece.speed(timemap.fps) <= 1e-6]
+            if any(float(b) <= float(a) for a, b in zip(timemap.instants, timemap.instants[1:])):
+                backwards = backwards or pieces
             if backwards:
                 raise ValidationError("retime_sound stretch cannot play a reverse or a freeze (its map runs back or "
                                       "holds still); the shot is muted")
             using = stretcher(stretch_with)
-            out = _joined(pieces, timemap, heard, total, sample_rate, using)
+            out = (anchored(heard, timemap, total, sample_rate) if using == "anchored"
+                   else _joined(pieces, timemap, heard, total, sample_rate, using))
             speeds = sorted({round(piece.speed(timemap.fps), 2) for piece in pieces})
             notes.append(f"its take's sound stretched with the picture, pitch kept, in {len(pieces)} piece(s) at "
                          f"{', '.join(f'{speed:g}x' for speed in speeds)} (`stretch`, {using})"
@@ -399,7 +407,8 @@ GRAIN = 0.040
 HOP = 0.010
 
 
-def anchored(heard: Path, timemap: TimeMap, total: int, sample_rate: int) -> np.ndarray:
+def anchored(heard: Path, timemap: TimeMap, total: int, sample_rate: int, grain_seconds: float | None = None,
+             hop_seconds: float | None = None) -> np.ndarray:
     """The shot's sound following its map, pitch kept, by WSOLA anchored on the map (CT-0080).
 
     Every grain of output is read from the media instant the map gives for its centre -- so no error ever
@@ -409,7 +418,8 @@ def anchored(heard: Path, timemap: TimeMap, total: int, sample_rate: int) -> np.
     `rubberband` either dips steady tones (crisp) or misplaces transients (mixed), and drifts with the content;
     `atempo` drifts and drops transients."""
 
-    grain, hop = int(round(GRAIN * sample_rate)), int(round(HOP * sample_rate))
+    grain = int(round((grain_seconds or GRAIN) * sample_rate))
+    hop = int(round((hop_seconds or HOP) * sample_rate))
     search = int(round(ALIGNMENT * sample_rate))
     window = np.hanning(grain + 1)[:-1].astype(np.float32)
     # Where each output grain starts, and the media sample its centre shows.
@@ -422,6 +432,9 @@ def anchored(heard: Path, timemap: TimeMap, total: int, sample_rate: int) -> np.
     stereo = _read(heard, lowest, highest - lowest, sample_rate)
     out = np.zeros((total + 2 * grain, 2), np.float32)
     norm = np.zeros(total + 2 * grain, np.float32)
+    # The attacks, and the output sample the map puts each at: kept out of the grains (where they would repeat
+    # or land early) and laid whole, at speed 1, on their instant afterwards.
+    kept = _attack_places(stereo, lowest, media, starts, grain, sample_rate, total)
     natural = None  # where the previous grain would have continued, in the source
     for start, at in zip(starts, media):
         anchor = int(round((at - lowest) * sample_rate)) - grain // 2
@@ -429,25 +442,114 @@ def anchored(heard: Path, timemap: TimeMap, total: int, sample_rate: int) -> np.
         if natural is not None:
             # Of the candidates within +/-search of the anchor, the one most like the natural continuation.
             reference = source[natural:natural + grain] * window
+            # From the anchor outwards, so a tie -- silence, where every candidate scores nothing -- keeps the grain
+            # where the map puts it.
             best = -np.inf
-            for shift in range(-search, search + 1, 4):
+            for shift in sorted(range(-search, search + 1, 4), key=abs):
                 candidate = source[anchor + shift:anchor + shift + grain]
                 if len(candidate) < grain or len(reference) < grain:
                     continue
                 score = float(np.dot(reference, candidate * window))
-                if score > best:
+                if score > best + 1e-9 * (1.0 + abs(best) if best > -np.inf else 1.0):
                     best, offset = score, shift
         read = anchor + offset
         piece = stereo[read:read + grain]
         if len(piece) < grain:
             piece = np.pad(piece, ((0, grain - len(piece)), (0, 0)))
+        for at, _place, room, _edge in kept:  # an attack inside this grain is the copy's, not the grain's
+            lo, hi = max(at - read, 0), min(at + room - read, grain)
+            if lo < hi:
+                piece = piece.copy()
+                piece[lo:hi] = 0.0
         lo = start + grain  # `out` is padded by a grain at the front
         out[lo:lo + grain] += piece * window[:, None]
         norm[lo:lo + grain] += window
         natural = read + hop
     body = out[grain:grain + total]
     weights = norm[grain:grain + total]
-    return body / np.maximum(weights, 1e-6)[:, None]
+    laid = body / np.maximum(weights, 1e-6)[:, None]
+    # Attacks laid as they are, at speed 1, where the map puts them: WSOLA halves them at 2x (they fall in some
+    # of the overlapping grains) and repeats them early at 0.5x; a copy keeps them whole and on their instant.
+    return _lay_attacks(laid, stereo, kept, sample_rate)
+
+
+#: An attack: a 2 ms frame this many times louder (in energy) than the loudest of the 8 ms before it, above
+#: -50 dBFS, at least `ATTACK_SPACING` after the last one. Laid at speed 1 for `ATTACK_LENGTH` after its start,
+#: or until the next attack -- each keeps its own instant.
+ATTACK_RISE = 8.0
+ATTACK_FLOOR = 10 ** (-50 / 10)
+ATTACK_LENGTH = 0.025
+ATTACK_FADE = 0.003
+ATTACK_SPACING = 0.008
+
+
+def attacks(mono: np.ndarray, sample_rate: int) -> list[int]:
+    """Where attacks start in a sound, in samples: a sharp rise of energy over what came just before."""
+
+    frame = int(round(0.002 * sample_rate))
+    count = len(mono) // frame
+    if count < 12:
+        return []
+    energy = (mono[: count * frame].reshape(count, frame) ** 2).mean(axis=1)
+    found: list[int] = []
+    back = max(1, int(round(ATTACK_SPACING / 0.002)))  # the energy just before: as far back as attacks may be apart
+    for index in range(back, count):
+        before = energy[index - back:index].max()
+        if energy[index] > ATTACK_FLOOR and energy[index] > ATTACK_RISE * max(before, 1e-12):
+            # To the sample: where, in this frame and the one before, the sound first reaches a quarter of the
+            # attack's peak -- the frame only says where to look.
+            lo = (index - 1) * frame
+            window = np.abs(mono[lo:(index + 1) * frame])
+            start = lo + int(np.argmax(window > 0.25 * float(window.max())))
+            if not found or start - found[-1] > ATTACK_SPACING * sample_rate:
+                found.append(start)
+    return found
+
+
+def _attack_places(stereo: np.ndarray, lowest: float, media: list[float], starts: list[int], grain: int,
+                   sample_rate: int, total: int) -> list[tuple[int, int, int, int]]:
+    """Each attack of the source (its sample in `stereo`) and the output sample the map puts it at -- only where
+    the map runs forward, and only those that land inside the output."""
+
+    centres = np.array([start + grain / 2 for start in starts], dtype=np.float64)
+    shown = np.array(media, dtype=np.float64)
+    if len(shown) < 2 or np.any(np.diff(shown) <= 0):
+        return []
+    longest, fade = int(round(ATTACK_LENGTH * sample_rate)), int(round(ATTACK_FADE * sample_rate))
+    found = attacks(stereo.sum(axis=1) / 2, sample_rate)
+    places = []
+    for index, at in enumerate(found):
+        instant = lowest + at / sample_rate
+        if not shown[0] <= instant <= shown[-1]:
+            continue
+        place = int(round(np.interp(instant, shown, centres)))
+        # Until the next attack, in the source and in the output, so the next one keeps its own instant; attacks
+        # this close cross-fade faster (a quarter of the gap), rather than one being left to the grains.
+        room, edge = longest, fade
+        if index + 1 < len(found):
+            following = found[index + 1]
+            next_place = int(round(np.interp(lowest + following / sample_rate, shown, centres)))
+            gap = min(following - at, next_place - place)
+            edge = max(1, min(fade, gap // 4))
+            room = min(room, gap - 2 * edge)
+        if room <= 0:
+            continue
+        if place - edge >= 0 and place + room + edge <= total and at - edge >= 0 and at + room + edge <= len(stereo):
+            places.append((at, place, room, edge))
+    return places
+
+
+def _lay_attacks(laid: np.ndarray, stereo: np.ndarray, kept: list[tuple[int, int, int, int]],
+                 sample_rate: int) -> np.ndarray:
+    out = laid.copy()
+    for at, place, room, fade in kept:
+        lo, hi = place - fade, place + room + fade
+        copy = stereo[at - fade:at + room + fade]
+        weight = np.ones(hi - lo, np.float32)
+        weight[:fade] = np.linspace(0, 1, fade, dtype=np.float32)
+        weight[-fade:] = np.linspace(1, 0, fade, dtype=np.float32)
+        out[lo:hi] = out[lo:hi] * (1 - weight[:, None]) + copy * weight[:, None]
+    return out
 
 
 def _media_at(timemap: TimeMap, seconds: Fraction) -> Any:

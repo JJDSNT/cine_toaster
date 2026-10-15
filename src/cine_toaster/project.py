@@ -220,6 +220,10 @@ def _load_shots(
                 "avoid": _avoid(field(raw, "avoid")),
                 "mute": [list(map(float, item)) for item in field(raw, "mute") or [] if isinstance(item, list) and len(item) == 2],
                 "sound_fades_at": float(field(raw, "sound_fades_at")) if field(raw, "sound_fades_at") not in (None, "") else None,
+                # Its take's sound when its picture is retimed (C7, CT-0080): mute (the default), preserve or
+                # stretch; and the stretcher, by name.
+                "retime_sound": _text(field(raw, "retime_sound")),
+                "stretch_with": _text(field(raw, "stretch_with")),
                 # Where a format's frame sits in the take (CT-0049): {x, y}, 0 to 1, centred by default.
                 "reframe": field(raw, "reframe") if isinstance(field(raw, "reframe"), dict) else None,
                 # Its length in beats of the scene's music, instead of seconds (CT-0067).

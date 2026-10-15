@@ -459,6 +459,24 @@ def _lottie() -> Capability:
     )
 
 
+def _retimed_sound() -> Capability:
+    """Which stretchers a retimed shot's sound can use here, and which is chosen when a shot names none."""
+
+    from .retime_sound import DEFAULT_STRETCHER, available
+
+    found = available()
+    return Capability(
+        name="Retimed sound",
+        what_it_enables="a retimed shot's take sound stretched with its picture, pitch kept (retime_sound: stretch)",
+        required=False,
+        status=OK,
+        detail=f"default {DEFAULT_STRETCHER} (provisional, pending the listening test); available: {', '.join(found)}"
+               + ("" if "rubberband" in found else " -- FFmpeg's rubberband filter is absent: a shot asking for it "
+                  "is refused, never switched"),
+        remedy="",
+    )
+
+
 def _beats() -> Capability:
     from .voice import voice_python
 
@@ -497,6 +515,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _beats,
     _colour_fonts,
     _lottie,
+    _retimed_sound,
     # Detected, not yet used. See `report`.
     _sox,
     _blender,

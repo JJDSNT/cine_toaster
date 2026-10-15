@@ -45,7 +45,14 @@ def _boom(context) -> dict:
     raise RuntimeError("the render exploded")
 
 
-for kind in (JobKind("test-steps", _any, _steps), JobKind("test-process", _any, _process), JobKind("test-boom", _any, _boom)):
+def _unkeepable(context) -> dict:
+    from fractions import Fraction
+
+    return {"files": [], "summary": {"instant": Fraction(1, 3)}}  # not JSON: the result cannot be recorded
+
+
+for kind in (JobKind("test-steps", _any, _steps), JobKind("test-process", _any, _process), JobKind("test-boom", _any, _boom),
+             JobKind("test-unkeepable", _any, _unkeepable)):
     register(kind)
 
 
@@ -95,6 +102,14 @@ class LifecycleTests(JobTestCase):
         job = self.finish(self.manager.submit("test-boom", self.film))
         self.assertEqual(job["state"], "failed")
         self.assertIn("exploded", job["error"])
+
+    def test_a_result_that_cannot_be_kept_fails_the_job_and_never_leaves_it_running(self) -> None:
+        """Found in CT-0080: a segment's sound map in an assembly's summary could not be stored, and the job
+        stayed 'running' for ever while its worker had finished."""
+
+        job = self.finish(self.manager.submit("test-unkeepable", self.film))
+        self.assertEqual(job["state"], "failed")
+        self.assertIn("could not be recorded", job["error"])
 
     def test_an_unknown_kind_is_refused_before_anything_is_queued(self) -> None:
         with self.assertRaises(ValidationError):

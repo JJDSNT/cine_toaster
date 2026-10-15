@@ -346,8 +346,38 @@ through a binding of our own. Onsets matched on the recordings are reported
 in the results file but too few to rank on; **real material is judged by
 listening** -- three files, every stretcher in turn, were given to the user.
 
-Not decided yet: which stretcher (or which per kind of material, behind one
-interface -- the user's idea); the decision waits for the listening.
+**After the user's review of the benchmark** (architecture approved; the
+algorithm conditional): the anchored WSOLA's worst 15 ms came apart into
+three faults, each fixed and measured:
+- at 1x every click +5 ms: in silence every candidate of the phase search
+  scored nothing and the first (-5 ms) won the tie -- now searched from the
+  anchor outwards, ties kept on the map;
+- at 2x clicks at half their level (they fell in some of four overlapping
+  grains), and at 0.5x repeated up to 15 ms early: **attacks are kept out of
+  the grains and laid whole, at speed 1, on the instant the map gives them**
+  (detected by a sharp rise of energy over the 8 ms before, to the sample;
+  each copy ends before the next attack, close ones cross-fading faster);
+- a detector that reported a 2 ms frame instead of the sample put attacks up
+  to 95 samples off where clicks were not on that grid (found by the tests).
+Measured after: the benchmark's 20 clicks at 0 or 1 sample, at full level;
+ten attacks packed 10-30 ms apart around both changes of speed, all exact; a
+sine flat within 0.01 dB and at 440 Hz; stereo coherent (a 1 ms offset
+between channels kept to the sample, nothing leaking across); 60 s of music
+under a 1x/1.5x/0.75x ramp in 25.8 s (0.43 s a second), 119 MB, length
+exact. Shorter grains or less overlap were measured and rejected (transients
+lost at 2x). Blind listening files (the original, then five stretchers in a
+shuffled order, the key kept apart) were given to the user; the default
+stretcher stays provisional until then.
+
+**Wired into the assembly** (the architectural part, released by the user):
+`plan_scene` carries a shot's `retime_sound` (mute by default, preserve,
+stretch) and `stretch_with` (anchored by default -- provisional -- or
+rubberband, atempo by name, never swapped in silence); `_shot_drawing` builds
+the shot's `TimeMap` from the source that is its take (`shown_instants`,
+the same composition as everything in step 2); `_draw_shot` lays the policy's
+sound under the drawing. Ambiguous maps, reverses and freezes under
+`stretch` are refused with a note and muted. `toast doctor` reports the
+stretchers available and the default.
 
 # Done
 
@@ -397,5 +427,23 @@ interface -- the user's idea); the decision waits for the listening.
   shown late against the take's sound), and is muted.
 - Full suite: 866 tests pass (the four scenario tests added after it, run
   alone).
+- Step 3 (`tests/test_retime_sound.py`): a map is unchanged, shifted or a
+  speed; pieces follow the map between frames (1x, 2x, 0.5x from exact
+  edges); policies are named, resample refused by name; stretch lays every
+  attack on its instant to the sample and whole; keeps pitch (440 Hz in each
+  speed) and level (within 0.5 dB) through the changes; stretch of a shift
+  moves the sound exactly; preserve keeps the take's own speed from the cut
+  point and pads where the take ends; mute is silence of the shot's length;
+  a reverse or a freeze is refused; a stretcher asked and missing is refused,
+  an unknown one too; stereo stays coherent; in a cut, a 2x shot with
+  stretch lays its click at sample 12,000 as the picture shows it, and an
+  offset of three frames moves the click by three frames.
+- Found by the full suite: two assembly jobs timed out. A segment's sound
+  map (Fractions) went into the job's JSON summary; storing the result
+  raised outside the job's error handling, and the job stayed `running` for
+  ever. Fixed twice: the map stays out of the summary (working state, not a
+  record), and a result that cannot be recorded now fails the job
+  (`tests/test_jobs.py`).
+- Full suite after step 3 wired: 885 tests pass.
 - The probes above (reproducible with a ten-frame clip whose red channel is
   its frame number). No code changed.

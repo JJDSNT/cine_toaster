@@ -411,9 +411,15 @@ class JobManager:
             self.store.update(job_id, state="failed", finished_at=_now(), error=message, message="Failed.")
             self._event(self.store.get(job_id), "job.failed", error=message)
         else:
-            self.store.update(job_id, state="succeeded", finished_at=_now(), progress=1.0,
-                              message="Ready to adopt.", result=result)
-            self._event(self.store.get(job_id), "job.succeeded")
+            try:
+                self.store.update(job_id, state="succeeded", finished_at=_now(), progress=1.0,
+                                  message="Ready to adopt.", result=result)
+            except Exception as error:  # a result that cannot be kept fails the job, never leaves it running
+                message = f"The job's result could not be recorded: {error}"
+                self.store.update(job_id, state="failed", finished_at=_now(), error=message, message="Failed.")
+                self._event(self.store.get(job_id), "job.failed", error=message)
+            else:
+                self._event(self.store.get(job_id), "job.succeeded")
         self._finished(job_id)
 
     def _finished(self, job_id: str) -> None:
@@ -763,7 +769,9 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
                   # A still is a drawing of the latest cut, disposable: it replaces the one before.
                   *[{"staged": f"stills/{shot}.png", "destination": f"{STILLS_DIRECTORY}/{scene_id}/{shot}.png",
                      "derived": True} for shot in stills]],
-        "summary": {"segments": [{**{key: value for key, value in asdict(segment).items() if key not in ("sound", "source")},
+        # A segment's working state stays out: the sound map is the render's, not a record (CT-0080).
+        "summary": {"segments": [{**{key: value for key, value in asdict(segment).items()
+                                     if key not in ("sound", "source", "piece", "timemap")},
                                   "gain_db": plan.gains.get(segment.shot, 0.0)} for segment in plan.segments],
                     "notes": plan.notes, "voices": voices, "sound": plan.sound, "loudness": plan.loudness,
                     "duration_seconds": plan.duration, "takes": plan.takes},
