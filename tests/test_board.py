@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 from cine_toaster.titles import blender_binary
 from cine_toaster.usd_export import available as usd_missing
+
+sys.path.insert(0, str(Path(__file__).parent))
+from heavy import heavy  # noqa: E402
 
 DEMO = Path(__file__).parents[1] / "examples" / "demo-project"
 
@@ -40,6 +44,7 @@ class SizeTests(unittest.TestCase):
             self.assertIn("shot_size_unknown", codes)
 
 
+@heavy("renders boards with Blender")
 @unittest.skipUnless(blender_binary() and not usd_missing() and shutil.which("ffmpeg"),
                      "needs Blender, usd-core and FFmpeg")
 class BoardTests(unittest.TestCase):

@@ -17,3 +17,5 @@ enter_at = 0.3
 [render]
 engine = "blender"
 effect = "letters-turn-in"
+# Rendered by Blender, laid by the compositing graph (C6, CT-0077):
+primitives = ["generate.source", "merge.over"]

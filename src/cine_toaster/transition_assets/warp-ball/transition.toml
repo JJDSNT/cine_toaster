@@ -1,0 +1,31 @@
+schema_version = 1
+id = "warp-ball"
+name = "Warp: ball"
+kind = "graph"
+category = "warp-wipe"
+description = "The outgoing picture wraps itself into a ball, still playing on its surface, spins and flies away into the distance, uncovering the next shot."
+guidance = "The Toaster's signature warp: a playful, overt change -- a show, a sports reel, a demo. The picture never stops while it travels."
+energy = "high"
+motion = "away"
+duration_ms = 2000
+tags = ["warp", "3d", "sphere", "toaster", "dve"]
+use_when = ["A change that should be a show in itself", "Sports, music, demo reels"]
+avoid_when = ["Drama that should not notice its edits"]
+license = "MIT"
+preview = "preview.webm"
+
+[render]
+ffmpeg = "graph"
+ffmpeg_note = "Drawn by the compositing reference from its graph: the picture on a 3D surface needs a mesh, which no FFmpeg filter draws."
+
+[graph]
+ports = {from = "picture", to = "picture", progress = "curve"}
+output = "out"
+
+[graph.nodes]
+form = {op = "curve.map", in = "progress", how = "remap", low = 0.0, high = 0.45, out_low = 0.0, out_high = 1.0}
+spin = {op = "curve.keys", in = "progress", keys = [[0.0, [0, 0, 0]], [1.0, [25, 420, 0]]]}
+away = {op = "curve.keys", in = "progress", keys = [{t = 0.35, value = [0.0, 0.0, 0.0], ease = "in"}, [1.0, [0.75, -0.62, 3.0]]]}
+ball = {op = "warp.surface", in = "from", shape = "sphere", morph = {curve = "form"}, rotate = {curve = "spin"}, translate = {curve = "away"}, perspective = 35, light = 0.45, camera = "join"}
+gone = {op = "curve.map", in = "progress", how = "remap", low = 0.88, high = 1.0, out_low = 1.0, out_high = 0.0}
+out = {op = "merge.over", front = "ball", back = "to", mix = {curve = "gone"}}

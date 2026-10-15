@@ -1,0 +1,10 @@
+# The same window with a moving camera: a plane track pins the landscape and the matte to the window (C7).
+nodes:
+  take:    {op: generate.source, take: CUT}
+  sky:     {op: generate.source, file: plates/sunset.mov}
+  plane:   {op: track.measure, in: take, kind: plane, region: [0.31, 0.2, 0.62, 0.71]}
+  pinned:  {op: warp.corner_pin, in: sky, track: plane}
+  window:  {op: matte.shape, shape: rectangle, points: [[0, 0], [1, 1]], feather: 0.01}
+  follows: {op: warp.corner_pin, in: window, track: plane}
+  inside:  {op: merge.over, front: pinned, back: take, matte: follows}
+output: inside

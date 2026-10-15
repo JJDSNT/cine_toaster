@@ -5,7 +5,7 @@ type: status
 status: current
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-09-20
+updated_at: 2026-10-13
 tags:
   - status
   - tracker
@@ -14,7 +14,7 @@ tags:
 
 # Project status
 
-Last updated: 2026-10-03
+Last updated: 2026-10-15
 
 ## Current phase
 
@@ -43,6 +43,93 @@ against US$ 1.75/h assumed, so estimates run about 10% low. Stems for a DAW are 
 error. Waiting for the user: the
 4K/finishing spike's cost, what feeds the 5.1, and
 switching the working folder to ~/films/singular.
+
+The demos line (2026-10-14): the reel is on the assembly path, a still is
+a take, narration is written beside its scene in each line's voice
+(CT-0065); footage is declared on a shot and fetched as its take with
+source, licence and credit (CT-0066, `toast footage fetch`, `toast take
+add`). Order agreed: the music-driven piece first, the reel after it and
+out of it; nothing of the previous reel is kept. Next: music brought in
+with its beats as a record.
+
+The compositing engine (ADR 0022, `development/compositing-roadmap.md`): C1
+and C2 are done, C2 closed only after the convergence audit the user asked
+for (CT-0072): one GL pipeline (gl-transitions shaders are `opaque.gl`
+nodes), one place for each decision (defaults, fitting to the frame,
+showing a frame), cards and transition previews drawn by the graph, a still
+as the graph at an instant (`toast still`), and the quick build (`toast
+build`) removed. What still draws outside the graph has an owner step (C5,
+C6, C10). C3 (animation) is done (CT-0074): eases are one vocabulary,
+a beat's instant is kept apart from how a parameter reacts, and the music
+piece's plume pulses on every beat. C4 (CT-0075) is done: layers are a record compiled into the graph, keys
+and despill exist in both renderers, blends respect transparency, and the
+ADO move, a replaced window and a keyed person are made on real footage.
+The review of FilmCraft and EffectCraft is in `references.md` and the
+roadmap (OTIO export to do; EffectCraft as an opaque renderer and an integer
+time base to study). C5 (CT-0076) is done: the transition catalog is recipes of primitives,
+filed by family, every one drawn by GL; two shaders stay with their reasons.
+C6 (CT-0077) is done: transitions, effects, looks, stock elements and
+titles all draw through one compositing engine, on GL; no FFmpeg filter chain
+composites a picture; Blender stays a renderer whose clips the graph lays.
+ADR 0022 separates what the graph supports from what the records expose.
+The frame-access range rule is met: float sources keep their light above white
+into the graph. C6b (CT-0078) is in progress: letters with their own time,
+styles as recipes with a bevel, colour fonts, and Lottie read as a source by
+ThorVG are done; the user's review of the chrome and colour fonts (the
+ColorFonts look, not emoji; glints optional) is recorded to return to.
+Then (the user's order): OpenFX into the shot's one graph (done), the time
+base (CT-0079: three faults measured and fixed -- cut points on the frame
+grid, rates as fractions, sound in samples, through one `timebase` module;
+every click within half a sample over an hour at 30000/1001) and ADR 0023
+(fractions to compute, ticks to store and exchange, the media clock's
+contract for C9b). C7 is done (CT-0080): the remap's meaning, source and timeline
+time composed (`clock`), retimed sound by policy (the anchored WSOLA),
+retimes, offsets, trails and pins in the records, tracks as production
+records (`tracks/<id>`), all on GL, and its three films. C8 opened
+(CT-0081) with its audit; the C6b review stays in the backlog. Step 1:
+signals as production records (ADR 0024). Step 2: a Blender scene's passes
+rendered apart and recorded (`renders/passes/<id>`: picture, the camera at
+every frame, Z depth and object index as signals), read by
+`generate.render`; Blender 5's multipart EXR now read whole. Step 3: models
+as adapters -- Depth Anything V2 Small, Video Depth Anything Small, SAM 2 --
+in their own environment, fetched explicitly at pinned revisions, recorded
+as estimated signals with their weights by hash, measured against Blender's
+passes. Step 4: alignment over a stretch with its residuals (held out by
+pixels, frames and a final stretch), unknown pixels apart from far,
+inverted occlusions flagged per object pair and refused by `merge.depth`
+until accepted; `merge.depth` also checks camera, quantity, unit and pixel
+grid. Step 5: depth compositing at edges -- each layer's depth carried into
+its coverage, three depth states kept, one depth per cut-out object; tests
+split into `make test-fast` and `make test-heavy`. Step 6: the signal ops on
+GL, conformant on llvmpipe and the Intel GPU. Step 7: depth and
+segmentation declared in a shot's layers, compiled into the one graph. Step
+8: the done-when film -- an orb rendered by Blender crossing behind Kael in
+SINGULAR's generated corridor take (copied read-only), ordered by depth,
+measured on the delivered file (`docs/trials.md`); making it found and
+fixed records missing from composite identities. C8 closed on the user's
+viewing (2026-10-15), and with it the exploratory phase of the compositing
+roadmap: C9, C9b, C11, C10, C5b and the C6b review are now paths of
+evolution taken when a production asks, not conditions for using the
+engine. The compositing branch (`ct-0064-reel-on-the-assembly-path`, C1-C8
+with the demos line's first points) was merged into `main` on 2026-10-15,
+with `main`'s UX research; that research's records were renumbered
+CT-0082..CT-0095 (their old ids were already the branch's). Next: the
+demos, produced through the production flow -- each with an intention, a
+screenplay, a storyboard -- the reel last, built from the others (the user,
+2026-10-15), on a branch of their own.
+
+Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
+Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional
+tape, as the two-act self-demo of `docs/production-validation.md`. Nothing
+is built. The reel was rendered by `toast build` (removed in CT-0072), which drew text cards
+only, while titles, effects, sound and transitions over moving video live
+in the assembly; the record lists what is missing (the reel on the
+assembly path, a matte and an overlay in the transition contract, layers
+and a keyer, renderers for three declared composed engines) and the
+order. It is its own line, not ordered by SINGULAR's milestones. A probe
+on a copy of the reel showed the assembly already cuts catalog title
+cards and recordings with transitions over moving video; it refuses a
+still take, and `toast voice` has three defects.
 
 Earlier: the first canonical production write is delivered. Cine Toaster is
 no longer a read-only prototype: a human or an agent can compare registered
@@ -145,7 +232,8 @@ required are all deleted.
 ## Delivered
 
 - `CT-0026` — gl-transitions submodule: 117 unreviewed shaders plus 6 reviewed;
-  `toast build` runs GLSL transitions through ModernGL (`done`).
+  GLSL transitions run through ModernGL, now as `opaque.gl` nodes of the GL
+  renderer (CT-0072) (`done`).
 - `CT-0013` — production-specific tooling boundary and demo examples (`done`).
 - `CT-0002` — canonical take selection (`done`).
 - `CT-0008` — scene geometry, continuity checks, sequences, live board (`done`).

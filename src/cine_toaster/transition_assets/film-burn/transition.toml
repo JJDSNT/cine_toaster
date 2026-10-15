@@ -4,12 +4,13 @@ name = "Film Burn"
 kind = "glsl"
 # The shader is gl-transitions' own; this manifest adds the review.
 upstream = "gl-transitions:FilmBurn"
-category = "analog"
+category = "stylised"
 description = "Light burns through the outgoing frame, as when film stock catches, and gives way to the incoming shot."
 guidance = "An analog rupture: flashbacks, home movies, archive, the end of a reel. It says the image is a physical thing that can be damaged."
 energy = "high"
 motion = "organic"
 duration_ms = 1200
+opaque_reason = "A procedural look of its own (burning noise and colour), not a reveal by primitives; a recipe of generate.noise, colour and merge is possible once its sheet is written."
 tags = ["analog", "film", "flashback", "archive"]
 use_when = [
   "Entering or leaving found footage, a flashback or archive",

@@ -1,10 +1,11 @@
 """Colour management with OpenColorIO (CT-0047).
 
 Elements delivered in scene-linear light (OpenEXR from a renderer or a
-simulation) are converted to the picture's display encoding before they are
-composited, by an OCIO processor, not by guesswork. Looks (a film
-response, a grade) are OCIO transforms baked to a 3D LUT that FFmpeg
-applies (`lut3d`).
+simulation) are converted by an OCIO processor, not by guesswork -- today to
+the display encoding before they are composited, which clips them at white
+(SPEC-0012's range rule, not met yet). Looks (a film response, a grade) are
+OCIO transforms applied in the compositing graph (`colour.lut`, CT-0077);
+`bake_look` still writes one as a .cube, for another tool.
 
 The config is `CINE_TOASTER_OCIO`, else `$OCIO`, else OCIO's built-in ACES
 studio config (`ocio://studio-config-latest`), which ships inside the
@@ -76,14 +77,73 @@ def _frames(pattern: str) -> list[Path]:
     return [path for _, path in sorted(found)]
 
 
+def exr_layers(path: Path) -> dict:
+    """Every layer of an EXR, from every part -- Blender 5 writes a multilayer EXR as one part per pass, and
+    reading the first part alone loses the rest (found in CT-0081). Keys are the layers' names without the
+    view layer ("Combined", "Depth", "Object Index", or "RGBA" for a plain file); values float32 arrays,
+    (height, width) for one channel, (height, width, n) for several. Two layers of one name (two view layers'
+    Depth) are refused, never one chosen for the other."""
+
+    import numpy as np
+    import OpenEXR
+
+    found: dict[str, dict[str | None, Any]] = {}
+    with OpenEXR.File(str(path)) as file:
+        for part in file.parts:
+            for name, channel in part.channels.items():
+                pieces, axis = name.split("."), None
+                if len(pieces) > 1 and len(pieces[-1]) == 1:  # a pass's channel: "ViewLayer.Depth.Z", "Normal.X"
+                    pieces, axis = pieces[:-1], pieces[-1]
+                if len(pieces) > 1:  # the view layer: "ViewLayer.Combined"
+                    pieces = pieces[1:]
+                key = ".".join(pieces)
+                if axis in found.setdefault(key, {}):
+                    raise ValidationError(f"{Path(path).name} has two layers called {key!r} (another is {name!r} "
+                                          f"in {part.name()!r}): which one is meant cannot be told")
+                found[key][axis] = np.asarray(channel.pixels, dtype=np.float32)
+    layers: dict = {}
+    order = "RGBAXYZUVW"
+    for key, channels in found.items():
+        if None in channels and len(channels) > 1:
+            raise ValidationError(f"{Path(path).name} has a layer {key!r} both whole and by channel")
+        if len(channels) == 1:
+            layers[key] = next(iter(channels.values()))
+        else:  # one channel a name -- X, Y, Z of a Normal pass -- stacked in their order
+            axes = sorted(channels, key=lambda axis: (order.find(axis) if axis in order else len(order), axis))
+            layers[key] = np.stack([channels[axis] for axis in axes], axis=-1)
+    return layers
+
+
+def exr_layer(path: Path, layer: str | None = None):
+    """One layer of an EXR, named -- or, unnamed, its only one. A file of several layers read without a name is
+    refused with their names: a depth is never the first channel that happens to be there."""
+
+    layers = exr_layers(Path(path))
+    if layer is None:
+        if len(layers) != 1:
+            raise ValidationError(f"{Path(path).name} has the layers {', '.join(sorted(layers))}: say which "
+                                  "(`layer`)")
+        return next(iter(layers.values()))
+    if layer not in layers:
+        raise ValidationError(f"{Path(path).name} has no layer {layer!r}; it has {', '.join(sorted(layers))}")
+    return layers[layer]
+
+
 def read_exr(path: Path):
-    """An EXR's RGBA as float32 (height, width, 4); alpha 1 when it has none."""
+    """An EXR's RGBA as float32 (height, width, 4); alpha 1 when it has none. A multilayer EXR's `Combined` pass
+    is its picture."""
 
     import numpy as np
     import OpenEXR
 
     with OpenEXR.File(str(path)) as file:
         channels = file.channels()
+        if not any(name in channels for name in ("RGBA", "RGB", "R")):
+            combined = {name: layer for name, layer in exr_layers(path).items() if name.endswith("Combined")}
+            if combined:
+                pixels = next(iter(combined.values()))
+                if pixels.ndim == 3 and pixels.shape[2] == 4:
+                    return pixels
         if "RGBA" in channels:
             pixels = np.asarray(channels["RGBA"].pixels, dtype=np.float32)
         elif "RGB" in channels:
@@ -139,13 +199,59 @@ def exr_to_display(pattern: str, output: Path, *, colorspace: str = LINEAR_SPACE
     return str(target), 1
 
 
+def exr_to_working(pattern: str, output: Path, *, colorspace: str = LINEAR_SPACE, lead: int = 0,
+                   loop_to: int = 0) -> str:
+    """A scene-linear EXR sequence in the compositing graph's working space, still float, its light above white
+    kept (SPEC-0012's range rule, CT-0077); `lead` transparent frames first (an element that starts later), and
+    the frames repeated until there are `loop_to` (a looping element).
+    Alpha stays premultiplied. Cached by the frames' names, sizes and times. Returns the new pattern."""
+
+    import numpy as np
+    import OpenEXR
+
+    frames = _frames(pattern)
+    if not frames:
+        raise ValidationError(f"No EXR frames match {pattern}")
+    hashed = hashlib.sha256(f"{colorspace}|{lead}|{loop_to}|working".encode())
+    for frame in frames:
+        stat = frame.stat()
+        hashed.update(f"{frame.name}{stat.st_size}{stat.st_mtime_ns}".encode())
+    folder = output / hashed.hexdigest()[:16]
+    target = folder / "f_%04d.exr"
+    if (folder / "done").is_file():
+        return str(target)
+    folder.mkdir(parents=True, exist_ok=True)
+    convert = None if colorspace == LINEAR_SPACE else _processor(colorspace, target=LINEAR_SPACE)
+
+    def write(index: int, pixels) -> None:
+        OpenEXR.File({"type": OpenEXR.scanlineimage, "compression": OpenEXR.ZIP_COMPRESSION},
+                     {"RGBA": pixels.astype(np.float16)}).write(str(folder / f"f_{index:04d}.exr"))
+
+    first = read_exr(frames[0])
+    for index in range(1, lead + 1):
+        write(index, np.zeros_like(first))
+    if loop_to > len(frames):
+        frames = [frames[index % len(frames)] for index in range(loop_to)]
+    for index, frame in enumerate(frames, lead + 1):
+        pixels = read_exr(frame)
+        if convert is not None:  # a transform need not be linear: applied to the straight colour
+            alpha = pixels[..., 3:4]
+            colour = np.ascontiguousarray(np.where(alpha > 1e-6, pixels[..., :3] / np.maximum(alpha, 1e-6), 0.0),
+                                          dtype=np.float32)
+            convert.applyRGB(colour)
+            pixels = np.concatenate([colour * alpha, alpha], axis=2)
+        write(index, pixels)
+    (folder / "done").write_text(str(len(frames) + lead), encoding="utf-8")
+    return str(target)
+
+
 def bake_look(output: Path, *, source: str = PICTURE_SPACE, working: str = "ACEScg", display: str = DISPLAY,
               view: str = "ACES 2.0 - SDR 100 nits (Rec.709)", size: int = 33) -> Path:
     """A 3D LUT (.cube) taking a display picture through a scene-referred look back to the display.
 
     The picture is decoded to linear, lifted into `working`, and shown
     through `view` (ACES 2.0's tone scale by default): a film response,
-    measured by OCIO, for FFmpeg's `lut3d`.
+    measured by OCIO, as a .cube for another tool (the graph applies the transform itself, `colour.lut`).
     """
 
     import numpy as np

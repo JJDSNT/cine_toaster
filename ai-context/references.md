@@ -5,7 +5,7 @@ type: reference
 status: active
 owner: project
 created_at: 2026-09-29
-updated_at: 2026-09-29
+updated_at: 2026-10-14
 tags:
   - references
   - interface
@@ -62,6 +62,9 @@ Ranked by value to the three priority problems.
 | — | [gl-transitions/gl-transitions](https://github.com/gl-transitions/gl-transitions) | MIT (items MIT, BSD-2, BSD-3) | **submodule** | **Adopted** as the transition catalog's shader bank (`CT-0026`). 125 shaders in our own GLSL contract; 123 usable, 6 reviewed so far. |
 | 9 | [NatronGitHub/Natron](https://github.com/NatronGitHub/Natron) | GPL-2.0 | external tool | Node-based compositor. It is not a graph-UI candidate. **VFX candidate** behind an adapter, driven headless by `NatronRenderer` (`CT-0031`). Upstream is largely inactive since 2.5. |
 | — | [friction2d/friction](https://github.com/friction2d/friction) | GPL-3.0 | external tool | Vector and raster motion graphics (lower thirds, animated graphics). **Motion-graphics candidate** behind the same adapter (`CT-0031`); headless render not yet verified. |
+| — | [thorvg/thorvg](https://github.com/thorvg/thorvg) via [thorvg-python](https://github.com/laggykiller/thorvg-python) | MIT (engine), LGPL-2.1 (binding) | library (the `motion` extra) | **Adopted** to draw Lottie animations as a source (`CT-0078` stage D), behind `compositing/lottie.py`. Chosen over rlottie (`rlottie-python`, LGPL) in a spike on ten files: faster on heavy ones, draws text layers. Skottie is not exposed by `skia-python`; `python-lottie` is AGPL. |
+| — | [storytold/effectcraft](https://github.com/storytold/effectcraft) | MIT or Apache-2.0 | code (with attribution) | A clean-room After Effects in Rust (first commit 2026-10-01; alpha, its own estimate ≈ 45% ready). **Confirms our architecture** -- one command registry for UI, CLI and MCP; a readable project file; linear-light compositing with a CPU reference the GPU is tested against; a cache by content -- and takes the **opposite path on effects**: 306 closed clones of After Effects' effects, where ADR 0022 has few primitives and recipes. Worth reading for: spill suppression (`keylight.rs`), text animators with range selectors and OpenType shaping (C6b), its fidelity harness; a candidate **opaque renderer** (CLI render of a JSON project) for particles, 3D extrusion and Lottie, after a spike. Reviewed 2026-10-14 (CT-0075). |
+| — | [storytold/filmcraft](https://github.com/storytold/filmcraft) | MIT or Apache-2.0 | code (with attribution) | A clean-room Premiere Pro in Rust (first commit 2026-09-30; alpha, ≈ 56% ready by its own estimate), with its own codecs. **Interchange target**: it opens OpenTimelineIO, FCP7 XML, FCPXML, AAF and EDL -- a version exported as OTIO would open there (and in Resolve and Premiere) for finishing. Its **integer time base** (254,016,000,000 ticks a second, exact for every frame and sample rate) is a reference for ours, which is float seconds. Reviewed 2026-10-14 (CT-0075). |
 | — | [snuq/QuickTitling](https://github.com/snuq/QuickTitling) | GPL-2.0+ | external tool | Blender sequencer addon (v0.6.8, Blender 5.1) that builds title scenes from presets. **Titles candidate**: the user installs it, and Cine Toaster only calls Blender (`CT-0031`). Its preset model is a reference for our composed cards. |
 
 ## SceneFlow and Auteur Script in detail

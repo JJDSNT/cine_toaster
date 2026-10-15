@@ -1,0 +1,6 @@
+# The music piece: a picture that swells a little on every beat of the scene's music (CT-0067, C3).
+nodes:
+  take:  {op: generate.source, take: CUT}
+  pulse: {op: curve.beats, attack: 0.03, decay: 0.25, low: 1.0, high: 1.04}
+  out:   {op: warp.transform, in: take, scale: {curve: pulse}}
+output: out

@@ -1,0 +1,8 @@
+# Monocular depth compared with a render's metric depth without aligning it.
+expect: composite_type_mismatch
+nodes:
+  person:  {op: generate.source, take: CUT}
+  guessed: {op: signal.estimate, picture: person, kind: depth_relative}
+  object:  {op: generate.render, renderer: blender}
+  out:     {op: merge.depth, pictures: [person, object], depths: [guessed, object.depth]}
+output: out

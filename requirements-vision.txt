@@ -1,0 +1,15 @@
+# The vision environment (C8 step 3, CT-0081): `make install-vision` puts it in .venv-vision.
+# Separate from the main one: the models need torch, which Cine Toaster itself never imports.
+# Models run here, as workers (src/cine_toaster/vision_worker.py); weights are never downloaded
+# implicitly -- `toast models fetch <name>` does it, at a pinned revision (models.py).
+# All permissive: torch, torchvision (BSD), transformers (Apache-2.0), einops (MIT), OpenCV (Apache-2.0).
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.6.0
+torchvision==0.21.0
+transformers==5.2.0
+safetensors>=0.4
+einops>=0.7
+opencv-python-headless>=4.9
+numpy>=1.26,<3
+pillow>=10
+huggingface_hub>=0.30

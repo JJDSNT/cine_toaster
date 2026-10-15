@@ -1242,6 +1242,35 @@ function demoTexture(gl, variant) {
   return texture;
 }
 
+function surfaceTexture(gl, surface) {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, surface);
+  return texture;
+}
+
+// The pictures an item names for its shader (SPEC-0011): a still is read
+// once; a clip is played and its current frame uploaded at every draw.
+async function inputPicture(transition, file) {
+  const url = `/transition-assets/${encodeURIComponent(transition.id)}/${encodeURIComponent(file)}`;
+  if (/\.(mp4|webm|mov)$/i.test(file)) {
+    const video = el("video");
+    Object.assign(video, { src: url, muted: true, loop: true, playsInline: true, crossOrigin: "anonymous" });
+    await video.play().catch(() => {});
+    await new Promise((resolve) => (video.readyState >= 2 ? resolve() : video.addEventListener("loadeddata", resolve, { once: true })));
+    return video;
+  }
+  const image = new Image();
+  image.src = url;
+  await image.decode();
+  return image;
+}
+
 function compileShader(gl, type, source) {
   const shader = gl.createShader(type);
   gl.shaderSource(shader, source);
@@ -1324,6 +1353,17 @@ async function startShaderPreview(canvas, transition) {
     // The shader's own parameters, at the defaults it declares: an unset
     // uniform is zero, and many transitions do nothing at zero.
     for (const param of transition.params || []) setShaderParam(gl, program, param);
+    // Pictures beside the two shots, from unit 2: a shader's textures.
+    const inputs = Object.entries(transition.inputs || {}).filter(([name]) => name !== "overlay");
+    const pictures = [];
+    for (const [name, file] of inputs) pictures.push([name, await inputPicture(transition, file)]);
+    const bound = pictures.map(([name, picture], index) => {
+      const unit = 2 + index;
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      const texture = surfaceTexture(gl, picture);
+      gl.uniform1i(gl.getUniformLocation(program, name), unit);
+      return { unit, texture, picture };
+    });
     const progressLocation = gl.getUniformLocation(program, "progress");
     const started = performance.now();
     const duration = Math.max(250, transition.duration_ms);
@@ -1334,6 +1374,12 @@ async function startShaderPreview(canvas, transition) {
       const elapsed = (now - started) % cycle;
       const progress = Math.max(0, Math.min(1, (elapsed - 350) / duration));
       gl.viewport(0, 0, canvas.width, canvas.height);
+      for (const { unit, texture, picture } of bound) {
+        if (!(picture instanceof HTMLVideoElement)) continue;
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, picture);
+      }
       gl.uniform1f(progressLocation, progress);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       requestAnimationFrame(draw);
@@ -1366,7 +1412,9 @@ function transitionVisual(transition, large = false, lazy = false) {
       canvas.remove();
       canvas = null;
     });
-  } else if (transition.kind === "webm") {
+  } else if (transition.kind === "webm" || (["graph", "matte"].includes(transition.kind) && transition.preview_url)) {
+    // A recipe of primitives (ADR 0022) -- a matte join among them -- is drawn by the compositing renderers,
+    // not in the browser: its preview is a clip they made from the same graph (CT-0072).
     const video = el("video");
     video.src = transition.preview_url;
     video.muted = true;
@@ -2076,7 +2124,7 @@ async function renderStoryboard() {
     emptyRoom(
       root,
       "No frames have been drawn yet",
-      "Composed shots get their still from `toast build`; generated shots get " +
+      "A card or a composite gets its still when its scene is assembled (or `toast still`); generated shots get " +
         "theirs from a take. Until then a scene is text on a screen.",
     );
   }
@@ -2673,13 +2721,28 @@ async function renderCut() {
   }
 
   const renders = production.renders || [];
-  if (!renders.length) {
+  // Each sequence's latest version is what this room shows first (CT-0072): the files in renders/ were
+  // written by the quick build, which is gone, and are listed only when a production still has some.
+  const latest = production.sequences.filter((sequence) => (sequence.versions || []).length);
+  if (!renders.length && !latest.length && !production.sequences.some((sequence) => sequence.render)) {
     emptyRoom(
       root,
       "Nothing has been assembled yet",
-      "`toast build` writes into the production's renders/ directory. Anything " +
-        "found there appears here; nothing has to be declared.",
+      "A sequence's latest version appears here once it is assembled (`toast assemble-sequence`, or Assemble " +
+        "in the Sequences room); each scene's versions are kept beside the scene.",
     );
+  }
+
+  for (const sequence of latest) {
+    const version = sequence.versions[0];
+    const panel = el("section", "panel wide-panel");
+    panel.append(sectionHeading("SEQUENCE", sequence.label, `${version.id} · ${version.verdict}`));
+    const video = el("video");
+    video.src = `/media/${version.media}`;
+    video.controls = true;
+    video.preload = "metadata";
+    panel.append(video);
+    root.append(panel);
   }
 
   for (const render of renders) {
@@ -2695,7 +2758,7 @@ async function renderCut() {
   }
 
   for (const sequence of production.sequences) {
-    if (!sequence.render) continue;
+    if (!sequence.render || (sequence.versions || []).length) continue;  // a declared render, from before versions
     const panel = el("section", "panel wide-panel");
     panel.append(sectionHeading("SEQUENCE", sequence.label, sequence.render));
     const video = el("video");

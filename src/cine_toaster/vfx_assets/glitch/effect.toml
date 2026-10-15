@@ -12,5 +12,7 @@ strength = 0.6
 rate = 0.15
 
 [render]
-engine = "ffmpeg"
+engine = "graph"
 effect = "glitch"
+# Drawn by the compositing graph (C6, CT-0077), of these primitives:
+primitives = ["curve.keys", "filter.noise", "merge.channels", "merge.mix", "signal.channel", "warp.transform"]

@@ -1,0 +1,7 @@
+# The draft's other mistake: a parameter the op does not have.
+expect: composite_unknown_param
+nodes:
+  person: {op: generate.source, take: CUT}
+  key:    {op: matte.key, picture: person, by: luminance, range: [0.7, 0.9]}
+  out:    {op: merge.over, front: person, back: person, matte: key}
+output: out

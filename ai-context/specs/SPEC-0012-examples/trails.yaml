@@ -1,0 +1,9 @@
+# The ADO's Infinity: a flown layer leaves echoes behind it.
+nodes:
+  take:  {op: generate.source, take: CUT}
+  inset: {op: generate.source, file: plates/launch.mov}
+  path:  {op: curve.keys, keys: [[0, [0.0, 0.0]], [1.5, [0.3, -0.2]]]}
+  flown: {op: warp.transform, in: inset, scale: [0.35, 0.35], translate: {curve: path}}
+  echo:  {op: time.echo, in: flown, count: 6, spacing: 2, decay: 0.6}
+  out:   {op: merge.over, front: echo, back: take}
+output: out

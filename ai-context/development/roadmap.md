@@ -5,7 +5,7 @@ type: roadmap
 status: active
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-10-07
+updated_at: 2026-10-15
 tags:
   - development
   - roadmap
@@ -221,24 +221,24 @@ Agreed order (2026-10-04):
    through a command; a per-shot brief override.
 6. **Cast lineage** (`CT-0015`): `cast_reference_unused` and
    `_superseded`; master references attached to video generation.
-7. **Blender MCP / DCC-MCP investigation** (`CT-0064`): compare an established
+7. **Blender MCP / DCC-MCP investigation** (`CT-0082`): compare an established
    Blender-specific MCP, DCC-MCP and the existing deterministic Blender/USD
    path. Run the inspect -> modify -> preview -> read-back -> deterministic
    regeneration spike before deciding adopt / narrow-adopt / wrap / defer /
    reject. This is an explicit next investigation, not a passive backlog note.
 
-### Active investigation — integrated editing and production architecture (CT-0065)
+### Active investigation — integrated editing and production architecture (CT-0083)
 
 - [ ] **Audit current editing capabilities** against code: implemented / partial / missing / unknown; identify canonical edit state, timebase, versioning, trim, preview and render contracts.
 - [ ] **Select one representative fixture** with J/L cut, transition, sound stems and an alternative generated take.
 - [ ] **Prototype an editable React timeline** using existing Core commands, with agent proposal/approval and undo; do not create competing edit state.
 - [ ] **Run interoperability and engine spikes**: OpenTimelineIO round-trip/reconform and FFmpeg vs MLT vs GES comparison, with measurable acceptance criteria.
 - [ ] **Evaluate production-wide finishing**: OpenColorIO/ACES, OpenEXR, OFX-host boundary, loudness, delivery profiles and dependency-aware regeneration.
-- [ ] Record findings and decisions in [CT-0065](../work/CT-0065-integrated-editing-and-production-architecture.md); convert validated choices into ADRs and implementation tasks.
+- [ ] Record findings and decisions in [CT-0083](../work/CT-0083-integrated-editing-and-production-architecture.md); convert validated choices into ADRs and implementation tasks.
 
 This is an active research track, **not** a decision to replace the existing media engine.
 
-### Active UX investigation — three workspaces (CT-0066)
+### Active UX investigation — three workspaces (CT-0084)
 
 - [ ] Audit current React routes, canvas, screenplay editor and control-room journeys against the three-workspace concept.
 - [ ] Define shared navigation and persistent project / sequence / scene / shot / take context.
@@ -246,52 +246,367 @@ This is an active research track, **not** a decision to replace the existing med
 - [ ] Validate screenplay-to-cut, edit-to-regeneration, agent-approval and delivery journeys with existing Core data.
 - [ ] Record usability, accessibility and layout findings and convert approved designs into implementation tasks and ADRs.
 
-Track scope and acceptance criteria in [CT-0066](../work/CT-0066-three-workspace-ux-vision.md). This is a UX investigation, not a commitment to rebuild the existing interface.
+Track scope and acceptance criteria in [CT-0084](../work/CT-0084-three-workspace-ux-vision.md). This is a UX investigation, not a commitment to rebuild the existing interface.
 
-### UX follow-up — wireframe validation and human information needs (CT-0067, CT-0068)
+### UX follow-up — wireframe validation and human information needs (CT-0085, CT-0086)
 
-- [ ] Preserve the initial three-workspace wireframe as a **non-validated design study** ([CT-0067](../work/CT-0067-three-workspace-wireframe-study.md)); do not treat the three-column layout as approved.
-- [ ] Research situation awareness, cognitive load, progressive disclosure, visual hierarchy and accessible interaction ([CT-0068](../work/CT-0068-human-centered-information-visibility.md)).
+- [ ] Preserve the initial three-workspace wireframe as a **non-validated design study** ([CT-0085](../work/CT-0085-three-workspace-wireframe-study.md)); do not treat the three-column layout as approved.
+- [ ] Research situation awareness, cognitive load, progressive disclosure, visual hierarchy and accessible interaction ([CT-0086](../work/CT-0086-human-centered-information-visibility.md)).
 - [ ] Produce a task → decision → required information → Core source matrix, starting with Production.
 - [ ] Compare focused, balanced and advanced-density layouts on laptop and large displays, with user tasks and workload measures.
 - [ ] Update the wireframes, record accepted UX decisions and create implementation work only after validation.
 
-### Research in progress — Production information priorities (CT-0069)
+### Research in progress — Production information priorities (CT-0087)
 
-- [x] Create an initial Production task → information → display-priority matrix, with preliminary React code audit ([CT-0069](../work/CT-0069-production-information-priority-matrix.md)).
+- [x] Create an initial Production task → information → display-priority matrix, with preliminary React code audit ([CT-0087](../work/CT-0087-production-information-priority-matrix.md)).
 - [ ] Audit control-room server pages, status APIs, FinOps and actual take-comparison flows; verify cross-room context preservation.
 - [ ] Compare Focus and Review/Expert layout variants using take selection, failed generation and agent approval tasks.
 - [ ] Extend the matrix to Screenplay & Storyboard and Editing & Post-production, and record user-test findings before approving a layout.
 
-### Research — Production Awareness and human situation awareness (CT-0070)
+### Research — Production Awareness and human situation awareness (CT-0088)
 
-- [x] Map situation awareness, ecological interface design, distributed cognition, attention management and human–AI interaction to Cine Toaster's existing Producer, continuity, FinOps and assistant capabilities ([CT-0070](../work/CT-0070-production-awareness-research.md)).
+- [x] Map situation awareness, ecological interface design, distributed cognition, attention management and human–AI interaction to Cine Toaster's existing Producer, continuity, FinOps and assistant capabilities ([CT-0088](../work/CT-0088-production-awareness-research.md)).
 - [ ] Verify primary research references and actual Core status, dependency and approval data contracts.
 - [ ] Prototype explainable **state + consequence + action** awareness items using existing records, without a new source of truth.
 - [ ] Compare status-only versus contextual-awareness layouts for stale-take, continuity, failed-job and agent-approval scenarios.
 - [ ] Validate with users before introducing UI components, priority rules or architecture decisions.
 
-### Cross-workspace cognitive UX study (CT-0071)
+### Cross-workspace cognitive UX study (CT-0089)
 
-- [x] Map narrative, operational, temporal and cross-workspace cognitive demands to the existing screenplay, storyboard, Producer, editor commands and assistant ([CT-0071](../work/CT-0071-cross-workspace-cognitive-model.md)).
+- [x] Map narrative, operational, temporal and cross-workspace cognitive demands to the existing screenplay, storyboard, Producer, editor commands and assistant ([CT-0089](../work/CT-0089-cross-workspace-cognitive-model.md)).
 - [ ] Audit actual editing/timeline UI and persistent navigation state; inventory canonical script → board → take → assembly links.
 - [ ] Complete information-priority matrices for Screenplay/Storyboard and Editing/Post.
 - [ ] Test context-preserving cross-workspace navigation and focused versus detailed layouts with users before approving wireframes.
 
-### Contextual creative decisions and navigation (CT-0072)
+### Contextual creative decisions and navigation (CT-0090)
 
-- [x] Audit existing sidebar, style cascading, location overrides, shot emotions and moodboard research; capture findings and navigation alternatives ([CT-0072](../work/CT-0072-contextual-creative-decisions-navigation.md)).
+- [x] Audit existing sidebar, style cascading, location overrides, shot emotions and moodboard research; capture findings and navigation alternatives ([CT-0090](../work/CT-0090-contextual-creative-decisions-navigation.md)).
 - [ ] Inventory cast/look/style/location/continuity resolver fields and existing UI deep links; document source, scope, overrides and provenance.
 - [ ] Build decision → origin → scope → override → affected references matrix, distinguishing actual dependencies from unknown ones.
 - [ ] Prototype current feature menu plus inspector against a compact workspace menu with contextual creative relations.
 - [ ] Validate on film-wide style, local location override, character performance and editing trace-back tasks before changing the sidebar.
 
-### Creative context Core inventory (CT-0073)
+### Creative context Core inventory (CT-0091)
 
-- [x] Audit Core resolvers for cast, looks, styles, locations, continuity and cuts, and document a proposed read-only contextual projection ([CT-0073](../work/CT-0073-creative-context-core-inventory.md)).
+- [x] Audit Core resolvers for cast, looks, styles, locations, continuity and cuts, and document a proposed read-only contextual projection ([CT-0091](../work/CT-0091-creative-context-core-inventory.md)).
 - [ ] Trace API/client payloads and exact scene/shot binding semantics; verify editing assembly references and cross-room selection persistence.
 - [ ] Compare existing feature menu + inspector with hybrid workspace/context navigation in a focused prototype.
 - [ ] Validate decisions, provenance and local exceptions with users before an implementation ADR.
+
+### The demos line: the music piece, then the reel (opened 2026-10-13)
+
+Its own line of work (the user, 2026-10-13): capabilities the demos need,
+which become part of Cine Toaster. It has no specific relation to SINGULAR
+and does not follow that line's priorities. The history and the evidence are
+in `CT-0064`. The user's rule (2026-10-14): every gap found is attacked, one
+point at a time, in this order. Each point gets its own work record when it
+starts and is struck here when it is done.
+
+Done: the reel on the assembly path, stills as takes, narration beside the
+scene (`CT-0065`); footage declared and fetched (`CT-0066`); the music search
+that hid Freesound's tracks; a first music piece and an organic trial, made
+partly by hand, outside the repository.
+
+**D1. ~~Beats are a record.~~** Done (`CT-0067`). Limitations left, each
+solvable, to be closed later as **D1b**:
+- **Bars.** librosa gives beats, not downbeats, so nothing knows which beat
+  is the first of a bar. Solvable two ways, both wanted: a downbeat tracker
+  (madmom's `DBNDownBeatTracker`, or a newer model such as beat_this; licences
+  to check against ADR 0011) writing `downbeats` beside `beats`; and a
+  person's correction in the record (`beats_per_bar`, `first_downbeat`), since
+  any detector can be wrong by one beat. Then a shot may count `bars: 2`, and
+  a check says when a join that should open a bar does not.
+- **Music that starts later than the scene.** Beats are counted from the
+  scene's start; music placed with `at` or `from` is refused. Solvable by
+  counting from where the music starts on the timeline.
+- **Tempo changes.** Lengths follow the detected beats, so a track that
+  speeds up is followed; but a beat the detector misses or doubles moves the
+  cut. Solvable with the same correction in the record (beats added or
+  removed by hand) and a view of the beats over the waveform.
+- What: `toast sound beats <project> <sound>` detects a track's tempo and
+  beats (librosa, in the voice interpreter, as a worker) and keeps them
+  beside the sound. A scene that has music may give a shot's length and a
+  join's place in beats (`duration: 8 beats`, or a join `on: 16`).
+- Check: a join that is not on a beat of the scene's music, when the scene
+  says it is cut to the music.
+- Done when: the music piece is assembled from beats written in its
+  breakdown, with no script outside the tool, and comes out the same length.
+- Closes: "beats are not in the tool"; "a shortened transition moves later
+  joins off the beat" (placing joins by beat makes each independent).
+
+**D2. ~~A production says its frame.~~** Done (`CT-0068`); a scene's own
+frame is left in C10 of the compositing roadmap (`toast build` was removed
+in CT-0072).
+- What: size and rate declared once in `project.yaml`; every version is
+  made in it, whatever its first take is. Footage is fetched to fit when no
+  height is given.
+- Done when: a scene opening on a 4K take and one opening on a card give
+  versions of the same declared size.
+
+**D3. A transition can take a matte and an overlay.** Done in its first
+part (`CT-0069`, `SPEC-0011`). What it left, and everything that was D3b to
+D7 -- the compositing primitives (ADR 0022), layers and the ADO move, the
+warp wipe, the catalogs rebuilt on primitives, time and tracking, signals
+from models and from 3D, real time and streams, and the loose ends -- is now
+**`development/compositing-roadmap.md`, steps C1 to C10**, with what each is
+done by and the limits known in advance.
+
+**D8. The music piece, finished.** After C5 of the compositing roadmap: joins written in
+beats, organic joins through mattes, a picture flown over another; better
+pictures than the Mars square. In the repository as the fourth demo
+(`docs/production-validation.md`), its footage fetched, not checked in.
+
+**D9. The reel, written from scratch.** A short narrated first act (two
+voices) and the music piece as its second. Nothing of the previous reel is
+kept; `examples/amiga-demo-reel` is a placeholder until this replaces it. The
+script goes to the user before it is built.
+
+Order: D1b (bars) when a piece needs bars; the compositing roadmap C1-C10
+in its own order; then D8 and D9.
+
+### From the review of FilmCraft and EffectCraft (2026-10-14, CT-0075)
+
+Neither changes the direction; each is used at the edges (`references.md`).
+
+- **Do -- a version exported as OpenTimelineIO.** The cut (shots, takes,
+  in and out points, joins, sound) as an `.otio` beside the version, so it
+  opens in FilmCraft, Resolve or Premiere for finishing: the picture's
+  counterpart of the stems for a DAW (CT-0063). How: the plan already holds
+  every segment; write it with the `opentimelineio` library behind an
+  adapter, a composite or a join rendered as its own clip.
+- **Spike, when C6b or C8 need it -- EffectCraft as an opaque renderer.**
+  `opaque.effectcraft`: a node whose picture is a render of a small JSON
+  project by `effectcraft-cli render`, for what our graph does not hold
+  (particles as a simulation, extruded 3D text, text animators). How: one
+  node, its project file known by content (identity), a doctor capability;
+  adopted only if it renders headless and repeatably. Not before: it is
+  alpha and changes daily.
+- **Research -- an integer time base** (in progress: `CT-0079`, measured -- see there). Our curves run on float seconds; C3
+  had to anchor a beat to its frame's centre, and 29.97 frames are inexact.
+  How: measure where float time drifts (long shots, 29.97, sample-accurate
+  sound); if it does, ticks as FilmCraft's (254,016,000,000 a second) in the
+  plan and the curves, seconds only at the edges. The user's reading of
+  FilmCraft's and EffectCraft's architecture (section 2, "Time base" /
+  "Time"; 2026-10-15), to compare our contract with before C7, since
+  tracking, retiming and audio-visual sync depend on it: a shared base of
+  254,016,000,000 ticks a second as `Tick(i64)` -- 10,584,000,000 a frame at
+  24 fps, 8,475,667,200 at 30000/1001, 5,292,000 a sample at 48 kHz,
+  5,760,000 at 44.1 kHz, all exact; intervals half-open (a start and a
+  duration, the end never in doubt); in multicamera sync, video placed on
+  frame boundaries and sound kept sample-accurate; the sound's clock the
+  master in playback. Compare: the canonical form of instants and lengths,
+  fps-to-sample-rate conversion, interval bounds, rounding where sound
+  segments are aligned in the assembly, and 24000/1001 and 30000/1001. Not
+  to adopt the ticks before showing that a seen problem comes from the time
+  representation rather than from how segments are aligned and encoded.
+- **Research -- spill suppression and text animators** from EffectCraft's
+  code (permissive licence, attribution): spill for C4's keys (recorded in
+  the compositing roadmap), per-character animators with range selectors
+  for C6b.
+- **Kept as it is -- particles and 3D letters.** They exist, rendered by
+  Blender (CT-0047's elements, the `blender` title engine); in C6 they
+  become layer sources with their alpha, in C8 the graph's
+  `generate.render`. No particle primitive is planned.
+- **Research in C6/C6b -- Lottie as an input** (the user, 2026-10-14;
+  first recorded here as "not pursued", which thought only of exporting it).
+  Lottie (`.json`, `.lottie`) is a large ecosystem of ready motion graphics
+  -- titles, lower thirds, credits, icons, infographics. Step 1: a Lottie
+  file as a layer source, rendered with its alpha, with its duration and
+  time under our control (`time.remap`), behind an adapter -- candidates
+  ThorVG (MIT engine; `thorvg-python`, LGPL binding), rlottie
+  (`rlottie-python`, LGPL binding) and Skia's Skottie (BSD; whether
+  `skia-python` exposes it to be checked); `python-lottie` is AGPL and not
+  linked. Step 2, evaluated after: converting the part of a Lottie file our
+  primitives express (shapes, transforms, keys and their Bézier eases,
+  masks) into the graph, so it can be changed and combined -- never a second
+  animation engine beside the graph. Export stays out of scope.
+  **Step 1 done** (CT-0078 stage D): a Lottie file is a format every source
+  reads, drawn by ThorVG. Left from it, each with how:
+  - *Step 2*, as above: start with shape layers (paths, fills, strokes,
+    transforms, keys with their eases) into `matte.shape`, `generate.solid`,
+    `warp.transform` and `curve.keys`; whatever is not converted stays drawn
+    by ThorVG as a source, so a file is never half lost.
+  - *Looping*: an animation shorter than its layer holds or ends; a `loop`
+    on the source (frames taken modulo its length in the adapter) would
+    repeat it.
+  - *Which engine is right where ThorVG and rlottie differ* (a mask sample,
+    the confetti's opacity, a star's stroke): draw the same frames with
+    lottie-web in headless Chromium (Playwright is already the splat
+    extra) and compare, before trusting either on masks.
+  - *Text layers' fonts*: ThorVG draws text layers whose glyphs the file
+    carries; one naming a system font needs the font loaded into ThorVG
+    (its font loader) -- not checked yet.
+
+### An intermittent test (found 2026-10-15, CT-0078; again in CT-0079)
+
+- Still open: passing alone does not resolve it (the user, 2026-10-15). A
+  robustness test of its own -- the same check run many times, or on PCM
+  stems -- should show it fixed, apart from C7's work.
+
+- `tests/test_stems.py` compares a stretch's mean loudness of the summed stems
+  with the version's within 0.5 dB, and once measured exactly 0.5. The mix
+  passes through AAC twice and a limiter with lookahead, whose output need
+  not be bit-identical run to run. How: compare the stems before encoding (a
+  PCM render of the mix), or measure where the limiter is idle, so the test
+  holds the claim -- the stems make the mix -- without a margin at its edge.
+
+### Colour fonts not drawn yet (found 2026-10-15, CT-0078 stage C)
+
+- **SVG glyphs** (OpenType SVG fonts) draw as plain fonts: FreeType draws
+  them only through a renderer hook Pillow does not give. How: read the
+  glyph's SVG document from the font's `SVG ` table (fontTools) and render it
+  with resvg or CairoSVG into the same tile the colour path places, behind a
+  doctor capability.
+- **A colour font under the letter animator** draws in `colour`: the
+  per-letter path draws coverage. How: give `_letters_coverage` an RGBA tile
+  from `_colour_text`'s drawing for each glyph, the same placement kept.
+
+### A listening review of retimed sound (CT-0080)
+
+- The anchored WSOLA was chosen as `stretch`'s default on measurements
+  (sync, level, pitch, transients); no one has judged it by ear on real
+  material -- the blind files' tape excerpt was near silence. How: blind
+  files of representative excerpts (speech, music with drums, ambience,
+  Foley), checked for level before they are sent, judged by a person; and
+  an objective perceptual score where one fits (ViSQOL, Apache 2.0) to
+  compare stretchers on the same map.
+
+### A scene's passes: what the Blender adapter does not do yet (CT-0081 step 2)
+
+- **Only Cycles.** What EEVEE's (or another renderer's) Z measures has not
+  been measured, so it is refused. How: render the wall square to the
+  camera with it, as `tests/test_renders.py` does, and add its entry to
+  `renders.Z_MEASURED` (z or distance).
+- **Only perspective cameras, square pixels.** How: an orthographic camera's
+  intrinsics are its `ortho_scale` over the sensor fit (no focal length);
+  panoramic cameras need their own projection named in `render.json`; a
+  pixel aspect other than 1 scales `fy` by it.
+- **Edges and transparency**: Z and the object index are one surface per
+  pixel, not anti-aliased, and a transparent surface writes its own. How:
+  Cryptomatte (Blender writes it; a coverage per object per pixel) for soft
+  object mattes, and depth compositing at edges as C8 step 5 plans.
+- **Blender's version is recorded, not checked at reading.** How: `toast
+  doctor` (or `renders.status(check_renderer=True)`) compares the installed
+  `blender --version` with the record's and says so, without making the
+  render stale by itself -- the scene, not the program, is its input.
+- **Rendering is a Python command, not yet a CLI or job.** How: `toast
+  render passes <id> --scene --camera --frames` and a job kind calling
+  `render_passes`, so the GUI, CLI and agents use the one command.
+- **A file the scene reaches outside the production is refused.** How: a
+  "collect" step copying textures and libraries into the production and
+  relinking them (Blender's `file.pack_all` or `make_paths_relative`).
+- **Signals are not on GL yet** (`generate.render` by record sends a graph
+  to the reference): C8 step 6.
+- **Depth resized to the nearest** (safe with +inf, but stair-stepped on
+  slanted surfaces). How, in C8 step 5: an interpolation that blends only
+  among valid neighbours on the same side of a depth discontinuity (a
+  threshold on the relative jump), +inf and labels never blended.
+
+### Integration a composite still lacks (seen in CT-0081's film)
+
+- **A CG object is sharp where the plate is soft.** How: a defocus by depth
+  (`filter.blur` weighted by the merged depth's distance from a focus
+  plane, a circle of confusion from the stated lens), recorded in the
+  layer.
+- **A CG object is lit as rendered, not as the plate.** How: a grade of the
+  render to the plate (its exposure and white from the plate's region
+  behind it), and the plate's light measured (a probe) for the render.
+- **A camera is stated, not solved.** How: a camera solve of the take
+  (C7's tracking, extended to a camera) recorded as the shot's camera, its
+  lens measured instead of assumed.
+
+### Depth in layers: what it does not do yet (CT-0081 step 7)
+
+- **A layer with a depth cannot move, pin, trail, shadow or border.** How:
+  the same warp applied to its depth (`warp.transform` and
+  `warp.corner_pin` of a two-channel signal, nearest-sampled), a shadow cast
+  by depth (a shadow layer at the depth of what it falls on).
+- **A constant depth for a layer** (a card at 4 m) needs a signal record.
+  How: `depth: {value: metres, camera}` compiled to an object depth of a
+  constant over the layer's alpha.
+- **A cut is a hard segmentation.** How: SAM 2's logits kept as a soft
+  alpha signal (step 3's item), `cut` taking it.
+
+### Signals on GL: what is not there yet (CT-0081 step 6)
+
+- **Reading a signal costs more than drawing it**: a 1080p frame is a
+  ZIP-compressed float EXR, 36 ms to decode. How: a disposable cache of
+  decoded frames (.npy, keyed by the record's data hash) beside the
+  composite cache -- 2.6 ms a frame; or a lighter EXR compression for
+  records read often.
+- **A surface's depth is drawn by the reference only.** How: the mesh pass
+  writes its depth buffer as linear z into a second target.
+- **An object's depth reads its matte back** (one transfer a frame). How: a
+  GPU histogram of the interior's depths (a reduction in two passes), kept
+  only if measured faster than the transfer.
+- **A merge takes 8 layers on GL.** How: merge in groups of 8 by depth
+  order, the partial result carried as a layer with its depth.
+- **The graph's `signal.align_depth` is the reference's**: the recorded
+  alignment (`toast signal align`) is the one to use; the graph op stays a
+  sketch until it reads a calibration's parameters.
+
+### Depth compositing: what it does not do yet (CT-0081 step 5)
+
+- **A cut-out's fringe carries the plate's background** (the person layer
+  is the plate times its matte, so its edge pixels hold the wall too). How:
+  estimate the foreground colour at the edge (closed-form matting's
+  foreground, or the plate's colour pulled from inside the matte), recorded
+  as the layer's.
+- **Inside an opaque layer a silhouette has no coverage.** How: Cryptomatte
+  from Blender for renders; for footage, cut every occluder out as a layer.
+- **One depth per object is a constant**: an object long in depth (a
+  table, a person reaching out) is not one number. How: `statistic: plane`
+  -- a plane fitted to the object's interior depth, carried over its matte.
+- **SAM 2's mattes are hard labels** (its soft logits dropped, step 3), so a
+  cut-out from them aliases. How: the logits kept as an `alpha` signal per
+  object.
+- **Coverage reaches 2 pixels**, a fixed choice from one measurement. How:
+  the reach from the picture's own filter width (a render records it).
+
+### Aligned depth: what it does not do yet (CT-0081 step 4)
+
+- **Proven on synthetic scenes only.** How: the done-when films of step 8
+  on real footage -- a person, hard occlusions, a handheld move -- with a
+  reference from a scanned or modelled set, the same measures recorded.
+- **An inverted occlusion is flagged, not mended.** How: a person's
+  correction of the order (a patch, `correct_signal`), or ordering by
+  object (step 5): a segmentation decides who is in front, the depth only
+  where it agrees.
+- **Calibration only against a metric depth of the same pixels.** How: a
+  depth from another camera brought into these pixels by a known warp in
+  the graph (`warp.*`), its window recorded; sparse references (tracked
+  points with depth, a measured distance) as a reference of a few pixels.
+- **Unknown pixels take `behind` or `front` only.** How: a fill from
+  neighbours of the same object (a segmentation), recorded as such.
+- **A steep surface reads as an edge.** The band left out of a calibration
+  is where the inverse depth jumps by more than 5% between neighbours; at a
+  low resolution a floor at a grazing angle does that on every row and is
+  left out whole. How: tell a discontinuity from a slope by the second
+  difference (a slope's steps are alike, an edge's is alone), or by the
+  segmentation's boundaries when one is given.
+- **Held-out 8-pixel blocks barely differ from the sample.** How: blocks
+  scaled to the frame (an eighth of its height), or held-out objects.
+
+### Estimated signals: what the model adapters do not do yet (CT-0081 step 3)
+
+- **CPU only, small models.** Video Depth Anything takes about 15 s a
+  32-frame window at input 252 and 170 s at 518 here. How: a device option
+  (CUDA when present) recorded in the environment, and the Runpod path for
+  long shots (C9), the record unchanged.
+- **One window's memory on a long shot**: Video Depth Anything holds every
+  frame of the stretch. How: its streaming mode (`run_streaming.py` in the
+  pinned code) as a parameter, recorded as a different temporal contract.
+- **SAM 2 keeps hard labels**; its soft per-object logits are dropped. How:
+  record each object's probability as an `alpha` signal beside the
+  segmentation, for soft mattes (step 5).
+- **Prompts are points and boxes on the command line.** How: prompts drawn on
+  a frame in the control room, kept with the record; a person's correction
+  re-prompting a frame.
+- **Frames are FFmpeg's rgb24** of the medium (its default matrix for YUV).
+  How: read through the colour pipeline to sRGB when a medium declares its
+  colour space, recorded in `pixels`.
+- **`compare` gives a correlation, not a residual**; the fitted alignment
+  and its residual are step 4's.
 
 ### Later
 
@@ -313,24 +628,24 @@ Track scope and acceptance criteria in [CT-0066](../work/CT-0066-three-workspace
   and a running nerfstudio (`CT-0047`); MLT/Kdenlive exchange; detached
   workers; frame-accurate comparison.
 
-### Compound location consumer audit (CT-0075)
+### Compound location consumer audit (CT-0093)
 
-- [x] Trace single-location scene resolution, location appearances, plate checks, `/api/locations`, and current set override semantics ([CT-0075](../work/CT-0075-location-consumer-and-continuity-audit.md)).
+- [x] Trace single-location scene resolution, location appearances, plate checks, `/api/locations`, and current set override semantics ([CT-0093](../work/CT-0093-location-consumer-and-continuity-audit.md)).
 - [ ] Inspect storyboard/render consumer paths and cross-scene editing continuity for compound-place requirements.
 - [ ] Compare optional place grouping versus explicit parent-child place/set model with a Singular hospital fixture.
 - [ ] Validate contextual navigation and only then propose a backward-compatible schema/ADR.
 
-### Model-dependent mood and master-image consistency (CT-0076)
+### Model-dependent mood and master-image consistency (CT-0094)
 
-- [x] Record qualitative Singular Codex-vs-Qwen master-image texture/mood observation and UX-first research questions ([CT-0076](../work/CT-0076-model-dependent-mood-and-visual-identity.md)).
+- [x] Record qualitative Singular Codex-vs-Qwen master-image texture/mood observation and UX-first research questions ([CT-0094](../work/CT-0094-model-dependent-mood-and-visual-identity.md)).
 - [ ] Audit current look/style, image-reference, provider-capability, provenance and human-approval contracts before schema changes.
 - [ ] Run controlled multi-sample comparison on one hospital shot, logging conditioning differences, settings, output, mood and continuity review.
 - [ ] Prototype UX comparison from visual intent to candidate masters to approved master and downstream shots, including aesthetic drift review.
 - [ ] Research Blender and planned Unreal roles as alternative/complementary spatial inputs, without imposing one fixed tool chain.
 
-### Visual Lab UX and Core fit (CT-0077)
+### Visual Lab UX and Core fit (CT-0095)
 
-- [x] Inspect look/style resolution, per-shot picture approval, decision journal and image derivation tests; record UX-first gaps ([CT-0077](../work/CT-0077-visual-lab-core-gap-and-ux-research.md)).
+- [x] Inspect look/style resolution, per-shot picture approval, decision journal and image derivation tests; record UX-first gaps ([CT-0095](../work/CT-0095-visual-lab-core-gap-and-ux-research.md)).
 - [ ] Prototype representative-location visual experiments and model comparison with complete provenance.
 - [ ] Determine how a film-wide visual baseline, exceptions and revisions fit existing Core contracts without a parallel truth model.
 - [ ] Validate Visual Lab placement in navigation and downstream change-impact visibility before a UI or schema ADR.

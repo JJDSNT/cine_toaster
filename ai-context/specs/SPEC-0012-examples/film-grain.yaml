@@ -1,0 +1,4 @@
+nodes:
+  take: {op: generate.source, take: CUT}
+  out:  {op: filter.noise, in: take, amount: 0.4, size: 1.5, seed: 7}
+output: out

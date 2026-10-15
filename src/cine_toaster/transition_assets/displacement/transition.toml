@@ -1,0 +1,37 @@
+schema_version = 1
+id = "displacement"
+name = "Displacement"
+kind = "graph"
+upstream = "gl-transitions:displacement"
+category = "warp"
+description = "The outgoing picture bends away along a map and the incoming one bends into place."
+guidance = "Liquid, heat haze, a picture going soft and returning; the map decides the bending."
+energy = "medium"
+motion = "warp"
+duration_ms = 1200
+preview = "preview.webm"  # drawn from the graph by transitions.render_preview
+tags = ["warp", "liquid", "map"]
+use_when = ["A dissolve should feel physical", "Water, heat, a dream"]
+avoid_when = ["Hard graphic punctuation"]
+# SPEC-0011: noise.png is ours (CC0), generated: smooth noise, so the picture bends rather than breaks.
+license = "CC0-1.0"
+author = "Cine Toaster contributors"
+
+[inputs]
+displacementMap = "noise.png"
+
+[render]
+ffmpeg = "graph"
+ffmpeg_note = "Drawn from its graph by GL, or by the reference where GL cannot run: no stand-in is needed (CT-0076)."
+
+[graph]
+ports = {from = "picture", to = "picture", progress = "curve", displacementMap = "picture"}
+output = "out"
+
+[graph.nodes]
+map = {op = "signal.luma", picture = "displacementMap"}
+leaving = {op = "curve.map", in = "progress", how = "scale", factor = 0.5}
+arriving = {op = "curve.map", in = "progress", how = "remap", low = 0.0, high = 1.0, out_low = 0.5, out_high = 0.0}
+from_bent = {op = "warp.displace", in = "from", map = "map", strength = {curve = "leaving"}, direction = [1.0, 0.0], edge = "mirror"}
+to_bent = {op = "warp.displace", in = "to", map = "map", strength = {curve = "arriving"}, direction = [-1.0, 0.0], edge = "mirror"}
+out = {op = "merge.mix", a = "from_bent", b = "to_bent", by = "progress"}

@@ -58,6 +58,8 @@ been, and making it that is what forced the schema to be real.
   `amiga-copper-bars` is now referenced by a shot rather than only loadable.
 - The narration is real and checked in: `sound/vo-open.mp3`, 7.7 s, generated
   offline with Piper TTS. The reel needs no API key to be true.
+  (Corrected 2026-10-13, CT-0065: the repository never held it. `toast voice`
+  makes it beside its scene.)
 - `tests/test_schema.py` (17) and the suite at 162, up from 145.
 
 # To do

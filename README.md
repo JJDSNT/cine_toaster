@@ -41,7 +41,7 @@ Those answers should not collapse into an automatic accept/reject score. The fil
 
 **Visual Lab** is the current research direction for testing visual choices across representative scenes and environments before promoting them into a production-wide visual baseline. Its precise UX and position in the application are **not yet decided**. The intent is to make visual discovery and approval practical, traceable, and reversible — not to impose one model, one aesthetic, or one workflow on every film.
 
-See [Visual Lab research](ai-context/work/CT-0077-visual-lab-core-gap-and-ux-research.md) and [model-dependent mood research](ai-context/work/CT-0076-model-dependent-mood-and-visual-identity.md).
+See [Visual Lab research](ai-context/work/CT-0095-visual-lab-core-gap-and-ux-research.md) and [model-dependent mood research](ai-context/work/CT-0094-model-dependent-mood-and-visual-identity.md).
 
 ## One film, many production methods
 
@@ -115,6 +115,7 @@ The repository already contains executable foundations. Among the implemented ca
 - Scene geometry, blocking views, screenplay coverage, camera movement/cut checks, and continuity findings.
 - Production knowledge and provider observations recorded with evidence and enforcement status.
 - Selected media workflows including FFmpeg-based assembly, transitions, and audio-related tooling.
+- A compositing engine: one graph per shot, drawn by an exact NumPy reference and by GL, for layers, keys, transitions, titles, time operations and tracking -- and depth and segmentation from AI models and Blender kept as production records, so a 3D object can pass behind a person in a generated picture.
 - Additional operational and production commands developed through the *Singular* validation work.
 
 These are **foundations, not a finished end-to-end filmmaking studio**. The existence of a research document, architectural adapter, command, or prototype does not imply that a complete interactive workflow is available.
@@ -148,7 +149,8 @@ Useful commands:
 | `make serve` | Open the production control room |
 | `make check` | Run production continuity/schema checks |
 | `make build` | Build the Amiga reel demonstration |
-| `make test` | Run the test suite |
+| `make test` | Run the whole test suite |
+| `make test-fast` | Run it without the heavy tests (Blender, models) |
 | `make ui` | Build the production canvas (Node 20+ required) |
 | `toast doctor` | Inspect installed and missing capabilities |
 | `toast --help` | Explore the CLI |

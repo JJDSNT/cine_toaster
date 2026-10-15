@@ -3,12 +3,12 @@
 # Cine Toaster is named after NewTek's Video Toaster, whose demo reel was a
 # slideshow carried by its transitions. This is that reel, and every part of it
 # runs with no API key: the narration is offline Piper TTS, the cards are
-# composed rather than generated, the transitions come from the catalog.
+# titles from the catalog, the transitions come from the catalog.
 schema_version: 1
 id: amiga-demo-reel
 title: Amiga Demo Reel
 format: Demo reel · 90 seconds
-logline: A second production, used to prove that two projects stay independent.
+logline: Cine Toaster showing what it does, with nothing but itself.
 
 paths:
   scenes: scenes

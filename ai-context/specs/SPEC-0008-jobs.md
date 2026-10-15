@@ -92,8 +92,8 @@ read from `-progress` output (`out_time_us` against the expected duration).
 
 # Interfaces
 
-- CLI: `toast jobs list|show|cancel|retry|adopt`. `toast previs` and
-  `toast build` run as jobs in the foreground and adopt to `--output`.
+- CLI: `toast jobs list|show|cancel|retry|adopt`. `toast previs` runs
+  as a job in the foreground and adopt to `--output`.
 - HTTP: `GET /api/jobs`, `GET /api/jobs/<id>`, `POST /api/jobs` to start,
   and `POST /api/jobs/<id>/cancel|retry|adopt`.
 - UI: a jobs tray with progress, cancel and adopt.

@@ -20,3 +20,5 @@ body_color = "#E6E6E6"
 [render]
 engine = "blender"
 effect = "disintegrate"
+# Rendered by Blender, then laid by the compositing graph (C6, CT-0077):
+primitives = ["generate.source", "merge.over", "warp.transform"]

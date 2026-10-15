@@ -1,0 +1,684 @@
+---
+id: SPEC-0012
+title: The compositing graph — primitives, typed values, colour, identity and renderers
+type: specification
+status: accepted
+implementation: partial
+owner: project
+created_at: 2026-10-14
+updated_at: 2026-10-14
+tags:
+  - compositing
+  - project-core
+  - colour
+  - renderers
+---
+
+# Goal
+
+Specify ADR 0022 so it can be built: the primitives with their ports and
+parameters, the values that flow between them, the colour contract, how a
+composite is written in the breakdown, how a node is identified, and what a
+renderer promises. Step C1 of `development/compositing-roadmap.md`.
+
+This specification is done when the existing transitions, effects and titles
+can be written as graphs of it (Appendix B shows they can, and says where
+they cannot yet), and C2 can start building the reference renderer against
+it without a decision left open.
+
+# 1. Values
+
+Every edge carries one typed value. A value is a function of time over its
+node's extent, sampled at the composite's frame rate.
+
+| Type | What it holds | Representation in the working space |
+|---|---|---|
+| `picture` | an image with alpha | RGBA, float, scene-linear, **premultiplied** |
+| `matte` | how much is seen | one channel, float, 0 to 1 (may exceed for soft operations, clamped at merge) |
+| `signal` | a named value per pixel | one or more channels, float; its `kind` says what (below) |
+| `sound` | audio | samples at the composite's rate; carried, not mixed here (the mix stays the assembly's) |
+| `track` | where something is per frame | a list of frames, each with points, a plane (four corners) or a camera (matrix, focal length), in fractions of the picture; and its **clock** (C7, CT-0080; ADR 0023): `{rate, origin}` -- the rate of its entries and the media instant of its first, as a time record (`{ticks}`, with `exact` when ticks cannot hold it). A track with a clock is read at the media instant its source shows; one without, by its reader's frame (as before). Each entry may carry `confidence` (0 to 1: of the features followed into it, the share passing a forward-backward check, and for a plane its homography's inliers), `reseeded`, `reacquired` (found again after it was lost) and `corrected` (a person's correction in force) |
+| `curve` | a number per frame | keyframes, or a driven value (§6) |
+| `meta` | facts that ride along | provenance, licence, credit, source timecode |
+
+Signal kinds: `luminance`, `luma`, `alpha`, `red`, `green`, `blue`, `hue`,
+`saturation`, `depth` (metric: distance from a named camera in scene units;
+near is small), `depth_relative` (from a monocular model: unknown scale and
+shift, possibly inverse -- not comparable with anything until aligned), `vectors` (two channels, pixels per frame),
+`normals` (three), `segmentation` (an integer label per pixel, with a table of
+labels). A recorded signal also says its **origin** -- `geometric` (a
+renderer's or surface's geometry), `estimated` (a model's), `authored` (a
+person's) -- which a transformation (an alignment) never changes, and its
+provenance, quality, clock, resolution, camera and depth conventions (ADR
+0024). Two depths are comparable only if both are `depth` from the same
+camera; `signal.align_depth` turns a `depth_relative` into a `depth` by fitting
+its scale and shift to a reference (or by values a person gives). A signal
+declares its range; a `matte` is made from a signal by an
+operation (§3), never by reinterpreting it.
+
+A connection is valid when the port's type equals the value's, or when the
+specification lists an implicit conversion. There are two:
+
+- `picture` → `matte`: the picture's alpha;
+- `matte` → `picture`: grey, with alpha 1.
+
+Any other mismatch is an error before rendering (`composite_type_mismatch`).
+
+# 2. The colour contract
+
+- **Working space.** Scene-linear. The production may name it
+  (`compositing: {working_space: ACEScg}` in `project.yaml`); the default is
+  `Linear Rec.709 (sRGB)`, the space `color.py` already uses. Names are OCIO
+  colour spaces.
+- **Into the working space.** Every source declares or is given a colour
+  space: a take's from its file's tags or the production's `picture_space`
+  (default `sRGB Encoded Rec.709 (sRGB)`); a Blender EXR is scene-linear; a
+  generated picture is made in the working space directly. The conversion is
+  an OCIO transform, done once at the source node.
+- **Alpha.** Inside the graph, pictures are premultiplied. A source declares
+  `alpha: straight | premultiplied` (default: straight for PNG, ProRes 4444
+  and WebM; premultiplied for EXR) and is converted at the source node.
+- **Precision.** Float inside the graph (a renderer may use half floats; it
+  says so). 8-bit or 10-bit only at the version's encode. Values above 1 are
+  kept: HDR is not clipped until the output transform.
+- **Out of the working space.** At the version's encode, through the output
+  transform the production's frame and delivery give (today `sRGB - Display`
+  with the `Un-tone-mapped` view, as `color.py`).
+- **Colours given as parameters** (`generate.solid`, `generate.text`,
+  `matte.key` by colour) are in the working space, straight (not premultiplied).
+  An interface that shows a picker converts from the display encoding first.
+- **Luma and luminance.** `signal.luminance` is computed from linear values
+  with explicit weights; the default weights are Rec.709's (0.2126, 0.7152,
+  0.0722), and an operation may name others or a transform (for HDR or another
+  working space). `signal.luma` is computed from values first encoded with a
+  named transfer function (default sRGB); it is what video calls Y'. They are
+  different quantities and an operation names which it reads. A luma wipe made
+  before this specification used FFmpeg's Y' of display-encoded 4:2:0; under
+  it, a recipe chooses, and the catalog's `luma` keeps Y' so its look does not
+  change unless its sheet says so.
+
+# 3. The primitives
+
+Each operation is `<primitive>.<name>`. Ports are named; parameters may be
+constants or curves (§6). The tables are the contract; C2 implements them in
+the NumPy reference first (§7).
+
+## signal
+
+| Op | In | Out | Parameters |
+|---|---|---|---|
+| `signal.luminance` | picture | signal | `weights` (3 numbers) or `transform` |
+| `signal.luma` | picture | signal | `transfer` (default sRGB), `weights` |
+| `signal.channel` | picture | signal | `channel`: red, green, blue, alpha, hue, saturation |
+| `signal.read` | -- | signal | `file`, `kind` (depth, vectors, normals, segmentation), `range`, `layer` (an EXR's layer by name -- `Depth`, `Object Index` --; unnamed, the file's only layer; several without a name, or a layer of other channels than the kind's, refused: CT-0081); or a production's **signal record** by id (`signal`, C8, ADR 0024): checked once (refused when stale), read at the instant its source `of` shows (else the graph's frame), refused when its kind or camera differs from the node's; an estimated depth (aligned to metres) only with `estimated: true`, and one whose calibration flagged inverted occlusions only with `inversions: accept` -- neither lifts the refusal of a stale record, another camera, or a frame outside its calibrated stretch; resized smoothly, labels and depths to the nearest (a depth between two surfaces is neither's; +inf stays +inf) |
+| `signal.object_depth` | `depth` signal, matte | `depth` signal | `statistic` (median, near: the 10th percentile), `inset`; one depth for an object over all of its matte -- from the matte's solid interior, unknown pixels left out (unknown when too few are known), +inf outside it -- where a per-pixel depth is soft at its silhouette (an estimate's): measured, the contact of two objects 7x nearer the truth (CT-0081 step 5) |
+| `signal.estimate` | picture | signal | `kind` (depth_relative, vectors, normals, segmentation), `model`, `seed`; not deterministic unless the model says so. Never run during evaluation (C8 step 3, CT-0081): a model of the catalog (`models.py`: pinned revision, Apache-2.0 only, fetched explicitly) estimates apart (`toast signal estimate`, `estimates.estimate`) in its own environment, and its result is a signal record -- `depth_relative` (inverse z, scale and shift unknown; never metric) or a `segmentation` of **instances** -- read by `signal.read`'s `signal` |
+| `signal.align_depth` | `depth_relative` signal, optional `depth` reference, optional region matte | `depth` signal | `method`: scale_shift (fitted to the reference over the region) or manual (`scale`, `shift`); `inverse`. Fitted afresh each frame, with no residual kept: a sketch. The recorded alignment (C8 step 4, `align.align_depth`, `toast signal align`) fits over a stretch -- regularized in time by default, shared or per frame by choice, the three compared -- excludes what the reference does not measure, records residuals in sample, on held-out pixels, alternate frames and a final stretch, marks pixels beyond its reach **unknown**, and orders objects where they meet, flagging inverted occlusions; its result is read with `signal.read` |
+
+## matte
+
+| Op | In | Out | Parameters |
+|---|---|---|---|
+| `matte.from_signal` | signal | matte | `low`, `high` (the range mapped to 0..1), `invert`, `gamma` |
+| `matte.key` | picture, optional `reference` | matte | `by`: luminance or luma -- `low`, `high`, `softness`, `invert`; colour -- `colour`, `tolerance`, `softness`; difference -- the `reference` picture, `tolerance`, `softness` |
+| `matte.label` | signal (segmentation) | matte | `labels` |
+| `matte.shape` | -- | matte | `shape` (rectangle, ellipse, polygon, spline), points, `feather` |
+| `matte.threshold` | matte, `progress` (curve) | matte | `softness` -- the wipe rule: a pixel is revealed when progress passes its value |
+| `matte.combine` | matte, matte | matte | `how`: union, intersect, subtract, multiply |
+
+Grow, shrink, feather and invert are `filter` and `colour` operations on a
+matte (§3 filter, colour); they are not repeated here.
+
+**Keys** (CT-0075) give 1 where the picture is kept. `luma`/`luminance` map
+the brightness, in the display encoding, from `low` to `high`. `colour` is a
+**colour-difference** key, in linear light: how much the screen's channel
+(the one the key colour is made of) exceeds the larger of the other two,
+against the screen's own excess -- 0 on the screen, 1 where there is none.
+An edge is the subject and the screen mixed in light, so between them the
+matte is the subject's share of the pixel, which `colour.despill` uses to
+take the screen out; it is exact for a subject with no excess of its own
+(grey, white, skin under neutral light) and close for others. A screen in
+shadow has less excess: a little shadow keys within the tolerance, a deep one
+needs a clean plate and the `difference` key, which takes the largest channel
+difference from the `reference` picture, in the display encoding. For colour
+and difference the matte rises from 0 at `tolerance` to 1 past it by
+`softness` (with the threshold's floor); a colour key that should follow
+edges physically uses a small tolerance and a wide softness.
+
+## merge
+
+| Op | In | Out | Parameters |
+|---|---|---|---|
+| `merge.over` | `front` picture, `back` picture, optional `matte` | picture | `mix` (0..1) |
+| `merge.porter_duff` | two pictures | picture | `how`: over, under, in, out, atop, xor |
+| `merge.blend` | two pictures | picture | `mode`: screen, add, multiply, overlay, difference, lighten, darken; `mix`. `b` onto `a` as W3C Compositing defines it for premultiplied pictures: the blend of their straight colours where both are, each alone where only it is; alpha is their union (CT-0075) |
+| `merge.mix` | two pictures, a `matte` or a `curve` | picture | -- (a dissolve is `merge.mix` with a curve) |
+| `merge.channels` | up to four signals or mattes | picture | which input fills red, green, blue, alpha (found missing by Appendix B: chromatic aberration) |
+| `merge.depth` | pictures, and a `depth` signal for each (metric, one camera; a `depth_relative` is refused) | picture (+ `depth`) | `near_is_small`; each pixel takes the nearest opaque picture (occlusion; §8; found missing by Appendix B). Three states kept apart (CT-0081 step 5): a depth known (a number), nothing there (+inf), unknown (NaN in the graph, from a record's `unknown` mask) -- `unknown` (refuse, behind, front) says what an unknown depth where its picture shows means, refused unless said; no other op takes an unknown depth. `edges`: `coverage` (default) carries each layer's depth into the pixels its picture covers where its one sample missed (`reach`, 2 pixels) -- the halo gone, measured against a rendered truth; `hard` as given. Its `depth` out: the nearest shown layer's depth, NaN where that is unknown, +inf where nothing is shown. Where its depths' records say (signals by id, renders): one camera, quantity, unit, size, coordinates and window of the camera's image -- else refused, never resampled |
+
+A matte on `merge.over` multiplies the front's alpha before the merge.
+
+## warp
+
+| Op | In | Out | Parameters |
+|---|---|---|---|
+| `warp.transform` | picture (or matte) | same | `translate`, `scale`, `rotate` (three axes), `pivot`, `perspective` (field of view), `skew` (degrees, leaning right as it rises: italic; CT-0078), `depth` (for 2.5D, §8). A flat picture turned and seen in perspective; `warp.surface` bends it. Both read `rotate` (three angles about x, y, z, x first; one number about z) and `perspective` (a camera at 0.5 / tan(fov / 2) picture heights) through one definition (`warp.rotation`, `warp.camera_distance`; CT-0075) |
+| `warp.corner_pin` | picture, optional track | same | four corners, or a plane track |
+| `warp.surface` | picture | picture, and a `depth` signal | `shape`: plane, sphere, cylinder, page; `morph` (0 the flat picture, 1 the full shape: the picture bends onto it), `rotate` (three axes, about the shape's centre), `translate` (x, y in frame fractions, z in picture heights away), `scale`, `perspective`, `light`, `detail` (mesh cells across), `supersample`, `camera` (names the depth) -- the playing picture on a 3D object: the Toaster's and the ADO's warps |
+| `warp.displace` | picture, signal (vectors or one channel) | same | `strength`, `direction` |
+| `warp.procedural` | picture | same | `kind`: ripple, swirl, bend, lens; its parameters |
+
+Pixels outside the source after a warp are transparent, unless a displacement
+or procedural warp says `edge: extend` (the border repeated) or `edge: mirror`
+-- what a full-frame warp in a join wants, so no black is pulled in.
+
+## colour
+
+| Op | In | Out | Parameters |
+|---|---|---|---|
+| `colour.lut` | picture | picture | `file` (a .cube, applied in the display encoding it was made for), an OCIO `look`, or an OCIO display `view` (with `display`): the picture seen through it -- a film response such as ACES 2.0's, highlights above white rolled off -- and brought back to light (CT-0077). A node like any other: on one picture before it is merged, or on the result |
+| `colour.grade` | picture | picture | `lift`, `gamma`, `gain`, `saturation`, `hue` |
+| `colour.curve` | picture or matte | same | points per channel |
+| `colour.posterise` / `solarise` / `cycle` | picture | picture | levels / threshold / speed |
+| `colour.invert` | picture or matte | same | -- |
+| `colour.despill` | picture, optional `matte` (the key's) | picture | `colour` (the screen's), `limit` (max, average), `amount`. With the matte, the screen's share of each edge pixel is subtracted -- an edge is subject and screen mixed in light, C = m F + (1 - m) S, so what is left is C - (1 - m) S, seen as much as the matte -- then the screen's dominant channel is held to the largest (or the mean) of the other two on the straight colour, the light the screen threw on the subject (CT-0075) |
+
+## filter
+
+| Op | In | Out | Parameters |
+|---|---|---|---|
+| `filter.blur` | picture or matte | same | `radius` (pixels at 720 lines, below), `kind` (gaussian, box, directional, defocus) |
+| `filter.sharpen` | picture | picture | `amount` |
+| `filter.glow` | picture | picture | `threshold`, `radius`, `intensity` |
+| `filter.edges` | picture | picture or matte | `kind` |
+| `filter.morphology` | matte | matte | `operation` (erode, dilate), `radius` (pixels at 720 lines) |
+
+**Lengths in pixels** -- a blur's, a glow's, a grow's radius, a grain's size,
+a text's size -- are pixels of a frame 720 lines high, scaled to the frame
+drawn (CT-0075): a composite looks the same in a 180-line preview or still as
+in the 1080-line cut. A shape's `feather` is a fraction of the frame.
+| `filter.bevel` | picture | picture | `radius` (pixels at 720 lines), `depth`, `angle` (where light comes from, degrees counter-clockwise from the right: 135 is the upper left), `elevation`, `highlight`, `shadow`: the picture lit as if raised, its blurred alpha a height -- faces turned to the light brightened, the others darkened; alpha untouched (C6b, CT-0078) |
+| `filter.noise` | picture | picture | `amount`, `size`, `seed` (grain); `space`: `linear` (default) adds it to the light, `display` to the encoded picture -- as video shows grain, the same in the shadows as in the highlights (CT-0077) |
+
+## time
+
+| Op | In | Out | Parameters |
+|---|---|---|---|
+| `time.remap` | any value over time | same | `map`, a curve from output time to input time (retime, ramp, reverse, freeze): *which* source instant; `interpolation` -- `nearest` (the frame that contains the instant, `floor`) or `blend` (the two frames either side, weighted) -- *how* it is pictured, decided apart so an optical or model interpolation is one more name (C7, CT-0080). Its input is read as far as the map reaches at any output frame (`reach`: its furthest instant, not its last), past the shot's end; before the source, its first frame; past it, its last (a blend's second frame included). A map of numbers -- linear or held keys, or a constant -- is followed **exactly** (fractions at the exact rate): a boundary stays a boundary. Only an approximate map (eases, noise, combinations, in floats) is placed by an explicit policy, `BOUNDARY_TOLERANCE` (within 1e-6 frame of a boundary, on it) |
+| `time.offset` | any | same | `frames` |
+| `time.blend` | picture | picture | `frames`: a shutter -- the average of that many neighbouring **output** frames (a temporal blur; motion blur after a speed-up). Not the blending between source frames, which is the remap's `blend` |
+| `time.echo` | picture | picture | `count`, `spacing`, `decay` (trails) |
+
+## generate
+
+| Op | In | Out | Parameters |
+|---|---|---|---|
+| `generate.source` | -- | picture (+ sound, meta) | a take, a file or a stretch; its colour space and alpha (§2). A Lottie animation (JSON, dotLottie) is a file like any other, drawn by ThorVG at its own frame rate, with its alpha (C6b stage D) |
+| `generate.solid` / `gradient` / `noise` | -- | picture | colour(s) -- up to eight stops, evenly spaced or placed by `at` (two close together make a sharp edge: a chrome's horizon; CT-0078) --, kind, seed, `repeat` (the ramp repeated: stripes, rings; CT-0077). A gradient's `kind`: `linear` (along `angle`), `radial` (the frame's own shape), `circle` (round whatever the frame), `diamond` (by \|x\| + \|y\|), `conic` (the angle clockwise from twelve o'clock, round); the distance kinds reach 1 at the corners -- so a gradient made a matte and thresholded by a join's progress is an iris, a diamond or a clock wipe (CT-0076) |
+| `generate.text` | -- | picture | text (lines split by `\n`), font, size (pixels at 720 lines), colour, position (the text's centre, or its start or end by `align`: centre, left, right), `line_spacing`, `outline` and `hollow` (a stroke round the letters, or the stroke alone), `reveal` (a curve: the share shown) by `reveal_by` letter or word; `letters`, an animator -- keys each letter plays from its own start (`offset` in pixels at 720 lines, `rotate`, `scale`, `opacity`, each with an ease), `stagger` seconds apart in an `order` (forward, backward, centre, random), a `start`, a `wave` along the line -- each letter placed where the whole block would put it (C6b, CT-0078). A colour font (COLR, CBDT, sbix) draws in its own colours, taking only the opacity of `colour` unless `glyph_colours` is false; its outline is the drawing grown round in `colour` (C6b stage C). Drawn once by the reference and uploaded by GL (CT-0077) |
+| `generate.render` | -- | picture (+ `depth`, `alpha`) | a renderer's own scene (Blender, a VFX recipe), its parameters, `seed`; it may also give depth or other passes. Read from a **render's record** (`render`, C8 step 2, CT-0081): rendered apart by `renders.render_passes` -- never during evaluation -- and kept as `renders/passes/<id>/` (the picture, premultiplied scene-linear, and `render.json`: renderer, scene and its files by hash, the camera at every frame, the object table) with its signals `<id>-depth` (geometric, z along the camera's axis, metres, +inf where nothing was hit) and `<id>-objects` (segmentation by stable pass index); refused when stale or when `camera` differs from the record's (`<id>/<camera>`); picture, depth and alpha of one frame of the render's clock; resized, the picture smoothly and the depth to the nearest. Without `render` the reference refuses it |
+
+## track and animate
+
+| Op | In | Out | Parameters |
+|---|---|---|---|
+| `track.measure` | picture | track | `kind` (point, plane, camera), a starting region; deterministic per tracker version |
+| `track.read` | -- | track | a file in the track format (§1), or a production's track by its id (`track`: `tracks/<id>`, the measurement in use with its corrections, refused when stale); `of`, the source (port or `generate.source`) it describes -- with a clock, it is read where that source is shown. A measured track (`track.measure`) describes its input and is given the input's clock |
+| `curve.keys` | optional curve `in` | curve | keyframes `[{t, value, ease}]`; `ease`: linear, in, out, in-out, hold, bezier handles. With `in`, `t` is that curve's value, not seconds: a join's recipe keys along its `progress` (0 to 1), whatever the join's length |
+| `curve.beats` | -- | curve | the scene's music beats (CT-0067): a pulse per beat with an envelope (`attack`, `decay`, `attack_ease`, `decay_ease`), `low` to `high`, `every`, `overlap` (max, add); §6 |
+| `curve.from_track` | track | curve | a field of the track (x, y, rotation, scale) |
+| `curve.progress` | -- | curve | 0 at a join's start to 1 at its end; only in recipes for joins |
+| `curve.noise` | -- | curve | `seed`, `frequency`, `amplitude`, `offset` (smooth, repeatable) |
+| `curve.map` | curve | curve | `how`: invert (1 - x), scale (`factor`), offset (`factor`), clamp (`low`, `high`), remap (`low`, `high` to `out_low`, `out_high`), ease (`ease`) |
+| `curve.combine` | curve, curve | curve | `how`: add, subtract, multiply, min, max |
+
+## Opaque nodes
+
+Some operations are programs Cine Toaster does not decompose: a
+gl-transitions shader, an OFX plugin through Natron, a Blender simulation.
+They are nodes of op `opaque.<renderer>` with typed ports declared by their
+item (for a shader: `from`, `to`, `progress`, its textures), a parameter set,
+and exactly one renderer. They are allowed, and say what they are: a recipe
+built only of opaque nodes is not portable, and the catalog shows it.
+
+**`opaque.gl`** (a gl-transitions shader, CT-0072) runs in the GL renderer,
+not in a pipeline of its own. Its contract: the shader's source with the
+gl-transitions host functions (`getFromColor`, `getToColor`, `progress`,
+`ratio`, and each texture it names, bound from a port of the graph); its
+pictures are given to it **in the display encoding**, as the shaders were
+written, and its result converted back to the working space; `uv` has its
+origin at the bottom left, as in the shaders' own convention, so a picture
+is not flipped; `progress` is the join's progress at each frame's centre,
+like every curve. Its identity includes the shader file's content and its
+textures' identities.
+
+**`opaque.natron`** (an OpenFX plugin, CT-0078) is staged: Natron is a
+process that reads and writes frames, so before a graph is drawn, what feeds
+each such node is drawn and handed to Natron as float OpenEXR (linear,
+premultiplied, its range kept -- no video encode), and Natron's frames are
+read back as the node's value; the rest of the graph is then drawn by
+whichever renderer holds its other ops. A plugin whose only reader is
+another plugin runs with it as one Natron chain, in order. Parameters: the
+plugin's OFX id (`plugin`) and its own parameters by name (`params`).
+
+## Frames in and out
+
+One rule each, used by every renderer and by the assembly (CT-0072):
+
+- **Fitting a picture to the frame**: a picture of another shape is fitted
+  within the frame and centred, never stretched; the rest is transparent in a
+  composite and black in a cut (`reference.conform_filter`).
+- **Showing a frame**: a picture is converted from the working space to the
+  display encoding and clipped to 0..1 over black (`reference.shown`), for a
+  film written and for a still alike.
+- **Range**: every source enters the graph in linear light **with its whole
+  range** -- nothing is clipped before compositing, so a fire, a Blender
+  render or a model's frame above white keeps the light a glow, an exposure
+  change or a look's roll-off acts on. Met (CT-0077): a float source (OpenEXR,
+  a float TIFF, an element or a Blender render prepared as EXR) is read as
+  float at its own size -- FFmpeg's scaler clips floats -- and fitted by the
+  same `conform_box` as everything else. A file's colour space and alpha are,
+  unless the node says, its convention: an integer picture is display encoded
+  with straight alpha, a float one scene-linear with premultiplied alpha.
+  What still ends at white is the delivery -- `write` encodes for display --
+  and stock elements delivered as 8-bit video, which never held more.
+- **A still** of a shot drawn by a graph is that graph run at one instant of
+  the shot, at the cut's frame, rate and beats -- the frame the cut shows
+  there. Titles and effects still drawn over a composite by FFmpeg are not in
+  it until C6; an instant inside a join is the sequence's, not one shot's.
+
+# 4. A composite in the breakdown
+
+A shot's picture is the take, unless the shot gives a `composite`:
+
+```yaml
+- n: 3
+  composite:
+    nodes:
+      take:   {op: generate.source, take: CUT}
+      sky:    {op: generate.source, file: plates/sunset.mov, colorspace: sRGB Encoded Rec.709 (sRGB)}
+      window: {op: matte.shape, shape: polygon, points: [[0.31,0.2],[0.62,0.2],[0.62,0.71],[0.31,0.71]], feather: 0.01}
+      inside: {op: merge.over, front: sky, back: take, matte: window}
+    output: inside
+    reason: The window looks onto the coast, not the car park it was shot against.
+```
+
+A node is `{op, <ports>: <node or node.port>, <parameters>}`. `output` names
+the node whose picture is the shot's. A node may be given a `renderer` to
+pin it; otherwise the planner (or, before C9, the single renderer running the
+graph) chooses.
+
+**Layers** (C4, CT-0075) are another way of writing the same thing, as a
+filmmaker thinks of it: pictures stacked, the first at the back, each placed,
+cut down, bordered, shadowed and merged, any of it over time. They are
+compiled when the scene loads into a graph of the ops above (nothing else
+draws them), checked like any composite, and a shot gives `layers` or a
+`composite`, not both (`layers_and_composite`; a layer that cannot be
+compiled is `layers_invalid`).
+
+```yaml
+- n: 1
+  layers:
+    - source: CUT                              # a take of the shot, or a file
+    - source: plates/launch.mp4
+      start: 1.0                               # seconds into the source
+      place:                                   # warp.transform: translate, scale, rotate, pivot, perspective
+        scale: 0.4
+        translate: {keys: [{t: 0, value: [0.6, -0.5], ease: out}, [1.2, [0.27, -0.24]]]}
+        rotate: [0, -8, 0]
+        perspective: 35
+      key: {by: colour, colour: "#1fb34a", tolerance: 0.08, softness: 0.05}   # in the source's frame; a colour key
+                                               # also takes out the screen's spill (`despill: false` to keep it)
+      garbage: {shape: rectangle, points: [[0.1, 0], [0.9, 1]]}             # in the source's frame
+      matte: {shape: polygon, points: [...]}   # in the frame: where the layer shows
+      border: {width: 3, colour: "#f2ead9"}    # around it, after it is placed
+      shadow: {offset: [0.012, 0.018], blur: 14, opacity: 0.55}
+      mode: over                               # over, or a blend: screen, add, multiply, lighten, darken, difference, overlay
+      opacity: {beats: {low: 0.8, high: 1.0}}  # any number: a value, {keys: [...]} or {beats: {...}}
+    - source: plates/window.mp4                # time (C7, CT-0080):
+      retime: {speed: 2}                       # speed (a number, or keys [{t, speed, ease}]), freeze -- seconds
+      offset: 0.25                             # shown a quarter of a second late
+      echo: {count: 4, spacing: 2, decay: 0.6} # trails, after it is placed: they follow where it went
+      pin: {track: tracks/window.track.json, of: 1, corners: [...]}   # or {measure: plane, region: [...]}:
+                                               # pinned by a track of layer 1's source, not placed
+```
+
+A shot retimes its whole picture with `retime` (speed keys may fall on the
+music's beats -- `{beat: n, speed}` -- and it may `reverse`), compiled when it
+is drawn into a `time.remap` ahead of its effects and title; its take's sound
+follows its `retime_sound` policy (`mute` by default, `preserve`, `stretch`).
+A layer's retime takes seconds only: a layer is compiled before its shot is
+cut, without its length or beats.
+
+Order within a layer: its source is retimed and offset; the key and garbage
+shape cut it down in its own frame; the layer is placed, or pinned; its trails
+are laid; its border is drawn around its placed edge
+(the same width whatever its size); a matte in the frame limits where it
+shows; its shadow is cast below it, in the frame; then it meets what is below
+by its mode and opacity. Colours are as seen (`#rrggbb`, or display-encoded
+0..1); positions are fractions of the frame; lengths are pixels at 720 lines.
+A layer's source is a take or a file; a graph as a source (a surface, another
+composite) is a planned extension that changes only the source node.
+
+A join's recipe is a catalog item whose graph has the ports `from` and `to`
+(pictures) and the curve `progress`; the join fills them:
+
+```toml
+id = "luma-wipe"
+family = "wipe/luma"
+[graph]
+nodes.order   = {op = "signal.luma", picture = "matte_source"}
+nodes.shape   = {op = "matte.from_signal", signal = "order"}
+nodes.reveal  = {op = "matte.threshold", matte = "shape", progress = "progress", softness = 0.05}
+nodes.out     = {op = "merge.over", front = "to", back = "from", matte = "reveal"}
+output = "out"
+[inputs]
+matte_source = "radial.png"
+```
+
+Parameters a recipe exposes are named in `[expose]`; a join may set those and
+no others (this is CT-0050's per-cut override, done).
+
+# 5. Identity and what is kept
+
+- A source node's identity is the SHA-256 of its file (or of the take's), its
+  stretch, and its declared colour space and alpha.
+- Any other node's identity is the SHA-256 of a canonical JSON of everything
+  that can change its result:
+  - its op, its parameters (curves included, as their own identities), and
+    its inputs' identities in port order;
+  - the colour context: the working space, the OCIO config's own hash (not
+    only its name), and the precision the renderer computes in;
+  - the time context: frame rate, the extent (start, length) and any time
+    remap it is evaluated under;
+  - the frame size it is rendered at;
+  - the renderer, its version, and its own dependencies that change pixels
+    (Blender's version and add-ons, FFmpeg's build, a GPU driver for GL when
+    the renderer declares results depend on it);
+  - every external file a parameter names -- a font, a LUT, a texture, a
+    scene -- by content hash;
+  - for a model, its name, version and a hash of its weights, and the seed.
+  An input the renderer cannot vouch for (a driver whose output varies) makes
+  the node not deterministic (below).
+- A result is cached under its identity, outside the production
+  (`~/.cache/cine-toaster/composite/`). Deleting the cache loses time only.
+- A node whose op is not deterministic (`signal.estimate`, `generate.render`
+  with a seed a renderer cannot honour exactly, `opaque.*` that say so) must
+  have its result **recorded**: the first run writes it into the production as
+  an asset with provenance (op, parameters, model, seed, inputs' identities),
+  and later runs read that asset. Re-running is an explicit act, which makes a
+  new asset.
+- A result a person approved (a segmentation, a generated matte) is promoted
+  the same way, whether or not its op is deterministic.
+
+# 6. Curves and time
+
+**Timeline time and source time** (C7, CT-0080). Every node is evaluated at
+a *local* time: the shot's at the output; below a `time.remap` or a
+`time.offset`, the time they make. A source turns its local time into an
+instant of its *media* by its **origin** -- a take's cut point (given by the
+assembly), a `generate.source`'s `start`. The instant a node shows of a source
+is found by walking from the node to the source and composing every time
+operation on the way, nested remaps and offsets included. A source reached
+by several paths at different times is legitimate for pictures; for reading
+a track it is ambiguous, and refused. A reader that is not upstream of the
+track's source (a window pinned on the plate it is laid over) reads the
+instant the output shows that source at, when the reader is on the output's
+time. A source is read as far as any path reaches, and **before its origin**
+(a pre-roll: negative local frames) as far as its media has frames.
+
+A numeric or vector parameter is a constant, or follows a curve: `{curve:
+<node>}`, where the node is a `curve.*` op. There is no expression language:
+"1 - progress" is `curve.map(progress; how invert)`, a moving value with
+noise is `curve.combine(keys, noise; add)`. Text and choice parameters never
+follow a curve.
+
+- **Values.** A curve gives a number or a vector (keys may hold `[x, y]`); a
+  vector parameter fed a number uses it for every component.
+- **Time.** A curve is evaluated at `t = (frame + 0.5) / fps` seconds from the
+  start of the extent it belongs to: the shot, or the join (where `progress`
+  is `t / length`). It is evaluated at the time of the node that reads it,
+  after any `time.*` node upstream of that node has remapped its time.
+- **Keys** are `[t, value]` or `{t, value, ease}`; between keys the value
+  follows the left key's ease; before the first and after the last it holds.
+  An ease is a name (linear, in, out, in-out, hold) or a cubic Bézier given
+  as its handles `[x1, y1, x2, y2]`, as CSS and animation tools write it; an
+  unknown name, or handles whose times leave 0..1, is refused when the graph
+  is validated. An ease is one thing wherever a parameter takes one -- a key,
+  `curve.map`, a pulse's envelope -- so the same Bézier shapes a move, a fade
+  or a beat.
+- **Beats** come from the scene's music (CT-0067); `every` picks every nth
+  beat (bars, once D1b exists). **When** a pulse happens is the beat's; **how**
+  the value reacts is the envelope's, and the two are kept apart (CT-0074): a
+  pulse rises over `attack` before its beat with `attack_ease` and falls over
+  `decay` after it with `decay_ease`; an ease maps 0 to 0 and 1 to 1, so
+  changing it reshapes the pulse and never moves its peak. The peak is placed
+  at the centre of the frame the beat falls in, so that frame shows the full
+  value whatever the eases. Pulses that meet (beats closer than a pulse
+  lasts) follow `overlap`: `max` keeps the higher (the default), `add` sums
+  them, never past a full pulse. Defaults: attack 0.02 s, decay 0.2 s, low 0,
+  high 1, linear eases. An attack or decay shorter than a frame is seen as
+  a one-frame step (a hit); its ease shows only over two frames or more.
+
+The examples in `SPEC-0012-examples/` use each of these forms.
+
+# 7. Renderers
+
+**The reference** is an evaluator in NumPy with OCIO: every op of §3 that is
+not opaque, in float, scene-linear, premultiplied, with the conversions of §2
+done by OCIO (or, for the default spaces, by the exact sRGB transfer
+function). FFmpeg reads and writes its files. It defines the expected result;
+every other renderer is checked against it, within a tolerance per op.
+
+A renderer publishes a manifest (`toast doctor` shows it):
+
+```text
+id, version
+implements: [op, ...] with, per op, limits (precision, max size, needs GPU)
+precision: float | half | 8-bit (the working precision it really uses)
+handover: how it reads and writes intermediate results
+deterministic: [op, ...]
+```
+
+- **One renderer, whole graph** (C2 onward): every node must be in its
+  `implements`; otherwise the graph is refused with the missing ops named.
+- **Split across renderers** (C9): a planner assigns nodes; a value crossing
+  renderers is written in the working space, in the form its type needs; each
+  part runs as a job with its place and cost.
+
+  | Value | Handed over as |
+  |---|---|
+  | picture | OpenEXR, half float, linear, premultiplied RGBA |
+  | matte | OpenEXR, half float, one channel |
+  | signal: luminance, luma, channels | OpenEXR, half float |
+  | signal: depth, depth_relative | OpenEXR, **32-bit float** (half loses range and steps visibly at distance) |
+  | signal: vectors, normals | OpenEXR, 32-bit float, two or three channels |
+  | signal: segmentation | OpenEXR **32-bit unsigned integer** channel, and its label table as JSON beside it |
+  | sound | WAV, 32-bit float |
+  | track, curve, meta | JSON |
+- **Conformance** (C2 onward): for each op a renderer claims, a reference
+  scene is rendered by it and by the reference (NumPy and OCIO, §7) and
+  compared within
+  a tolerance stated per op, at 160x90 and 1920x1080, 24 and 29.97 fps, 8-bit
+  and float input, straight and premultiplied alpha.
+
+## Execution and memory (ADR 0022 §9)
+
+The reference executes offline, incrementally: one frame at a time, each
+node's value kept for the frame being made and, for a node a time operation
+reads, as far back as the farthest such reader reaches (`node_windows`);
+everything else is released after its last consumer. An optional budget in
+bytes bounds what is resident; past it the oldest frames go first and are
+computed again if asked. Decoded clips live in a memory-mapped file whose
+pages are let go once behind every reader. Measured on a real 1080p composite
+(CT-0071): anonymous memory 545 MiB for 30 frames and 551 MiB for 120 --
+independent of the length -- where holding clips whole had exhausted 11 GB.
+These are properties of the executor, not of the operations, and a
+real-time executor (C9b) applies other policies to the same graph.
+
+# 8. Room for 2.5D
+
+`warp.transform` carries `depth` and a camera's `perspective`; a picture may
+carry a `depth` signal. A later `merge.depth` (ordering pictures by depth, with
+occlusion) and a composite-level `camera` (with its own curves) make layers
+sit in a space with parallax without a Blender scene. Not specified further
+here; nothing above prevents it.
+
+# 9. Checks
+
+| Code | Severity | When |
+|---|---|---|
+| `composite_type_mismatch` | error | an edge's value is not the port's type and no conversion applies |
+| `composite_cycle` | error | the graph is not acyclic |
+| `composite_unknown_op` | error | an op no primitive or opaque item declares |
+| `composite_input_missing` | error | a port with no value, a file not there |
+| `composite_unrenderable` | error (warning before C9) | no renderer implements a node |
+| `composite_unrecorded` | warning | a non-deterministic node whose result is not recorded yet |
+| `composite_colourspace_unknown` | error | a source's colour space OCIO does not know |
+| `composite_unknown_param` | error | a parameter the op does not have, or a value outside its choices |
+| `composite_param_missing` | error | a parameter an op's chosen method needs is not given (`matte.key` by luminance without `low` and `high`, by difference without its `reference`) |
+
+# 10. Acceptance (for C1)
+
+- Every op above has its ports, types and parameters stated (done here).
+- The examples in `SPEC-0012-examples/` are validated automatically against
+  the schema, and the invalid ones refused for their stated reason.
+- Every existing transition, VFX item and title is placed in Appendix B as
+  expressible, expressible with an opaque node, or not yet expressible with
+  what is missing named.
+- No open decision is left to C2 other than implementation.
+
+# Appendix A: terms
+
+- **Premultiplied**: colour already multiplied by alpha; merges are then a
+  sum. **Straight**: colour independent of alpha.
+- **Scene-linear**: values proportional to light; mixing two pictures 50/50
+  gives the physically halfway light.
+- **Luma (Y')**: weighted sum of encoded (gamma) values. **Luminance (Y)**:
+  weighted sum of linear values.
+
+# Appendix B: what exists, written as graphs
+
+The authoritative graphs are the files in `SPEC-0012-examples/`, validated
+by `tests/test_compositing_schema.py` against the schema in
+`cine_toaster.compositing.schema`; `invalid/` holds graphs that must be refused,
+two of them the mistakes an earlier draft of this appendix made. Below, the
+same in short form, `node: op(inputs; parameters)`.
+
+**Cross-dissolve** (`cross-dissolve`): `out: merge.mix(from, to; curve=progress)`.
+
+**Luma wipe** (`luma`, with its texture): `order: signal.luma(texture)`,
+`shape: matte.from_signal(order)`, `reveal: matte.threshold(shape, progress; softness 0)`,
+`out: merge.over(to over from; matte reveal)`.
+
+**Custom wipe with a moving matte** (`matte-wipe`, SPEC-0011):
+`m: generate.source(the join's matte)`, `a: signal.luma(m)`,
+`reveal: matte.from_signal(a)` with the completion of SPEC-0011 as
+`matte.combine(reveal, ramp; union)` where `ramp: matte.threshold(generate.solid(white), progress)` restricted to the last tenth;
+`out: merge.over(to over from; matte)`.
+
+**Geometric wipe** (`diamond-wipe`, `clock-wipe`): `shape: matte.shape` with
+its size or angle a curve of progress; `out: merge.over(to over from; matte shape)`.
+
+**Warp** (`displacement`): `wa: warp.displace(from, noise; strength = curve of progress)`,
+`wb: warp.displace(to, noise; strength = curve.map(progress; invert))`,
+`out: merge.mix(wa, wb; progress)`.
+
+**Warp wipe** (the user's, as the Toaster did it): the playing picture on a 3D
+object that moves away -- `ball: warp.surface(from; sphere, morph and spin and
+away as curves keyed along progress)`, `out: merge.over(ball over to)`
+(`warp-wipe-ball.yaml`). What this appendix first called a warp wipe is a
+**displace wipe**: `wa: warp.displace(from, map; strength rising)`,
+`reveal: matte.threshold(matte.from_signal(signal.luma(texture)), progress)`,
+`out: merge.over(to over wa; matte reveal)`.
+
+**DVE moves** (`cube`, `doorway`, `switcher-flip`): expressible as
+`warp.transform` of each picture with rotation and perspective curves and a
+`merge.porter_duff` ordered by which face is in front; until 2.5D's
+`merge.depth` exists, ordering is by a curve that switches at the half. The
+gl-transitions shaders stay **opaque** nodes in the meantime.
+
+**The rest of gl-transitions** (117 shaders): opaque `opaque.gl` nodes with
+ports `from`, `to`, `progress`; portable only where a sheet re-expresses one.
+
+**Done in C5** (CT-0076): `cross-dissolve`, `dip-to-black`, `blur-dissolve`,
+`iris-open`, `clock-wipe`, `diamond-wipe`, `luma`, `displacement` and
+`switcher-flip` are recipes in the catalog, as above (the DVE flip as two
+`warp.transform` folds over black). A recipe that replaces an upstream shader
+keeps its name in `upstream`, so the raw shader is not listed beside it, and
+reads none of it. A reviewed item that stays a shader says why
+(`opaque_reason`): `pixelate` (no mosaic primitive yet) and `film-burn` (a
+procedural look of its own). A join's matte may be a generator --
+`{gradient: {...}}` or `{noise: {...}}` -- drawn as a node of the matte
+join's graph and read as its values are (`signal.luminance`), where a
+file's grey is read as it is shown (`signal.luma`).
+
+**VFX, FFmpeg forms** -- done in C6 (CT-0077): the fourteen are fragments of
+the graph built from each item's parameters (`compositing/effects.py`), every
+item names its primitives, and FFmpeg no longer draws them:
+- `film-grain`: `filter.noise(picture)`.
+- `vignette`: `merge.blend(picture, generate.gradient(radial); multiply)`.
+- `chromatic-aberration`: three `signal.channel` + three `warp.transform`
+  (small scales) recombined by `merge.channels` (an op Appendix B found missing; now in §3).
+- `glitch`, `camera-shake`: `warp.transform` with noise curves; `glitch` also
+  `colour.*` per band -- band selection needs `matte.shape` with curves:
+  expressible.
+- `flash`, `fade-to-black`, `light-leak`: `merge.blend`/`merge.mix` with a
+  `generate.*` and a curve.
+- `focus-pull-in`: `filter.blur(kind defocus; radius curve)`.
+- `crop`, `mirror`: `warp.transform` (mirror is a scale of -1).
+- `old-film`: `filter.noise` + `colour.grade` + `warp.transform` (jitter
+  curve) + scratches from `generate.noise`: expressible.
+- `hologram`: `colour.*` + `generate` scanlines + `merge.blend`: expressible.
+- `fog` (ffmpeg): `generate.noise` + `merge.blend(screen)`; its present form
+  is a regular weave and should be replaced when it is re-expressed (CT-0064).
+- `aces-film-look`: `colour.lut(view)`, mixed over the picture by its strength.
+- Element effects (`fire-over`, `smoke-over`, `explosion-over`,
+  `muzzle-flash`, `sparks-over`): `generate.source(element)` →
+  `merge.blend(screen)` for black-backed elements, `merge.over` for alpha ones,
+  `matte.key(colour)` and `colour.despill` for green ones, placed by
+  `warp.transform` -- done in C6 (CT-0077); the element's form (a sequence,
+  EXR, a Blender render, a splat) is turned into one clip by
+  `vfx.prepare_element`, transparent until its start.
+
+**VFX, Blender forms** (`disintegrate`, `melt`, `shatter`, `liquid-splash`,
+`lightning`, `rain`, `snow`, `sparks-burst`): `generate.render` (a Blender
+scene, a seed, optionally depth and alpha passes) then `merge.over`. Not
+deterministic across Blender versions: recorded (§5).
+
+**VFX, OFX** (`ofx-bloom`, `ofx-glow`, `ofx-lens-distortion`): opaque
+`opaque.natron` nodes; `ofx-glow` and `ofx-bloom` are also `filter.glow` and
+can be re-expressed.
+
+**Titles** (`card`, `film-title`, `caption`, `lower-third`, `slide-up`,
+`grow`, `flicker`, `neon-sign`, `typewriter`, `word-by-word`,
+`credits-roll`): `generate.text` with curves on its alpha, position, size or
+`reveal`, `generate.solid` for bars, `merge.over` on the picture -- done in C6
+(CT-0077, `compositing/title_graphs.py`); the neon's halos are
+`filter.blur` and `colour.grade` added by `merge.blend`. The Blender titles
+(`letters-rise`, `letters-turn-in`) are rendered by Blender and laid by the
+graph.
+`letters-rise`, `letters-turn-in` (Blender, letters as objects):
+`generate.render`. Expressible; the per-letter animation of the FFmpeg forms
+is a `reveal` curve and per-word timing a `reveal` with holds.
+
+**The music piece's joins** (CT-0064): each transition above, with its
+length and placement from beats (CT-0067) -- a join's `progress` spans its
+beats; a beat-pulsing parameter is `curve.beats`.
+
+**A window replaced** (the user's example): the composite in §4.
+**A luma key**: `k: matte.key(picture; by luminance, low, high, invert)`,
+`out: merge.over(picture over background; matte k)`.
+**A Blender object behind a person** (C8): `person: generate.source(take)`,
+`d: signal.estimate(person; kind depth_relative)`, `obj: generate.render(blender; camera)`,
+`m: signal.align_depth(d; reference obj.depth)`, then `merge.depth(person with m, obj with obj.depth)`.
+
+What the appendix found missing, and §3 now has:
+
+- `merge.channels` (a picture from separate channels) -- for chromatic
+  aberration and channel effects;
+- `merge.depth` -- occlusion by depth, also §8's first piece.
+
+With them, every existing item is expressible, or expressible as an opaque
+node (the gl-transitions shaders not yet re-expressed, the OFX plugins, the
+Blender simulations as `generate.render`).

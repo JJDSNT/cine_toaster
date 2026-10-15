@@ -195,17 +195,37 @@ def _licence_name(item: dict[str, Any]) -> str:
     return f"CC {code.upper()} {item.get('license_version') or ''}".strip()
 
 
-def openverse_search(terms: str, count: int = 10, music: bool = True) -> list[dict[str, Any]]:
-    """Audio a film may use without asking (CC0, public domain, CC BY), music by default."""
+#: Under this, an item with no category is taken for a sound, not a piece of music.
+MUSIC_SECONDS = 30.0
 
-    query = {"q": terms, "license": ",".join(OPENVERSE_LICENCES), "page_size": count}
-    if music:
-        query["category"] = "music"
-    data = _get_json(f"https://api.openverse.org/v1/audio/?{urllib.parse.urlencode(query)}")
+
+def openverse_search(terms: str, count: int = 10, music: bool = True) -> list[dict[str, Any]]:
+    """Audio a film may use without asking (CC0, public domain, CC BY), music by default.
+
+    Openverse files only some of its sources under a category: Jamendo's
+    tracks are `music`, Freesound's have none. Asking for the category alone
+    hides every track on Freesound ("synthwave": none, of 175), so the music
+    search also takes uncategorised items long enough to be a piece.
+    """
+
+    def ask(**extra: Any) -> list[dict[str, Any]]:
+        query = {"q": terms, "license": ",".join(OPENVERSE_LICENCES), "page_size": count, **extra}
+        return _get_json(f"https://api.openverse.org/v1/audio/?{urllib.parse.urlencode(query)}").get("results") or []
+
+    if not music:
+        found = ask()
+    else:
+        found = ask(category="music")
+        if len(found) < count:
+            seen = {item["id"] for item in found}
+            # A wider page: most uncategorised items are short sounds, dropped below.
+            found += [item for item in ask(page_size=max(count * 3, 20))
+                      if item["id"] not in seen and not item.get("category")
+                      and (item.get("duration") or 0) / 1000 >= MUSIC_SECONDS]
     return [{"source": "openverse", "id": item["id"], "name": item.get("title") or "",
              "by": item.get("creator") or "", "from": item.get("source") or "",
              "seconds": round((item.get("duration") or 0) / 1000, 1), "licence": _licence_name(item),
-             "url": item.get("foreign_landing_url") or ""} for item in data.get("results") or []]
+             "url": item.get("foreign_landing_url") or ""} for item in found[:count]]
 
 
 def openverse_fetch(root: Path, audio: str, *, sound_id: str = "", category: str = "music", says: str = "") -> Path:

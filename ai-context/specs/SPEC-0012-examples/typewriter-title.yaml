@@ -1,0 +1,7 @@
+# `typewriter`: letters revealed over two seconds, over the picture.
+nodes:
+  take:    {op: generate.source, take: CUT}
+  letters: {op: curve.keys, keys: [[0, 0], [2, 1]]}
+  words:   {op: generate.text, text: "NASA, 1969", size: 34, colour: [1, 1, 1, 1], reveal: {curve: letters}}
+  out:     {op: merge.over, front: words, back: take}
+output: out

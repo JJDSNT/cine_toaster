@@ -292,3 +292,37 @@ def write_srt(blocks: list[tuple[float, float, str]], path: Path) -> Path:
     path.write_text("".join(f"{index}\n{stamp(a)} --> {stamp(b)}\n{text}\n\n"
                             for index, (a, b, text) in enumerate(blocks, 1)), encoding="utf-8")
     return path
+
+
+def parse_frame(raw: Any) -> tuple[dict[str, Any] | None, str]:
+    """A production's frame (CT-0068): {width, height, fps}, or why it cannot be read.
+
+    Written `frame: 1920x1080@29.97`, `frame: 1920x1080` (the rate is then the
+    first moving take's), or `frame: {width: 1920, height: 1080, fps: 30000/1001}`.
+    """
+
+    if raw in (None, "", {}):
+        return None, ""
+    if isinstance(raw, str):
+        size, _, rate = raw.replace(" ", "").lower().partition("@")
+        width, _, height = size.partition("x")
+        raw = {"width": width, "height": height, "fps": rate or None}
+    if not isinstance(raw, dict):
+        return None, f"frame {raw!r} is neither WIDTHxHEIGHT@FPS nor {{width, height, fps}}"
+    try:
+        width, height = int(raw.get("width") or 0), int(raw.get("height") or 0)
+    except (TypeError, ValueError):
+        width = height = 0
+    if width <= 0 or height <= 0 or width % 2 or height % 2:
+        return None, f"frame {raw.get('width')}x{raw.get('height')} is not two even numbers of pixels"
+    fps = raw.get("fps")
+    if fps in (None, ""):
+        return {"width": width, "height": height, "fps": None}, ""
+    try:
+        numerator, _, denominator = str(fps).partition("/")
+        rate = float(numerator) / float(denominator or 1)
+    except (TypeError, ValueError, ZeroDivisionError):
+        rate = 0.0
+    if not 1 <= rate <= 240:
+        return None, f"frame rate {fps!r} is not a number of frames per second"
+    return {"width": width, "height": height, "fps": round(rate, 3)}, ""

@@ -1,0 +1,21 @@
+schema_version = 1
+id = "matte-wipe"
+name = "Matte wipe"
+kind = "matte"
+category = "wipe/custom"
+description = "The incoming shot appears where a matte the join gives is white: a still one as an order, a moving one as the shape itself."
+guidance = "The shape of the join is a picture: smoke, ink, a splash, an animated object. Give it with `matte:` on the join, and optionally an `overlay:` that rides it."
+energy = "medium"
+motion = "organic"
+duration_ms = 2000
+tags = ["matte", "organic", "toaster"]
+use_when = ["A join should look made of something", "The production has a matte clip or image"]
+avoid_when = ["A join that should not be noticed"]
+license = "MIT"
+# Drawn by `transitions.render_preview` from the matte join's graph, with a sample matte (CT-0072).
+preview = "preview.webm"
+# SPEC-0011: no shader and no matte of its own; the join names its matte.
+
+[render]
+ffmpeg = "matte"
+ffmpeg_note = "Drawn by the matte renderer on every engine: there is no shader to run."

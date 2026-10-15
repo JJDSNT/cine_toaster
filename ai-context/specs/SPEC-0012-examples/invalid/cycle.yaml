@@ -1,0 +1,5 @@
+expect: composite_cycle
+nodes:
+  a: {op: filter.blur, in: b}
+  b: {op: filter.blur, in: a}
+output: a

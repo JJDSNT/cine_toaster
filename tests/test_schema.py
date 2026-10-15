@@ -125,12 +125,16 @@ class FamilyTests(unittest.TestCase):
 
 class TransitionReferenceTests(unittest.TestCase):
     def test_the_reel_references_the_catalog_including_its_own(self) -> None:
+        reel = _reel()
         ids = {
             shot["transition"]["id"]
-            for scene in _reel()["scenes"]
+            for scene in reel["scenes"]
             for shot in scene["shots"]
             if shot["transition"]
         }
+        # A scene's first join is the scene's own (`enter`), not its first shot's.
+        ids |= {scene["enter"]["transition"]["id"] for scene in reel["scenes"]
+                if (scene.get("enter") or {}).get("transition")}
         self.assertIn("amiga-copper-bars", ids)
         self.assertGreaterEqual(len(ids), 4)
 

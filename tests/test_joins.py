@@ -62,10 +62,36 @@ class JoinTests(unittest.TestCase):
                 self.assertGreater(self.colour(out, 0.5)[0], 200)
                 self.assertGreater(self.colour(out, 3.2)[2], 200)
 
-    def shader(self) -> Path:
-        from cine_toaster.transitions import list_transitions
+    def test_a_still_take_is_held_for_the_shot_and_joined_like_any_other(self) -> None:
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=blue:s=320x180",
+                        "-frames:v", "1", str(self.root / "b.png")], check=True)
+        second = Segment("P2", "B", "b.png", 0.0, 2.0, normalize=False, still=True,
+                         transition={"id": "cross-dissolve", "seconds": 0.5, "mode": "fade"})
+        plan = self.plan(second)
+        out = self.root / "cut.mp4"
+        render(self.root, plan, out, self.root / "work", run)
+        made = probe(out)
+        self.assertAlmostEqual(made["duration"], 3.5, delta=0.1)
+        self.assertEqual((made["width"], made["height"], made["fps"]), (160, 90, 24.0))  # the moving take's frame
+        self.assertGreater(self.colour(out, 0.5)[0], 200)
+        self.assertGreater(self.colour(out, 3.2)[2], 200)
 
-        return next(item["asset_path"] for item in list_transitions() if item["id"] == "cross-dissolve")
+    def test_the_productions_frame_decides_the_versions_size_and_rate(self) -> None:
+        second = Segment("P2", "B", self.take("b.mp4", "blue", "0"), 1.0, 3.0, normalize=False)
+        plan = self.plan(second)
+        plan.frame = {"width": 320, "height": 180, "fps": 25.0}
+        out = self.root / "cut.mp4"
+        render(self.root, plan, out, self.root / "work", run)
+        made = probe(out)
+        self.assertEqual((made["width"], made["height"], made["fps"]), (320, 180, 25.0))  # the takes are 160x90 at 24
+        self.assertAlmostEqual(made["duration"], 4.0, delta=0.1)
+
+    def shader(self) -> Path:
+        """A gl-transitions dissolve of the test's own: the catalog's dissolve is a recipe since CT-0076."""
+
+        path = self.root / "dissolve.glsl"
+        path.write_text("vec4 transition(vec2 uv) {\n  return mix(getFromColor(uv), getToColor(uv), progress);\n}\n")
+        return path
 
     def test_a_j_cut_leads_with_the_incoming_takes_sound_from_before_its_cut_point(self) -> None:
         # B speaks (a tone) from 0.4 s to 0.9 s of its take, before its picture starts at 1.0 s.
@@ -166,7 +192,7 @@ class PlannedJoinTests(unittest.TestCase):
                               encoding="utf-8")
         second = self.plan().segments[1]
         self.assertEqual((second.transition["id"], second.transition["seconds"]), ("dip-to-black", 0.2))
-        self.assertTrue(second.transition.get("shader") or second.transition.get("mode") == "fadeblack")
+        self.assertTrue(second.transition.get("graph"))  # a recipe since CT-0076, drawn wherever it runs
         # The demo's takes are short: a long transition is cut to half the shorter shot, and said.
         scene_file.write_text(text.replace("  - n: 2\n", "  - n: 2\n    transition: {id: dip-to-black}\n", 1),
                               encoding="utf-8")

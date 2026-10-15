@@ -1,0 +1,35 @@
+schema_version = 1
+id = "luma"
+name = "Luma"
+kind = "graph"
+upstream = "gl-transitions:luma"
+category = "wipe/luma"
+description = "The incoming shot appears in the order a picture's brightness gives: here from the centre out."
+guidance = "A wipe whose shape is a picture. Give the join its own matte to change the shape; this item's is a radial order."
+energy = "medium"
+motion = "outward"
+duration_ms = 1200
+preview = "preview.webm"  # drawn from the graph by transitions.render_preview
+tags = ["matte", "wipe", "iris"]
+use_when = ["A wipe should have a shape no formula draws", "The production has a matte of its own"]
+avoid_when = ["A join that should not be noticed"]
+# SPEC-0011: each sampler2D the shader declares names an input. radial.png is ours (CC0), generated.
+license = "CC0-1.0"
+author = "Cine Toaster contributors"
+
+[inputs]
+luma = "radial.png"
+
+[render]
+ffmpeg = "graph"
+ffmpeg_note = "Drawn from its graph by GL, or by the reference where GL cannot run: no stand-in is needed (CT-0076)."
+
+[graph]
+ports = {from = "picture", to = "picture", progress = "curve", luma = "picture"}
+output = "out"
+
+[graph.nodes]
+order = {op = "signal.luma", picture = "luma"}
+shape = {op = "matte.from_signal", signal = "order"}
+reveal = {op = "matte.threshold", matte = "shape", progress = "progress", softness = 0.0}
+out = {op = "merge.over", front = "to", back = "from", matte = "reveal"}

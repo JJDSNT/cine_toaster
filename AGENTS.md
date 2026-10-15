@@ -78,13 +78,18 @@ report a tool as working when nothing calls it.
 
 ## Validation
 
-Run the smallest relevant tests. The current repository-wide check is:
+Run the smallest relevant tests while working. The suite is split by one mark,
+`@heavy("why")` (`tests/heavy.py`), on tests that need Blender, a model's
+inference or a long render -- never on a contract:
 
 ```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -v
+make test-fast    # every test but the heavy ones: while working
+make test-heavy   # only the heavy ones: after changing an adapter
+make test         # the whole suite, the final authority: before a step closes
 ```
 
-Or `make test`, which uses the environment `make setup` created.
+`PYTHONPATH=src python3 tests/run.py [fast|heavy] [--times]` runs the same
+without make; `--times` lists the slowest test classes.
 
 Code, comments, and repository documentation are written in English. The schema
 is English too -- directory, file, field and enum names -- while a production's

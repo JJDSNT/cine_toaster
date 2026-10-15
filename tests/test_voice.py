@@ -7,6 +7,7 @@ import os
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,6 +16,9 @@ from cine_toaster.errors import ValidationError
 from cine_toaster.jobs import JobManager, JobStore
 from cine_toaster.project import load_production, load_scene
 from cine_toaster.voice import plan_conversion, voice_python
+
+sys.path.insert(0, str(Path(__file__).parent))
+from heavy import heavy  # noqa: E402
 
 DEMO = Path(__file__).parents[1] / "examples" / "demo-project"
 HAS_FFMPEG = shutil.which("ffmpeg") is not None
@@ -107,6 +111,7 @@ class RevoiceTests(unittest.TestCase):
         job = self.manager.wait(self.manager.submit("convert_voice", self.root, {"scene": "SC-030", "shot": "P3"})["id"], timeout=60)
         self.assertEqual(job["state"], "succeeded", job["error"])
 
+    @heavy("converts a voice with Chatterbox")
     def test_the_converted_take_joins_the_others_with_its_lineage(self) -> None:
         self.assertIsNotNone(voice_python())
         job = self.manager.wait(self.manager.submit("convert_voice", self.root, {"scene": "SC-030", "shot": "P3"})["id"], timeout=60)
@@ -125,6 +130,7 @@ class RevoiceTests(unittest.TestCase):
                                  "-of", "json", str(self.root / "scenes/030-echo-chamber/work/c03.mp4")], capture_output=True, text=True)
         self.assertEqual(json.loads(probe.stdout), json.loads(source.stdout))
 
+    @heavy("converts a voice with Chatterbox")
     def test_the_cut_can_hear_a_shot_in_the_cast_voice_without_a_new_take(self) -> None:
         from cine_toaster.commands import dispatch
 

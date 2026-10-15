@@ -203,7 +203,8 @@ def _blender() -> Capability:
     path = blender_binary()
     return Capability(
         name="Blender",
-        what_it_enables="3D titles from the title catalog (letters-turn-in, letters-rise; CT-0031)",
+        what_it_enables="3D titles from the title catalog (letters-turn-in, letters-rise; CT-0031); a scene's "
+                        "passes as records the graph reads -- picture, Z depth, object index (`renders.py`, CT-0081)",
         required=False,
         status=OK if path else MISSING,
         detail=path or "",
@@ -213,16 +214,56 @@ def _blender() -> Capability:
 
 
 def _moderngl() -> Capability:
-    from .shader_render import gl_unavailable_reason
+    from .compositing.gl import gl_unavailable_reason
 
     reason = gl_unavailable_reason()
+    device = ""
+    if reason is None:
+        # Which device draws: a software rasteriser (llvmpipe) is GL, but on the CPU (CT-0080, step 6).
+        import os
+
+        from .compositing.gl import renderer_for
+
+        drawing = renderer_for({"ports": {}, "nodes": {"o": {"op": "generate.solid", "colour": [0, 0, 0, 1]}},
+                                "output": "o"})
+        device = str(drawing.context.info.get("GL_RENDERER", "")) if drawing is not None else ""
+        if "llvmpipe" in device and Path("/dev/dxg").exists() and not os.environ.get("GALLIUM_DRIVER"):
+            device += " -- software, on the CPU; this WSL has a GPU: GALLIUM_DRIVER=d3d12 draws on it"
     return Capability(
         name="ModernGL",
-        what_it_enables="running a transition's own GLSL shader in `toast build` instead of its FFmpeg stand-in",
+        what_it_enables="the GL renderer of compositing graphs, and a transition's own GLSL shader instead of its FFmpeg stand-in",
         required=False,
         status=OK if reason is None else MISSING,
-        detail=reason or "",
+        detail=reason or device,
         remedy="" if reason is None else "uv sync --extra gpu   (or: pip install -e '.[gpu]')",
+    )
+
+
+def _compositing() -> Capability:
+    """The renderers of SPEC-0012 graphs (ADR 0022 §5): the reference, and GL with the device it runs on."""
+
+    from .compositing.reference import IMPLEMENTED as REFERENCE_OPS
+    from .compositing.schema import OPS
+    from .compositing.gl import gl_unavailable_reason
+
+    parts = [f"reference (NumPy, exact): {len(REFERENCE_OPS)} of {len(OPS)} ops"]
+    reason = gl_unavailable_reason()
+    if reason is None:
+        from .compositing.gl import IMPLEMENTED as GL_OPS, renderer_for
+
+        renderer = renderer_for({"nodes": {}})
+        device = renderer.name if renderer else "no context"
+        parts.append(f"GL on {device}: {len(GL_OPS)} ops")
+        if "llvmpipe" in device:
+            parts.append("a GPU may be reachable with GALLIUM_DRIVER=d3d12 on WSL (measured slower here)")
+    return Capability(
+        name="Compositing",
+        what_it_enables="composites and recipe joins drawn from their graphs: GL when it covers every op, "
+                        "else the reference",
+        required=False,
+        status=OK,
+        detail="; ".join(parts),
+        remedy="" if reason is None else f"for the fast renderer: {reason}",
     )
 
 
@@ -265,6 +306,25 @@ def _voice() -> Capability:
         status=OK if not reason else MISSING,
         detail=reason,
         remedy="" if not reason else "make install-voice   (a separate environment: its engines pin their own torch)",
+    )
+
+
+def _vision() -> Capability:
+    from .models import describe, vision_unavailable_reason
+
+    reason = vision_unavailable_reason()
+    missing = [item["model"] for item in describe() if not item["fetched"]]
+    detail = reason or ("models not fetched: " + ", ".join(missing) if missing else "all models fetched")
+    remedy = ("make install-vision   (its own environment: torch never enters Cine Toaster's)" if reason else
+              "; ".join(f"toast models fetch {name}" for name in missing))
+    return Capability(
+        name="Vision models",
+        what_it_enables="depth and segmentation estimated as signal records -- Depth Anything V2 Small, Video "
+                        "Depth Anything Small, SAM 2 (`toast signal estimate`, CT-0081)",
+        required=False,
+        status=OK if not reason and not missing else MISSING,
+        detail=detail,
+        remedy=remedy,
     )
 
 
@@ -391,6 +451,80 @@ def _whisper() -> Capability:
     )
 
 
+def _colour_fonts() -> Capability:
+    """A title in a colour font's own colours: FreeType, inside Pillow, draws layered (COLR) and bitmap glyphs
+    (CBDT, sbix) from 2.10, COLR's gradients (version 1) from 2.13."""
+
+    version = ""
+    if _module("PIL"):
+        from PIL import features
+
+        version = features.version("freetype2") or ""
+    numbers = tuple(int(part) for part in version.split(".")[:2] if part.isdigit())
+    ok = numbers >= (2, 10)
+    return Capability(
+        name="Colour fonts",
+        what_it_enables="titles in a colour font's own colours -- layered (COLR), bitmap (CBDT, sbix) and emoji",
+        required=False,
+        status=OK if ok else MISSING,
+        detail=f"FreeType {version}" + ("" if numbers >= (2, 13) else ", COLR version 0 only") if ok else "",
+        remedy="" if ok else "pip install -U pillow   (its wheels carry a FreeType that draws colour glyphs)",
+    )
+
+
+def _lottie() -> Capability:
+    from .compositing.lottie import REMEDY, available
+
+    ok = available()
+    version = ""
+    if ok:
+        from importlib.metadata import version as installed
+
+        version = f"thorvg-python {installed('thorvg-python')}"
+    return Capability(
+        name="Lottie",
+        what_it_enables="Lottie animations (JSON, dotLottie) as a source: a layer, an element, a title's fill",
+        required=False,
+        status=OK if ok else MISSING,
+        detail=version,
+        remedy="" if ok else REMEDY,
+    )
+
+
+def _retimed_sound() -> Capability:
+    """Which stretchers a retimed shot's sound can use here, and which is chosen when a shot names none."""
+
+    from .retime_sound import DEFAULT_STRETCHER, available
+
+    found = available()
+    return Capability(
+        name="Retimed sound",
+        what_it_enables="a retimed shot's take sound stretched with its picture, pitch kept (retime_sound: stretch)",
+        required=False,
+        status=OK,
+        detail=f"default {DEFAULT_STRETCHER}; available: {', '.join(found)}"
+               + ("" if "rubberband" in found else " -- FFmpeg's rubberband filter is absent: a shot asking for it "
+                  "is refused, never switched"),
+        remedy="",
+    )
+
+
+def _beats() -> Capability:
+    from .voice import voice_python
+
+    voice = voice_python()
+    ok = bool(voice and list(voice.parent.parent.glob("lib/python*/site-packages/librosa")))
+    return Capability(
+        name="Beats",
+        what_it_enables="a music track's beats heard and kept (`toast sound beats`), so shots are cut to it in beats",
+        required=False,
+        status=OK if ok else MISSING,
+        detail=f"librosa in {voice.parent.parent}" if ok else "",
+        remedy="" if ok else "make install-voice",
+        wired=True,
+    )
+
+
 CHECKS: tuple[Callable[[], Capability], ...] = (
     _python,
     _yaml,
@@ -410,10 +544,16 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _natron,
     _splat,
     _sound_sources,
+    _beats,
+    _colour_fonts,
+    _lottie,
+    _retimed_sound,
     # Detected, not yet used. See `report`.
     _sox,
     _blender,
+    _vision,
     _moderngl,
+    _compositing,
     _whisper,
 )
 

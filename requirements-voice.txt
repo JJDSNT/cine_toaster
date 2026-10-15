@@ -11,3 +11,5 @@ soundfile>=0.12
 faster-whisper>=1.0
 # webrtcvad (via resemblyzer) still imports pkg_resources.
 setuptools<80
+# A music track's beats, so shots can be cut to it (CT-0067; ISC).
+librosa>=0.10

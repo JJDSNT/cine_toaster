@@ -43,6 +43,11 @@ The project owns the film. Libraries and providers remain replaceable.
     not interpret provider behavior.
 11. Development-agent context and production-agent runtime context never share
     a lifecycle or authority boundary.
+12. Time is exact and converted in one place, `timebase.py` (ADR 0023):
+    fractions to compute, ticks (254,016,000,000 a second) to store and
+    exchange, never a silent rounding; cut points on the frame grid, sound in
+    samples. The offline render never depends on a clock; playback's media
+    clock (the sound as master) is C9b's.
 
 ## Logical layers
 

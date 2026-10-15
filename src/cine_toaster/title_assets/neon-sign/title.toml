@@ -21,5 +21,7 @@ fade_in = 0.0
 fade_out = 0.6
 
 [render]
-engine = "ffmpeg"
+engine = "graph"
 effect = "neon"
+# Drawn by the compositing graph (C6, CT-0077), of these primitives:
+primitives = ["colour.grade", "curve.keys", "filter.blur", "generate.text", "merge.blend", "merge.over"]

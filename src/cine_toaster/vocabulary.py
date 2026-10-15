@@ -154,6 +154,18 @@ CORE_SHOT_FIELDS: frozenset[str] = frozenset(
         # CT-0054: stretches of the take's sound silenced ([[from, to]], take seconds), and where it fades out.
         "mute",
         "sound_fades_at",
+        # CT-0080 (C7): its picture retimed, and what its take's sound does then, with what stretcher.
+        "retime",
+        "retime_sound",
+        "stretch_with",
+        # SPEC-0012: the shot's picture as a compositing graph.
+        "composite",
+        # C4 (CT-0075): the shot's picture as layers, compiled into its composite when the scene loads.
+        "layers",
+        # CT-0067: the shot's length in beats of the scene's music.
+        "beats",
+        # CT-0066: the stretch of a public file this shot's picture is, fetched by `toast footage fetch`.
+        "footage",
         # What a generation must not do (production intent, translated by each provider; docs/generation.md).
         "avoid",
         # What holds still in a single generated shot: setting (default), light (only the light changes),

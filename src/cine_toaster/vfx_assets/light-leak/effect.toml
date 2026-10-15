@@ -12,5 +12,7 @@ strength = 0.45
 color = "#FF8A3C"
 
 [render]
-engine = "ffmpeg"
+engine = "graph"
 effect = "light-leak"
+# Drawn by the compositing graph (C6, CT-0077), of these primitives:
+primitives = ["curve.keys", "generate.gradient", "generate.solid", "matte.from_signal", "merge.blend", "merge.over", "signal.luminance", "warp.transform"]

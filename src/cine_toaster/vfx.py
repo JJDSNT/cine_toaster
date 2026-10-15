@@ -38,7 +38,7 @@ CATEGORIES = ("frame", "texture", "lens", "light", "motion", "glitch", "particle
 EFFECTS = ("mirror", "crop", "fade-out", "grain", "vignette", "light-leak", "aberration", "glitch", "shake", "flash", "defocus", "old-film",
            "element", "sparks-burst", "disintegrate", "look", "ofx", "hologram", "fog", "rain", "snow", "lightning",
            "shatter", "melt", "liquid-splash")
-ENGINES = ("ffmpeg", "blender", "ofx")
+ENGINES = ("graph", "ffmpeg", "blender", "ofx")
 #: OpenFX plugins run in Natron, an OFX host driven headless (vfx_assets/_natron/chain.py).
 NATRON_CHAIN_SCRIPT = BUILTIN / "_natron" / "chain.py"
 #: Effects Blender renders as an element on the fly (vfx_assets/_blender/element.py).
@@ -83,6 +83,8 @@ def list_effects(project_root: Path | None = None) -> list[dict[str, Any]]:
                 "avoid_when": [str(item) for item in raw.get("avoid_when") or []],
                 "params": dict(raw.get("params") or {}), "effect": str(render.get("effect") or "grain"),
                 "engine": str(render.get("engine") or "ffmpeg"),
+                # The primitives it is made of, when the compositing graph draws it (C6, CT-0077).
+                "primitives": [str(op) for op in render.get("primitives") or []],
                 "plugin": str(render.get("plugin") or ""),
                 "element_category": str(render.get("element_category") or ""), "origin": origin,
                 "directory": str(manifest.parent),
@@ -220,120 +222,6 @@ def _number(params: dict[str, Any], key: str, default: float) -> float:
         raise ValidationError(f"The effect parameter {key} must be a number") from error
 
 
-def _chain(effect: dict[str, Any], label: str, out: str, duration: float, width: int, height: int,
-           element_input: int | None) -> str:
-    """One effect as a filter-graph step from [label] to [out]."""
-
-    params, kind = effect["params"], effect["effect"]
-    strength = _number(params, "strength", 0.5)
-    start = _number(params, "start", 0.0)
-    if kind == "mirror":
-        return f"[{label}]hflip[{out}]"
-    if kind == "crop":
-        # A detail of the frame, enlarged to fill it: x, y, width, height as fractions of the frame.
-        x, y = _number(params, "x", 0.0), _number(params, "y", 0.0)
-        w, h = _number(params, "width", 0.5), _number(params, "height", 0.5)
-        return (f"[{label}]crop=iw*{w:.4f}:ih*{h:.4f}:iw*{x:.4f}:ih*{y:.4f},scale={width}:{height},setsar=1[{out}]")
-    if kind == "fade-out":
-        length = min(_number(params, "length", 1.0), duration)
-        return f"[{label}]fade=t=out:st={max(0.0, duration - length):.3f}:d={length:.3f}[{out}]"
-    if kind == "grain":
-        return f"[{label}]noise=alls={max(1, round(strength * 40))}:allf=t+u[{out}]"
-    if kind == "vignette":
-        return f"[{label}]vignette=angle={0.2 + strength * 0.6:.3f}[{out}]"
-    if kind == "light-leak":
-        # A warm glow drifting across the frame, laid over the picture.
-        colour = str(params.get("color") or "#FF8A3C").lstrip("#")
-        r, g, b = (int(colour[i:i + 2], 16) for i in (0, 2, 4))
-        return (f"color=c=black:s={width}x{height}:d={duration:.3f},format=rgba,"
-                f"geq=r={r}:g={g}:b={b}:"
-                f"a='{255 * strength:.0f}*exp(-pow((X-W*(0.2+0.6*T/{max(0.1, duration):.3f}))/(W*0.3),2))'[{label}leak];"
-                f"[{label}][{label}leak]overlay=format=auto:shortest=1,format=yuv420p[{out}]")
-    if kind == "aberration":
-        shift = max(1, round(strength * 8 * width / 1280))
-        return f"[{label}]rgbashift=rh=-{shift}:bh={shift}[{out}]"
-    if kind == "glitch":
-        # Bursts of a split, noisy copy over the picture, several times a second.
-        shift = max(2, round(strength * 24 * width / 1280))
-        rate = _number(params, "rate", 0.15)
-        return (f"[{label}]split[{label}a][{label}b];[{label}b]rgbashift=rh={shift}:bh=-{shift}:edge=wrap,"
-                f"noise=alls={max(1, round(strength * 30))}:allf=t[{label}g];"
-                f"[{label}a][{label}g]overlay=enable='gt(mod(t*12\\,1)\\,{1 - rate:.3f})'[{out}]")
-    if kind == "shake":
-        amount = max(2, round(strength * 20 * width / 1280))
-        return (f"[{label}]crop=iw-{2 * amount}:ih-{2 * amount}:"
-                f"'{amount}+{amount}*sin(t*37)*sin(t*13)':'{amount}+{amount}*sin(t*29)*cos(t*17)',"
-                f"scale={width}:{height}[{out}]")
-    if kind == "flash":
-        length = _number(params, "length", 0.4)
-        return (f"[{label}]eq=brightness='{min(1.0, strength):.3f}*max(0,1-abs(t-{start:.3f})/{length:.3f})':"
-                f"eval=frame[{out}]")
-    if kind == "defocus":
-        length = _number(params, "length", 1.2)
-        # Out of focus, coming into focus: the blur shrinks over `length`.
-        return (f"[{label}]split[{label}s][{label}b];[{label}b]gblur=sigma={4 + strength * 16:.1f}[{label}bl];"
-                f"[{label}s][{label}bl]blend=all_expr='A*min(1,T/{length:.3f})+B*(1-min(1,T/{length:.3f}))'[{out}]")
-    if kind == "old-film":
-        return (f"[{label}]colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131,"
-                f"noise=alls={max(1, round(strength * 30))}:allf=t+u,vignette=angle=0.6,"
-                f"eq=brightness='0.03*sin(t*23)':eval=frame[{out}]")
-    if kind == "hologram":
-        # Cyan light, scanlines, a colour fringe and an unsteady brightness: a projection, not a person.
-        shift = max(1, round(strength * 4 * width / 1280))
-        gap = max(2, round(3 * height / 720))
-        return (f"[{label}]colorchannelmixer=.15:.25:.2:0:.25:.55:.35:0:.35:.65:.85,"
-                f"drawgrid=w=iw:h={gap}:t=1:c=black@{0.25 + 0.3 * strength:.2f},rgbashift=rh=-{shift}:bh={shift},"
-                f"eq=brightness='0.04*sin(t*31)+0.08*gt(random(1),0.93)':eval=frame,"
-                f"gblur=sigma=0.6[{out}]")
-    if kind == "fog":
-        # Soft banks of mist drifting across, laid over the picture with screen.
-        drift = _number(params, "drift", 0.5)
-        return (f"nullsrc=s={width // 4}x{height // 4}:d={duration:.3f}:r=24,"
-                f"geq=lum='128+70*sin(X/9+T*{drift:.3f})*cos(Y/7-T*{drift * 0.6:.3f})+40*sin((X+Y)/13+T*{drift * 0.3:.3f})':"
-                f"cb=128:cr=128,gblur=sigma=4,scale={width}:{height},format=gbrp[{label}fog];[{label}]format=gbrp[{label}p];"
-                f"[{label}p][{label}fog]blend=all_mode=screen:all_opacity={min(1.0, strength):.3f},format=yuv420p[{out}]")
-    if kind == "look":
-        # An OpenColorIO view baked to a 3D LUT (cached), for FFmpeg to apply.
-        from .color import bake_look
-        from .jobs import state_root
-
-        view = str(params.get("view") or "ACES 2.0 - SDR 100 nits (Rec.709)")
-        name = "".join(ch if ch.isalnum() else "-" for ch in view).strip("-").lower()
-        lut = state_root() / "looks" / f"{name}.cube"
-        if not lut.is_file():
-            bake_look(lut, view=view)
-        path = str(lut).replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
-        mix = min(1.0, max(0.0, strength))
-        return (f"[{label}]split[{label}o][{label}l];[{label}l]lut3d=file='{path}'[{label}g];"
-                f"[{label}o][{label}g]blend=all_expr='A*(1-{mix:.3f})+B*{mix:.3f}'[{out}]")
-    if kind == "element":
-        element = effect["element"]
-        scale = _number(params, "scale", 1.0)
-        x, y = _number(params, "x", 0.5), _number(params, "y", 0.5)
-        opacity = _number(params, "opacity", 1.0)
-        # Fitted inside `scale` of the frame, its proportion kept, never larger than the frame.
-        box_w, box_h = max(2, round(width * min(scale, 1.0) / 2) * 2), max(2, round(height * min(scale, 1.0) / 2) * 2)
-        size = f"{box_w}:{box_h}:force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2"
-        source = f"[{element_input}:v]setpts=PTS-STARTPTS+{start:.3f}/TB"
-        if element.get("_matte_input") is not None:
-            # A separate matte: its brightness is the element's opacity.
-            matte = f"[{element['_matte_input']}:v]setpts=PTS-STARTPTS+{start:.3f}/TB,format=gray[{label}m]"
-            source = f"{matte};{source},format=rgba[{label}c];[{label}c][{label}m]alphamerge"
-        source += f",scale={size}"
-        place = f"x='W*{x:.3f}-w/2':y='H*{y:.3f}-h/2'"
-        if element["blend"] in ("screen", "add"):
-            mode = "screen" if element["blend"] == "screen" else "addition"
-            # A black-backed element: padded to the frame and blended.
-            return (f"{source},pad={width}:{height}:'{width}*{x:.3f}-iw/2':'{height}*{y:.3f}-ih/2':black,"
-                    f"format=gbrp[{label}e];[{label}]format=gbrp[{label}p];"
-                    f"[{label}p][{label}e]blend=all_mode={mode}:all_opacity={opacity:.3f}:shortest=0,format=yuv420p[{out}]")
-        if element["blend"] == "key":
-            source += f",colorkey={element['key_color']}:{_number(params, 'similarity', 0.3):.3f}:0.1"
-        return (f"{source},format=yuva420p,colorchannelmixer=aa={opacity:.3f}[{label}e];"
-                f"[{label}][{label}e]overlay={place}:eof_action=pass:format=auto[{out}]")
-    raise ValidationError(f"The effect {kind!r} is not one Cine Toaster draws", effects=list(EFFECTS))
-
-
 def natron_binary() -> str | None:
     import glob
 
@@ -345,46 +233,6 @@ def natron_binary() -> str | None:
         return found
     candidates = sorted(glob.glob(str(Path.home() / ".local/opt/Natron*/bin/NatronRenderer")))
     return candidates[-1] if candidates else None
-
-
-def _ofx(effects: list[dict[str, Any]], duration: float, work: Path, *, background: Path | None, start: float,
-         width: int, height: int, fps: int, run) -> Path:
-    """Run OpenFX plugins through Natron over the picture; returns the treated clip (sound kept)."""
-
-    import json
-
-    natron = natron_binary()
-    if not natron:
-        raise ValidationError("OpenFX effects run in Natron, which is not found (install it, or set CINE_TOASTER_NATRON)")
-    ffmpeg = shutil.which("ffmpeg")
-    frames = max(1, round(duration * fps))
-    if background is None:
-        background, start = render([], duration, work / "source.mp4", width=width, height=height, fps=fps, run=run), 0.0
-    (work / "in").mkdir()
-    (work / "out").mkdir()
-    size = f"{width}:{height}"
-    run([ffmpeg, "-v", "error", "-y", "-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", str(background),
-         "-vf", f"scale={size}:force_original_aspect_ratio=decrease,pad={size}:(ow-iw)/2:(oh-ih)/2,fps={fps}",
-         "-frames:v", str(frames), "-start_number", "1", str(work / "in" / "f_%04d.png")])
-    spec = work / "spec.json"
-    spec.write_text(json.dumps({"input": str(work / "in" / "f_####.png"), "output": str(work / "out" / "o_####.png"),
-                                "frames": frames, "width": width, "height": height,
-                                "effects": [{"plugin": effect["plugin"], "params": effect["params"]}
-                                            for effect in effects]}), encoding="utf-8")
-    environment = {**os.environ, "CINE_TOASTER_OFX_SPEC": str(spec)}
-    completed = subprocess.run([natron, "-w", "Out", f"1-{frames}", str(NATRON_CHAIN_SCRIPT)], cwd=work,
-                               env=environment, capture_output=True, text=True, timeout=3600)
-    rendered = sorted((work / "out").glob("o_*.png"))
-    if completed.returncode != 0 or not rendered:
-        raise ValidationError("Natron could not run the OpenFX chain",
-                              detail=(completed.stderr or completed.stdout)[-600:])
-    treated = work / "treated.mp4"
-    first = int(rendered[0].stem.split("_")[-1])
-    run([ffmpeg, "-v", "error", "-y", "-framerate", str(fps), "-start_number", str(first), "-i",
-         str(work / "out" / "o_%04d.png"), "-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", str(background),
-         "-map", "0:v", "-map", "1:a?", "-c:v", "libx264", "-crf", "16", "-pix_fmt", "yuv420p", "-c:a", "aac",
-         "-shortest", str(treated)])
-    return treated
 
 
 def _sequence_input(pattern: str, fps: int, loop: bool) -> list[str]:
@@ -509,45 +357,106 @@ def render(effects: list[dict[str, Any]], duration: float, output: Path, *, back
     if not ffmpeg:
         raise ValidationError("FFmpeg is needed to draw effects")
     width, height = width // 2 * 2, height // 2 * 2
-    plugins = [effect for effect in effects if effect["effect"] == "ofx"]
-    if plugins:
-        # OpenFX plugins first, in order, in one Natron chain; then the rest here.
-        with tempfile.TemporaryDirectory(prefix="ofx-") as scratch:
-            treated = _ofx(plugins, duration, Path(scratch), background=background, start=start, width=width,
-                           height=height, fps=fps, run=run)
-            rest = [effect for effect in effects if effect["effect"] != "ofx"]
-            return render(rest, duration, output, background=treated, start=0.0, width=width, height=height,
-                          fps=fps, run=run)
-    size = f"{width}:{height}"
-    if background is not None:
-        inputs = ["-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", str(background)]
-        graph = [f"[0:v]scale={size}:force_original_aspect_ratio=decrease,pad={size}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
-                 f"fps={fps},format=yuv420p[v0]"]
-        sound = ["-map", "0:a?"]
+    return render_graph(prepared(effects, duration, width, height, fps, run), duration, output,
+                        background=background, start=start, width=width, height=height, fps=fps, run=run)
+
+
+def prepared(effects: list[dict[str, Any]], duration: float, width: int, height: int, fps: int,
+             run) -> list[dict[str, Any]]:
+    """The effects with their elements turned into clips the graph reads (`prepare_element`)."""
+
+    return [dict(effect, prepared=prepare_element(effect, duration, width, height, fps, run))
+            if effect["effect"] == "element" else effect for effect in effects]
+
+
+def effects_graph(effects: list[dict[str, Any]], duration: float, *, width: int = 1280, height: int = 720,
+                  fps: int = 24, run=None) -> dict[str, Any]:
+    """The effects, in order, as a graph with one port, `picture`: what a shot's graph chains after its picture.
+    An OpenFX plugin is a node of it too, run by Natron when the graph is drawn (`compositing/natron.py`)."""
+
+    from .compositing.effects import graph_for
+
+    run = run or (lambda command: subprocess.run(command, check=True, capture_output=True))
+    width, height = width // 2 * 2, height // 2 * 2
+    return graph_for(prepared(effects, duration, width, height, fps, run), duration, fps)
+
+
+def prepare_element(effect: dict[str, Any], duration: float, width: int, height: int, fps: int,
+                    run) -> dict[str, Any]:
+    """An element's frames as one clip with alpha -- and its matte as another -- for the graph to read, made once
+    and kept by what they are (CT-0077). Whatever form a stock library delivers it in (a video, a sequence, EXR
+    frames, a Blender render, a splat) is turned into frames here; laying it is the graph's."""
+
+    import hashlib
+    import json
+
+    from .jobs import state_root
+
+    element = effect["element"]
+    sources = [element.get(key) for key in ("file", "matte", "project", "splat", "volume", "usd", "alembic")]
+    stats = [(source, Path(source.replace("%04d", "0001")).stat().st_size)
+             for source in sources if source and Path(source.replace("%04d", "0001")).exists()]
+    hashed = hashlib.sha256(json.dumps([element, effect["params"], duration, width, height, fps, stats],
+                                       sort_keys=True, default=str).encode()).hexdigest()[:20]
+    folder = state_root() / "vfx-elements" / "clips"
+    folder.mkdir(parents=True, exist_ok=True)
+
+    def made(name: str, file: str, matte: bool) -> str:
+        clip = folder / f"{hashed}-{name}.mov"
+        if not clip.is_file():
+            inputs = _element_input(element, file, duration, width, height, fps, effect["params"], run, matte=matte)
+            partial = clip.with_name(f".{clip.name}.part.mov")
+            # Nothing until its `start` (frame access, not compositing: the graph lays what the clip holds), and
+            # RGB with alpha even for a matte -- QuickTime RLE has no grey; FFmpeg would fall back to a palette.
+            delay = max(0.0, float(effect["params"].get("start", 0.0) or 0.0))
+            pad = [f"format=argb,tpad=start_duration={delay:.3f}:color=black@0"] if delay else ["format=argb"]
+            run([shutil.which("ffmpeg") or "ffmpeg", "-v", "error", "-y", *inputs, "-vf", ",".join(pad),
+                 "-t", f"{duration:.3f}", "-r", str(fps), "-an", "-c:v", "qtrle", "-pix_fmt", "argb", str(partial)])
+            partial.replace(clip)
+        return str(clip)
+
+    kind = element.get("format")
+    if kind in ("generated", "blender-project", "openvdb", "openusd", "alembic", "exr", "exr-sequence"):
+        # Scene-linear light stays float in the working space, its highlights kept (SPEC-0012's range rule).
+        from .color import LINEAR_SPACE, exr_to_working
+
+        if kind in ("exr", "exr-sequence"):
+            pattern = element.get("file") or ""
+        else:
+            frames = element.get("frames") or max(2, round(duration * fps))
+            pattern = _blender_element(element, effect["params"], frames, width, height, fps,
+                                       state_root() / "vfx-elements", run)
+        delay = max(0.0, float(effect["params"].get("start", 0.0) or 0.0))
+        clip = exr_to_working(pattern, state_root() / "vfx-elements" / "working",
+                              colorspace=element.get("colorspace") or LINEAR_SPACE, lead=round(delay * fps),
+                              loop_to=round(duration * fps) if element.get("loop") else 0)
     else:
-        # A neutral picture for previews: a soft gradient with a figure-like shape.
-        inputs = ["-f", "lavfi", "-i", f"gradients=s={width}x{height}:c0=0x2a3a4a:c1=0x6a5a4a:d={duration:.3f}:r={fps}:speed=0.01:seed=7"]
-        graph = [f"[0:v]drawbox=x=iw*0.46:y=ih*0.35:w=iw*0.08:h=ih*0.65:color=0x1c1f22:t=fill,format=yuv420p[v0]"]
-        sound = []
-    label = "v0"
-    for index, effect in enumerate(effects, 1):
-        element_input = None
-        if effect["effect"] == "element":
-            element = effect["element"] = dict(effect["element"])
-            element_input = len([part for part in inputs if part == "-i"])
-            inputs += _element_input(element, element["file"], duration, width, height, fps, effect["params"], run)
-            element["_matte_input"] = None
-            if element.get("matte"):
-                element["_matte_input"] = element_input + 1
-                inputs += _element_input(element, element["matte"], duration, width, height, fps, {}, run,
-                                         matte=True)
-        graph.append(_chain(effect, label, f"v{index}", duration, width, height, element_input))
-        label = f"v{index}"
-    output.parent.mkdir(parents=True, exist_ok=True)
-    run([ffmpeg, "-v", "error", "-y", *inputs, "-filter_complex", ";".join(graph), "-map", f"[{label}]", *sound,
-         "-t", f"{duration:.3f}", "-r", str(fps), "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt",
-         "yuv420p", "-c:a", "aac", str(output)])
-    return output
+        clip = made("picture", element.get("file") or "", False)
+    prepared = {"_clip": clip, "_blend": element.get("blend", "alpha"), "_key_color": element.get("key_color") or "0x00FF00"}
+    if element.get("matte"):
+        prepared["_matte"] = made("matte", element["matte"], True)
+    return prepared
+
+
+def render_graph(effects: list[dict[str, Any]], duration: float, output: Path, *, background: Path | None = None,
+                 start: float = 0.0, width: int = 1280, height: int = 720, fps: int = 24, run=None) -> Path:
+    """Effects drawn by the compositing graph (C6, CT-0077) over a clip, its sound kept; without a clip, over a
+    neutral picture for previews (a soft gradient with a dark figure in the middle)."""
+
+    import numpy as np
+
+    from .compositing.drawing import over_picture
+    from .compositing.effects import graph_for
+
+    still = None
+    if background is None:
+        width, height = width // 2 * 2, height // 2 * 2
+        ys, xs = np.mgrid[0:height, 0:width].astype(np.float32)
+        still = np.dstack([0.05 + 0.08 * xs / width, 0.07 + 0.05 * ys / height, 0.1 + 0.03 * xs / width,
+                           np.ones_like(xs)]).astype(np.float32)
+        still[int(height * 0.35):, int(width * 0.46):int(width * 0.54), :3] = 0.012
+    return over_picture(graph_for(effects, duration, fps), duration, output, background=background, still=still,
+                        start=start, width=width, height=height, fps=fps, run=run)
 
 
 def preview_clip(item: dict[str, Any], output: Path, *, root: Path | None = None, element: str = "") -> Path:

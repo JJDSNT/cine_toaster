@@ -1,0 +1,7 @@
+# A person shot against a bright background, keyed by luminance over another picture.
+nodes:
+  person: {op: generate.source, take: CUT}
+  behind: {op: generate.source, file: plates/city.mov}
+  key:    {op: matte.key, picture: person, by: luminance, low: 0.7, high: 0.9, invert: true, softness: 0.05}
+  out:    {op: merge.over, front: person, back: behind, matte: key}
+output: out

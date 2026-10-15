@@ -16,5 +16,7 @@ bar_color = "#101315"
 subtitle_color = "#9AA3A8"
 
 [render]
-engine = "ffmpeg"
+engine = "graph"
 effect = "lower-third"
+# Drawn by the compositing graph (C6, CT-0077), of these primitives:
+primitives = ["curve.keys", "generate.solid", "generate.text", "matte.shape", "merge.over"]

@@ -63,19 +63,22 @@ def _default(kind: str, raw: str, name: str) -> list[float] | float | bool | int
     return values[0] if count == 1 else values
 
 
-def shader_params(source: str) -> list[dict[str, Any]]:
+def shader_params(source: str, inputs: Any = ()) -> list[dict[str, Any]]:
     """The parameters a gl-transitions shader declares, with their defaults.
 
     The convention is `uniform float count; // = 10.0`. A uniform without a
-    default cannot be rendered honestly, and a texture is an input neither the
-    preview nor the build supplies, so both are refused.
+    default cannot be rendered honestly, and is refused. A texture
+    (`sampler2D`) is an input: allowed when the item names a picture for it in
+    ``inputs`` (SPEC-0011), refused otherwise.
     """
 
     params = []
     for match in _UNIFORM.finditer(source):
         kind, name = match[1], match[2]
-        if name in _PROVIDED:
+        if name in _PROVIDED or (kind == "sampler2D" and name in inputs):
             continue
+        if kind == "sampler2D":
+            raise UnsupportedShader(f"Uniform {name} is a texture, and the item names no picture for it")
         if kind not in _COMPONENTS:
             raise UnsupportedShader(f"Uniform {name} is a {kind}, which no renderer supplies")
         raw = match[3] or match[4]
@@ -134,6 +137,9 @@ def _upstream_catalog(root: Path) -> tuple[dict[str, Any], ...]:
                 "webm_role": "preview",
                 "render": {},
                 "params": params,
+                "inputs": {},
+                "softness": 0.0,
+                "graph": None,
                 "curated": False,
                 "upstream": f"{UPSTREAM_NAME}:{path.stem}",
                 "origin": UPSTREAM_NAME,
@@ -190,7 +196,10 @@ def _load_manifest(path: Path, origin: str) -> dict[str, Any]:
         raise TransitionFormatError(f"Invalid TOML in {path}: {error}") from error
 
     upstream = str(document.get("upstream", ""))
-    # A curated manifest over an upstream shader inherits its licence and author.
+    # A curated manifest over an upstream shader inherits its licence and author. A recipe that replaces one
+    # (CT-0076) keeps the name, so the raw shader is not listed beside it, but is its own work: no shader is read.
+    replaces = upstream if document.get("kind") == "graph" else ""
+    upstream = "" if replaces else upstream
     required = ("id", "name", "kind", "description") + (() if upstream else ("license",))
     missing = [key for key in required if not document.get(key)]
     if missing:
@@ -198,18 +207,25 @@ def _load_manifest(path: Path, origin: str) -> dict[str, Any]:
 
     transition_id = str(document["id"])
     kind = str(document["kind"])
-    if kind not in {"glsl", "webm"}:
+    if kind not in {"glsl", "webm", "matte", "graph"}:
         raise TransitionFormatError(f"Unsupported transition kind {kind!r} in {path}")
 
     if upstream:
         asset_path = _upstream_shader(upstream)
         asset_name = asset_path.name
         header = {key.lower(): value for key, value in _HEADER.findall(asset_path.read_text(encoding="utf-8"))}
+    elif kind in ("matte", "graph") and not document.get("asset"):
+        # A matte item draws with the host's own matte renderer; it has no shader (SPEC-0011).
+        asset_name, asset_path, header = "", None, {}
     else:
         asset_name = str(document.get("asset", ""))
         asset_path = _safe_asset(path.parent, asset_name)
         header = {}
-    params = shader_params(asset_path.read_text(encoding="utf-8")) if kind == "glsl" else []
+    # Pictures the item gives its renderer: a matte, an overlay, a shader's textures (SPEC-0011).
+    declared = document.get("inputs") or {}
+    inputs = {name: _safe_asset(path.parent, str(value)) for name, value in declared.items() if isinstance(value, str)}
+    softness = float(declared.get("softness", 0.0) or 0.0) if isinstance(declared, dict) else 0.0
+    params = shader_params(asset_path.read_text(encoding="utf-8"), inputs) if kind == "glsl" else []
     preview_name = str(document.get("preview", ""))
     preview_path = _safe_asset(path.parent, preview_name) if preview_name else None
 
@@ -235,14 +251,34 @@ def _load_manifest(path: Path, origin: str) -> dict[str, Any]:
         # declared by the item rather than inferred by a renderer.
         "render": dict(document.get("render", {})),
         "params": params,
+        "inputs": inputs,
+        "softness": softness,
+        # A recipe of SPEC-0012 primitives (ADR 0022), checked when the catalog loads.
+        "graph": _recipe(document.get("graph"), path),
+        # Why a reviewed shader stays a closed program and is not a recipe of primitives (CT-0076).
+        "opaque_reason": str(document.get("opaque_reason", "")),
         "curated": True,
-        "upstream": upstream or None,
+        "upstream": (upstream or replaces) or None,
         "origin": origin,
         "asset": asset_name,
         "preview": preview_name or None,
         "asset_path": asset_path,
         "preview_path": preview_path,
     }
+
+
+def _recipe(graph: Any, path: Path) -> dict[str, Any] | None:
+    if not graph:
+        return None
+    from .compositing.schema import validate
+
+    problems = validate(graph)
+    for name in ("from", "to", "progress"):
+        if name not in (graph.get("ports") or {}):
+            problems.append(("composite_input_missing", f"a join's recipe has a port {name!r}"))
+    if problems:
+        raise TransitionFormatError(f"The graph in {path} is not valid: " + "; ".join(text for _, text in problems))
+    return graph
 
 
 def list_transitions(project_root: Path | None = None) -> list[dict[str, Any]]:
@@ -273,7 +309,8 @@ def list_transitions(project_root: Path | None = None) -> list[dict[str, Any]]:
 def public_transition(transition: dict[str, Any]) -> dict[str, Any]:
     value = {key: item for key, item in transition.items() if not key.endswith("_path")}
     transition_id = transition["id"]
-    value["asset_url"] = f"/transition-assets/{transition_id}/{transition['asset']}"
+    value["inputs"] = {name: path.name for name, path in (transition.get("inputs") or {}).items()}
+    value["asset_url"] = f"/transition-assets/{transition_id}/{transition['asset']}" if transition["asset"] else None
     if transition["preview"]:
         value["preview_url"] = f"/transition-assets/{transition_id}/{transition['preview']}"
     elif transition["kind"] == "webm":
@@ -291,8 +328,69 @@ def transition_asset_path(
     for transition in list_transitions(project_root):
         if transition["id"] != transition_id:
             continue
-        for key in ("asset_path", "preview_path"):
-            path = transition.get(key)
+        for path in [transition.get("asset_path"), transition.get("preview_path"),
+                     *(transition.get("inputs") or {}).values()]:
             if path is not None and path.name == filename:
                 return path
     return None
+
+
+def _sample_pictures(size: tuple[int, int]) -> dict[str, Any]:
+    """Two shots and a matte to show a recipe with: a warm and a cool gradient, and soft dark blobs."""
+
+    import numpy as np
+
+    width, height = size
+    y, x = np.mgrid[0:height, 0:width].astype(np.float32)
+    u, v = x / max(width - 1, 1), y / max(height - 1, 1)
+    warm = np.dstack([0.9 - 0.4 * v, 0.35 + 0.3 * u, 0.12 + 0.1 * v, np.ones_like(u)])
+    cool = np.dstack([0.08 + 0.1 * u, 0.25 + 0.3 * v, 0.75 - 0.3 * u, np.ones_like(u)])
+    # Detail a blur or a warp can be seen on: thin lines on one, rings on the other.
+    lines = (np.abs(np.mod(x, 40) - 20) < 2) | (np.abs(np.mod(y, 40) - 20) < 2)
+    rings = np.abs(np.mod(np.hypot(x - width / 2, y - height / 2), 36) - 18) < 3
+    warm[lines, :3] *= 0.35
+    cool[rings, :3] = cool[rings, :3] * 0.4 + 0.5
+    matte = np.ones_like(u)
+    for cx, cy, r, shade in ((0.31, 0.47, 0.55, 0.0), (0.73, 0.33, 0.4, 0.27), (0.66, 0.83, 0.45, 0.47),
+                             (0.14, 0.17, 0.32, 0.67)):
+        reach = np.clip(np.hypot((u - cx) * width / height, v - cy) / r, 0, 1)
+        matte = np.minimum(matte, shade + (1 - shade) * reach)
+    from .compositing.reference import decode_srgb
+
+    matte = decode_srgb(matte)  # as a matte drawn in an image file arrives: decoded to linear light
+    return {"from": warm.astype(np.float32), "to": cool.astype(np.float32),
+            "matte_clip": np.dstack([matte, matte, matte, np.ones_like(matte)]).astype(np.float32)}
+
+
+def render_preview(transition: dict[str, Any], destination: Path, *, seconds: float = 2.0, fps: int = 24,
+                   size: tuple[int, int] = (640, 360)) -> Path:
+    """A recipe's preview clip, drawn from its graph by the renderers every join uses (ADR 0022, CT-0072).
+
+    A `matte` item is previewed through the matte join's own graph with a sample matte, so the browser
+    holds no copy of the rule. The clip is VP9 WebM, which every browser plays.
+    """
+
+    import shutil
+    import subprocess
+    import tempfile
+
+    from .compositing import reference
+    from .compositing.gl import renderer_for
+    from .mattes import recipe as matte_recipe
+
+    graph = matte_recipe(False) if transition["kind"] == "matte" else transition.get("graph")
+    if not graph:
+        raise TransitionFormatError(f"{transition['id']} has no graph to preview")
+    frames = max(1, round(seconds * fps))
+    inputs = {name: value for name, value in _sample_pictures(size).items() if name in graph["ports"]}
+    for name, path in (transition.get("inputs") or {}).items():  # the recipe's own pictures: a luma, a map
+        if name in graph["ports"]:
+            inputs[name] = reference.read(Path(path), frames, size, fps)
+    pictures, _, _ = reference.render(graph, inputs, frames=frames, size=size, fps=fps, cache=False,
+                                      renderer=renderer_for(graph))
+    with tempfile.TemporaryDirectory() as work:
+        drawn = reference.write(pictures, Path(work) / "preview.mp4", fps)
+        subprocess.run([shutil.which("ffmpeg") or "ffmpeg", "-y", "-loglevel", "error", "-i", str(drawn), "-c:v",
+                        "libvpx-vp9", "-b:v", "0", "-crf", "36", "-pix_fmt", "yuv420p", "-an", str(destination)],
+                       check=True)
+    return Path(destination)

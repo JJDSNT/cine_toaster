@@ -1,0 +1,23 @@
+# The reel's own card: the catalog's card in this production's palette, held
+# rather than faded. The look says a card arrives on its transition and is never
+# faded itself, so the fades are off here once instead of on every shot.
+schema_version = 1
+id = "reel-card"
+name = "Reel card"
+category = "cards"
+says = "A headline and one line under it, in the reel's ink on its night blue, held still."
+energy = "low"
+use_when = ["Every card of this reel"]
+avoid_when = ["Over a picture: this card is its own background"]
+
+[params]
+size = 64
+spaced = true
+color = "#f2ead9"
+background = "#0b0b16"
+fade_in = 0.0
+fade_out = 0.0
+
+[render]
+engine = "ffmpeg"
+effect = "fade"

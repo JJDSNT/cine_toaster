@@ -50,9 +50,25 @@ project/
   scenes/<scene>/scene.yaml       authored: direction, geography, shots
   scenes/<scene>/state.json       runtime-owned: selections, decisions, versions
   scenes/<scene>/work/            the takes, as files
+  signals/<id>/                   runtime-owned (C8, CT-0081; ADR 0024): a signal of a medium -- signal.yaml
+                                  (kind, origin, clock, size, camera, depth conventions, labels, data in use),
+                                  provenance.json (the chain: makers, inputs by hash, transformations),
+                                  quality.json (declared apart from measured), data/NNNN/ (frames, never
+                                  edited), corrections/ (a person's, apart)
+  tracks/<id>/                    runtime-owned (C7, CT-0080): a track of a medium -- track.yaml (identity,
+                                  media and its hash, the measurement in use), measurements/NNNN.json (each
+                                  automatic measurement, never edited), corrections.json (a person's, apart)
   assets/
-  renders/
+  renders/                        assembled files; renders/passes/<id>/ (C8, CT-0081): a 3D scene's render --
+                                  render.json (renderer, scene and its files by hash, the camera at every
+                                  frame, the object table) and rgba/ (the picture); its depth and object index
+                                  are the signals <id>-depth and <id>-objects
 ```
+
+A track belongs to its media, not to a shot: any shot cut from that media
+reads it by its clock, whatever its trim or retime. It is refused when stale
+(its media or its measuring has changed), and changed only by the `track`
+commands -- measure, correct, revert -- with an actor and an event.
 
 There is one native format and no import step: the production's own breakdown is
 the scene file (ADR 0010). It holds direction, scene geometry, shots, open

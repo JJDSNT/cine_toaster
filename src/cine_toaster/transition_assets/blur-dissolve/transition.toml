@@ -1,15 +1,16 @@
 schema_version = 1
 id = "blur-dissolve"
 name = "Blur Dissolve"
-kind = "glsl"
-# The shader is gl-transitions' own; this manifest adds the review.
+kind = "graph"
+# Replaces gl-transitions' shader of this name; the recipe below is Cine Toaster's own (CT-0076).
 upstream = "gl-transitions:LinearBlur"
-category = "classic"
+category = "dissolve"
 description = "Both shots soften while they blend, so the join passes through a blur."
 guidance = "A dissolve that hides a mismatch: busy or high-contrast frames that would muddy in a plain dissolve blur through each other instead. Also reads as memory, sleep or drifting attention."
 energy = "low"
 motion = "neutral"
 duration_ms = 1000
+preview = "preview.webm"  # drawn from the graph by transitions.render_preview
 tags = ["soft", "dream", "memory", "temporal"]
 use_when = [
   "Two busy frames would muddy in a dissolve",
@@ -19,9 +20,23 @@ avoid_when = [
   "The audience must read detail through the join",
 ]
 
+license = "CC0-1.0"
+author = "Cine Toaster contributors"
+
 # How this item renders on each engine that can execute it. Declared by whoever
 # wrote the item, never inferred by the renderer: a substitution nobody chose
 # is a substitution nobody can argue with.
 [render]
-ffmpeg = "hblur"
-ffmpeg_note = "xfade's hblur blurs horizontally only; the shader blurs in every direction."
+ffmpeg = "graph"
+ffmpeg_note = "Drawn from its graph by GL, or by the reference where GL cannot run: no stand-in is needed (CT-0076)."
+
+[graph]
+ports = {from = "picture", to = "picture", progress = "curve"}
+output = "out"
+
+[graph.nodes]
+# Both pictures soften toward the middle of the join and sharpen out of it (radius in pixels at 720 lines).
+soft = {op = "curve.keys", in = "progress", keys = [{t = 0.0, value = 0.0, ease = "in-out"}, {t = 0.5, value = 18.0, ease = "in-out"}, [1.0, 0.0]]}
+from_soft = {op = "filter.blur", in = "from", radius = {curve = "soft"}}
+to_soft = {op = "filter.blur", in = "to", radius = {curve = "soft"}}
+out = {op = "merge.mix", a = "from_soft", b = "to_soft", by = "progress"}

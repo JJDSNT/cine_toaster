@@ -220,8 +220,22 @@ def _load_shots(
                 "avoid": _avoid(field(raw, "avoid")),
                 "mute": [list(map(float, item)) for item in field(raw, "mute") or [] if isinstance(item, list) and len(item) == 2],
                 "sound_fades_at": float(field(raw, "sound_fades_at")) if field(raw, "sound_fades_at") not in (None, "") else None,
+                # Its take's sound when its picture is retimed (C7, CT-0080): mute (the default), preserve or
+                # stretch; and the stretcher, by name.
+                "retime_sound": _text(field(raw, "retime_sound")),
+                # Its picture retimed (C7, CT-0080): speed (keys may fall on beats), reverse, freeze.
+                "retime": field(raw, "retime") if isinstance(field(raw, "retime"), dict) else None,
+                "stretch_with": _text(field(raw, "stretch_with")),
                 # Where a format's frame sits in the take (CT-0049): {x, y}, 0 to 1, centred by default.
                 "reframe": field(raw, "reframe") if isinstance(field(raw, "reframe"), dict) else None,
+                # Its length in beats of the scene's music, instead of seconds (CT-0067).
+                "beats": field(raw, "beats"),
+                # The shot's picture as a composite of SPEC-0012 (a graph), when it is not the take alone.
+                "composite": field(raw, "composite") if isinstance(field(raw, "composite"), dict) else None,
+                # The shot's picture as layers (C4): compiled into its composite when the scene loads.
+                "layers": field(raw, "layers"),
+                # The stretch of a public file this shot's picture is (CT-0066).
+                "footage": _footage(field(raw, "footage")),
                 "derive": _derive(field(raw, "derive")),
                 "guide_at_cut": field(raw, "guide_at_cut") if isinstance(field(raw, "guide_at_cut"), bool) else None,
                 "guide_strength": field(raw, "guide_strength"),
@@ -330,11 +344,23 @@ def _transition(raw: dict[str, Any]) -> dict[str, Any] | None:
         return None
     if not isinstance(value, dict):
         return {"id": _text(value), "duration_ms": None, "reason": ""}
-    return {
+    reference = {
         "id": _text(value.get("id")),
         "duration_ms": value.get("duration_ms"),
         "reason": vtext(value, "reason"),
     }
+    if value.get("beats") is not None:
+        # Its length in beats of the scene's music (CT-0067); turned into milliseconds when the beats are known.
+        reference["beats"] = value.get("beats")
+    # Pictures the join gives the transition, over the item's own (SPEC-0011).
+    for key in ("matte", "overlay", "blend"):
+        if key == "matte" and isinstance(value.get(key), dict):
+            reference[key] = dict(value[key])  # a generated matte (CT-0076): {gradient: {...}} or {noise: {...}}
+        elif value.get(key):
+            reference[key] = _text(value.get(key))
+    if value.get("softness") is not None:
+        reference["softness"] = value.get("softness")
+    return reference
 
 
 def _extra_shot_fields(
@@ -429,6 +455,32 @@ def _expand_effects(shots: list[dict[str, Any]], scene_id: str, root: Path) -> l
         for problem in problems:
             findings.append(Finding(code="effect_problem", severity="error", scene_id=scene_id, shots=(shot["id"],),
                                     message=f"{shot['id']} {problem}. It would be lost, not guessed."))
+    return findings
+
+
+def _expand_layers(shots: list[dict[str, Any]], scene_id: str) -> list[Finding]:
+    """`layers: [...]` become the shot's composite, a SPEC-0012 graph (C4, CT-0075): one way of drawing."""
+
+    if not any(shot.get("layers") is not None for shot in shots):
+        return []
+    from .compositing.layers import compile_layers
+
+    findings = []
+    for shot in shots:
+        if shot.get("layers") is None:
+            continue
+        if shot.get("composite"):
+            findings.append(Finding(code="layers_and_composite", severity="error", scene_id=scene_id,
+                                    shots=(shot["id"],),
+                                    message=f"{shot['id']} gives both `layers` and a `composite`; one picture is "
+                                            f"written one way."))
+            continue
+        graph, problems = compile_layers(shot["layers"])
+        for problem in problems:
+            findings.append(Finding(code="layers_invalid", severity="error", scene_id=scene_id, shots=(shot["id"],),
+                                    message=f"{shot['id']}: {problem}."))
+        if graph is not None:
+            shot["composite"] = graph
     return findings
 
 
@@ -676,7 +728,14 @@ def _load_scene(
     move_findings = _expand_camera_moves(shots, scene_id, root)
     move_findings.extend(_expand_titles(shots, scene_id, root))
     move_findings.extend(_expand_effects(shots, scene_id, root))
+    move_findings.extend(_expand_layers(shots, scene_id))
     sound_beds, sound_findings = _expand_sounds(shots, document, scene_id, root)
+    if any(shot.get("beats") is not None for shot in shots):
+        from .beats import lay_out
+        from .sounds import list_sounds
+
+        sound_findings.extend(Finding(**problem) for problem in lay_out(
+            shots, sound_beds["music"], {item["id"]: item for item in list_sounds(root)}, scene_id))
     move_findings.extend(sound_findings)
     enter, enter_findings = _scene_enter(document, scene_id, root)
     move_findings.extend(enter_findings)
@@ -745,25 +804,85 @@ def _load_scene(
                          f"A generation makes one continuous run of shots; the shots between would be cut out of it."),
             ).public_dict())
 
+    # A composite is checked as SPEC-0012 says, before anything renders; its takes and files must be there.
+    if any(shot.get("composite") for shot in shots):
+        from .compositing.schema import validate as validate_composite
+
+        for shot in shots:
+            graph = shot.get("composite")
+            if not graph:
+                continue
+            for code, message in validate_composite(graph):
+                findings.append(Finding(code=code, severity="error", scene_id=scene_id, shots=(shot["id"],),
+                                        message=f"{shot['id']}: its composite: {message}.").public_dict())
+            takes = {take["id"] for take in shot.get("takes") or []} | ({"CUT"} if shot.get("takes") else set())
+            for node_name, node in (graph.get("nodes") or {}).items():
+                if not isinstance(node, dict):
+                    continue
+                if node.get("op") == "generate.source" and node.get("take") and str(node["take"]) not in takes:
+                    findings.append(Finding(code="composite_input_missing", severity="error", scene_id=scene_id,
+                                            shots=(shot["id"],),
+                                            message=f"{shot['id']}: its composite's {node_name} names the take "
+                                                    f"{node['take']!r}, which the shot does not have.").public_dict())
+                for key in ("file", "scene"):
+                    if isinstance(node.get(key), str) and not (root / node[key]).is_file():
+                        findings.append(Finding(code="composite_input_missing", severity="error", scene_id=scene_id,
+                                                shots=(shot["id"],),
+                                                message=f"{shot['id']}: its composite's {node_name} reads "
+                                                        f"{node[key]}, which is not there.").public_dict())
+
+    # Footage from outside is declared with where it is and its licence, and fetched (CT-0066).
+    from .footage import problem as footage_problem
+
+    for shot in shots:
+        declared = shot.get("footage")
+        if not declared or shot.get("out_of_cut"):
+            continue
+        wrong = footage_problem(declared)
+        if wrong:
+            findings.append(Finding(
+                code="footage_incomplete", severity="error", scene_id=scene_id, shots=(shot["id"],),
+                message=f"{shot['id']} {wrong}; footage that cannot say where it is from cannot be shown.",
+            ).public_dict())
+        elif not shot.get("takes"):
+            findings.append(Finding(
+                code="footage_not_fetched", severity="advice", scene_id=scene_id, shots=(shot["id"],),
+                message=f"{shot['id']}: its footage is declared, not fetched yet; toast footage fetch brings it.",
+            ).public_dict())
+
     # A line laid from a file (a narration, a line recorded apart) whose file is not there is not heard (CT-0063).
+    # The cut reads it beside the scene, and nowhere else (CT-0065).
+    from .narration import stale as line_stale
+
     for shot in shots:
         for line in shot.get("lines") or []:
             mix = line.get("mix") if isinstance(line.get("mix"), dict) else {}
             name = mix.get("file") or mix.get("arquivo")
-            # Beside the scene (the assembly reads it there) or from the production (the reel's `toast voice`).
-            if not name or shot.get("out_of_cut") or (directory / str(name)).is_file() or (root / str(name)).is_file():
+            if not name or shot.get("out_of_cut"):
                 continue
             who = line.get("who") or "a line"
+            if (directory / str(name)).is_file():
+                changed = line_stale(directory / str(name), line)
+                if changed:
+                    findings.append(Finding(
+                        code="line_audio_stale", severity="warning", scene_id=scene_id, shots=(shot["id"],),
+                        message=(f"{shot['id']}: {who}'s audio {name} was spoken before {changed}; "
+                                 f"toast voice speaks it again."),
+                    ).public_dict())
+                continue
+            elsewhere = (f" It is at the production root, where the cut does not read it."
+                         if (root / str(name)).is_file() else "")
             if str(line.get("voice") or "").startswith("piper/"):
                 # Cine Toaster speaks it itself: not lost, only not made yet.
                 findings.append(Finding(
                     code="line_audio_missing", severity="advice", scene_id=scene_id, shots=(shot["id"],),
-                    message=f"{shot['id']}: {who}'s line is not spoken yet ({name}); toast voice makes it.",
+                    message=f"{shot['id']}: {who}'s line is not spoken yet ({name}); toast voice makes it.{elsewhere}",
                 ).public_dict())
             else:
                 findings.append(Finding(
                     code="line_audio_missing", severity="error", scene_id=scene_id, shots=(shot["id"],),
-                    message=f"{shot['id']}: {who}'s audio {name} is not there, so the cut does not hear it.",
+                    message=(f"{shot['id']}: {who}'s audio {name} is not beside the scene, so the cut does not "
+                             f"hear it.{elsewhere}"),
                 ).public_dict())
 
     decisions = [
@@ -895,7 +1014,10 @@ def _scene_enter(document: dict[str, Any], scene_id: str, root: Path) -> tuple[d
         split = 0.0
     enter = {"type": cut_type, "reason": str(raw.get("reason") or ""),
              "transition": {"id": str(transition["id"]), "duration_ms": transition.get("duration_ms"),
-                            "reason": str(transition.get("reason") or "")} if transition.get("id") else None,
+                            "reason": str(transition.get("reason") or ""),
+                            # A join between scenes may be shaped by a matte too (SPEC-0011).
+                            **{key: transition[key] for key in ("matte", "overlay", "blend", "softness")
+                               if transition.get(key) is not None}} if transition.get("id") else None,
              **({"split": split} if split else {})}
     return enter, findings
 
@@ -923,6 +1045,33 @@ def _check_transitions(
     except Exception:
         return []
     findings: list[Finding] = []
+    # The pictures a join gives its transition must be in the production (SPEC-0011).
+    scene_root = root.expanduser().resolve()
+    for shot in shots:
+        reference = shot.get("transition") or {}
+        for key in ("matte", "overlay"):
+            name = reference.get(key)
+            if not name:
+                continue
+            if isinstance(name, dict):
+                from .mattes import generated_problem
+
+                problem = generated_problem(name)
+                if problem:
+                    findings.append(Finding(code="transition_matte_invalid", severity="error", scene_id=scene_id,
+                                            shots=(shot["id"],),
+                                            message=f"{shot['id']}: its transition's generated matte {problem}."))
+                continue
+            path = (scene_root / name).resolve()
+            if not path.is_relative_to(scene_root):
+                findings.append(Finding(code="transition_input_outside", severity="error", scene_id=scene_id,
+                                        shots=(shot["id"],),
+                                        message=f"{shot['id']}: its transition's {key} {name} is outside the production."))
+            elif not path.is_file():
+                findings.append(Finding(code="transition_input_missing", severity="error", scene_id=scene_id,
+                                        shots=(shot["id"],),
+                                        message=f"{shot['id']}: its transition's {key} {name} is not there; the join "
+                                                "would be made without it."))
     for transition_id, shot_id in sorted(referenced.items()):
         if transition_id in available:
             continue
@@ -1157,6 +1306,12 @@ def _identifier(name: str) -> str:
 
     text = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
     return re.sub(r"[^A-Za-z0-9]+", "-", text).strip("-").upper() or "SUBJECT"
+
+
+def _footage(raw: Any) -> dict[str, Any] | None:
+    from .footage import read
+
+    return read(raw)
 
 
 def scene_directory(root: Path, scene_id: str) -> Path:
@@ -1581,6 +1736,12 @@ def load_production(root: Path) -> dict[str, Any]:
         for path in scene_files(root, manifest)
     ]
     scenes.sort(key=lambda scene: (scene["order"], scene["id"]))
+    # The frame every version is made in (CT-0068), declared once for the production.
+    from .formats import parse_frame
+
+    frame, frame_problem = parse_frame(manifest.get("frame"))
+    for scene in scenes:
+        scene["frame"] = frame
     scene_ids = [scene["id"] for scene in scenes]
     if len(scene_ids) != len(set(scene_ids)):
         raise ProjectFormatError("Scene ids must be unique")
@@ -1601,6 +1762,9 @@ def load_production(root: Path) -> dict[str, Any]:
             ]
 
     attention: list[dict[str, Any]] = []
+    if frame_problem:
+        attention.append({"kind": "frame", "scene_id": "", "scene_title": "",
+                          "message": f"project.yaml: {frame_problem}; versions take the first moving take's frame."})
     if script_problem:
         attention.append({"kind": "screenplay", "scene_id": "", "scene_title": "", "message": script_problem})
     for sequence in sequences:
@@ -1640,6 +1804,7 @@ def load_production(root: Path) -> dict[str, Any]:
         "look": project_look,
         "style": manifest.get("style"),
         "deliver": manifest.get("deliver"),
+        "frame": frame,
         "avoid": _avoid(manifest.get("avoid")),
         "renders": discover_renders(root),
         "script_path": _script_path(manifest, root),

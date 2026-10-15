@@ -20,9 +20,11 @@ shots:
     engine: title
     duration: 6
     label: The boot card names the reel.
-    text:
-      headline: CINE TOASTER
-      subhead: demo reel
+    title:
+      id: reel-card
+      text: CINE TOASTER
+      subtitle: demo reel
+      reason: The reel names itself before it shows anything.
     lines:
       - who: NARRATOR
         text: "Cine Toaster. Four scenes, four transitions, one look."

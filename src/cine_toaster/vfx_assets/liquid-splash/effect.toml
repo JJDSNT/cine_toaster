@@ -18,3 +18,5 @@ clarity = 0.85
 [render]
 engine = "blender"
 effect = "liquid-splash"
+# Rendered by Blender, then laid by the compositing graph (C6, CT-0077):
+primitives = ["generate.source", "merge.over", "warp.transform"]

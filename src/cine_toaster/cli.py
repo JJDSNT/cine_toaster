@@ -15,7 +15,7 @@ from .commands import (
     review_assembly,
     select_take,
 )
-from .errors import CineToasterError
+from .errors import CineToasterError, ValidationError
 from .events import tail_events
 from .index import ProjectIndex, build_index, index_path_for
 from .knowledge import coverage, load_practices, load_providers, practices_for_check
@@ -269,6 +269,50 @@ def command_take_select(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_take_add(args: argparse.Namespace) -> int:
+    from .commands import add_take
+
+    result = add_take(args.project, scene_id=args.scene, shot_id=args.shot, source=args.file,
+                      actor=_resolve_actor(args), name=args.name, kind=args.kind, origin=args.source or "",
+                      licence=args.licence or "", credit=args.credit or "")
+    if args.json:
+        print(json.dumps(result.public_dict(), ensure_ascii=False, indent=2))
+    else:
+        print(f"Added {result.event['payload']['media']} as take {result.take_id} of {result.shot_id}")
+    return 0
+
+
+def command_footage(args: argparse.Namespace) -> int:
+    """Footage declared in the breakdown: what there is, and bringing it in (CT-0066)."""
+
+    from .footage import fetch
+
+    root = args.project.expanduser().resolve()
+    production = load_production(root)
+    if args.footage_command == "list":
+        found = False
+        for scene in production["scenes"]:
+            for shot in scene["shots"]:
+                footage = shot.get("footage")
+                if not footage or (args.scene and scene["id"] != args.scene):
+                    continue
+                found = True
+                state = "fetched" if shot.get("takes") else "not fetched"
+                print(f"{scene['id']} {shot['id']:5} {state:12} {footage['in']:g} s + "
+                      f"{footage['duration'] or shot.get('duration_seconds') or 0:g} s  {footage['licence']}"
+                      f"  ({footage['credit'] or 'no credit'})\n      {footage['page'] or footage['url']}")
+        if not found:
+            print("No shot declares footage.")
+        return 0
+    results = fetch(root, production, _resolve_actor(args), scene_id=args.scene, report=print)
+    if not results:
+        print("No shot declares footage.")
+        return 0
+    for item in results:
+        print(f"  {item.status:8} {item.scene} {item.shot}  {item.detail}")
+    return 1 if any(item.status == "refused" for item in results) else 0
+
+
 def command_take_clear(args: argparse.Namespace) -> int:
     result = clear_selection(
         args.project,
@@ -325,26 +369,29 @@ def _foreground_job(kind: str, project: Path, params: dict, output: Path | None,
     return manager.adopt(job["id"], overwrite=True, destination=output)
 
 
-def command_build(args: argparse.Namespace) -> int:
-    """Render the production's composed shots into one watchable file."""
+def command_still(args: argparse.Namespace) -> int:
+    """A shot's frame as the cut draws it: its graph run at one instant (CT-0072)."""
 
-    job = _foreground_job("build", args.project, {"engine": args.engine}, args.output, quiet=args.json)
-    if job is None:
+    from .assembly import plan_scene, still
+    from .project import STILLS_DIRECTORY, load_production
+
+    root = args.project.expanduser().resolve()
+    production = load_production(root)
+    scene = next((item for item in production["scenes"] if item["id"] == args.scene), None)
+    if scene is None:
+        print(f"No scene {args.scene!r}.", file=sys.stderr)
         return 1
-    result = job["result"]["summary"]
-    adopted = job["message"].removeprefix("Adopted: ")
-    if args.json:
-        print(json.dumps({**result, "output": adopted, "job": job["id"]}, indent=2))
-    else:
-        print(
-            f"Built {adopted}\n"
-            f"  {result['shots']} shot(s), {result['transitions']} transition(s), "
-            f"{result['duration_seconds']:.1f}s, "
-            f"{'with audio' if result['audio'] else 'silent'}\n"
-            f"  engine {result['engine']}: {result['shaders']} transition(s) ran their own shader\n"
-            f"  {result['stills']} still(s) kept for the storyboard\n"
-            f"  job {job['id']}"
-        )
+    destination = args.output or root / STILLS_DIRECTORY / args.scene / f"{args.shot}.png"
+    try:
+        plan = plan_scene(root, scene, production.get("words_sidecar") or "{stem}.words.json")
+        still(root, plan, args.shot, destination, args.at)
+    except ValidationError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    for note in plan.notes:
+        if note.startswith(f"{args.shot}:"):
+            print(f"  {note}")
+    print(f"Wrote {destination}")
     return 0
 
 
@@ -784,6 +831,122 @@ def command_vfx(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_track(args: argparse.Namespace) -> int:
+    """Tracks as production records (C7 step 5, CT-0080): measure, see, correct, revert."""
+
+    from . import tracks
+
+    root = args.project.expanduser().resolve()
+    if args.track_command == "measure":
+        done = tracks.measure_track(root, track_id=args.id, media=args.media, kind=args.kind, region=args.region,
+                                    start=args.start, end=args.end, actor=_resolve_actor(args),
+                                    rationale=args.rationale)
+        state = tracks.status(root, args.id)
+        weak = ", ".join(f"{a}-{b}" for a, b in state["weak"]) or "none"
+        print(f"{args.id}: measurement {done['measurement']}, revision {done['revision']}; weak entries: {weak}")
+        return 0
+    if args.track_command == "status":
+        print(json.dumps(tracks.status(root, args.id), indent=2))
+        return 0
+    if args.track_command == "correct":
+        values = [[args.at[i], args.at[i + 1]] for i in range(0, len(args.at), 2)]
+        done = tracks.correct_track(root, track_id=args.id, index=args.index, actor=_resolve_actor(args),
+                                    **({"corners": values} if len(values) == 4 else {"points": values}),
+                                    note=args.rationale, expected_revision=args.expect_revision)
+        print(f"{args.id}: entry {args.index} corrected ({done['correction']}), revision {done['revision']}")
+        return 0
+    done = tracks.revert_corrections(root, track_id=args.id, actor=_resolve_actor(args), correction=args.correction,
+                                     index=args.index, note=args.rationale)
+    print(f"{args.id}: reverted {', '.join(done['reverted'])}, revision {done['revision']}")
+    return 0
+
+
+def _prompted_objects(args: argparse.Namespace) -> list[dict]:
+    """`--object NAME[@FRAME]:X,Y[:X,Y...]` and `--box NAME[@FRAME]:X0,Y0,X1,Y1`, in the order given."""
+
+    objects = []
+    for given, kind in [(item, "points") for item in args.object or []] + [(item, "box") for item in args.box or []]:
+        head, _, rest = given.partition(":")
+        name, _, frame = head.partition("@")
+        try:
+            numbers = [[float(value) for value in pair.split(",")] for pair in rest.split(":") if pair]
+        except ValueError:
+            raise ValidationError(f"Not an object: {given!r} (NAME[@FRAME]:X,Y[:X,Y...])") from None
+        if not name or not numbers:
+            raise ValidationError(f"Not an object: {given!r} (NAME[@FRAME]:X,Y[:X,Y...])")
+        objects.append({"name": name, "frame": int(frame or 0),
+                        **({"points": numbers} if kind == "points" else {"box": numbers[0]})})
+    return objects
+
+
+def command_models(args: argparse.Namespace) -> int:
+    """The models that estimate signals: the catalog, and fetching one -- the only act that downloads."""
+
+    from . import models
+
+    if args.models_command == "list":
+        for item in models.describe():
+            print(f"{item['model']:30} {item['kind']:15} {item['licence']:11} {item['revision']}  "
+                  f"{'fetched' if item['fetched'] else 'not fetched'}")
+        return 0
+    done = models.fetch(args.name, again=args.again)
+    print(f"{args.name}: {'fetched' if done['fetched'] else 'already here'} in {done['directory']}")
+    return 0
+
+
+def command_signal(args: argparse.Namespace) -> int:
+    """Signals as production records (C8, CT-0081): estimate one with a model, compare, see."""
+
+    from . import estimates, signals
+
+    root = args.project.expanduser().resolve()
+    if args.signal_command == "estimate":
+        done = estimates.estimate(root, signal_id=args.id, model=args.model, media=args.media,
+                                  actor=_resolve_actor(args), first=args.first, count=args.count,
+                                  objects=_prompted_objects(args) or None, threads=args.threads, repeat=args.repeat,
+                                  parameters={"input_size": args.input_size} if args.input_size else None)
+        repeat = done["repeat"]
+        print(f"{args.id}: {done['frames']} frames by {args.model}, revision {done['revision']}"
+              + (f"; a second run {'identical' if repeat['identical'] else 'differed by ' + str(repeat['max_difference'])}"
+                 if repeat else ""))
+        return 0
+    if args.signal_command == "align":
+        from . import align
+
+        done = align.align_depth(root, signal_id=args.id, estimate=args.estimate, reference=args.reference,
+                                 camera=args.camera, actor=_resolve_actor(args), temporal=args.temporal,
+                                 smoothness=args.smoothness, first=args.first, count=args.count,
+                                 region=args.region, keep_labels=args.keep, leave_labels=args.leave,
+                                 objects=args.objects)
+        print(json.dumps({key: done[key] for key in ("signal", "revision", "residual", "held_out_frames",
+                                                      "held_out_tail", "temporal_agreement", "modes_compared",
+                                                      "occlusions_inverted") if key in done}, indent=2))
+        return 0
+    if args.signal_command == "compare":
+        done = estimates.compare(root, signal_id=args.id, reference=args.reference, actor=_resolve_actor(args))
+        print(json.dumps(done, indent=2))
+        return 0
+    print(json.dumps(signals.status(root, args.id), indent=2, default=str))
+    return 0
+
+
+def command_render(args: argparse.Namespace) -> int:
+    """A 3D scene's passes rendered apart and recorded (C8 step 2, CT-0081)."""
+
+    from . import renders
+
+    root = args.project.expanduser().resolve()
+    if args.render_command == "passes":
+        done = renders.render_passes(root, render_id=args.id, camera=args.camera, first=args.first, last=args.last,
+                                     size=tuple(args.size), fps=args.fps, actor=_resolve_actor(args),
+                                     blend=args.blend, recipe=args.recipe, samples=args.samples,
+                                     camera_id=args.camera_id)
+        print(f"{args.id}: {done['frames']} frames by Blender {done['blender']}; signals {', '.join(done['signals'])}")
+        return 0
+    print(json.dumps(renders.status(root, args.id), indent=2, default=str))
+    return 0
+
+
 def command_sound(args: argparse.Namespace) -> int:
     """The sound catalog, and the sources recorded sound and music come from (CT-0048)."""
 
@@ -816,6 +979,17 @@ def command_sound(args: argparse.Namespace) -> int:
         print(f"registered {len(made)} sounds from {args.folder}")
         return 0
     catalog = {item["id"]: item for item in list_sounds(root)}
+    if args.sound_command == "beats":
+        from .beats import detect
+
+        if args.id not in catalog:
+            print(f"No sound {args.id!r} in the catalog", file=sys.stderr)
+            return 1
+        heard = detect(catalog[args.id])
+        times = heard["beats"]
+        print(f"{args.id}: {heard['tempo']:g} BPM, {len(times)} beats from {times[0]:.2f} s to {times[-1]:.2f} s "
+              f"-> {Path(catalog[args.id]['directory']).relative_to(root) / 'beats.json'}")
+        return 0
     if args.sound_command == "preview":
         if args.id not in catalog:
             print(f"No sound {args.id!r} in the catalog", file=sys.stderr)
@@ -1108,6 +1282,18 @@ def command_assemble_sequence(args: argparse.Namespace) -> int:
 
     from .jobs import JobManager
 
+    if getattr(args, "scenes", False):
+        # The whole sequence from its records: a new version of each scene, then of the sequence (CT-0065).
+        sequence = next((item for item in load_production(args.project)["sequences"] if item["id"] == args.sequence), None)
+        if sequence is None:
+            print(f"There is no sequence {args.sequence!r} in this production.", file=sys.stderr)
+            return 1
+        for scene_id in sequence["scene_ids"]:
+            made = command_assemble(argparse.Namespace(project=args.project, scene=scene_id, version=None,
+                                                       summary=args.summary, stems=False))
+            if made:
+                return made
+
     manager = JobManager()
     try:
         job = manager.wait(manager.submit("assemble_sequence", args.project, {
@@ -1271,42 +1457,27 @@ def command_voice(args: argparse.Namespace) -> int:
     root = args.project.expanduser().resolve()
     production = load_production(root)
 
-    pending: list[tuple[str, str, dict]] = []
-    for scene in production["scenes"]:
-        if args.scene and scene["id"] != args.scene:
-            continue
-        for shot in scene["shots"]:
-            for line in shot["lines"]:
-                target = (line.get("mix") or {}).get("file")
-                if not target:
-                    continue
-                pending.append((scene["id"], shot["id"], {**line, "target": target}))
+    from .narration import speak_lines
 
-    if not pending:
+    narrators: dict[str, PiperNarration] = {}
+
+    def speaker(voice: str) -> PiperNarration:
+        # Voices are downloaded once into the production, where the film can be remade from.
+        return narrators.setdefault(voice, PiperNarration(root / VOICES_DIRECTORY, voice))
+
+    results = speak_lines(root, production, speaker, scene_id=args.scene,
+                          default_voice=args.voice or DEFAULT_VOICE, force=args.force)
+    if not results:
         print("No lines with a mix destination. Nothing to speak.")
         return 0
-
-    narrator = PiperNarration(root / VOICES_DIRECTORY, args.voice or DEFAULT_VOICE)
-    made = 0
-    for scene_id, shot_id, line in pending:
-        destination = root / line["target"]
-        if destination.is_file() and not args.force:
-            print(f"  keep   {line['target']}  (exists; --force to remake)")
-            continue
-        if destination.suffix.lower() != ".wav":
-            print(
-                f"  refuse {line['target']}  "
-                f"offline narration writes WAV; declare a .wav file"
-            )
-            continue
-        text = line.get("en") or line.get("text") or ""
-        result = narrator.speak(text=text, output=destination)
-        made += 1
-        print(
-            f"  spoke  {scene_id} {shot_id}  {result.duration_seconds:.1f}s  "
-            f"{result.media.relative_to(root)}  [{result.model}]"
-        )
-    print(f"\n{made} line(s) spoken, {len(pending) - made} not made. Cost: $0.00, offline.")
+    for item in results:
+        if item.made:
+            print(f"  {item.status:<7}{item.scene} {item.shot}  {item.seconds:.1f}s  {item.file}  [{item.voice}]"
+                  + (f"  ({item.reason})" if item.reason else ""))
+        else:
+            print(f"  {item.status:<7}{item.file}  ({item.reason})")
+    made = sum(1 for item in results if item.made)
+    print(f"\n{made} line(s) spoken, {len(results) - made} not made. Cost: $0.00, offline.")
     return 0
 
 
@@ -1841,6 +2012,23 @@ def build_parser() -> argparse.ArgumentParser:
     select_parser.add_argument("--json", action="store_true")
     select_parser.set_defaults(function=command_take_select)
 
+    add_parser = take_actions.add_parser(
+        "add", help="Bring a recording or a still in as a take, with its source, licence and credit")
+    add_parser.add_argument("project", type=Path)
+    add_parser.add_argument("scene")
+    add_parser.add_argument("shot")
+    add_parser.add_argument("file", type=Path)
+    add_parser.add_argument("--name", help="what this take is called; needed when the shot already has one")
+    add_parser.add_argument("--kind", choices=("captured", "archival"), default="captured",
+                            help="filmed for this production, or someone else's footage (default: captured)")
+    add_parser.add_argument("--source", help="where it came from: a URL, a library, a card")
+    add_parser.add_argument("--licence", help="its licence (required for archival)")
+    add_parser.add_argument("--credit", help="who must be credited, as the licence asks")
+    add_parser.add_argument("--actor")
+    add_parser.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
+    add_parser.add_argument("--json", action="store_true")
+    add_parser.set_defaults(function=command_take_add)
+
     clear_parser = take_actions.add_parser("clear", help="Return a shot to undecided")
     clear_parser.add_argument("project", type=Path)
     clear_parser.add_argument("scene")
@@ -1853,6 +2041,18 @@ def build_parser() -> argparse.ArgumentParser:
     clear_parser.add_argument("--expect-revision", type=int)
     clear_parser.add_argument("--json", action="store_true")
     clear_parser.set_defaults(function=command_take_clear)
+
+    footage_parser = subparsers.add_parser(
+        "footage", help="Footage from outside, declared in the breakdown: list it, fetch it (CT-0066)")
+    footage_actions = footage_parser.add_subparsers(dest="footage_command", required=True)
+    for name, text in (("list", "What the shots declare, and whether it is here"),
+                       ("fetch", "Download each declared stretch and bring it in as its shot's take")):
+        action = footage_actions.add_parser(name, help=text)
+        action.add_argument("project", type=Path)
+        action.add_argument("--scene")
+        action.add_argument("--actor")
+        action.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
+        action.set_defaults(function=command_footage)
 
     check_parser = subparsers.add_parser(
         "check", help="Check scene geometry for continuity problems"
@@ -1928,6 +2128,8 @@ def build_parser() -> argparse.ArgumentParser:
     sequence_parser.add_argument("sequence")
     sequence_parser.add_argument("--version")
     sequence_parser.add_argument("--summary")
+    sequence_parser.add_argument("--scenes", action="store_true",
+                                 help="first assemble a new version of each of its scenes")
     sequence_parser.set_defaults(function=command_assemble_sequence)
 
     cast_parser = subparsers.add_parser("cast", help="Cast sheets: list them, or draft them from the scenes")
@@ -2114,6 +2316,112 @@ def build_parser() -> argparse.ArgumentParser:
     emotion_face.add_argument("--intensity", default="clear", choices=("subtle", "clear", "overwhelming"))
     emotion_parser.set_defaults(function=command_emotion)
 
+    track_parser = subparsers.add_parser("track", help="Tracks measured on media, kept, corrected and reused (C7, CT-0080)")
+    track_sub = track_parser.add_subparsers(dest="track_command", required=True)
+    track_measure = track_sub.add_parser("measure", help="Measure a track (again) on its media")
+    track_measure.add_argument("project", type=Path)
+    track_measure.add_argument("id")
+    track_measure.add_argument("--media", required=True, help="The media, a path in the production")
+    track_measure.add_argument("--kind", choices=("point", "plane"), required=True)
+    track_measure.add_argument("--region", type=float, nargs=4, default=[0.0, 0.0, 1.0, 1.0],
+                               metavar=("X0", "Y0", "X1", "Y1"))
+    track_measure.add_argument("--start", type=float)
+    track_measure.add_argument("--end", type=float)
+    track_status = track_sub.add_parser("status", help="What a track is: stale, weak stretches, corrections")
+    track_status.add_argument("project", type=Path)
+    track_status.add_argument("id")
+    track_correct = track_sub.add_parser("correct", help="Correct one entry (kept apart from the measurement)")
+    track_correct.add_argument("project", type=Path)
+    track_correct.add_argument("id")
+    track_correct.add_argument("index", type=int)
+    track_correct.add_argument("at", type=float, nargs="+", help="x y (a point) or four corners' x y")
+    track_correct.add_argument("--expect-revision", type=int)
+    track_revert = track_sub.add_parser("revert", help="Take corrections out of force, keeping them")
+    track_revert.add_argument("project", type=Path)
+    track_revert.add_argument("id")
+    track_revert.add_argument("--correction")
+    track_revert.add_argument("--index", type=int)
+    for action in (track_measure, track_correct, track_revert):
+        action.add_argument("--rationale", default="")
+        action.add_argument("--actor", help="Who is deciding (default: current user)")
+        action.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
+    track_parser.set_defaults(function=command_track)
+
+    models_parser = subparsers.add_parser("models", help="Models that estimate signals: the catalog, and fetching "
+                                                         "one at its pinned revision (C8, CT-0081)")
+    models_sub = models_parser.add_subparsers(dest="models_command", required=True)
+    models_sub.add_parser("list", help="The catalog: kind, licence, revision, fetched or not")
+    models_fetch = models_sub.add_parser("fetch", help="Download a model at its pinned revision, checked by hash")
+    models_fetch.add_argument("name")
+    models_fetch.add_argument("--again", action="store_true", help="Fetch again even when it is here")
+    models_parser.set_defaults(function=command_models)
+
+    signal_parser = subparsers.add_parser("signal", help="Signals of media -- depth, segmentation -- as records "
+                                                         "(C8, CT-0081)")
+    signal_sub = signal_parser.add_subparsers(dest="signal_command", required=True)
+    signal_estimate = signal_sub.add_parser("estimate", help="Estimate a signal of a medium with a model")
+    signal_estimate.add_argument("project", type=Path)
+    signal_estimate.add_argument("id")
+    signal_estimate.add_argument("--model", required=True, help="A model of `toast models list`")
+    signal_estimate.add_argument("--media", required=True, help="The medium, a path in the production")
+    signal_estimate.add_argument("--first", type=int, default=0, help="Its first frame")
+    signal_estimate.add_argument("--count", type=int, help="How many frames (default: to the end)")
+    signal_estimate.add_argument("--object", action="append", help="SAM 2: NAME[@FRAME]:X,Y[:X,Y...] (pixels)")
+    signal_estimate.add_argument("--box", action="append", help="SAM 2: NAME[@FRAME]:X0,Y0,X1,Y1 (pixels)")
+    signal_estimate.add_argument("--input-size", type=int, help="Video Depth Anything: the model's input size")
+    signal_estimate.add_argument("--threads", type=int)
+    signal_estimate.add_argument("--repeat", action="store_true", help="Run twice and record what differed")
+    signal_align = signal_sub.add_parser("align", help="Align a relative depth to a metric one over a stretch; "
+                                                       "residuals and inverted occlusions recorded")
+    signal_align.add_argument("project", type=Path)
+    signal_align.add_argument("id")
+    signal_align.add_argument("--estimate", required=True, help="The relative depth")
+    signal_align.add_argument("--reference", required=True, help="The metric depth of the same pixels")
+    signal_align.add_argument("--camera", required=True, help="The reference's camera, stated as seeing the medium")
+    signal_align.add_argument("--temporal", choices=("regularized", "shared", "per_frame"), default="regularized")
+    signal_align.add_argument("--smoothness", type=float, default=1.0)
+    signal_align.add_argument("--first", type=int, default=0)
+    signal_align.add_argument("--count", type=int)
+    signal_align.add_argument("--region", help="A segmentation limiting the calibration")
+    signal_align.add_argument("--keep", type=int, nargs="+", help="Its labels to calibrate on")
+    signal_align.add_argument("--leave", type=int, nargs="+", help="Its labels to leave out")
+    signal_align.add_argument("--objects", help="A segmentation of instances: each pair of objects ordered")
+    signal_compare = signal_sub.add_parser("compare", help="Measure a signal against a reference; recorded as "
+                                                           "measured quality")
+    signal_compare.add_argument("project", type=Path)
+    signal_compare.add_argument("id")
+    signal_compare.add_argument("--reference", required=True)
+    signal_status = signal_sub.add_parser("status", help="What a signal is: stale, quality, transformations")
+    signal_status.add_argument("project", type=Path)
+    signal_status.add_argument("id")
+    for action in (signal_estimate, signal_align, signal_compare):
+        action.add_argument("--actor", help="Who is deciding (default: current user)")
+        action.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
+    signal_parser.set_defaults(function=command_signal)
+
+    render_parser = subparsers.add_parser("render", help="A 3D scene's passes, rendered apart (C8, CT-0081)")
+    render_sub = render_parser.add_subparsers(dest="render_command", required=True)
+    render_passes = render_sub.add_parser("passes", help="Render a scene's picture, Z and object index; record them")
+    render_passes.add_argument("project", type=Path)
+    render_passes.add_argument("id")
+    scene_given = render_passes.add_mutually_exclusive_group(required=True)
+    scene_given.add_argument("--blend", help="A .blend in the production")
+    scene_given.add_argument("--recipe", help="A recipe (JSON) in the production")
+    render_passes.add_argument("--camera", required=True)
+    render_passes.add_argument("--first", type=int, default=1)
+    render_passes.add_argument("--last", type=int, required=True)
+    render_passes.add_argument("--size", type=int, nargs=2, default=[1280, 720], metavar=("WIDTH", "HEIGHT"))
+    render_passes.add_argument("--fps", default="24")
+    render_passes.add_argument("--samples", type=int, default=16)
+    render_passes.add_argument("--camera-id", help="The production's camera this render's camera is (a shot's, "
+                                                   "matched); default <id>/<camera>")
+    render_passes.add_argument("--actor", help="Who is deciding (default: current user)")
+    render_passes.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
+    render_status = render_sub.add_parser("status", help="Whether a render still follows from its scene")
+    render_status.add_argument("project", type=Path)
+    render_status.add_argument("id")
+    render_parser.set_defaults(function=command_render)
+
     sound_parser = subparsers.add_parser("sound", help="The sound catalog and its sources: Freesound, Sonniss, Openverse (CT-0048)")
     sound_sub = sound_parser.add_subparsers(dest="sound_command", required=True)
     sound_list = sound_sub.add_parser("list", help="Ambiences, effects, Foley and music, built in and the production's")
@@ -2123,6 +2431,9 @@ def build_parser() -> argparse.ArgumentParser:
     sound_preview.add_argument("id")
     sound_preview.add_argument("--seconds", type=float, default=0.0)
     sound_preview.add_argument("--output")
+    sound_beats = sound_sub.add_parser("beats", help="Hear a music track's tempo and beats and keep them beside it")
+    sound_beats.add_argument("project", type=Path)
+    sound_beats.add_argument("id")
     sound_search = sound_sub.add_parser("search", help="Search a source; nothing is written")
     sound_search.add_argument("source", choices=("freesound", "sonniss", "openverse"))
     sound_search.add_argument("terms")
@@ -2284,18 +2595,16 @@ def build_parser() -> argparse.ArgumentParser:
     frame_parser.add_argument("--json", action="store_true", help="the frame's facts instead of the drawing")
     frame_parser.set_defaults(function=command_frame)
 
-    build_parser = subparsers.add_parser(
-        "build", help="Render the production's composed shots into a file"
+    still_parser = subparsers.add_parser(
+        "still", help="Draw a shot's frame as the cut draws it (a card, a composite), as a PNG; "
+        "titles and effects laid over a composite are not in it yet (C6)"
     )
-    build_parser.add_argument("project", type=Path)
-    build_parser.add_argument("--output", type=Path)
-    build_parser.add_argument("--json", action="store_true")
-    build_parser.add_argument(
-        "--engine", choices=("auto", "gl", "ffmpeg"), default="auto",
-        help="gl runs each GLSL transition's own shader; ffmpeg its declared stand-in "
-        "(default: gl when a GL context is available)",
-    )
-    build_parser.set_defaults(function=command_build)
+    still_parser.add_argument("project", type=Path)
+    still_parser.add_argument("scene")
+    still_parser.add_argument("shot")
+    still_parser.add_argument("--at", type=float, help="seconds into the shot (default: its middle)")
+    still_parser.add_argument("--output", type=Path, help="default: stills/<scene>/<shot>.png in the production")
+    still_parser.set_defaults(function=command_still)
 
     voice_parser = subparsers.add_parser(
         "voice", help="Speak the production's lines with an offline voice"
