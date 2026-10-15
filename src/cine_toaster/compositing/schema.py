@@ -165,7 +165,7 @@ OPS: dict[str, Op] = {
     # -- track and curves
     "track.measure": Op({"in": P(*PIC)}, {"out": "track"},
                         {"kind": "enum:point|plane|camera", "region": "vector", "tracker": "text"}),
-    "track.read": Op({}, {"out": "track"}, {"file": "file"}),
+    "track.read": Op({}, {"out": "track"}, {"file": "file", "of": "text"}),
     # Keys over time, or -- given `in` -- over another curve's value (a join's progress, 0 to 1).
     "curve.keys": Op({"in": P(*CRV, required=False)}, {"out": "curve"}, {"keys": "vector"}),
     "curve.beats": Op({}, {"out": "curve"}, {"attack": "number", "decay": "number", "every": "int", "low": "number",

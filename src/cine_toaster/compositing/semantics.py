@@ -171,7 +171,7 @@ def _floor(frames: Any) -> int:
 REMAP_INTERPOLATIONS = ("nearest", "blend")
 
 
-def remap_samples(seconds: Any, fps: Any, interpolation: str = "nearest") -> list[tuple[int, float]]:
+def remap_samples(seconds: Any, fps: Any, interpolation: str = "nearest", *, clamp: bool = True) -> list[tuple[int, float]]:
     """The source frames, and their weights, that make the picture at source instant `seconds`.
 
     The remap decides *which instant*; this decides *how it is pictured* -- so an optical or a model's
@@ -180,7 +180,8 @@ def remap_samples(seconds: Any, fps: Any, interpolation: str = "nearest") -> lis
       frame of an instant: the last one started) -- `floor(seconds * fps)`;
     - blend: the two frames whose centres stand either side of the instant, weighted by where it falls
       between them (`floor` finds them, the fraction weighs them).
-    Frames before the first are the first; past the last, the caller holds the last. An exact instant (a
+    Frames before the first are the first (unless `clamp` is off: a source with a pre-roll has frames before
+    its local zero, at negative indices); past the last, the caller holds the last. An exact instant (a
     Fraction, with the rate as one) is placed exactly; an approximate one by `BOUNDARY_TOLERANCE`.
     """
 
@@ -190,13 +191,14 @@ def remap_samples(seconds: Any, fps: Any, interpolation: str = "nearest") -> lis
         from ..timebase import rate
 
         fps = rate(fps)
+    lowest = 0 if clamp else -(10**12)
     if interpolation == "nearest":
-        return [(max(0, _floor(seconds * fps)), 1.0)]
+        return [(max(lowest, _floor(seconds * fps)), 1.0)]
     if interpolation != "blend":
         raise ValueError(f"interpolation is one of {', '.join(REMAP_INTERPOLATIONS)}, not {interpolation!r}")
     position = seconds * fps - Fraction(1, 2) if isinstance(seconds, Fraction) else seconds * fps - 0.5
     first = _floor(position)
     weight = max(0.0, float(position - first))
-    if first < 0:
-        return [(0, 1.0)]
+    if first < lowest:
+        return [(lowest, 1.0)]
     return [(first, 1.0 - weight)] + ([(first + 1, weight)] if weight > 1e-9 else [])

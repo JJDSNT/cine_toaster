@@ -107,6 +107,9 @@ class Segment:
     #: The shot drawn by its graph, already a piece of the cut (its frame, rate and format): joined as it is,
     #: not encoded again.
     piece: str = ""
+    #: Its graph shows its take at another time than the cut's (a retime): the take's sound is not laid under
+    #: it -- muted, until a sound policy says otherwise (CT-0080).
+    retime_muted: bool = False
     #: Speech heard within a scene version, in its own seconds (a sequence's segments): music ducks under it.
     speech_spans: list[tuple[float, float]] = field(default_factory=list)
     #: A format's frame in the take ({x, y}, CT-0049), and the captions spoken in it, in the take's seconds.
@@ -652,9 +655,21 @@ def _shot_drawing(root: Path, segment: Segment, size: tuple[int, int], fps: floa
     graph = shot_graph(base, fragments) if base is not None or fragments else None
     # The music's beats in the shot's own seconds: a shot pulses with the cut, not with its take.
     local = [beat - at for beat in beats or [] if -1.0 <= beat - at <= length + 1.0]
-    # The takes read as far as the graph reaches: past the shot's end when it is retimed faster (CT-0080).
+    # The takes read as far as the graph reaches: past the shot's end when it is retimed faster, and before its
+    # cut point (a pre-roll) when a remap runs back past it, as far as the take has frames (CT-0080).
     extent = reference.reach(graph, frames, fps, local) if graph is not None else frames
+    early = reference.preroll(graph, frames, fps, local) if graph is not None else 0
     inputs: dict[str, Any] = {}
+    origins: dict[str, Any] = {}
+
+    def take(media: str, start: float, name: str, **more: Any) -> Any:
+        grid = probe(root / media)["fps"]
+        # The take's media instant at the shot's local zero, exactly: its cut point on the take's grid.
+        origins[name] = timebase.seconds_of(timebase.frame_at(start, grid), grid)
+        back = min(early, int(round(start * fps)))
+        clip = reference.read(root / media, extent + back, size, fps, start=start - back / fps, **more)
+        return reference.Shifted(clip, back) if back else clip
+
     if segment.composite:
         for name, node in base["nodes"].items():
             if node.get("op") != "generate.source" or not node.get("take"):
@@ -665,18 +680,19 @@ def _shot_drawing(root: Path, segment: Segment, size: tuple[int, int], fps: floa
                                       f"shot does not have ({', '.join(segment.composite_takes) or 'none'})")
             # The cut's stretch of the take, unless the node asks for another start.
             start = float(node["start"]) if node.get("start") is not None else segment.start
-            inputs[name] = reference.read(root / media, extent, size, fps, start=start,
-                                          colorspace=node.get("colorspace"), alpha=node.get("alpha"))
+            inputs[name] = take(media, start, name, colorspace=node.get("colorspace"), alpha=node.get("alpha"))
     elif segment.media:
-        inputs["picture"] = reference.read(root / segment.media, extent, size, fps, start=segment.start)
+        inputs["picture"] = take(segment.media, segment.start, "picture")
     else:
         inputs["picture"] = card_picture(segment.title or {"params": {}}, width, height)
     if graph is None:  # a take as it is: its own frames
         clip = inputs["picture"]
         return (clip[index] for index in range(frames)), None, False
+    # A retimed shot's take sound would drift from its picture: muted until a policy is chosen (CT-0080).
+    segment.retime_muted = bool(segment.media or segment.composite) and reference.retimed(graph, frames, fps, local)
     fast = renderer_for(graph)
     pictures, _identity, cached = reference.render(graph, inputs, frames=frames, size=size, fps=fps, root=root,
-                                                   beats=local, renderer=fast)
+                                                   beats=local, renderer=fast, origins=origins)
     return pictures, fast, cached
 
 
@@ -701,8 +717,13 @@ def _draw_shot(root: Path, segment: Segment, destination: Path, first: dict[str,
                     quality=reference.PIECE)
     if still is not None and kept:
         reference.write_still(kept[0], still)
-    # A take whose voice was converted is heard converted.
+    # A take whose voice was converted is heard converted; a retimed one is not heard (CT-0080).
     heard = Path(segment.sound) if segment.sound else (root / segment.media if segment.media else None)
+    if segment.retime_muted:
+        notes.append(f"{segment.shot}: retimed -- its take's sound is muted (a sound policy -- preserve, stretch -- "
+                     "is to come); nothing out of sync is heard.")
+        segment.speech, segment.speech_spans = None, []
+        heard = None
     if heard is not None and probe(heard).get("audio"):
         sound = ["-ss", timebase.seek(segment.start), "-t", f"{length:.6f}", "-i", str(heard)]
     else:

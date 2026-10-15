@@ -250,6 +250,55 @@ Implications for the next steps:
 - `nearest` and `blend` are the reference's; GL still refuses time ops
   (step 6): a retimed shot draws on the reference, slower.
 
+## Before step 2: a retimed shot is muted (done 2026-10-15)
+
+The user: protect now, the other policies in step 3. A shot whose graph
+shows any source at another time than its own, by half a frame or more
+(`reference.retimed`, through the same composition as everything below), has
+its take's sound muted, its speech cleared (no ducking under silence), and a
+note in the plan. A shot without a retime is untouched -- including a remap
+that changes nothing.
+
+## Step 2 -- source time and timeline time (done 2026-10-15)
+
+- `compositing/clock.py`, one walk: from a node to a source, composing each
+  time operation (`step`: a remap's map, exact for linear or held keys; an
+  offset's frames), over every path (`instants`) -- or the single one a track
+  needs (`instant`, refusing disagreement). `extents` gives each source's
+  first and last local frame read, over every output frame and path; the
+  reference's `reach`, `preroll` and `retimed` use it, so nested remaps and
+  offsets are followed exactly (the step-1 limitation lifted).
+- **Origins**: `evaluate` and `render` take each source port's media origin;
+  a `generate.source`'s is its `start`. The assembly gives a take's: its cut
+  point, exact on the take's grid. Origins enter the cache identity.
+- **Pre-roll**: a source is read before its local zero as far as its media
+  has frames (`Shifted`: local frame -k is the frame k before the cut); the
+  assembly reads takes that way; before the media, its first frame.
+- **Tracks with a clock**: a track says its `clock` (`rate`, `origin` as a
+  time record); `track.read` says what it describes (`of`); a measured track
+  is given its input's clock. Read at the media instant its source shows,
+  through the walk -- so a track of the whole take lands on the cut, and a
+  reader over a retimed plate follows the plate. Without a clock, as before.
+- `warp.corner_pin` and `curve.from_track` read tracks this way; a point
+  track moves a pinned picture from where it was at the shot's first frame.
+- Held frames, one rule (`_from_held`): before what a source holds, its
+  first (a pre-roll's first); past its end, its last -- arrays, clips,
+  shifted clips.
+
+Implications:
+- **Audio**: everything the sound policies need is now known per shot: the
+  source's instant at every output frame (`clock.instants` from the output
+  to the take), exactly where the map is exact. `preserve` is the take from
+  the cut at speed 1; `stretch` follows the instants -- for a constant speed
+  one stretch, for a ramp the instants cut into pieces each with its own
+  speed; reverse refused for `stretch` (step 3).
+- **Tracking**: a track can now be a production record measured once on
+  the whole take and reused by any shot cut from it, any retime -- step 5
+  writes those records (with confidence and review); `track.read` already
+  reads them right.
+- GL still refuses time ops and tracks (step 6); a retimed or tracked shot
+  draws on the reference.
+
 # Done
 
 - Read every time and track node, its tests, SPEC-0012 §6, the assembly's
@@ -274,5 +323,29 @@ Implications for the next steps:
   for one peaking at 1.45 s and ending at 0.5 s); before the source, its
   first frame; a blend on the last frame holds it, for an array and a clip.
 - Full suite: 855 tests pass.
+- Step 2 (`tests/test_time_clock.py`): an offset under a remap composes
+  (frame 0 of a 2x remap over a two-frame offset reads -0.1 s, exactly);
+  nested remaps compose (0.25 s -> 0.5 s -> 1.5 s); a source at two times is
+  kept for pictures and refused for a single instant; extents follow every
+  path and reach back (-5 to 9 frames, a pre-roll of 5); a shot is retimed
+  only when a source is shown at another time (a remap that changes nothing
+  is not); a track of the whole take lands on the cut (entries 10, 11, 12 ...
+  from a cut at 1 s; 0, 1, 2 with no origin); a reader over a 2x plate
+  follows it (1, 3, 5, 7, 9); a reader whose source is shown at two times is
+  refused; a measured track keeps its clock; a remap back past a source's
+  start reads the file's earlier frames (5, 6, 7 before a start at 10); in a
+  cut, a retimed shot is muted with a note and the other heard.
+- The user's review asked for three scenarios explicitly (`ScenarioTests`):
+  a whole-take track stays right after a trim (a cut at 2 s reads entries
+  20, 21, 22), an offset (17, 18, 19) and a reverse (29 down to 20); a source
+  in two branches at two times, mixed and echoed, composes without a false
+  ambiguity -- only a reader needing one instant refuses; a corner pin after
+  a retime that runs forward then back moves its strip by exactly the
+  entries the plate shows, turning back with it. And a trim is not a
+  retime: a later cut point (an origin), a zero offset or an identity remap
+  leave the sound alone; a non-zero offset is a retime (its picture is
+  shown late against the take's sound), and is muted.
+- Full suite: 866 tests pass (the four scenario tests added after it, run
+  alone).
 - The probes above (reproducible with a ten-frame clip whose red channel is
   its frame number). No code changed.

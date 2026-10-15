@@ -37,7 +37,7 @@ node's extent, sampled at the composite's frame rate.
 | `matte` | how much is seen | one channel, float, 0 to 1 (may exceed for soft operations, clamped at merge) |
 | `signal` | a named value per pixel | one or more channels, float; its `kind` says what (below) |
 | `sound` | audio | samples at the composite's rate; carried, not mixed here (the mix stays the assembly's) |
-| `track` | where something is per frame | a list of frames, each with points, a plane (four corners) or a camera (matrix, focal length) |
+| `track` | where something is per frame | a list of frames, each with points, a plane (four corners) or a camera (matrix, focal length), in fractions of the picture; and its **clock** (C7, CT-0080; ADR 0023): `{rate, origin}` -- the rate of its entries and the media instant of its first, as a time record (`{ticks}`, with `exact` when ticks cannot hold it). A track with a clock is read at the media instant its source shows; one without, by its reader's frame (as before) |
 | `curve` | a number per frame | keyframes, or a driven value (§6) |
 | `meta` | facts that ride along | provenance, licence, credit, source timecode |
 
@@ -218,7 +218,7 @@ in the 1080-line cut. A shape's `feather` is a fraction of the frame.
 | Op | In | Out | Parameters |
 |---|---|---|---|
 | `track.measure` | picture | track | `kind` (point, plane, camera), a starting region; deterministic per tracker version |
-| `track.read` | -- | track | a file in the track format (§1) |
+| `track.read` | -- | track | a file in the track format (§1); `of`, the source (port or `generate.source`) it describes -- with a clock, it is read where that source is shown. A measured track (`track.measure`) describes its input and is given the input's clock |
 | `curve.keys` | optional curve `in` | curve | keyframes `[{t, value, ease}]`; `ease`: linear, in, out, in-out, hold, bezier handles. With `in`, `t` is that curve's value, not seconds: a join's recipe keys along its `progress` (0 to 1), whatever the join's length |
 | `curve.beats` | -- | curve | the scene's music beats (CT-0067): a pulse per beat with an envelope (`attack`, `decay`, `attack_ease`, `decay_ease`), `low` to `high`, `every`, `overlap` (max, add); §6 |
 | `curve.from_track` | track | curve | a field of the track (x, y, rotation, scale) |
@@ -393,6 +393,20 @@ no others (this is CT-0050's per-cut override, done).
   the same way, whether or not its op is deterministic.
 
 # 6. Curves and time
+
+**Timeline time and source time** (C7, CT-0080). Every node is evaluated at
+a *local* time: the shot's at the output; below a `time.remap` or a
+`time.offset`, the time they make. A source turns its local time into an
+instant of its *media* by its **origin** -- a take's cut point (given by the
+assembly), a `generate.source`'s `start`. The instant a node shows of a source
+is found by walking from the node to the source and composing every time
+operation on the way, nested remaps and offsets included. A source reached
+by several paths at different times is legitimate for pictures; for reading
+a track it is ambiguous, and refused. A reader that is not upstream of the
+track's source (a window pinned on the plate it is laid over) reads the
+instant the output shows that source at, when the reader is on the output's
+time. A source is read as far as any path reaches, and **before its origin**
+(a pre-roll: negative local frames) as far as its media has frames.
 
 A numeric or vector parameter is a constant, or follows a curve: `{curve:
 <node>}`, where the node is a `curve.*` op. There is no expression language:
