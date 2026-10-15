@@ -25,7 +25,7 @@ import numpy as np
 from ..errors import ValidationError
 from .reference import LINEAR, REC709, Clip, _Held, curve_factory, read
 from .schema import validate
-from .semantics import CHROMA_FLOOR, blur_kernel, pixels, threshold_spread
+from .semantics import blur_kernel, pixels, screen_channel, threshold_spread
 from .semantics import default as semantic_default
 
 IMPLEMENTED = {
@@ -35,7 +35,7 @@ IMPLEMENTED = {
     "merge.over", "merge.mix", "merge.blend", "merge.porter_duff",
     "warp.transform", "warp.corner_pin", "warp.surface",
     "matte.shape",
-    "colour.grade", "colour.invert",
+    "colour.grade", "colour.invert", "colour.despill",
     "filter.blur", "filter.morphology",
     "curve.progress", "curve.keys", "curve.map", "curve.combine", "curve.noise", "curve.beats",
     "opaque.gl",
@@ -114,12 +114,14 @@ _SHADERS = {
                       result = vec4(m, 0.0, 0.0, 1.0); }""",
     "key": """uniform sampler2D a; uniform sampler2D plate; uniform float low; uniform float high; uniform int inv;
         uniform int encoded; uniform int method; uniform vec3 colour; uniform float tolerance; uniform float spread;
-        uniform float floor_; vec3 chroma(vec3 c) { return c / (c.r + c.g + c.b + floor_); }
+        uniform int screen;
+        float excess(vec3 c) { return screen == 0 ? c.r - max(c.g, c.b) : (screen == 1 ? c.g - max(c.r, c.b)
+                                                                             : c.b - max(c.r, c.g)); }
         void main() { vec3 s = straight(texture(a, uv)); float k;
           if (method == 0) { if (encoded == 1) s = encode(s);
                              k = clamp((dot(s, REC709) - low) / max(high - low, 1e-9), 0.0, 1.0); }
           else { vec3 e = encode(s); float d;
-                 if (method == 1) d = length(chroma(e) - chroma(encode(colour)));
+                 if (method == 1) d = 1.0 - excess(s) / max(excess(colour), 1e-6);
                  else { vec3 q = abs(e - encode(straight(texture(plate, uv)))); d = max(q.r, max(q.g, q.b)); }
                  k = clamp((d - tolerance) / spread, 0.0, 1.0); }
           result = vec4(inv == 1 ? 1.0 - k : k, 0.0, 0.0, 1.0); }""",
@@ -131,11 +133,13 @@ _SHADERS = {
         void main() { float w = by_matte == 1 ? texture(by, uv).r : weight;
                       result = mix(texture(a, uv), texture(b, uv), w); }""",
     "blend": """uniform sampler2D a; uniform sampler2D b; uniform int mode; uniform float mixing;
-        void main() { vec4 x = texture(a, uv), y = texture(b, uv), r;
-          if (mode == 0) r = x + y - x * y; else if (mode == 1) r = x + y; else if (mode == 2) r = x * y;
-          else if (mode == 3) r = max(x, y); else if (mode == 4) r = min(x, y); else if (mode == 5) r = abs(x - y);
-          else r = mix(2.0 * x * y, 1.0 - 2.0 * (1.0 - x) * (1.0 - y), step(0.5, x));
-          r = mix(x, r, mixing); r.a = max(x.a, y.a); result = r; }""",
+        void main() { vec4 x = texture(a, uv), y = texture(b, uv);
+          vec3 cb = straight(x), cs = straight(y), f;
+          if (mode == 0) f = cb + cs - cb * cs; else if (mode == 1) f = cb + cs; else if (mode == 2) f = cb * cs;
+          else if (mode == 3) f = max(cb, cs); else if (mode == 4) f = min(cb, cs); else if (mode == 5) f = abs(cb - cs);
+          else f = mix(2.0 * cb * cs, 1.0 - 2.0 * (1.0 - cb) * (1.0 - cs), step(0.5, cb));
+          vec4 r = vec4(y.rgb * (1.0 - x.a) + x.rgb * (1.0 - y.a) + x.a * y.a * f, x.a + y.a - x.a * y.a);
+          result = mix(x, r, mixing); }""",
     "porter_duff": """uniform sampler2D a; uniform sampler2D b; uniform int how;
         void main() { vec4 x = texture(a, uv), y = texture(b, uv);
           if (how == 0) result = x + y * (1.0 - x.a); else if (how == 1) result = y + x * (1.0 - y.a);
@@ -152,6 +156,18 @@ _SHADERS = {
         void main() { vec4 p = texture(a, uv); vec3 c = straight(p);
           c = pow(max(c * gain + lift * (1.0 - c), 0.0), 1.0 / gam);
           float g = dot(c, REC709); c = g + (c - g) * saturation; result = vec4(c * p.a, p.a); }""",
+    "despill": """uniform sampler2D a; uniform sampler2D m; uniform int has_matte; uniform vec3 screen_rgb;
+        uniform int screen; uniform int average; uniform float amount;
+        void main() { vec4 p = texture(a, uv);
+          if (has_matte == 1) { float k = texture(m, uv).r;
+            p = vec4(max(p.rgb - (1.0 - k) * screen_rgb * p.a, vec3(0.0)), p.a * k); }
+          vec3 c = straight(p);
+          float s = screen == 0 ? c.r : (screen == 1 ? c.g : c.b);
+          float o1 = screen == 0 ? c.g : c.r, o2 = screen == 2 ? c.g : c.b;
+          float cap = average == 1 ? 0.5 * (o1 + o2) : max(o1, o2);
+          float held = mix(s, min(s, cap), amount);
+          if (screen == 0) c.r = held; else if (screen == 1) c.g = held; else c.b = held;
+          result = vec4(c * p.a, p.a); }""",
     "invert": """uniform sampler2D a; uniform int is_matte;
         void main() { vec4 p = texture(a, uv);
           result = is_matte == 1 ? vec4(1.0 - p.r, 0.0, 0.0, 1.0) : vec4(p.a - p.rgb, p.a); }""",
@@ -383,7 +399,7 @@ class GLRenderer:
             colour = tuple(float(c) for c in (list(p("colour") or [0, 0, 0]) + [0, 0, 0])[:3])
             return self.draw("key", size, 1, textures, inv=int(bool(node.get("invert"))),
                              method=1 if by == "colour" else 2, colour=colour, tolerance=float(p("tolerance")),
-                             floor_=CHROMA_FLOOR,
+                             screen=screen_channel(colour),
                              spread=threshold_spread(p("softness", 0.0)))
         if op == "merge.over":
             textures = {"front": value(node["front"]), "back": value(node["back"])}
@@ -430,6 +446,14 @@ class GLRenderer:
             return self.draw("grade", size, 4, {"a": value(node["in"])}, lift=vector("lift", 0.0),
                              gain=vector("gain", 1.0), gam=vector("gamma", 1.0),
                              saturation=float(p("saturation", 1.0)))
+        if op == "colour.despill":
+            textures = {"a": value(node["in"])}
+            if node.get("matte"):
+                textures["m"] = self._matte(value(node["matte"]), size)
+            screen_rgb = tuple(float(c) for c in (list(p("colour")) + [0, 0, 0])[:3])
+            return self.draw("despill", size, 4, textures, screen=screen_channel(screen_rgb), screen_rgb=screen_rgb,
+                             has_matte=int(bool(node.get("matte"))), average=int(p("limit", "max") == "average"),
+                             amount=float(p("amount", 1.0)))
         if op == "colour.invert":
             source = value(node["in"])
             return self.draw("invert", size, source.components, {"a": source}, is_matte=int(source.components == 1))

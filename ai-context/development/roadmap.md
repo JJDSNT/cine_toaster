@@ -293,6 +293,50 @@ script goes to the user before it is built.
 Order: D1b (bars) when a piece needs bars; the compositing roadmap C1-C10
 in its own order; then D8 and D9.
 
+### From the review of FilmCraft and EffectCraft (2026-10-14, CT-0075)
+
+Neither changes the direction; each is used at the edges (`references.md`).
+
+- **Do -- a version exported as OpenTimelineIO.** The cut (shots, takes,
+  in and out points, joins, sound) as an `.otio` beside the version, so it
+  opens in FilmCraft, Resolve or Premiere for finishing: the picture's
+  counterpart of the stems for a DAW (CT-0063). How: the plan already holds
+  every segment; write it with the `opentimelineio` library behind an
+  adapter, a composite or a join rendered as its own clip.
+- **Spike, when C6b or C8 need it -- EffectCraft as an opaque renderer.**
+  `opaque.effectcraft`: a node whose picture is a render of a small JSON
+  project by `effectcraft-cli render`, for what our graph does not hold
+  (particles as a simulation, extruded 3D text, text animators). How: one
+  node, its project file known by content (identity), a doctor capability;
+  adopted only if it renders headless and repeatably. Not before: it is
+  alpha and changes daily.
+- **Research -- an integer time base.** Our curves run on float seconds; C3
+  had to anchor a beat to its frame's centre, and 29.97 frames are inexact.
+  How: measure where float time drifts (long shots, 29.97, sample-accurate
+  sound); if it does, ticks as FilmCraft's (254,016,000,000 a second) in the
+  plan and the curves, seconds only at the edges.
+- **Research -- spill suppression and text animators** from EffectCraft's
+  code (permissive licence, attribution): spill for C4's keys (recorded in
+  the compositing roadmap), per-character animators with range selectors
+  for C6b.
+- **Kept as it is -- particles and 3D letters.** They exist, rendered by
+  Blender (CT-0047's elements, the `blender` title engine); in C6 they
+  become layer sources with their alpha, in C8 the graph's
+  `generate.render`. No particle primitive is planned.
+- **Research in C6/C6b -- Lottie as an input** (the user, 2026-10-14;
+  first recorded here as "not pursued", which thought only of exporting it).
+  Lottie (`.json`, `.lottie`) is a large ecosystem of ready motion graphics
+  -- titles, lower thirds, credits, icons, infographics. Step 1: a Lottie
+  file as a layer source, rendered with its alpha, with its duration and
+  time under our control (`time.remap`), behind an adapter -- candidates
+  ThorVG (MIT engine; `thorvg-python`, LGPL binding), rlottie
+  (`rlottie-python`, LGPL binding) and Skia's Skottie (BSD; whether
+  `skia-python` exposes it to be checked); `python-lottie` is AGPL and not
+  linked. Step 2, evaluated after: converting the part of a Lottie file our
+  primitives express (shapes, transforms, keys and their Bézier eases,
+  masks) into the graph, so it can be changed and combined -- never a second
+  animation engine beside the graph. Export stays out of scope.
+
 ### Later
 
 - Sound: generated sound and music, stems, spatial phases 2-4 (`CT-0048`,

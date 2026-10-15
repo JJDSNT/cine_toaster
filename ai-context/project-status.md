@@ -61,10 +61,12 @@ as the graph at an instant (`toast still`), and the quick build (`toast
 build`) removed. What still draws outside the graph has an owner step (C5,
 C6, C10). C3 (animation) is done (CT-0074): eases are one vocabulary,
 a beat's instant is kept apart from how a parameter reacts, and the music
-piece's plume pulses on every beat. C4 (CT-0075) is under way: layers are a
-record compiled into the graph, the colour and difference keys exist in both
-renderers, and the ADO move and a replaced window are made on real footage;
-a keyed person on real footage waits for a clip the user accepts.
+piece's plume pulses on every beat. C4 (CT-0075) is done: layers are a record compiled into the graph, keys
+and despill exist in both renderers, blends respect transparency, and the
+ADO move, a replaced window and a keyed person are made on real footage.
+The review of FilmCraft and EffectCraft is in `references.md` and the
+roadmap (OTIO export to do; EffectCraft as an opaque renderer and an integer
+time base to study). Next: C5, transitions as recipes, or C6.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional

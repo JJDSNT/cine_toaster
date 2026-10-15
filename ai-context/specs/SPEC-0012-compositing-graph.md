@@ -124,16 +124,21 @@ the NumPy reference first (§7).
 Grow, shrink, feather and invert are `filter` and `colour` operations on a
 matte (§3 filter, colour); they are not repeated here.
 
-**Keys** (CT-0075) measure in the display encoding, where equal steps look
-equal, and give 1 where the picture is kept: `luma`/`luminance` map the
-brightness from `low` to `high`; `colour` measures how far a pixel's
-**chromaticity** (its colour's proportions, brightness divided out, with a
-small floor so near-black stays) is from the key colour's, so a screen in
-shadow keys like the lit screen, and a background with no colour (white,
-grey) is keyed by luma instead; `difference` takes the largest channel
-difference from the `reference` picture (a clean plate). For colour and
-difference the matte rises from 0 at `tolerance` to 1 past it by
-`softness` (with the threshold's floor).
+**Keys** (CT-0075) give 1 where the picture is kept. `luma`/`luminance` map
+the brightness, in the display encoding, from `low` to `high`. `colour` is a
+**colour-difference** key, in linear light: how much the screen's channel
+(the one the key colour is made of) exceeds the larger of the other two,
+against the screen's own excess -- 0 on the screen, 1 where there is none.
+An edge is the subject and the screen mixed in light, so between them the
+matte is the subject's share of the pixel, which `colour.despill` uses to
+take the screen out; it is exact for a subject with no excess of its own
+(grey, white, skin under neutral light) and close for others. A screen in
+shadow has less excess: a little shadow keys within the tolerance, a deep one
+needs a clean plate and the `difference` key, which takes the largest channel
+difference from the `reference` picture, in the display encoding. For colour
+and difference the matte rises from 0 at `tolerance` to 1 past it by
+`softness` (with the threshold's floor); a colour key that should follow
+edges physically uses a small tolerance and a wide softness.
 
 ## merge
 
@@ -141,7 +146,7 @@ difference the matte rises from 0 at `tolerance` to 1 past it by
 |---|---|---|---|
 | `merge.over` | `front` picture, `back` picture, optional `matte` | picture | `mix` (0..1) |
 | `merge.porter_duff` | two pictures | picture | `how`: over, under, in, out, atop, xor |
-| `merge.blend` | two pictures | picture | `mode`: screen, add, multiply, overlay, difference, lighten, darken; `mix` |
+| `merge.blend` | two pictures | picture | `mode`: screen, add, multiply, overlay, difference, lighten, darken; `mix`. `b` onto `a` as W3C Compositing defines it for premultiplied pictures: the blend of their straight colours where both are, each alone where only it is; alpha is their union (CT-0075) |
 | `merge.mix` | two pictures, a `matte` or a `curve` | picture | -- (a dissolve is `merge.mix` with a curve) |
 | `merge.channels` | up to four signals or mattes | picture | which input fills red, green, blue, alpha (found missing by Appendix B: chromatic aberration) |
 | `merge.depth` | pictures, and a `depth` signal for each (metric, one camera; a `depth_relative` is refused) | picture | `near_is_small`; each pixel takes the nearest opaque picture (occlusion; §8; found missing by Appendix B) |
@@ -152,7 +157,7 @@ A matte on `merge.over` multiplies the front's alpha before the merge.
 
 | Op | In | Out | Parameters |
 |---|---|---|---|
-| `warp.transform` | picture (or matte) | same | `translate`, `scale`, `rotate` (three axes), `pivot`, `perspective` (field of view), `depth` (for 2.5D, §8) |
+| `warp.transform` | picture (or matte) | same | `translate`, `scale`, `rotate` (three axes), `pivot`, `perspective` (field of view), `depth` (for 2.5D, §8). A flat picture turned and seen in perspective; `warp.surface` bends it. Both read `rotate` (three angles about x, y, z, x first; one number about z) and `perspective` (a camera at 0.5 / tan(fov / 2) picture heights) through one definition (`warp.rotation`, `warp.camera_distance`; CT-0075) |
 | `warp.corner_pin` | picture, optional track | same | four corners, or a plane track |
 | `warp.surface` | picture | picture, and a `depth` signal | `shape`: plane, sphere, cylinder, page; `morph` (0 the flat picture, 1 the full shape: the picture bends onto it), `rotate` (three axes, about the shape's centre), `translate` (x, y in frame fractions, z in picture heights away), `scale`, `perspective`, `light`, `detail` (mesh cells across), `supersample`, `camera` (names the depth) -- the playing picture on a 3D object: the Toaster's and the ADO's warps |
 | `warp.displace` | picture, signal (vectors or one channel) | same | `strength`, `direction` |
@@ -171,6 +176,7 @@ or procedural warp says `edge: extend` (the border repeated) or `edge: mirror`
 | `colour.curve` | picture or matte | same | points per channel |
 | `colour.posterise` / `solarise` / `cycle` | picture | picture | levels / threshold / speed |
 | `colour.invert` | picture or matte | same | -- |
+| `colour.despill` | picture, optional `matte` (the key's) | picture | `colour` (the screen's), `limit` (max, average), `amount`. With the matte, the screen's share of each edge pixel is subtracted -- an edge is subject and screen mixed in light, C = m F + (1 - m) S, so what is left is C - (1 - m) S, seen as much as the matte -- then the screen's dominant channel is held to the largest (or the mean) of the other two on the straight colour, the light the screen threw on the subject (CT-0075) |
 
 ## filter
 
@@ -295,12 +301,13 @@ compiled is `layers_invalid`).
         translate: {keys: [{t: 0, value: [0.6, -0.5], ease: out}, [1.2, [0.27, -0.24]]]}
         rotate: [0, -8, 0]
         perspective: 35
-      key: {by: colour, colour: "#1fb34a", tolerance: 0.08, softness: 0.05}   # in the source's frame
+      key: {by: colour, colour: "#1fb34a", tolerance: 0.08, softness: 0.05}   # in the source's frame; a colour key
+                                               # also takes out the screen's spill (`despill: false` to keep it)
       garbage: {shape: rectangle, points: [[0.1, 0], [0.9, 1]]}             # in the source's frame
       matte: {shape: polygon, points: [...]}   # in the frame: where the layer shows
       border: {width: 3, colour: "#f2ead9"}    # around it, after it is placed
       shadow: {offset: [0.012, 0.018], blur: 14, opacity: 0.55}
-      mode: over                               # over, screen, add, lighten, difference
+      mode: over                               # over, or a blend: screen, add, multiply, lighten, darken, difference, overlay
       opacity: {beats: {low: 0.8, high: 1.0}}  # any number: a value, {keys: [...]} or {beats: {...}}
 ```
 
@@ -310,8 +317,8 @@ own frame; the layer is placed; its border is drawn around its placed edge
 shows; its shadow is cast below it, in the frame; then it meets what is below
 by its mode and opacity. Colours are as seen (`#rrggbb`, or display-encoded
 0..1); positions are fractions of the frame; lengths are pixels at 720 lines.
-Multiply, darken and overlay are not layer modes yet: `merge.blend` blends by
-values only, so a transparent part of the layer would darken what is below.
+A layer's source is a take or a file; a graph as a source (a surface, another
+composite) is a planned extension that changes only the source node.
 
 A join's recipe is a catalog item whose graph has the ports `from` and `to`
 (pictures) and the curve `progress`; the join fills them:

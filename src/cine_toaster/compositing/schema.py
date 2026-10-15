@@ -126,6 +126,10 @@ OPS: dict[str, Op] = {
     "colour.solarise": Op({"in": P(*PIC)}, params={"threshold": "number"}),
     "colour.cycle": Op({"in": P(*PIC)}, params={"speed": "number"}),
     "colour.invert": Op({"in": P(*EITHER)}, {"out": SAME}),
+    # The screen taken out of a keyed subject (CT-0075): given the key's matte, the screen's share of each edge
+    # pixel subtracted (C - (1 - m) S); then its dominant channel held to the others (the light it threw).
+    "colour.despill": Op({"in": P(*PIC), "matte": P(*MAT, required=False)}, {"out": "picture"},
+                         {"colour": "vector", "limit": "enum:max|average", "amount": "number"}),
     # -- filter
     "filter.blur": Op({"in": P(*EITHER)}, {"out": SAME},
                       {"radius": "number", "kind": "enum:gaussian|box|directional|defocus", "angle": "number"}),
@@ -180,7 +184,7 @@ REQUIRED_PARAMS: dict[str, tuple[str, ...]] = {
     "matte.shape": ("shape",), "matte.combine": ("how",), "matte.label": ("labels",),
     "merge.porter_duff": ("how",), "merge.blend": ("mode",),
     "warp.procedural": ("kind",), "warp.surface": ("shape",), "warp.corner_pin": ("corners|track",),
-    "colour.lut": ("file|look",), "colour.posterise": ("levels",), "colour.solarise": ("threshold",),
+    "colour.lut": ("file|look",), "colour.posterise": ("levels",), "colour.solarise": ("threshold",), "colour.despill": ("colour",),
     "filter.morphology": ("operation", "radius"), "filter.blur": ("radius",),
     "time.remap": ("map",), "time.offset": ("frames",), "time.blend": ("frames",), "time.echo": ("count",),
     "generate.source": ("take|file",), "generate.solid": ("colour",), "generate.text": ("text",),

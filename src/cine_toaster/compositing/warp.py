@@ -89,26 +89,40 @@ def transform(image: np.ndarray, *, translate: Any, scale: Any, rotate: Any, piv
                                                perspective=perspective, aspect=aspect), aspect)
 
 
+def rotation(angles: Any) -> np.ndarray:
+    """The turn every warp makes from its `rotate`, decided once (CT-0075): three angles in degrees about x, y
+    and z, applied x first; one number is a turn in the picture's plane (about z), as an editor means it."""
+
+    values = np.asarray(angles if angles is not None else 0.0, dtype=np.float64).reshape(-1)
+    rx, ry, rz = (values.tolist() + [0.0, 0.0])[:3] if values.size >= 2 else [0.0, 0.0, float(values[0]) if values.size else 0.0]
+    a, b, c = np.radians([rx, ry, rz])
+    turn_x = np.array([[1, 0, 0], [0, np.cos(a), -np.sin(a)], [0, np.sin(a), np.cos(a)]])
+    turn_y = np.array([[np.cos(b), 0, np.sin(b)], [0, 1, 0], [-np.sin(b), 0, np.cos(b)]])
+    turn_z = np.array([[np.cos(c), -np.sin(c), 0], [np.sin(c), np.cos(c), 0], [0, 0, 1]])
+    return turn_z @ turn_y @ turn_x
+
+
+def camera_distance(perspective: float | None) -> float | None:
+    """How far the camera stands from the picture (in picture heights) for a vertical field of view in degrees;
+    None for no perspective (an orthographic view). One camera for every warp (CT-0075)."""
+
+    return 0.5 / math.tan(math.radians(float(perspective)) / 2) if perspective else None
+
+
 def transform_corners(*, translate: Any, scale: Any, rotate: Any, pivot: Any, perspective: float,
                       aspect: float) -> list[list[float]]:
     """Where the picture's four corners land (fractions of the frame): the geometry every renderer shares."""
 
     translate = np.broadcast_to(np.asarray(translate, dtype=np.float64), (2,))
     scale = np.broadcast_to(np.asarray(scale, dtype=np.float64), (2,))
-    angles = np.asarray(rotate, dtype=np.float64).reshape(-1)
-    rx, ry, rz = (angles if angles.size == 3 else np.array([0.0, 0.0, angles[-1] if angles.size else 0.0]))
     pivot = np.broadcast_to(np.asarray(pivot, dtype=np.float64), (2,))
     # The picture as a plane in 3D, in units of its height, centred on the pivot.
     corners = []
     for x, y in UNIT:
         px, py = (x - pivot[0]) * aspect * scale[0], (y - pivot[1]) * scale[1]
         corners.append(np.array([px, py, 0.0]))
-    a, b, c = (math.radians(value) for value in (rx, ry, rz))
-    turn_x = np.array([[1, 0, 0], [0, math.cos(a), -math.sin(a)], [0, math.sin(a), math.cos(a)]])
-    turn_y = np.array([[math.cos(b), 0, math.sin(b)], [0, 1, 0], [-math.sin(b), 0, math.cos(b)]])
-    turn_z = np.array([[math.cos(c), -math.sin(c), 0], [math.sin(c), math.cos(c), 0], [0, 0, 1]])
-    turn = turn_z @ turn_y @ turn_x
-    distance = 0.5 / math.tan(math.radians(perspective) / 2) if perspective else None
+    turn = rotation(rotate)
+    distance = camera_distance(perspective)
     target = []
     for corner in corners:
         x, y, z = turn @ corner
@@ -196,14 +210,6 @@ def _surface_points(shape: str, morph: float, u: np.ndarray, v: np.ndarray, aspe
     raise ValueError(f"no surface {shape!r}")
 
 
-def _rotation(angles: Any) -> np.ndarray:
-    rx, ry, rz = (np.asarray(angles, dtype=np.float64).reshape(-1).tolist() + [0.0, 0.0, 0.0])[:3]
-    a, b, c = np.radians([rx, ry, rz])
-    turn_x = np.array([[1, 0, 0], [0, np.cos(a), -np.sin(a)], [0, np.sin(a), np.cos(a)]])
-    turn_y = np.array([[np.cos(b), 0, np.sin(b)], [0, 1, 0], [-np.sin(b), 0, np.cos(b)]])
-    turn_z = np.array([[np.cos(c), -np.sin(c), 0], [np.sin(c), np.cos(c), 0], [0, 0, 1]])
-    return turn_z @ turn_y @ turn_x
-
 
 def surface(image: np.ndarray, *, shape: str, morph: float, rotate: Any, translate: Any, scale: float,
             perspective: float, light: float, detail: int, supersample: int, aspect: float) -> tuple[np.ndarray, np.ndarray]:
@@ -238,9 +244,9 @@ def surface_mesh(*, shape: str, morph: float, rotate: Any, translate: Any, scale
     points = _surface_points(shape, morph, gu, gv, aspect)
     centre = points.reshape(-1, 3).mean(axis=0) if shape in ("sphere", "cylinder") else np.zeros(3)
     points = (points - centre) * float(scale)
-    points = points @ _rotation(rotate).T
+    points = points @ rotation(rotate).T
     move = (list(np.asarray(translate, dtype=np.float64).reshape(-1)) + [0.0, 0.0, 0.0])[:3]
-    distance = 0.5 / np.tan(np.radians(perspective) / 2) if perspective else 1e6
+    distance = camera_distance(perspective) or 1e6  # no perspective: a camera far enough to be orthographic
     z = points[..., 2] + move[2] + (centre[2] * float(scale) if shape in ("sphere", "cylinder") else 0.0)
     factor = distance / np.maximum(distance + z, 1e-6)
     sx = (points[..., 0] * factor) / aspect + 0.5 + move[0]

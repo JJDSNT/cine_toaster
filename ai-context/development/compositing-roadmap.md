@@ -191,14 +191,14 @@ its shot, drawn by GL in agreement with the reference.
   in the breakdown.
 - Limits: bars (D1b in `roadmap.md`) are needed for "on every bar".
 
-### C4. Layers: the ADO move and the keyers
+### ~~C4. Layers: the ADO move and the keyers~~
 
-In progress (`CT-0075`): layers as a record compiled into the graph; colour
-and difference keys in both renderers; lengths in pixels at 720 lines; GL
-draws layered shots (28 ops). On real footage: the ADO move (SC-030 v3) and
-a window replaced (SC-040 v1). Left: a person on a light background keyed on
-real footage, waiting for a clip and licence the user accepts.
-
+Done (`CT-0075`): layers are a record compiled into the graph (no layer
+renderer); colour (colour difference) and difference keys and
+`colour.despill` in both renderers; blends on premultiplied pictures by W3C's
+rule; one rotation and one camera for both warps; lengths in pixels at 720
+lines; GL draws layered shots. On real footage: the ADO move (SC-030 v3), a
+window replaced (SC-040 v1) and a person keyed (SC-050 v1).
 
 - What: a shot holds layers, each a source with a warp (place, size, rotation
   in three axes with perspective), a matte and a merge mode, animated (C3).
@@ -258,6 +258,11 @@ Started early, inside C2 (`CT-0071`): transitions of kind `graph`, the
   says which primitives it uses.
 
 ### C6b. Rich typography and animated lettering (intention, recorded 2026-10-14)
+
+Also to investigate here: **Lottie as an input** -- ready motion graphics
+as a layer source with alpha, then a partial conversion into the graph
+(`development/roadmap.md`, the review of 2026-10-14).
+
 
 Recorded at the user's request during C2, to be investigated after the
 primitives are consolidated; not part of C2, and no format, library or API is
@@ -371,13 +376,17 @@ prescribed here.
   the same graph -- seek the inputs' decoding to the instant minus the window
   `node_windows` says each node needs, or keep checkpoints -- never a second
   renderer.
-- Layer modes **multiply, darken, overlay**: `merge.blend` blends by values
-  only, so a transparent part of a layer darkens what is below. Blend only
-  where the front covers (the front's alpha weighting the blend), in both
-  renderers, then open the modes (CT-0075).
-- **Spill suppression** for a green screen: the key removes the screen but
-  not the green it throws on the subject. A `colour` operation that pulls the
-  key's hue toward neutral where the matte is partial, in both renderers.
+- ~~Layer modes multiply, darken, overlay~~: done in CT-0075 -- `merge.blend`
+  composites premultiplied pictures by W3C's rule in both renderers.
+- **A layer whose source is a graph** (a surface, another composite, a
+  generator): today a source is a take or a file. The compiler gives each
+  layer one source node (`L<n>`) feeding its chain, so a `source: {graph:
+  ...}` would put a subgraph there, its output into the same chain -- no
+  other change. Built when a shot needs it, not in C4.
+- ~~Spill suppression~~: done in CT-0075 (`colour.despill`).
+- A **screen-correction plate** for colour keys on unevenly lit screens (as
+  dedicated keyers have): the key's excess measured against the plate's, pixel
+  by pixel, instead of one screen colour.
 - (high) A still of a shot **cut from a take** is the take's frame; `toast still`
   refuses it today: read the take at the cut's instant through the same
   conform and display rules.

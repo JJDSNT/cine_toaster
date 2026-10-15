@@ -8,6 +8,8 @@ work records named here hold the detail.
 
 | Date | Piece | Length | File | Published |
 |---|---|---|---|---|
+| 2026-10-14 | Presenter v2: the presented launch in motion | 4 s | `trials/presenter-layers-v2.mp4` | not yet |
+| 2026-10-14 | Presenter: a key, a despill, a picture presented | 4 s | `trials/presenter-layers-v1.mp4` | not yet |
 | 2026-10-14 | Window: layers, a matte in the frame | 4 s | `trials/window-layers-v1.mp4` | not yet |
 | 2026-10-14 | Inset: layers, the ADO move | 4 s | `trials/inset-layers-v3.mp4` | not yet |
 | 2026-10-14 | Orbit v6, the plume on every beat | 41 s | `trials/music-piece-v6-plume.mp4` | not yet |
@@ -23,6 +25,17 @@ work records named here hold the detail.
 
 `trials/` is `~/cine-toaster-references/trials/` on the machine they were made
 on. A link is added when a piece is published.
+
+## 2026-10-14 · Presenter: a person keyed (C4)
+
+A picture against a green screen, given by the user, keyed by colour over the
+Earth, the launch flown in to rest above her hand (CT-0075). The first key
+left a green fringe on the hair; it took a despill that subtracts the screen
+from each edge pixel and a colour-difference key to read the edge as the mix
+it is.
+
+- The user: the launch inside the layer looked still. It played, but the clip
+  was the production's slowest; v2 (and Inset v4) use the night launch.
 
 ## 2026-10-14 · Window and Inset: layers (C4)
 

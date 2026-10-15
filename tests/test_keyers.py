@@ -24,10 +24,10 @@ GREEN = (0.10, 0.70, 0.25)
 
 
 def screen_with_actor() -> np.ndarray:
-    """A green screen with a shadow on its left half, an actor in grey and skin in the middle."""
+    """A green screen, lit a little less on its left half, an actor in grey and skin in the middle."""
 
     out = picture(GREEN)
-    out[:, : W // 2, :3] = decode_srgb(np.asarray(GREEN, np.float32) * 0.45)  # the same green in shadow
+    out[:, : W // 2, :3] *= 0.8  # the same green, a fifth darker in linear light
     out[10:26, 24:40, :3] = decode_srgb(np.asarray((0.55, 0.55, 0.55), np.float32))  # a grey shirt
     out[12:18, 28:36, :3] = decode_srgb(np.asarray((0.85, 0.62, 0.50), np.float32))  # a face
     return out
@@ -49,27 +49,64 @@ def matte_of(graph: dict, inputs: dict) -> np.ndarray:
     return evaluate(graph, inputs, frames=1, size=(W, H), fps=12)[0, ..., 0]
 
 
-COLOUR = key_graph(by="colour", colour=decode_srgb(np.asarray(GREEN, np.float32)).tolist(), tolerance=0.08,
-                   softness=0.05)
+SCREEN = decode_srgb(np.asarray(GREEN, np.float32))
+COLOUR = key_graph(by="colour", colour=SCREEN.tolist(), tolerance=0.25, softness=0.05)
 
 
 class ColourKeyTests(unittest.TestCase):
-    def test_the_screen_goes_and_its_shadow_with_it_while_the_actor_stays(self) -> None:
+    """By colour difference (CT-0075): how much the screen's channel exceeds the others, against the screen's own."""
+
+    def test_the_screen_goes_and_the_actor_stays(self) -> None:
         matte = matte_of(COLOUR, {"a": screen_with_actor()})
         self.assertLess(float(matte[2:8, 44:60].max()), 0.01)  # the lit screen
-        self.assertLess(float(matte[2:8, 4:20].max()), 0.01)  # the screen in shadow: chroma ignores brightness
+        # A screen a fifth darker has a fifth less excess: it keys within a tolerance of 0.25. A deep shadow
+        # needs more tolerance, or a clean plate and the difference key.
+        self.assertLess(float(matte[2:8, 4:20].max()), 0.01)
         self.assertGreater(float(matte[20:24, 26:38].min()), 0.99)  # the grey shirt
         self.assertGreater(float(matte[13:17, 29:35].min()), 0.99)  # the face
 
-    def test_softness_spreads_the_edge_between_tolerance_and_beyond(self) -> None:
-        near = picture((0.18, 0.66, 0.30))  # a green a little off the key
-        hard = matte_of(key_graph(by="colour", colour=decode_srgb(np.asarray(GREEN, np.float32)).tolist(),
-                                  tolerance=0.02, softness=0.0), {"a": near})
-        soft = matte_of(key_graph(by="colour", colour=decode_srgb(np.asarray(GREEN, np.float32)).tolist(),
-                                  tolerance=0.02, softness=0.5), {"a": near})
-        self.assertEqual(float(hard.mean()), 1.0)
-        self.assertGreater(float(soft.mean()), 0.0)
-        self.assertLess(float(soft.mean()), 0.5)
+    @staticmethod
+    def unmixed(subject: np.ndarray, share: float) -> np.ndarray:
+        """A strand over the screen, both mixed in light (C = share F + (1 - share) S), keyed and despilled."""
+
+        edge = np.ones((H, W, 4), np.float32)
+        edge[..., :3] = share * subject + (1 - share) * SCREEN
+        graph = {"ports": {"a": "picture"},
+                 "nodes": {"key": {"op": "matte.key", "picture": "a", "by": "colour", "colour": SCREEN.tolist(),
+                                   "tolerance": 0.0, "softness": 1.0},
+                           "out": {"op": "colour.despill", "in": "a", "matte": "key", "colour": SCREEN.tolist()}},
+                 "output": "out"}
+        return evaluate(graph, {"a": edge}, frames=1, size=(W, H), fps=12)[0, 5, 5]
+
+    def test_an_edge_pixel_gets_the_subjects_share_and_the_screen_is_taken_out(self) -> None:
+        """For a subject with no excess of the screen's channel (grey, white), exact: the matte is its share and
+        what is left is that share of it, with no green."""
+
+        grey = decode_srgb(np.asarray((0.6, 0.6, 0.6), np.float32))
+        out = self.unmixed(grey, 0.4)
+        self.assertAlmostEqual(float(out[3]), 0.4, places=4)
+        np.testing.assert_allclose(out[:3], 0.4 * grey, atol=1e-4)
+
+    def test_a_coloured_strand_is_close_and_left_with_no_green(self) -> None:
+        """Brown hair has less green than red: its share is read a little high (the larger of the other channels
+        changes across the mix), and no green above red is left on it."""
+
+        hair = decode_srgb(np.asarray((0.45, 0.28, 0.15), np.float32))
+        out = self.unmixed(hair, 0.4)
+        self.assertAlmostEqual(float(out[3]), 0.4, delta=0.05)
+        self.assertLessEqual(float(out[1]), float(max(out[0], out[2])) + 1e-6)
+
+    def test_the_light_a_screen_throws_on_the_subject_is_held_back(self) -> None:
+        """Spill on an opaque subject: its green above its other channels is held to the larger of them."""
+
+        spilled = picture((0.55, 0.62, 0.5))  # a grey shirt with a green cast
+        graph = {"ports": {"a": "picture"},
+                 "nodes": {"out": {"op": "colour.despill", "in": "a", "colour": SCREEN.tolist()}}, "output": "out"}
+        out = evaluate(graph, {"a": spilled}, frames=1, size=(W, H), fps=12)[0, 5, 5]
+        self.assertAlmostEqual(float(out[1]), float(out[0]), places=5)  # green no higher than red
+        self.assertAlmostEqual(float(out[2]), float(spilled[0, 0, 2]), places=5)  # blue untouched
+        skin = picture((0.85, 0.62, 0.50))
+        np.testing.assert_allclose(evaluate(graph, {"a": skin}, frames=1, size=(W, H), fps=12)[0], skin, atol=1e-6)
 
 
 class DifferenceKeyTests(unittest.TestCase):
@@ -88,12 +125,19 @@ class KeyConformanceTests(unittest.TestCase):
         from cine_toaster.compositing.gl import renderer_for
 
         plate = picture((0.6, 0.6, 0.62))
-        cases = [(COLOUR, {"a": screen_with_actor()}),
+        edge = np.ones((H, W, 4), np.float32)
+        edge[..., :3] = np.linspace(0, 1, W)[None, :, None] * SCREEN + (1 - np.linspace(0, 1, W)[None, :, None]) * 0.3
+        despilled = {"ports": {"a": "picture"},
+                     "nodes": {"key": {"op": "matte.key", "picture": "a", "by": "colour", "colour": SCREEN.tolist(),
+                                       "tolerance": 0.05, "softness": 0.9},
+                               "out": {"op": "colour.despill", "in": "a", "matte": "key", "colour": SCREEN.tolist()}},
+                     "output": "out"}
+        cases = [(COLOUR, {"a": screen_with_actor()}), (despilled, {"a": edge}),
                  (key_graph(by="difference", tolerance=0.05, softness=0.1),
                   {"a": screen_with_actor(), "plate": plate}),
                  (key_graph(by="luma", low=0.3, high=0.6, invert=True), {"a": screen_with_actor()})]
         for graph, inputs in cases:
-            with self.subTest(by=graph["nodes"]["key"]["by"]):
+            with self.subTest(graph=sorted(graph["nodes"])):
                 renderer = renderer_for(graph)
                 self.assertIsNotNone(renderer)
                 exact = evaluate(graph, inputs, frames=1, size=(W, H), fps=12)

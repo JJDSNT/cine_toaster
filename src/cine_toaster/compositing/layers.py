@@ -20,7 +20,7 @@ same renderers as any composite (ADR 0022, CT-0072).
           scale: 0.4
           rotate: [0, 20, 0]
           perspective: 35
-        key: {by: colour, colour: "#1fb34a", tolerance: 0.08, softness: 0.05}
+        key: {by: colour, colour: "#1fb34a", tolerance: 0.08, softness: 0.05}   # and its spill removed
         garbage: {shape: rectangle, points: [[0.1, 0], [0.9, 1]]}
         matte: {shape: polygon, points: [[0.31, 0.2], [0.62, 0.2], [0.62, 0.71], [0.31, 0.71]]}
         border: {width: 4, colour: "#ffffff"}
@@ -39,10 +39,9 @@ from typing import Any
 
 LAYER_KEYS = ("source", "start", "place", "key", "garbage", "matte", "border", "shadow", "mode", "opacity", "depth")
 PLACE_KEYS = ("translate", "scale", "rotate", "pivot", "perspective")
-#: How a layer meets what is below it. `over` composites by its alpha; the others blend by the picture's values,
-#: where a transparent part leaves what is below unchanged. (Multiply, darken and overlay would darken a
-#: transparent part to black with merge.blend as it is; recorded in CT-0075.)
-MODES = ("over", "screen", "add", "lighten", "difference")
+#: How a layer meets what is below it: `over` by its alpha, the others by a blend of colours where the layer
+#: is, leaving what is below unchanged where it is transparent (merge.blend, W3C Compositing; CT-0075).
+MODES = ("over", "screen", "add", "multiply", "lighten", "darken", "difference", "overlay")
 SHAPES = ("rectangle", "ellipse", "polygon", "spline")
 
 
@@ -140,7 +139,13 @@ class _Compiler:
                 seen = self.add(f"{n}-kept", {"op": "matte.combine", "a": seen, "b": garbage, "how": "intersect"})
             else:
                 seen = seen or garbage
-        if seen:
+        key = layer.get("key")
+        if seen and isinstance(key, dict) and key.get("by") == "colour" and key.get("despill", True):
+            # The screen taken out with the key (CT-0075): its share of each edge pixel subtracted, and its light
+            # on the subject held back -- no green fringe on hair. `despill: false` multiplies by the matte only.
+            current = self.add(f"{n}-seen", {"op": "colour.despill", "in": current, "matte": seen,
+                                             "colour": self.nodes[f"{n}-key"]["colour"]})
+        elif seen:
             current = self.masked(f"{n}-seen", current, seen)
 
         place = layer.get("place")
@@ -202,7 +207,8 @@ class _Compiler:
         if not isinstance(spec, dict) or spec.get("by") not in ("luma", "luminance", "colour", "difference"):
             self.problems.append(f"{where} is {{by: luma | colour | difference, ...}}")
             return None
-        node = {"op": "matte.key", "picture": picture, **{k: v for k, v in spec.items() if k != "reference"}}
+        node = {"op": "matte.key", "picture": picture,
+                **{k: v for k, v in spec.items() if k not in ("reference", "despill")}}
         if spec["by"] == "colour":
             colour = _linear(spec.get("colour"))
             if colour is None:

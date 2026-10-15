@@ -31,7 +31,7 @@ import numpy as np
 
 from ..errors import ValidationError
 from .schema import validate
-from .semantics import CHROMA_FLOOR, blur_kernel, pixels, threshold_spread
+from .semantics import blur_kernel, pixels, screen_channel, threshold_spread
 from .semantics import default as semantic_default
 
 #: The default spaces, converted by the exact sRGB transfer function; any other goes through OCIO.
@@ -377,11 +377,12 @@ def _picture(value: Any) -> np.ndarray:
     return value
 
 
-def _chroma(rgb: np.ndarray) -> np.ndarray:
-    """A display-encoded colour's proportions, its brightness divided out: a screen in shadow is the same colour.
-    Near black the proportions are noise, so a small offset (`semantics.CHROMA_FLOOR`) pulls them to grey."""
+def _excess(rgb: np.ndarray, screen: np.ndarray) -> np.ndarray:
+    """How much a colour's screen channel (the one the key colour is made of) exceeds the larger of the other two."""
 
-    return rgb / (rgb.sum(axis=-1, keepdims=True) + CHROMA_FLOOR)
+    index = screen_channel(screen)
+    others = [channel for channel in range(3) if channel != index]
+    return rgb[..., index] - np.maximum(rgb[..., others[0]], rgb[..., others[1]])
 
 
 def _blur(image: np.ndarray, radius: float) -> np.ndarray:
@@ -428,7 +429,7 @@ IMPLEMENTED = {
     "matte.from_signal", "matte.threshold", "matte.combine", "matte.shape", "matte.key", "matte.label",
     "merge.over", "merge.mix", "merge.blend", "merge.porter_duff", "merge.channels", "merge.depth",
     "warp.transform", "warp.corner_pin", "warp.displace", "warp.procedural", "warp.surface",
-    "colour.grade", "colour.invert", "colour.curve", "colour.lut", "colour.posterise", "colour.solarise",
+    "colour.grade", "colour.invert", "colour.despill", "colour.curve", "colour.lut", "colour.posterise", "colour.solarise",
     "colour.cycle",
     "filter.blur", "filter.sharpen", "filter.glow", "filter.edges", "filter.morphology", "filter.noise",
     "time.remap", "time.offset", "time.blend", "time.echo",
@@ -818,14 +819,16 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
                 low, high = float(param("low")), float(param("high"))
                 key = np.clip((signal - low) / ((high - low) or 1e-9), 0, 1)
             else:
-                # Distances in the display encoding, where equal steps look equal (CT-0075): a colour key by
-                # chromaticity, ignoring brightness (a shadow on the screen still keys); a difference key by the
-                # largest channel against a clean plate. 0 at `tolerance`, 1 past it by the softness's spread.
+                # A colour key by colour difference (CT-0075), in linear light where an edge is the subject and
+                # the screen mixed: how much the screen's channel exceeds the others, against the screen's own
+                # excess. 0 on the screen, 1 where there is no excess, and between, the subject's share of an
+                # edge pixel -- what `colour.despill` needs to take the screen out. A difference key by the
+                # largest channel against a clean plate, in the display encoding. 0 at `tolerance`, 1 past it
+                # by the softness's spread.
                 shown_here = convert(straight, working, ENCODED)
                 if by == "colour":
-                    target = convert(np.asarray(param("colour"), dtype=np.float32)[:3].reshape(1, 1, 3), working,
-                                     ENCODED)
-                    distance = np.linalg.norm(_chroma(shown_here) - _chroma(target), axis=-1)
+                    target = np.asarray(param("colour"), dtype=np.float32)[:3]
+                    distance = 1.0 - _excess(straight, target) / max(float(_excess(target, target)), 1e-6)
                 else:
                     plate = _picture(value(node["reference"], frame))
                     plate_alpha = plate[..., 3:4]
@@ -852,15 +855,21 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             return {"over": a + b * (1 - aa), "under": b + a * (1 - ba), "in": a * ba, "out": a * (1 - ba),
                     "atop": a * ba + b * (1 - aa), "xor": a * (1 - ba) + b * (1 - aa)}[node["how"]].astype(np.float32)
         if op == "merge.blend":
+            # `b` blended onto `a` as W3C Compositing defines it for premultiplied pictures (CT-0075): the blend
+            # of their straight colours where both are, each alone where only it is, so a transparent part of
+            # `b` leaves `a` as it was whatever the mode; the alpha is the union of both.
             a, b = _picture(value(node["a"], frame)), _picture(value(node["b"], frame))
+            alpha_a, alpha_b = a[..., 3:4], b[..., 3:4]
+            cb = np.divide(a[..., :3], alpha_a, out=np.zeros_like(a[..., :3]), where=alpha_a > 1e-6)
+            cs = np.divide(b[..., :3], alpha_b, out=np.zeros_like(b[..., :3]), where=alpha_b > 1e-6)
             mode = node["mode"]
-            blended = {"screen": a + b - a * b, "add": a + b, "multiply": a * b, "lighten": np.maximum(a, b),
-                       "darken": np.minimum(a, b), "difference": np.abs(a - b),
-                       "overlay": np.where(a < 0.5, 2 * a * b, 1 - 2 * (1 - a) * (1 - b))}[mode]
+            blended = {"screen": cb + cs - cb * cs, "add": cb + cs, "multiply": cb * cs, "lighten": np.maximum(cb, cs),
+                       "darken": np.minimum(cb, cs), "difference": np.abs(cb - cs),
+                       "overlay": np.where(cb < 0.5, 2 * cb * cs, 1 - 2 * (1 - cb) * (1 - cs))}[mode]
+            composed = np.concatenate([b[..., :3] * (1 - alpha_a) + a[..., :3] * (1 - alpha_b)
+                                       + alpha_a * alpha_b * blended, alpha_a + alpha_b - alpha_a * alpha_b], axis=-1)
             mix = float(param("mix", 1.0))
-            out = a * (1 - mix) + blended * mix
-            out[..., 3] = np.maximum(a[..., 3], b[..., 3])
-            return out.astype(np.float32)
+            return (a * (1 - mix) + composed * mix).astype(np.float32)
         if op == "merge.channels":
             out = np.zeros((height, width, 4), dtype=np.float32)
             out[..., 3] = 1.0
@@ -927,6 +936,27 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             rgb = grey + (rgb - grey) * saturation
             picture[..., :3] = rgb * alpha
             return picture
+        if op == "colour.despill":
+            # The screen's channel held to the largest (or the mean) of the other two, on the straight colour:
+            # a grey or a skin keeps its colour, a green cast on hair goes. The same in any encoding, since it
+            # compares channels of one pixel through the same curve.
+            picture = _picture(value(node["in"], frame))
+            screen_rgb = np.asarray(param("colour"), dtype=np.float32)[:3]
+            if node.get("matte"):
+                # An edge pixel is the subject and the screen mixed in light, C = m F + (1 - m) S: what is left
+                # of the subject is C - (1 - m) S, seen as much as the matte says.
+                matte = _matte(value(node["matte"], frame))[..., None]
+                picture = np.concatenate([np.clip(picture[..., :3] - (1 - matte) * screen_rgb * picture[..., 3:4],
+                                                  0, None), picture[..., 3:4] * matte], axis=-1)
+            alpha = picture[..., 3:4]
+            rgb = np.divide(picture[..., :3], alpha, out=np.zeros_like(picture[..., :3]), where=alpha > 1e-6)
+            screen = screen_channel(screen_rgb)
+            others = rgb[..., [index for index in range(3) if index != screen]]
+            cap = others.max(axis=-1) if param("limit", "max") == "max" else others.mean(axis=-1)
+            held = rgb.copy()
+            held[..., screen] = np.minimum(rgb[..., screen], cap)
+            rgb = rgb + (held - rgb) * float(param("amount", 1.0))
+            return np.concatenate([rgb * alpha, alpha], axis=-1).astype(np.float32)
         if op == "colour.invert":
             given = value(node["in"], frame)
             if given.ndim == 2:

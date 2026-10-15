@@ -25,6 +25,7 @@ DEFAULTS: dict[str, dict[str, Any]] = {
     "warp.procedural": {"amount": 1.0, "frequency": 4.0, "centre": [0.5, 0.5], "edge": "transparent"},
     "warp.surface": {"morph": 1.0, "rotate": [0.0, 0.0, 0.0], "translate": [0.0, 0.0, 0.0], "scale": 1.0,
                      "perspective": 35.0, "light": 0.4, "detail": 48, "supersample": 2},
+    "colour.despill": {"limit": "max", "amount": 1.0},
     "colour.grade": {"lift": 0.0, "gain": 1.0, "gamma": 1.0, "saturation": 1.0},
     "filter.blur": {"radius": 0.0, "kind": "gaussian"},
     "generate.gradient": {"kind": "linear", "colours": [[0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0, 1.0]], "angle": 0.0},
@@ -37,9 +38,6 @@ DEFAULTS: dict[str, dict[str, Any]] = {
 
 #: The named eases (SPEC-0012 §6); any other ease is a cubic Bezier given as [x1, y1, x2, y2].
 EASE_NAMES = ("linear", "in", "out", "in-out", "hold")
-
-#: Added to a colour's sum before its proportions are taken, for a colour key: near black they are noise.
-CHROMA_FLOOR = 0.05
 
 #: The smallest spread a threshold's edge has: a hard edge is still one level wide, never a division by zero.
 SOFTNESS_FLOOR = 0.002
@@ -72,6 +70,13 @@ def ease_problem(ease: Any) -> str | None:
     if str(ease) not in EASE_NAMES:
         return f"no ease {ease!r}: {', '.join(EASE_NAMES)}, or a Bezier [x1, y1, x2, y2]"
     return None
+
+
+def screen_channel(colour: Any) -> int:
+    """Which channel a key colour is made of -- 0 red, 1 green, 2 blue: the one a spill raises (CT-0075)."""
+
+    values = [float(c) for c in (list(colour) + [0.0, 0.0, 0.0])[:3]]
+    return max(range(3), key=lambda index: values[index])
 
 
 def threshold_spread(softness: Any) -> float:

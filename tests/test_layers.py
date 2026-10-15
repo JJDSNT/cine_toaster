@@ -74,7 +74,7 @@ class CompileTests(unittest.TestCase):
         cases = {
             "has no blur": [{"source": "CUT"}, {"source": "B", "blur": 3}],
             "says no `source`": [{"source": "CUT"}, {"place": {"scale": 0.5}}],
-            "mode is 'multiply'": [{"source": "CUT"}, {"source": "B", "mode": "multiply"}],
+            "mode is 'burn'": [{"source": "CUT"}, {"source": "B", "mode": "burn"}],
             "is at the back": [{"source": "CUT", "opacity": 0.5}],
             "place has no spin": [{"source": "CUT"}, {"source": "B", "place": {"spin": 3}}],
             "is a shape": [{"source": "CUT"}, {"source": "B", "matte": {"shape": "star"}}],
@@ -172,6 +172,103 @@ class LayerConformanceTests(unittest.TestCase):
         self.assertLess(float(np.abs(exact - fast).mean()), 0.01)
 
 
+MODES = ("screen", "add", "multiply", "lighten", "darken", "difference", "overlay")
+
+
+def half_covered() -> np.ndarray:
+    """A picture over the left half only, with a soft edge between: what a placed or keyed layer is."""
+
+    out = solid((0.2, 0.8, 0.4))
+    ramp = np.clip((0.6 - np.linspace(0, 1, W)) / 0.2, 0, 1).astype(np.float32)
+    return out * ramp[None, :, None]
+
+
+def blend_graph(mode: str) -> dict:
+    return {"ports": {"below": "picture", "layer": "picture"},
+            "nodes": {"out": {"op": "merge.blend", "a": "below", "b": "layer", "mode": mode}}, "output": "out"}
+
+
+class BlendTests(unittest.TestCase):
+    """merge.blend on premultiplied pictures (CT-0075): where the layer is transparent, nothing changes."""
+
+    def test_every_mode_leaves_what_is_below_where_the_layer_is_not(self) -> None:
+        below = solid((0.6, 0.5, 0.3))
+        for mode in MODES:
+            with self.subTest(mode=mode):
+                out = evaluate(blend_graph(mode), {"below": below, "layer": half_covered()}, frames=1,
+                               size=(W, H), fps=FPS)[0]
+                np.testing.assert_allclose(out[:, -20:], below[:, -20:], atol=1e-6)  # the layer is not there
+                self.assertTrue(np.allclose(out[..., 3], 1.0))  # an opaque base stays opaque
+
+    def test_where_both_are_opaque_a_mode_is_its_plain_formula(self) -> None:
+        below, layer = solid((0.6, 0.5, 0.3)), solid((0.2, 0.8, 0.4))
+        a, b = below[0, 0, :3], layer[0, 0, :3]
+        expected = {"screen": a + b - a * b, "multiply": a * b, "difference": np.abs(a - b)}
+        for mode, value in expected.items():
+            out = evaluate(blend_graph(mode), {"below": below, "layer": layer}, frames=1, size=(W, H), fps=FPS)[0]
+            np.testing.assert_allclose(out[5, 5, :3], value, atol=1e-6)
+
+    def test_a_multiply_layer_no_longer_blackens_around_itself(self) -> None:
+        layers = [{"source": "sea"}, {"source": "sky", "place": {"scale": 0.4}, "mode": "multiply"}]
+        out = run(layers, {"sea": solid(SEA), "sky": solid(SKY)})[0]
+        sea = decode_srgb(np.asarray(SEA, np.float32))
+        np.testing.assert_allclose(out[2, 2, :3], sea, atol=1e-5)  # outside the placed layer: the sea
+
+
+@unittest.skipIf(gl_unavailable_reason(), "no GL context here")
+class BlendConformanceTests(unittest.TestCase):
+    def test_gl_blends_as_the_reference_does_on_soft_edges(self) -> None:
+        from cine_toaster.compositing.gl import renderer_for
+
+        below = solid((0.6, 0.5, 0.3), alpha=0.7)  # a base that is itself partly transparent
+        for mode in MODES:
+            with self.subTest(mode=mode):
+                graph = blend_graph(mode)
+                inputs = {"below": below, "layer": half_covered()}
+                exact = evaluate(graph, inputs, frames=1, size=(W, H), fps=FPS)
+                fast = np.stack(list(renderer_for(graph).evaluate(graph, inputs, frames=1, size=(W, H), fps=FPS,
+                                                                  stream=True)))
+                self.assertLess(float(np.abs(exact - fast).max()), 2e-3)
+
+    def test_a_surface_takes_part_in_the_same_merges(self) -> None:
+        """warp.surface's picture is a picture like any other: merged over or blended, in both renderers."""
+
+        from cine_toaster.compositing.gl import renderer_for
+
+        for merge in ({"op": "merge.over", "front": "ball", "back": "below"},
+                      {"op": "merge.blend", "a": "below", "b": "ball", "mode": "screen"}):
+            graph = {"ports": {"below": "picture", "layer": "picture"},
+                     "nodes": {"ball": {"op": "warp.surface", "in": "layer", "shape": "sphere", "morph": 0.8,
+                                        "rotate": [10, 30, 0], "translate": [0.1, 0, 0.5]},
+                               "out": merge}, "output": "out"}
+            with self.subTest(merge=merge["op"]):
+                inputs = {"below": solid(SEA), "layer": solid(SKY)}
+                exact = evaluate(graph, inputs, frames=2, size=(W, H), fps=FPS)
+                fast = np.stack(list(renderer_for(graph).evaluate(graph, inputs, frames=2, size=(W, H), fps=FPS,
+                                                                  stream=True)))
+                self.assertLess(float(np.abs(exact - fast).mean()), 0.01)
+
+
+class WarpDecisionTests(unittest.TestCase):
+    def test_a_flat_surface_and_a_transform_turn_and_see_alike(self) -> None:
+        """One rotation and one camera for both warps (CT-0075): the same `rotate` and `perspective` put a flat
+        picture's corners in the same places, whichever op draws it; one number turns it in its plane."""
+
+        from cine_toaster.compositing.warp import surface_mesh, transform_corners
+
+        aspect = 16 / 9
+        for rotate in (30.0, [0.0, 40.0, 0.0], [25.0, -20.0, 10.0]):
+            with self.subTest(rotate=rotate):
+                corners = transform_corners(translate=[0, 0], scale=[1, 1], rotate=rotate, pivot=[0.5, 0.5],
+                                            perspective=35, aspect=aspect)
+                mesh = surface_mesh(shape="plane", morph=0.0, rotate=rotate, translate=[0, 0, 0], scale=1.0,
+                                    perspective=35, light=0.0, detail=8, aspect=aspect)
+                ends = [(0, 0), (0, -1), (-1, -1), (-1, 0)]  # the mesh's corners in UNIT's order
+                for (row, column), corner in zip(ends, corners):
+                    self.assertAlmostEqual(float(mesh["x"][row, column]), corner[0], places=6)
+                    self.assertAlmostEqual(float(mesh["y"][row, column]), corner[1], places=6)
+
+
 class LoadTests(unittest.TestCase):
     def test_layers_in_a_scene_become_its_composite_and_bad_ones_are_findings(self) -> None:
         from cine_toaster.project import load_production
@@ -196,7 +293,7 @@ class LoadTests(unittest.TestCase):
                     layers:
                       - source: plates/room.png
                       - source: plates/sky.png
-                        mode: multiply
+                        mode: burn
                   - n: 3
                     duration: 2
                     label: Both ways.
