@@ -25,6 +25,23 @@ every solvable limitation is written down here; nothing of the old reel is
 kept; the Video Toaster and the ADO are models of what to reach, never limits
 to copy.
 
+## The exploratory phase, closed (2026-10-15)
+
+C1 to C8 are done: one engine (the reference and GL, conformant), its
+primitives, animation, layers, transitions, every catalog drawn through it,
+time and tracks, and signals from models and from 3D -- each closed on films
+made with it and measured on the delivered file. C8's film closed the phase
+(the user, 2026-10-15: good enough for the present maturity; effects
+improve as real cases ask).
+
+From here the remaining steps are **paths of evolution pulled by real
+productions, not conditions for using the engine**: C9 (hybrid execution),
+C9b (real time and streams), C11 (a compositing view for the filmmaker),
+C10 (loose ends), C5b (surfaces from Blender), and the C6b review of colour
+fonts and chrome. Each is taken when a production asks for it, with the
+measurement that justifies it -- the integration gaps C8's film showed
+(defocus by depth, a grade to the plate, a solved camera) among them.
+
 ## The architecture in one page
 
 ```text
@@ -366,7 +383,7 @@ against the true move). Its leftovers are listed in `CT-0080`.
 
 ### C8. Signals from models and from 3D
 
-In progress (`CT-0081`): the audit done first -- the contract already tells
+Done (`CT-0081`, closed 2026-10-15). Begun: the audit done first -- the contract already tells
 metric from relative depth by camera, but not geometric from estimated once
 aligned; `signal.read` reads one frame; no adapter runs a model or renders
 Blender into the graph; alignment flickers per frame; depth merges per pixel;

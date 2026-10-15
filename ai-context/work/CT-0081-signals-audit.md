@@ -2,7 +2,7 @@
 id: CT-0081
 title: C8 -- signals from models and from 3D, the audit before building
 type: work
-status: doing
+status: done
 owner: unassigned
 created_at: 2026-10-15
 updated_at: 2026-10-15
@@ -659,6 +659,11 @@ same held for C7's tracks.
 Not C8's, seen in the film: the orb is sharp where the corridor is
 defocused, and lit brighter than the scene; a defocus by depth and a grade
 to the plate are compositing's next (the roadmap).
+
+**Closed (2026-10-15).** The user watched the film: good enough for the
+tool's present maturity; the effects improve as real cases ask for them.
+C8 is done, and with it the exploratory phase of the compositing roadmap
+(`development/compositing-roadmap.md` § The exploratory phase, closed).
 
 # Done
 
