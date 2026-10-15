@@ -61,7 +61,7 @@ def _coloured(f: Fragment, name: str, colour: list[float], seen, length: float) 
     return f.sampled(name, lambda t: [round(c, 6) for c in colour[:3]] + [round(seen(t), 6)], length)
 
 
-STYLE_KEYS = ("fill", "outline", "bevel", "cycle", "glow", "shadow")
+STYLE_KEYS = ("fill", "outline", "bevel", "cycle", "glow", "shadow", "slant", "glints")
 
 
 def style_problem(style: Any) -> str | None:
@@ -77,9 +77,15 @@ def style_problem(style: Any) -> str | None:
     fill = style.get("fill")
     if fill is not None and not (isinstance(fill, dict) and len(fill) == 1 and next(iter(fill)) in ("gradient", "picture")):
         return "fills with {gradient: {colours, angle, kind}} or {picture: a file}"
-    for key in ("outline", "bevel", "glow", "shadow", "cycle"):
+    for key in ("bevel", "glow", "shadow", "cycle", "glints"):
         if style.get(key) is not None and not isinstance(style[key], dict):
             return f"gives its {key} as a mapping"
+    outline = style.get("outline")
+    if outline is not None and not (isinstance(outline, dict) or
+                                    (isinstance(outline, list) and all(isinstance(ring, dict) for ring in outline))):
+        return "gives its outline as a ring {width, colour} or a list of them, inner first"
+    if style.get("slant") is not None and not isinstance(style["slant"], (int, float)):
+        return "gives its slant in degrees"
     return None
 
 
@@ -108,7 +114,8 @@ def _styled(f: Fragment, letters: str, style: dict[str, Any]) -> str:
             colours = [_linear(colour, "#FFFFFF") + [1.0] for colour in spec.get("colours") or ["#FFFFFF", "#888888"]]
             source = f.add(f"{name}-fill", {"op": "generate.gradient", "kind": spec.get("kind", "linear"),
                                             "angle": float(spec.get("angle", 90.0)), "colours": colours,
-                                            **({"repeat": spec["repeat"]} if spec.get("repeat") else {})})
+                                            **({"repeat": spec["repeat"]} if spec.get("repeat") else {}),
+                                            **({"at": [float(v) for v in spec["at"]]} if spec.get("at") else {})})
             if spec.get("span", "letters") == "letters":
                 # Spread over the lines' height where the text stands, not over the frame: a chrome's bands fall
                 # across the letters themselves.
@@ -125,15 +132,25 @@ def _styled(f: Fragment, letters: str, style: dict[str, Any]) -> str:
         face = f.add(f"{name}-cycled", {"op": "colour.cycle", "in": face,
                                          "speed": float(style["cycle"].get("speed", 90.0))})
     outline = style.get("outline")
-    if outline is not None:
-        stroke = {**f.nodes[letters], "outline": float(outline.get("width", 4.0)), "hollow": False}
-        stroked = f.add(f"{name}-stroke", stroke)
-        ring = _filled(f, f.solid(f"{name}-stroke-colour", _linear(outline.get("colour"), "#101010") + [1.0]),
-                       _alpha_matte(f, stroked, f"{name}-stroke-shape"), f"{name}-ring")
-        face = f.add(f"{name}-outlined", {"op": "merge.over", "front": face, "back": ring})
+    rings = [outline] if isinstance(outline, dict) else list(outline or [])
+    reach = 0.0
+    for index, ring in enumerate(rings):  # inner first: each ring wider than the last, beneath it
+        reach += float(ring.get("width", 4.0))
+        stroked = f.add(f"{name}-stroke{index}", {**f.nodes[letters], "outline": reach, "hollow": False})
+        band = _filled(f, f.solid(f"{name}-stroke{index}-colour", _linear(ring.get("colour"), "#101010") + [1.0]),
+                       _alpha_matte(f, stroked, f"{name}-stroke{index}-shape"), f"{name}-ring{index}")
+        face = f.add(f"{name}-outlined{index}", {"op": "merge.over", "front": face, "back": band})
     bevel = style.get("bevel")
     if bevel is not None:
         face = f.add(f"{name}-bevelled", {"op": "filter.bevel", "in": face, **{k: float(v) for k, v in bevel.items()}})
+    if style.get("slant"):
+        node = f.nodes[letters]
+        where = node.get("position") if isinstance(node.get("position"), list) else [0.5, 0.5]
+        face = f.add(f"{name}-slanted", {"op": "warp.transform", "in": face, "skew": float(style["slant"]),
+                                         "pivot": [0.5, float(where[1])]})
+    glints = style.get("glints")
+    if glints is not None:  # light catching the metal: upright stars, after the letters lean
+        face = _glinting(f, face, letters, glints, name)
     picture = face
     glow = style.get("glow")
     if glow is not None:
@@ -152,6 +169,49 @@ def _styled(f: Fragment, letters: str, style: dict[str, Any]) -> str:
                                    [min(1.0, float(shadow.get("opacity", 0.6)))]), cast, f"{name}-shade")
         picture = f.add(f"{name}-shadowed", {"op": "merge.over", "front": picture, "back": shade})
     return picture
+
+
+def _glinting(f: Fragment, face: str, letters: str, spec: dict[str, Any], name: str) -> str:
+    """Four-pointed stars of light catching on the letters' upper edges, each twinkling in turn: two streaks of
+    a soft round glow, stretched across each other, laid over the letters (C6b, CT-0078)."""
+
+    import numpy as np
+
+    node = f.nodes[letters]
+    size = float(node["size"]) if isinstance(node.get("size"), (int, float)) else 60.0
+    where = node.get("position") if isinstance(node.get("position"), list) else [0.5, 0.5]
+    text = str(node.get("text", ""))
+    across = min(0.9, len(text) * size * 0.55 / FRAME_LINES / (16 / 9))  # the line's width, roughly, at 16:9
+    # A star `size` pixels across (at 720 lines): the round glow it is made of reaches about a third of the frame.
+    count, star = int(spec.get("count", 3)), 3.0 * float(spec.get("size", 70.0)) / FRAME_LINES
+    period = float(spec.get("every", 1.6))
+    rng = np.random.default_rng(int(spec.get("seed", 7)))
+    distance = f.add(f"{name}-glint-distance", {"op": "generate.gradient", "kind": "circle"})
+    falloff = f.add(f"{name}-glint-falloff", {"op": "matte.from_signal", "low": 0.0, "high": 0.5, "invert": True,
+                                               "gamma": 2.0, "signal": f.add(f"{name}-glint-reach",
+                                                                             {"op": "signal.luminance",
+                                                                              "picture": distance})})
+    spark = _filled(f, f.solid(f"{name}-glint-colour", _linear(spec.get("colour"), "#FFFFFF") + [1.0]), falloff,
+                    f"{name}-glint-spark")
+    lit = face
+    for index in range(count):
+        x = float(where[0]) + (rng.uniform(-0.5, 0.5)) * across
+        y = float(where[1]) - size * 0.3 / FRAME_LINES  # on the letters' upper edge
+        offset = index * period / max(count, 1)
+
+        def twinkle(t: float, offset=offset) -> float:
+            phase = ((t - offset) % period) / period
+            return round(max(0.0, math.sin(math.pi * phase / 0.35)) if phase < 0.35 else 0.0, 6)
+
+        for axis, scale in (("h", [star, star * 0.05]), ("v", [star * 0.04, star * 0.75]),
+                            ("c", [star * 0.18, star * 0.32])):
+            streak = f.add(f"{name}-glint{index}{axis}", {
+                "op": "warp.transform", "in": spark, "scale": scale,
+                "translate": [x - 0.5, y - 0.5]})
+            lit = f.add(f"{name}-glinting{index}{axis}", {"op": "merge.blend", "a": lit, "b": streak, "mode": "screen",
+                                                          "mix": f.sampled(f"{name}-glint{index}{axis}-twinkle",
+                                                                           twinkle, getattr(f, "length", 10.0))})
+    return lit
 
 
 def _text(f: Fragment, name: str, text: str, size: Any, colour: Any, position: Any, **more: Any) -> str:
@@ -370,6 +430,7 @@ def graph_for(title: dict[str, Any], length: float, fps: float) -> dict[str, Any
     params = {**title["params"], **(title.get("prepared") or {})}
     # A style dresses the letters (C6b); the neon sign is a look of its own and takes none.
     f.style = params.get("style") if title.get("effect") != "neon" else None
+    f.length = length
     if title.get("engine") == "blender":
         clip = f.add("letters", {"op": "generate.source", "file": params["_clip"], "alpha": "straight"})
         out = _over(f, clip, "picture", "titled")

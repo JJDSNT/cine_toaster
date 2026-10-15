@@ -92,7 +92,7 @@ vec3 decode(vec3 c) { return vec3(decode1(c.r), decode1(c.g), decode1(c.b)); }
 
 _SHADERS = {
     "solid": "uniform vec4 colour; void main() { result = colour; }",
-    "gradient": """uniform vec4 stops[8]; uniform int count; uniform int radial; uniform float angle;
+    "gradient": """uniform vec4 stops[8]; uniform float places[8]; uniform int count; uniform int radial; uniform float angle;
         uniform float aspect; uniform float repeats;
         void main() {
           vec2 p = uv; vec2 d = p - 0.5; float x;
@@ -102,9 +102,11 @@ _SHADERS = {
           else if (radial == 4) x = mod(atan(d.x * aspect, -d.y) / 6.283185307 - angle / 6.283185307, 1.0);
           else x = (p.x - 0.5) * cos(angle) + (p.y - 0.5) * sin(angle) + 0.5;
           if (repeats > 1.0) x = mod(clamp(x, 0.0, 1.0) * repeats, 1.0);
-          x = clamp(x, 0.0, 1.0); float place = x * float(count - 1);
-          int low = clamp(int(floor(place)), 0, max(count - 2, 0));
-          vec4 c = count == 1 ? stops[0] : mix(stops[low], stops[low + 1], place - float(low));
+          x = clamp(x, 0.0, 1.0); int high = 1;
+          for (int i = 1; i < 8; i++) { if (i < count && x >= places[i]) high = min(i + 1, count - 1); }
+          int low = high - 1;
+          float w = clamp((x - places[low]) / max(places[high] - places[low], 1e-6), 0.0, 1.0);
+          vec4 c = count == 1 ? stops[0] : mix(stops[low], stops[high], w);
           result = vec4(c.rgb * c.a, c.a);
         }""",
     "luminance": """uniform sampler2D a; uniform vec3 weights; uniform int encoded;
@@ -414,9 +416,12 @@ class GLRenderer:
         if op == "generate.gradient":
             colours = np.asarray(p("colours", [[0, 0, 0, 1], [1, 1, 1, 1]]), np.float32)
             kinds = ("linear", "radial", "circle", "diamond", "conic")
-            stops = [tuple(float(c) for c in colour) for colour in colours.reshape(-1, 4)[:8]]
+            from .reference import gradient_stops
+
+            colour_stops, places = gradient_stops(colours, p("at", None))
+            stops = [tuple(float(c) for c in colour) for colour in colour_stops]
             return self.draw("gradient", size, 4, {}, stops=tuple(stops + [stops[-1]] * (8 - len(stops))),
-                             count=len(stops),
+                             places=tuple(float(v) for v in places) + (1.0,) * (8 - len(places)), count=len(stops),
                              radial=kinds.index(p("kind", "linear")), angle=float(np.radians(p("angle", 0.0))),
                              aspect=width / height, repeats=float(p("repeat", 1.0) or 1.0))
         if op in ("signal.luminance", "signal.luma"):
@@ -478,7 +483,8 @@ class GLRenderer:
             if op == "warp.transform":
                 corners = transform_corners(translate=p("translate"), scale=p("scale"),
                                             rotate=p("rotate"), pivot=p("pivot"),
-                                            perspective=float(p("perspective") or 0.0), aspect=aspect)
+                                            perspective=float(p("perspective") or 0.0), aspect=aspect,
+                                            skew=float(p("skew", 0.0) or 0.0))
             else:
                 if node.get("track"):
                     raise ValidationError("The GL renderer does not read tracks")

@@ -82,11 +82,11 @@ def corner_pin(image: np.ndarray, corners: list[list[float]], aspect: float) -> 
 
 
 def transform(image: np.ndarray, *, translate: Any, scale: Any, rotate: Any, pivot: Any, perspective: float,
-              aspect: float) -> np.ndarray:
-    """Move, scale and rotate in three axes about a pivot; with a field of view, in perspective."""
+              aspect: float, skew: float = 0.0) -> np.ndarray:
+    """Move, scale, lean and rotate in three axes about a pivot; with a field of view, in perspective."""
 
     return corner_pin(image, transform_corners(translate=translate, scale=scale, rotate=rotate, pivot=pivot,
-                                               perspective=perspective, aspect=aspect), aspect)
+                                               perspective=perspective, aspect=aspect, skew=skew), aspect)
 
 
 def rotation(angles: Any) -> np.ndarray:
@@ -110,7 +110,7 @@ def camera_distance(perspective: float | None) -> float | None:
 
 
 def transform_corners(*, translate: Any, scale: Any, rotate: Any, pivot: Any, perspective: float,
-                      aspect: float) -> list[list[float]]:
+                      aspect: float, skew: float = 0.0) -> list[list[float]]:
     """Where the picture's four corners land (fractions of the frame): the geometry every renderer shares."""
 
     translate = np.broadcast_to(np.asarray(translate, dtype=np.float64), (2,))
@@ -120,6 +120,7 @@ def transform_corners(*, translate: Any, scale: Any, rotate: Any, pivot: Any, pe
     corners = []
     for x, y in UNIT:
         px, py = (x - pivot[0]) * aspect * scale[0], (y - pivot[1]) * scale[1]
+        px -= py * math.tan(math.radians(float(skew or 0.0)))  # leaning right as it rises (italic): CT-0078
         corners.append(np.array([px, py, 0.0]))
     turn = rotation(rotate)
     distance = camera_distance(perspective)

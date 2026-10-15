@@ -2,7 +2,7 @@ schema_version = 1
 id = "chrome"
 name = "Chrome"
 category = "texture"
-says = "Polished metal letters: bands of light across them, a bevelled edge, a dark rim and a shadow."
+says = "1980s chrome: sky over a sharp dark horizon and a warm ground reflected below, bevelled, double-rimmed, leaning, with glints."
 energy = "high"
 use_when = ["An eighties logo, a show's title, a demo reel; anywhere the letters are an object."]
 avoid_when = ["A quiet film whose titles should not be noticed"]
@@ -15,13 +15,16 @@ fade_in = 0.6
 fade_out = 0.8
 
 [params.style]
-fill = {gradient = {colours = ["#FFFFFF", "#9AA0AE", "#3A3F4C", "#E6EAF2", "#7D8392"], angle = 90.0}}
-outline = {width = 3.0, colour = "#15171C"}
-bevel = {radius = 8.0, depth = 1.5, highlight = 0.8}
-shadow = {offset = [6.0, 8.0], blur = 10.0, opacity = 0.8}
+# The 1980s horizon chrome: sky above a sharp dark horizon, a warm ground reflected below it.
+fill = {gradient = {colours = ["#FFFFFF", "#BFE4FF", "#4C9BE0", "#0D0A1E", "#4A2A1C", "#C9873A", "#FFE9B8"], at = [0.0, 0.28, 0.5, 0.52, 0.6, 0.84, 1.0], angle = 90.0}}
+outline = [{width = 3.0, colour = "#0B0820"}, {width = 4.0, colour = "#E8F4FF"}]
+bevel = {radius = 7.0, depth = 1.6, highlight = 0.9, shadow = 0.5}
+glints = {count = 3, size = 80.0, every = 1.8}
+slant = 10.0
+shadow = {offset = [8.0, 10.0], blur = 8.0, opacity = 0.75}
 
 [render]
 engine = "graph"
 effect = "fade"
 # Drawn by the compositing graph (C6b, CT-0078), of these primitives:
-primitives = ["curve.keys", "filter.bevel", "filter.blur", "generate.gradient", "generate.solid", "generate.text", "matte.from_signal", "merge.over", "signal.channel", "warp.transform"]
+primitives = ["curve.keys", "filter.bevel", "filter.blur", "generate.gradient", "generate.solid", "generate.text", "matte.from_signal", "merge.blend", "merge.over", "signal.channel", "signal.luminance", "warp.transform"]

@@ -473,17 +473,29 @@ def lut_colours(node: dict[str, Any], rgb: np.ndarray, working: str, root: Path 
     return convert(encoded.reshape(rgb.shape), ENCODED, working)
 
 
-def gradient_colours(colours: np.ndarray, x: np.ndarray) -> np.ndarray:
-    """Colours along a gradient: its stops evenly spaced from 0 to 1, mixed linearly between them (up to eight,
-    as GL takes them; CT-0078)."""
+def gradient_stops(colours: Any, at: Any = None) -> tuple[np.ndarray, np.ndarray]:
+    """A gradient's stops (up to eight, as GL takes them) and where each sits from 0 to 1: given by `at`, or
+    evenly spaced. Two stops close together make a sharp edge -- a chrome's horizon (CT-0078)."""
 
     stops = np.asarray(colours, dtype=np.float32).reshape(-1, 4)[:8]
+    if at is not None and len(np.asarray(at).reshape(-1)) >= len(stops):
+        places = np.maximum.accumulate(np.clip(np.asarray(at, dtype=np.float32).reshape(-1)[:len(stops)], 0, 1))
+    else:
+        places = np.linspace(0.0, 1.0, len(stops), dtype=np.float32)
+    return stops, places
+
+
+def gradient_colours(colours: np.ndarray, x: np.ndarray, at: Any = None) -> np.ndarray:
+    """Colours along a gradient: mixed linearly between its stops (`gradient_stops`)."""
+
+    stops, places = gradient_stops(colours, at)
     if len(stops) == 1:
         return np.broadcast_to(stops[0], x.shape + (4,)).astype(np.float32).copy()
-    place = x * (len(stops) - 1)
-    low = np.clip(np.floor(place).astype(int), 0, len(stops) - 2)
-    weight = (place - low)[..., None]
-    return (stops[low] * (1 - weight) + stops[low + 1] * weight).astype(np.float32)
+    upper = np.clip(np.searchsorted(places, x, side="right"), 1, len(stops) - 1)
+    lower = upper - 1
+    span = np.maximum(places[upper] - places[lower], 1e-6)
+    weight = np.clip((x - places[lower]) / span, 0, 1)[..., None]
+    return (stops[lower] * (1 - weight) + stops[upper] * weight).astype(np.float32)
 
 
 def bevel_lit(picture: np.ndarray, relief: np.ndarray, radius_px: float, param: Callable[..., Any]) -> np.ndarray:
@@ -1105,7 +1117,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             if repeats > 1.0:  # the ramp repeated: stripes, rings, bands (CT-0077)
                 x = np.mod(np.clip(x, 0, 1) * repeats, 1.0)
             x = np.clip(x, 0, 1)
-            out = gradient_colours(colours, x)
+            out = gradient_colours(colours, x, param("at", None))
             out[..., :3] *= out[..., 3:4]
             return out.astype(np.float32)
         if op in ("signal.luminance", "signal.luma"):
@@ -1217,7 +1229,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             return transform(value(node["in"], frame), translate=param("translate"),
                              scale=param("scale"), rotate=angles if angles is not None else 0.0,
                              pivot=param("pivot"), perspective=float(param("perspective") or 0.0),
-                             aspect=aspect)
+                             aspect=aspect, skew=float(param("skew", 0.0) or 0.0))
         if op == "warp.corner_pin":
             from .warp import corner_pin
 

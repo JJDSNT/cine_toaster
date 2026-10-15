@@ -67,6 +67,16 @@ lacked:
   (the Amiga's ColorFonts: a rainbow cycling, a white rim, a shadow).
 - Found on the way: a gradient across the frame left the letters a near
   uniform slice of it -- fills now follow the text's band.
+- **The 1980s chrome** the user pointed to (three image searches: chrome
+  metallic lettering, retro chrome text, Kara Fonts chrome -- the pages could
+  not be read by the tools, so the look was taken from its known traits):
+  sky over a sharp dark horizon with a warm ground reflected below, double
+  rims, a lean, glints. Two gaps in the primitives, closed: gradient stops at
+  chosen places (`at`: two close together make the horizon) and `skew` on
+  `warp.transform` (in the geometry both renderers share). Exposed in the
+  style: rings (`outline` as a list, inner first), `slant`, `glints`
+  (four-pointed stars of stretched soft glow, twinkling in turn, upright after
+  the letters lean). `chrome` is now the horizon chrome.
 
 # Decisions
 
@@ -96,3 +106,9 @@ lacked:
   animation; the items name the bevel and the cycling; GL draws the styled
   items and many-stop gradients as the reference does.
 - Full suite after stage B: 796 tests pass.
+- With the 1980s chrome: gradient stops make a sharp horizon where placed;
+  `skew` leans a picture; two rings in their colours; a slant moves the
+  upper half; glints shine at their moment and not always. Full suite: 799
+  tests, one failing once -- `test_stems`' loudness of a stretch at exactly its
+  0.5 dB bound (sound, untouched here); it passed three runs alone. Recorded
+  in the roadmap as an intermittent test to make deterministic.

@@ -149,6 +149,41 @@ class StyleTests(unittest.TestCase):
         self.assertTrue(all(b >= a - 1e-4 for a, b in zip(seen, seen[1:])))
         self.assertGreater(seen[-1], seen[2] * 1.5)
 
+    def test_gradient_stops_at_chosen_places_make_a_sharp_horizon(self) -> None:
+        graph = {"ports": {}, "output": "g", "nodes": {"g": {
+            "op": "generate.gradient", "kind": "linear", "angle": 90, "at": [0.0, 0.5, 0.52, 1.0],
+            "colours": [[1, 1, 1, 1], [0.3, 0.6, 1, 1], [0.05, 0.03, 0.08, 1], [1, 0.7, 0.3, 1]]}}}
+        blue = evaluate(graph, {}, frames=1, size=(W, H), fps=FPS)[0, :, W // 2, 2]
+        steps = np.abs(np.diff(blue))
+        self.assertGreater(float(steps.max()), 0.25)  # one sharp edge
+        self.assertAlmostEqual(int(np.argmax(steps)) / H, 0.5, delta=0.03)  # where the stops put it
+
+    def test_a_skew_leans_a_picture_and_both_warps_agree(self) -> None:
+        from cine_toaster.compositing.warp import transform_corners
+
+        corners = transform_corners(translate=[0, 0], scale=[1, 1], rotate=0.0, pivot=[0.5, 0.5], perspective=0.0,
+                                    aspect=16 / 9, skew=10.0)
+        self.assertGreater(corners[0][0], 0.0)  # the top edge leans right
+        self.assertLess(corners[3][0], 0.0)  # the bottom edge left
+
+    def test_rings_slant_and_glints(self) -> None:
+        from cine_toaster.compositing.title_graphs import style_problem
+
+        self.assertIsNone(style_problem({"outline": [{"width": 2, "colour": "#000000"}, {"width": 3}],
+                                         "slant": 12, "glints": {"count": 2}}))
+        self.assertIn("ring", style_problem({"outline": "thick"}))
+        two = styled({"fill": {"gradient": {"colours": ["#FFFFFF", "#FFFFFF"]}},
+                      "outline": [{"width": 6, "colour": "#FF0000"}, {"width": 6, "colour": "#0000FF"}]})[-1]
+        self.assertGreater(int(((two[..., 0] > 0.5) & (two[..., 1] < 0.1)).sum()), 30)  # the inner ring, red
+        self.assertGreater(int(((two[..., 2] > 0.5) & (two[..., 1] < 0.1)).sum()), 30)  # the outer one, blue
+        upright, leaning = styled({}, size=60)[-1], styled({"slant": 15}, size=60)[-1]
+        top = lambda frame: np.nonzero(frame[: H // 2, :, 0].max(axis=0) > 0.3)[0].mean()  # noqa: E731
+        self.assertGreater(top(leaning), top(upright))  # the upper half moved right
+        sparkling = styled({"glints": {"count": 1, "size": 90, "every": 1.0}}, frames=12)
+        above = [float(frame[: H // 2 - 20, :, :3].max()) for frame in sparkling]
+        self.assertGreater(max(above), 0.5)  # a star of light over the letters, at its moment
+        self.assertLess(min(above), 0.05)  # and not always
+
     def test_the_styled_items_are_in_the_catalog(self) -> None:
         catalog = {item["id"]: item for item in list_titles()}
         for item in ("chrome", "colour-font"):

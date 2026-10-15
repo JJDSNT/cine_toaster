@@ -337,6 +337,15 @@ Neither changes the direction; each is used at the edges (`references.md`).
   masks) into the graph, so it can be changed and combined -- never a second
   animation engine beside the graph. Export stays out of scope.
 
+### An intermittent test (found 2026-10-15, CT-0078)
+
+- `tests/test_stems.py` compares a stretch's mean loudness of the summed stems
+  with the version's within 0.5 dB, and once measured exactly 0.5. The mix
+  passes through AAC twice and a limiter with lookahead, whose output need
+  not be bit-identical run to run. How: compare the stems before encoding (a
+  PCM render of the mix), or measure where the limiter is idle, so the test
+  holds the claim -- the stems make the mix -- without a margin at its edge.
+
 ### Later
 
 - Sound: generated sound and music, stems, spatial phases 2-4 (`CT-0048`,
