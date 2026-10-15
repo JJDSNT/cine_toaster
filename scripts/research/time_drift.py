@@ -52,3 +52,7 @@ gap = (onsets[:k] - flashes[:k]) * 1000
 print("click minus flash, ms: first", np.round(gap[:3], 3), "last", np.round(gap[-3:], 3),
       "min", round(float(gap.min()), 3), "max", round(float(gap.max()), 3))
 print("frame duration ms", round(1000 * den / num, 3))
+# The trend across the film, fitted over every shot, against the shot-to-shot scatter.
+slope, offset = np.polyfit(flashes[:k], gap, 1)
+spread = float(np.std(gap - (slope * flashes[:k] + offset)))
+print(f"fit: {offset:.3f} ms at the start, {slope * 3600:.2f} ms an hour (scatter {spread:.3f} ms around it)")

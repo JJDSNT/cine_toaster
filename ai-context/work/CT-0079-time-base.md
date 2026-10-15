@@ -49,7 +49,7 @@ measured against its flash in the cut.
 
 | Rate | Shots | The cut's rate | Click minus flash | Drift over the film |
 |---|---|---|---|---|
-| 30000/1001 | 40 (80 s) | **2997/100** | **-16.3 ms** every shot | +0.24 ms (~11 ms an hour) |
+| 30000/1001 | 40 (66 s) | **2997/100** | **-16.2 ms** every shot, scatter 0.26 ms | none measurable |
 | 24/1 | 10 | 24/1 | **-16.67 ms** every shot | none |
 
 What it shows:
@@ -66,14 +66,22 @@ What it shows:
 2. **The rate is rounded**: `probe` keeps three decimals, so 30000/1001
    becomes 29.97 and the cut is written at 2997/100 -- not an NTSC rate.
    This is representation: a rational rate kept as a fraction fixes it.
-3. **The small drift** (0.24 ms over 80 s) comes from that rounded rate and
-   from placing sounds with `adelay` in whole milliseconds and passing
-   lengths with three decimals (up to 24 samples at 48 kHz each). Small, but
-   it grows with the film's length and it is avoidable: positions in samples.
+3. **The scatter, not a drift.** A first reading (first and last three
+   shots) claimed ~11 ms an hour; the user's review (via ChatGPT) doubted it,
+   and a linear fit over all 40 shots gives -9.8 +/- 8 ms an hour -- a change
+   over the film (0.18 ms) below the scatter (0.26 ms): **no drift is shown**
+   at this length. The scatter is what whole-millisecond `adelay` predicts
+   (an error uniform within +/-0.5 ms: 0.29 ms deviation): each shot's sound
+   is placed up to 24 samples off at 48 kHz, independently.
+4. **The rounded rate drifts against the world, not within the cut**:
+   picture and sound are both placed on the same rounded 29.97, so they keep
+   together in the cut; but the cut runs 3.6 ms an hour off true 30000/1001
+   (the ratio of the two rates) -- against another program's timeline, a
+   timecode, an OTIO exchange.
 
 So the answer to "does the problem come from the representation?": partly.
 The audible one (half a frame, every shot) comes from boundaries; the
-NTSC rate and the drift come from the representation. Both are what
+NTSC rate and the millisecond scatter come from the representation. Both are what
 FilmCraft's contract solves together: a rational rate, every boundary
 snapped to the frame grid, sound placed in samples from the same instant,
 half-open ranges -- and one integer time that makes those exact.
@@ -95,25 +103,47 @@ half-open ranges -- and one integer time that makes those exact.
   for drawing. Beats come from analysis as seconds and are measurements, not
   edit points: kept as they are, snapped where they place a cut.
 
+# Causes, fixes and the tests that keep them fixed
+
+Kept apart, as the user's review asked: numeric precision, the frame grid,
+sample precision.
+
+| Kind | Cause (measured) | Fix | Regression test |
+|---|---|---|---|
+| Frame grid | Cut points off the frame grid: picture on a whole frame, sound at the exact second -- the sound leads by the fraction (16.67 ms at 24 for 0.35 s) | Snap every cut point (in, out, overlap, split) to the take's frame grid when planned; sound cut from the same snapped instant | Flash and click: every click on its flash within one sample, at 24, 25, 30000/1001, 24000/1001, for trims on and off the grid |
+| Rate | `probe` rounds `r_frame_rate` to 3 decimals: 30000/1001 written as 2997/100 (3.6 ms an hour off true NTSC) | Keep the rate as a fraction from probe to the writer | The cut's `r_frame_rate` is 30000/1001 for an NTSC take; a 24000/1001 take likewise |
+| Samples | Sounds placed with `adelay` in whole ms and lengths in 3 decimals: up to 24 samples off per shot (0.26 ms scatter) | Positions and lengths in samples (`adelay=...S`, `atrim` by samples) from the snapped instants | Scatter of click-minus-flash below one sample across 40 shots |
+| Precision | None shown yet: the fitted trend is within its error | Exact arithmetic where times are combined (see below) | A long film (an hour, synthetic) at 30000/1001: no trend beyond one sample |
+
+**Exact without ticks, in Python**: `fractions.Fraction` keeps any rate and
+any instant exact (`Fraction(30000, 1001)`), which is what FilmCraft's int64
+ticks buy in Rust. So the first three fixes need no new time type: rates as
+fractions, cut points as whole frames of their take, sound in whole samples.
+Ticks become worth adopting when times must be one integer across rates --
+a 30000/1001 take in a 24 fps cut, 44.1 kHz sound in a 48 kHz film, OTIO
+exchange with FilmCraft -- to be decided after the remeasurement, as the
+user's review recommends.
+
 # Proposal (to do before C7, if the user agrees)
 
-1. `cine_toaster/timebase.py`: `TICKS_PER_SECOND = 254_016_000_000`, `Tick`
-   (an int), `FrameRate(num, den)` with `tick_of`, `frame_at`, `snap`,
-   `TimeRange(start, duration)` half-open; conversions to seconds, frames
-   and samples. No dependency.
-2. `probe` keeps `r_frame_rate` as a fraction; the cut is written at it.
-3. The plan's cut points (take in and out, overlaps, splits) are snapped to
-   the take's frame grid when planned, as ticks; picture and sound are cut
+1. `probe` keeps `r_frame_rate` as a `Fraction`; the cut is written at it.
+2. The plan's cut points snapped to the take's frame grid when planned
+   (whole frames, half-open: a start and a length); picture and sound cut
    from the same snapped instants -- the picture by frame count, the sound
-   by sample count (`atrim=start_sample/end_sample`, `adelay=...S`).
-4. Re-run the measurement: click on flash within one sample, no drift, the
-   cut at 30000/1001.
+   by sample count (`atrim` by samples, `adelay=...S`).
+3. The regression tests of the table, from `scripts/research/time_drift.py`.
+4. Remeasure; then decide on ticks (`TICKS_PER_SECOND = 254_016_000_000`,
+   half-open `TimeRange`) for mixed rates and exchange.
 
 # Done
 
 - Read FilmCraft's and EffectCraft's section 2 and FilmCraft's
   `crates/time` API; checked the constant's arithmetic.
-- Measured the assembly at 30000/1001 and 24 (above).
+- Measured the assembly at 30000/1001 and 24 (above); the drift corrected
+  by a fit over every shot after the user's review doubted it.
+- Natron (CT-0078), checked again at the review's request: its round-trip
+  test already uses premultiplied random alpha (transparent edges included)
+  and values to 3x white; exact to half-float precision.
 
 # Validation
 
