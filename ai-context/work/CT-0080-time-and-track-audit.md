@@ -299,6 +299,56 @@ Implications:
 - GL still refuses time ops and tracks (step 6); a retimed or tracked shot
   draws on the reference.
 
+## Step 3 -- the sound of a retimed shot (in progress)
+
+**The contract** (`retime_sound.py`): a shot's `TimeMap` -- the media instant
+shown at each output frame's centre, and the map itself at any instant
+(`at`), so the sound, which lives between frames, follows the map and the
+frames are where it is checked. Its kind: unchanged, **shifted** (each frame
+its own instant moved by a constant, at speed 1: an offset) or **speed**; a
+speed map cut into pieces of near-constant speed, edges where the map is.
+The user's review separated the two properties: a shift needs no stretch --
+the sound moves by the same amount -- and only a change of speed does.
+
+**Binding and stems** (the user's addition, for the stems and a later DAW
+exchange -- Ardour): the policy (mute, preserve, stretch) says what is done
+to a sound; its **binding** says which clock governs it -- `source` (the
+take's media: a shot's own sound, and only it, follows the map), `timeline`
+(music, ambience, cues: they keep their place whatever the picture does --
+already so: catalog sounds are placed on the cut, never muted by a retime),
+`event` (bound to a visual event, a hit: later). Stems keep a stable
+identity (dialogue, effects, Foley, music, ambience) so a policy applies to
+the right one, and an exchange with a DAW -- stems aligned to the cut's
+start, same rate, durations, sources named; reconform when the cut changes
+-- is a later step, not C7's.
+
+**Stretchers, measured** (`scripts/research/stretch_bench.py`, the user's
+request: libraries before an engine of our own). One map -- 1x for a second,
+2x, 0.5x -- and one set of signals: a sine, 2 ms clicks off any grid, and
+three recordings (a voice, a synthwave track, the 1991 tape's sound).
+
+| Stretcher | Licence | Length | Sine level | Pitch | Clicks (found, extra, worst) | Speed |
+|---|---|---|---|---|---|---|
+| anchored WSOLA (ours, numpy) | ours | exact | flat | 440 | 20/20, 0, 15 ms (mean 0.5) | 0.14 s/s |
+| Rubber Band native (C API, offline R3, key frames every 10 ms) | GPL / commercial | exact | flat | 440 | 11/20, 6 extra, 10 ms | 0.10 s/s |
+| FFmpeg rubberband, pieces + aligned splice | GPL (FFmpeg's, a process) | exact | -10.3 dB dips | 435 | 20/20, 3 extra, 7.5 ms | 0.49 s/s |
+| SoundTouch (system library, ctypes, streamed) | LGPL 2.1 | exact | gaps (-180 dB) | 440 | 16/20, 3 extra, 19 ms | 0.02 s/s |
+| AudioTSM WSOLA (streamed) | MIT | exact | flat | 440 | 20/20, 0, 23 ms (mean -10.6: drifts) | 0.05 s/s |
+| Signalsmith Stretch (python-stretch) | MIT | exact | flat | 440 | whole buffer, constant speed: 17/17, -16 to -83 ms | 0.10 s/s |
+
+Notes: `pylibrb`'s key-frame binding refuses every map (its std::map
+conversion is missing), so Rubber Band was driven through its C API; its R3
+engine keeps tones perfect but smears and doubles 2 ms clicks. Signalsmith's
+Python wrapper processes a buffer per call, so it cannot be driven by a map
+(blocks of 10 ms broke it: pitch 240 Hz -- our driver's fault, not the
+library's); its C++ API (any input and output count per call) could be,
+through a binding of our own. Onsets matched on the recordings are reported
+in the results file but too few to rank on; **real material is judged by
+listening** -- three files, every stretcher in turn, were given to the user.
+
+Not decided yet: which stretcher (or which per kind of material, behind one
+interface -- the user's idea); the decision waits for the listening.
+
 # Done
 
 - Read every time and track node, its tests, SPEC-0012 §6, the assembly's
