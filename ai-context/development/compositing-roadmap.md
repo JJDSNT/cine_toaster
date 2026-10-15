@@ -433,10 +433,10 @@ prescribed here.
   title are one graph (`compositing/shot.py` chains each fragment's port
   `picture` after the picture so far), drawn once and written once as the
   cut's piece, joined without another encode; the take's sound laid under
-  it by copy. Left: **a shot with OpenFX effects** is still drawn in passes,
-  since Natron reads and writes files. How: an `opaque.natron` node fed by
-  the graph's frames (a pipe or a frame sequence the node owns), so Natron
-  is one node of the shot's graph rather than a pass around it.
+  it by copy. OpenFX too (the user, right after): `opaque.natron` is a node
+  of the shot's graph, staged -- what feeds it drawn, handed to Natron as
+  float OpenEXR and read back, no video encode -- and a still picture is
+  drawn the same way, so no shot is encoded before its piece.
 - A **screen-correction plate** for colour keys on unevenly lit screens (as
   dedicated keyers have): the key's excess measured against the plate's, pixel
   by pixel, instead of one screen colour.

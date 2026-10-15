@@ -247,6 +247,15 @@ is not flipped; `progress` is the join's progress at each frame's centre,
 like every curve. Its identity includes the shader file's content and its
 textures' identities.
 
+**`opaque.natron`** (an OpenFX plugin, CT-0078) is staged: Natron is a
+process that reads and writes frames, so before a graph is drawn, what feeds
+each such node is drawn and handed to Natron as float OpenEXR (linear,
+premultiplied, its range kept -- no video encode), and Natron's frames are
+read back as the node's value; the rest of the graph is then drawn by
+whichever renderer holds its other ops. A plugin whose only reader is
+another plugin runs with it as one Natron chain, in order. Parameters: the
+plugin's OFX id (`plugin`) and its own parameters by name (`params`).
+
 ## Frames in and out
 
 One rule each, used by every renderer and by the assembly (CT-0072):

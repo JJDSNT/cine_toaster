@@ -739,7 +739,9 @@ def renderer_for(graph: dict[str, Any]) -> "GLRenderer | None":
     One context is made once per thread and kept: compiling the programs is the slow part.
     """
 
-    if any(node.get("op") not in IMPLEMENTED for node in (graph.get("nodes") or {}).values()):
+    # An OpenFX plugin is Natron's, staged before any renderer draws (`natron.stage`): not GL's to refuse.
+    if any(node.get("op") not in IMPLEMENTED and node.get("op") != "opaque.natron"
+           for node in (graph.get("nodes") or {}).values()):
         return None
     renderer = getattr(_SHARED, "renderer", None)
     if renderer is None:

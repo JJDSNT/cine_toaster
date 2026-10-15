@@ -596,55 +596,6 @@ def loudness_gain(source: Path, segment: Segment) -> float:
     return round(max(-12.0, min(ceiling, target - float(measured[-1]))), 1)
 
 
-def _draw_title(root: Path, segment: Segment, output: Path, first: dict[str, Any], fps: float, run_process,
-                held: Path | None = None) -> None:
-    """Render a segment's effects and title: a card on its own, or over the cut piece of its take, sound kept.
-
-    The segment is then cut from that file, which starts where the cut does.
-    """
-
-    from .titles import render as render_title
-
-    length = segment.end - segment.start
-    background = None
-    if held is not None:
-        background = held
-    elif segment.media:
-        # A take whose voice was converted is titled over the converted sound.
-        background = Path(segment.sound) if segment.sound else root / segment.media
-        if segment.sound:
-            muxed = output.with_suffix(".voice.mp4")
-            run_process(["ffmpeg", "-y", "-loglevel", "error", "-i", str(root / segment.media), "-i", str(segment.sound),
-                         "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-shortest", str(muxed)],
-                        message=f"{segment.shot}: the converted voice under the picture")
-            background = muxed
-    from .vfx import render as render_effects
-
-    size = {"width": first["width"] // 2 * 2, "height": first["height"] // 2 * 2, "fps": round(fps) or FPS}
-
-    def run(what: str):
-        return lambda command: run_process(command, expected_seconds=length, message=f"{segment.shot}: {what}")
-
-    start = segment.start
-    if segment.effects and background is not None:  # a take: its effects, then the title over them
-        treated = output.with_suffix(".fx.mp4")
-        render_effects(segment.effects, length, treated, background=background, start=start,
-                       run=run("effects " + ", ".join(e["id"] for e in segment.effects)), **size)
-        background, start = treated, 0.0
-    if segment.title:
-        render_title(segment.title, length, output, background=background, start=start, root=root,
-                     run=run(f"title {segment.title['id']}"), **size)
-    else:
-        shutil.copyfile(background, output)
-    if segment.effects and not segment.media:  # a card: the effects over the drawn card, text included
-        treated = output.with_suffix(".fx.mp4")
-        render_effects(segment.effects, length, treated, background=output, run=run("effects"), **size)
-        treated.replace(output)
-    if segment.speech:
-        segment.speech = (segment.speech[0] - segment.start, segment.speech[1] - segment.start)
-    segment.source, segment.start, segment.end = str(output), 0.0, length
-
-
 def _scene_beats(root: Path, scene: dict[str, Any]) -> list[float]:
     """The beats of the scene's music, in seconds of the cut, when the music starts with the scene."""
 
@@ -659,23 +610,11 @@ def _scene_beats(root: Path, scene: dict[str, Any]) -> list[float]:
     return list((heard or {}).get("beats") or [])
 
 
-def _composite_pictures(root: Path, segment: Segment, size: tuple[int, int], fps: float,
-                        beats: list[float] | None = None, at: float = 0.0) -> tuple[Any, Any, bool]:
-    """The shot's composite alone, drawn (SPEC-0012, ADR 0022 §5): for a shot whose OpenFX effects Natron
-    draws after it, from a file. Every other shot is drawn whole by `_shot_drawing`."""
-
-    import dataclasses
-
-    return _shot_drawing(root, dataclasses.replace(segment, effects=[], title=None), size, fps, beats, at)
-
-
 def _drawn(segment: Segment) -> bool:
-    """Whether the shot is drawn by one graph: a composite, or a picture with effects or a title. OpenFX
-    plugins are Natron's, which reads files: a shot with them is still drawn in passes."""
+    """Whether the shot is drawn by its graph: a composite, a still picture, or a take with effects or a title
+    (OpenFX plugins included: Natron runs as a node of it). A take with nothing over it is cut as it is."""
 
-    if any(effect.get("effect") == "ofx" for effect in segment.effects):
-        return False
-    return bool(segment.composite or segment.title or segment.effects)
+    return bool(segment.composite or segment.title or segment.effects or segment.still)
 
 
 def _shot_drawing(root: Path, segment: Segment, size: tuple[int, int], fps: float, beats: list[float] | None = None,
@@ -775,40 +714,6 @@ def _frames_keeping(pictures: Any, index: int, kept: list[Any]):
         yield picture
 
 
-def _render_composite(root: Path, segment: Segment, destination: Path, first: dict[str, Any], fps: float,
-                      run_process, notes: list[str], beats: list[float] | None = None,
-                      at: float = 0.0, still: Path | None = None) -> Path:
-    """The shot's composite as a piece of the cut, with its take's sound kept; with ``still``, its middle
-    frame written there too -- the frame the cut shows, not a second drawing."""
-
-    from .compositing import reference
-
-    length = segment.end - segment.start
-    size = (first["width"] // 2 * 2, first["height"] // 2 * 2)
-    pictures, fast, cached = _composite_pictures(root, segment, size, fps, beats, at)
-    notes.append(f"{segment.shot}: its composite was drawn by "
-                 + (f"GL ({fast.name.split(' (')[0]})." if fast else "the NumPy reference (exact, slow)."))
-    if cached:
-        notes.append(f"{segment.shot}: its composite was found in the cache.")
-    kept: list[Any] = []
-    silent = destination.with_suffix(".picture.mp4")
-    reference.write(_frames_keeping(pictures, max(1, round(length * fps)) // 2, kept), silent, fps)
-    if still is not None and kept:
-        reference.write_still(kept[0], still)
-    if segment.media and probe(root / segment.media).get("audio"):
-        run_process(["ffmpeg", "-y", "-loglevel", "error", "-i", str(silent), "-ss", f"{segment.start:.3f}",
-                     "-t", f"{length:.3f}", "-i", str(root / segment.media), "-map", "0:v:0", "-map", "1:a:0",
-                     "-c:v", "copy", "-c:a", "aac", "-shortest", str(destination)],
-                    expected_seconds=length, message=f"{segment.shot}: the take's sound under its composite")
-    else:
-        run_process(["ffmpeg", "-y", "-loglevel", "error", "-i", str(silent), "-f", "lavfi", "-t", f"{length:.3f}",
-                     "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-map", "0:v:0", "-map", "1:a:0",
-                     "-c:v", "copy", "-c:a", "aac", "-shortest", str(destination)],
-                    expected_seconds=length, message=f"{segment.shot}: its composite")
-    segment.start, segment.end = 0.0, length
-    return destination
-
-
 def _source_frame(root: Path, plan: Plan) -> tuple[dict[str, Any], float]:
     """The cut's frame and rate before a format reframes it: decided once, for the render and a still."""
 
@@ -841,7 +746,7 @@ def still(root: Path, plan: Plan, shot: str, destination: Path, at: float | None
     one graph -- its picture, effects and title (CT-0078) -- run at that instant, at the cut's frame and rate,
     with the cut's beats (CT-0072). A shot cut from a take with nothing over it is the take's frame, read
     through the same conform. An instant inside a join belongs to the sequence, not to one shot (recorded in
-    the compositing roadmap); OpenFX plugins are Natron's and are not in a still.
+    the compositing roadmap).
     """
 
     from .compositing import reference
@@ -852,11 +757,6 @@ def still(root: Path, plan: Plan, shot: str, destination: Path, at: float | None
     segment = plan.segments[index]
     if segment.method.startswith("solid:") or not (segment.media or segment.composite or segment.title):
         raise ValidationError(f"{shot} has no picture to draw a still from")
-    if any(effect.get("effect") == "ofx" for effect in segment.effects):
-        import dataclasses
-
-        plan.notes.append(f"{shot}: its OpenFX effects are drawn by Natron and are not in this still.")
-        segment = dataclasses.replace(segment, effects=[e for e in segment.effects if e.get("effect") != "ofx"])
     first, fps = _source_frame(root, plan)
     if plan.format.get("aspect"):
         from .formats import target_size
@@ -922,7 +822,6 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
                          "-pix_fmt", "yuv420p", "-c:a", "aac", str(solid)],
                         expected_seconds=length, message=f"{segment.shot}: {segment.method.split(':', 1)[1]} screen")
             segment.source = str(solid)
-        held = None
         if _drawn(segment) and not segment.source:
             # One graph, drawn once, written once as the cut's piece (CT-0078).
             kept = work / "stills" / f"{segment.shot}.png"
@@ -930,30 +829,6 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
                        plan.beats, starts[index], still=kept)
             if kept.is_file():
                 plan.stills[segment.shot] = str(kept)
-        if segment.composite and not segment.source:
-            kept = work / "stills" / f"{segment.shot}.png"
-            composed = _render_composite(root, segment, work / f"composite-{index:03d}.mp4", first, fps, run_process,
-                                         plan.notes, plan.beats, starts[index], still=kept)
-            if kept.is_file():
-                plan.stills[segment.shot] = str(kept)
-            if segment.title or segment.effects:
-                held = composed  # the title and effects are drawn over the composite
-            else:
-                segment.source = str(composed)
-        if segment.still and not segment.source:
-            held = work / f"still-{index:03d}.mp4"
-            length = segment.end - segment.start
-            run_process(["ffmpeg", "-y", "-loglevel", "error", "-loop", "1", "-framerate", str(round(fps) or FPS),
-                         "-t", f"{length:.3f}", "-i", str(root / segment.media), "-f", "lavfi", "-t", f"{length:.3f}",
-                         "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-shortest",
-                         "-vf", conform_filter(first["width"] // 2 * 2, first["height"] // 2 * 2, transparent=False)
-                                + ",format=yuv420p",
-                         "-c:v", "libx264", "-c:a", "aac", str(held)],
-                        expected_seconds=length, message=f"{segment.shot}: the still held {length:g} s")
-            if not (segment.title or segment.effects):
-                segment.source, segment.start, segment.end = str(held), 0.0, length
-        if (segment.title or segment.effects) and not segment.source:
-            _draw_title(root, segment, work / f"title-{index:03d}.mp4", first, fps, run_process, held)
         source = Path(segment.source) if segment.source else root / segment.media
         length = segment.end - segment.start
         picture = work / f"picture-{index:03d}.mp4"

@@ -256,6 +256,14 @@ def _element(f: Fragment, src: str, params: dict[str, Any], length: float) -> st
 
 
 #: The effect kinds the graph draws, by the `effect` name items give in `[render]`.
+def _openfx(f: Fragment, src: str, params: dict[str, Any], length: float) -> str:
+    """An OpenFX plugin, run by Natron: an opaque node of the graph, staged before the graph is drawn
+    (`compositing/natron.py`). Its parameters are the plugin's own, by name."""
+
+    return f.add("ofx", {"op": "opaque.natron", "in": src, "plugin": str(params["_plugin"]),
+                         "params": {key: value for key, value in params.items() if not key.startswith("_")}})
+
+
 BUILDERS: dict[str, Builder] = {
     "mirror": _mirror, "crop": _crop, "fade-out": _fade_out, "grain": _grain, "vignette": _vignette,
     "light-leak": _light_leak, "aberration": _aberration, "glitch": _glitch, "shake": _shake, "flash": _flash,
@@ -270,12 +278,14 @@ def graph_for(effects: list[dict[str, Any]], length: float, fps: float) -> dict[
     nodes: dict[str, Any] = {}
     current = "picture"
     for index, effect in enumerate(effects, 1):
-        builder = BUILDERS.get(effect["effect"])
+        # An OpenFX plugin is Natron's: an opaque node, not one of the graph's own effects.
+        builder = _openfx if effect["effect"] == "ofx" else BUILDERS.get(effect["effect"])
         if builder is None:
             raise ValidationError(f"The effect {effect['effect']!r} is not drawn by the graph",
                                   effects=sorted(BUILDERS))
         # An element's prepared clip comes in with its parameters (`vfx.prepare_element`).
-        params = {**(effect.get("params") or {}), **(effect.get("prepared") or {})}
+        params = {**(effect.get("params") or {}), **(effect.get("prepared") or {}),
+                  **({"_plugin": effect["plugin"]} if effect.get("plugin") else {})}
         current = builder(Fragment(nodes, f"E{index}", fps), current, params, length)
     if current == "picture":
         nodes["out"] = {"op": "merge.over", "front": "picture", "back": "picture"}

@@ -235,46 +235,6 @@ def natron_binary() -> str | None:
     return candidates[-1] if candidates else None
 
 
-def _ofx(effects: list[dict[str, Any]], duration: float, work: Path, *, background: Path | None, start: float,
-         width: int, height: int, fps: int, run) -> Path:
-    """Run OpenFX plugins through Natron over the picture; returns the treated clip (sound kept)."""
-
-    import json
-
-    natron = natron_binary()
-    if not natron:
-        raise ValidationError("OpenFX effects run in Natron, which is not found (install it, or set CINE_TOASTER_NATRON)")
-    ffmpeg = shutil.which("ffmpeg")
-    frames = max(1, round(duration * fps))
-    if background is None:
-        background, start = render([], duration, work / "source.mp4", width=width, height=height, fps=fps, run=run), 0.0
-    (work / "in").mkdir()
-    (work / "out").mkdir()
-    size = f"{width}:{height}"
-    run([ffmpeg, "-v", "error", "-y", "-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", str(background),
-         "-vf", f"scale={size}:force_original_aspect_ratio=decrease,pad={size}:(ow-iw)/2:(oh-ih)/2,fps={fps}",
-         "-frames:v", str(frames), "-start_number", "1", str(work / "in" / "f_%04d.png")])
-    spec = work / "spec.json"
-    spec.write_text(json.dumps({"input": str(work / "in" / "f_####.png"), "output": str(work / "out" / "o_####.png"),
-                                "frames": frames, "width": width, "height": height,
-                                "effects": [{"plugin": effect["plugin"], "params": effect["params"]}
-                                            for effect in effects]}), encoding="utf-8")
-    environment = {**os.environ, "CINE_TOASTER_OFX_SPEC": str(spec)}
-    completed = subprocess.run([natron, "-w", "Out", f"1-{frames}", str(NATRON_CHAIN_SCRIPT)], cwd=work,
-                               env=environment, capture_output=True, text=True, timeout=3600)
-    rendered = sorted((work / "out").glob("o_*.png"))
-    if completed.returncode != 0 or not rendered:
-        raise ValidationError("Natron could not run the OpenFX chain",
-                              detail=(completed.stderr or completed.stdout)[-600:])
-    treated = work / "treated.mp4"
-    first = int(rendered[0].stem.split("_")[-1])
-    run([ffmpeg, "-v", "error", "-y", "-framerate", str(fps), "-start_number", str(first), "-i",
-         str(work / "out" / "o_%04d.png"), "-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", str(background),
-         "-map", "0:v", "-map", "1:a?", "-c:v", "libx264", "-crf", "16", "-pix_fmt", "yuv420p", "-c:a", "aac",
-         "-shortest", str(treated)])
-    return treated
-
-
 def _sequence_input(pattern: str, fps: int, loop: bool) -> list[str]:
     from .color import _frames
 
@@ -397,15 +357,6 @@ def render(effects: list[dict[str, Any]], duration: float, output: Path, *, back
     if not ffmpeg:
         raise ValidationError("FFmpeg is needed to draw effects")
     width, height = width // 2 * 2, height // 2 * 2
-    plugins = [effect for effect in effects if effect["effect"] == "ofx"]
-    if plugins:
-        # OpenFX plugins first, in order, in one Natron chain; then the rest here.
-        with tempfile.TemporaryDirectory(prefix="ofx-") as scratch:
-            treated = _ofx(plugins, duration, Path(scratch), background=background, start=start, width=width,
-                           height=height, fps=fps, run=run)
-            rest = [effect for effect in effects if effect["effect"] != "ofx"]
-            return render(rest, duration, output, background=treated, start=0.0, width=width, height=height,
-                          fps=fps, run=run)
     return render_graph(prepared(effects, duration, width, height, fps, run), duration, output,
                         background=background, start=start, width=width, height=height, fps=fps, run=run)
 
@@ -421,13 +372,11 @@ def prepared(effects: list[dict[str, Any]], duration: float, width: int, height:
 def effects_graph(effects: list[dict[str, Any]], duration: float, *, width: int = 1280, height: int = 720,
                   fps: int = 24, run=None) -> dict[str, Any]:
     """The effects, in order, as a graph with one port, `picture`: what a shot's graph chains after its picture.
-    OpenFX plugins are Natron's, which reads and writes files: they are not in it (`render` runs them first)."""
+    An OpenFX plugin is a node of it too, run by Natron when the graph is drawn (`compositing/natron.py`)."""
 
     from .compositing.effects import graph_for
 
     run = run or (lambda command: subprocess.run(command, check=True, capture_output=True))
-    if any(effect["effect"] == "ofx" for effect in effects):
-        raise ValidationError("OpenFX plugins are drawn by Natron, outside the graph")
     width, height = width // 2 * 2, height // 2 * 2
     return graph_for(prepared(effects, duration, width, height, fps, run), duration, fps)
 

@@ -155,8 +155,17 @@ encodes.
   and a shot cut from a take now has a still (a recorded limitation closed).
 - Kept stills: every shot drawn by a graph now keeps its middle frame, not
   only composites.
-- Left: shots with OpenFX effects (Natron reads files) keep the passes,
-  recorded with how in the compositing roadmap.
+- **OpenFX in the same graph** (the user: resolve it before the time base
+  and C7). An OFX effect compiles to `opaque.natron` like any effect, in the
+  order written (before, plugins ran first, out of order). `compositing/
+  natron.py` stages it in `reference.render`: what feeds the node is drawn
+  (GL when it can), written as float OpenEXR, run through Natron's chain
+  script with EXR in and out, and read back as the node's value -- a port
+  of the rest of the graph, which GL then draws. Adjacent plugins are one
+  Natron run. `vfx._ofx` (mp4 in, PNG out, mp4 back) is gone, and with it
+  the assembly's old pass functions (`_render_composite`, `_draw_title`).
+- A still picture is drawn by the same path (read once, written once as the
+  piece), instead of an mp4 held and then cut again.
 
 ## Review of stages B and C (the user, 2026-10-15) -- to return to
 
@@ -258,3 +267,11 @@ What to do when this is taken up:
   still by the path taken (the old two encodes happened to stay under 32);
   bounded at 64, the mean and regional bounds unchanged. Full suite: 819
   tests pass.
+- OpenFX staged (`OpenFxStagingTests`, `NatronTests`): adjacent plugins are
+  one Natron run, in order, over what feeds them, drawn first (Natron
+  mocked); the graph validates; with Natron, an empty chain returns frames
+  unchanged to half-float precision, light above white included (measured:
+  mean 1e-5 on the demo's sun); a cut draws a shot with an OFX lens
+  distortion and a vignette in one graph, nothing written between. A lens
+  distortion at k1 = 0 differs by 0.0045 on average: the plugin's own
+  resampling, not the round trip. Full suite: 823 tests pass.

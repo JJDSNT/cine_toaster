@@ -92,6 +92,86 @@ class CutTests(unittest.TestCase):
             self.assertLess(corner, centre)  # the vignette darkens the edges
 
 
+class OpenFxStagingTests(unittest.TestCase):
+    """An OpenFX plugin is a node of the shot's graph: Natron is run over what feeds it, before the rest."""
+
+    def graph(self) -> dict:
+        return {"ports": {"picture": "picture"}, "output": "tint",
+                "nodes": {"grey": {"op": "colour.grade", "in": "picture", "gain": [0.5, 0.5, 0.5]},
+                          "lens": {"op": "opaque.natron", "in": "grey", "plugin": "a.lens", "params": {"k1": 0.3}},
+                          "blur": {"op": "opaque.natron", "in": "lens", "plugin": "b.blur", "params": {}},
+                          "tint": {"op": "colour.grade", "in": "blur", "gain": [1.0, 0.0, 0.0]}}}
+
+    def test_adjacent_plugins_are_one_natron_run_in_order_over_what_feeds_them(self) -> None:
+        from unittest import mock
+
+        from cine_toaster.compositing import natron
+
+        calls = []
+
+        def fake(plugins, pictures, *, frames, size, fps):
+            calls.append([step["plugin"] for step in plugins])
+            return np.stack([np.asarray(picture) for picture in pictures]) + np.array([0, 0.25, 0, 0], np.float32)
+
+        white = np.ones((4, 8, 8, 4), np.float32)
+        with mock.patch.object(natron, "run", side_effect=fake):
+            from cine_toaster.compositing.reference import render
+
+            pictures, _, _ = render(self.graph(), {"picture": white}, frames=4, size=(8, 8), fps=24, cache=False)
+            frames = np.stack(list(pictures))
+        self.assertEqual(calls, [["a.lens", "b.blur"]])  # one run, in the written order
+        # grey (0.5), then Natron's +0.25 green, then the tint keeps red: what feeds Natron is drawn first.
+        np.testing.assert_allclose(frames[0, 0, 0], [0.5, 0.0, 0.0, 1.0], atol=1e-5)
+
+    def test_it_is_validated_as_any_graph(self) -> None:
+        self.assertEqual(validate(self.graph()), [])
+
+
+def _natron() -> str:
+    from cine_toaster.vfx import natron_binary
+
+    return natron_binary() or ""
+
+
+@unittest.skipUnless(HAS_FFMPEG and _natron(), "Natron (the OpenFX host) is not installed")
+class NatronTests(unittest.TestCase):
+    def test_frames_go_to_natron_and_back_unchanged(self) -> None:
+        """Float OpenEXR both ways: an empty chain returns the picture to half-float precision, light above
+        white included -- nothing is encoded on the way."""
+
+        from cine_toaster.compositing import natron
+
+        rng = np.random.default_rng(3)
+        pictures = rng.random((3, 18, 32, 4), dtype=np.float32)
+        pictures[..., :3] *= pictures[..., 3:] * 3.0  # premultiplied, above white
+        out = natron.run([], iter(pictures), frames=3, size=(32, 18), fps=24)
+        back = np.stack([out[index] for index in range(3)])
+        np.testing.assert_allclose(back, pictures, atol=4e-3)
+        self.assertGreater(float(back.max()), 1.5)
+
+    def test_a_cut_draws_a_shot_with_openfx_in_one_graph(self) -> None:
+        from cine_toaster.assembly import plan_scene, render
+        from cine_toaster.project import load_scene
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "film"
+            shutil.copytree(DEMO, root)
+            scene_file = root / "scenes" / "030-echo-chamber" / "scene.yaml"
+            scene_file.write_text(scene_file.read_text(encoding="utf-8").replace(
+                "  - n: 2\n", "  - n: 2\n    effects: [{id: ofx-lens-distortion, k1: 0.3}, {id: vignette}]\n", 1),
+                encoding="utf-8")
+            plan = plan_scene(root, load_scene(root, "SC-030"))
+            written: list[str] = []
+
+            def run(command, expected_seconds=None, message="", span=None):
+                written.append(Path(str(command[-1])).name)
+                subprocess.run(command, check=True, capture_output=True)
+
+            render(root, plan, Path(directory) / "cut.mp4", Path(directory) / "work", run)
+            self.assertTrue(any(note.startswith("P2: drawn in one graph") for note in plan.notes), plan.notes)
+            self.assertFalse([name for name in written if "treated" in name or name.endswith(".fx.mp4")])
+
+
 def plan_fps(plan, root: Path) -> float:
     from cine_toaster.assembly import _source_frame
 

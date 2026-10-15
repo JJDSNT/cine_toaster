@@ -1650,7 +1650,11 @@ def render(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size: 
     """
 
     from .identity import REFERENCE_VERSION, identities
+    from .natron import has_plugins, stage
 
+    if has_plugins(graph):
+        # OpenFX plugins run by Natron first, over what feeds them; the rest is drawn as any graph is.
+        graph, inputs = stage(graph, inputs, frames=frames, size=size, fps=fps, root=root, beats=beats)
     known = {name: _input_identity(value) for name, value in inputs.items()}
     # Another renderer (GL) draws the same graph; its results are kept apart from the reference's.
     draw = renderer.evaluate if renderer is not None else evaluate
