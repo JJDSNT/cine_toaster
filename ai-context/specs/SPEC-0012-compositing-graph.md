@@ -192,7 +192,7 @@ or procedural warp says `edge: extend` (the border repeated) or `edge: mirror`
 a text's size -- are pixels of a frame 720 lines high, scaled to the frame
 drawn (CT-0075): a composite looks the same in a 180-line preview or still as
 in the 1080-line cut. A shape's `feather` is a fraction of the frame.
-| `filter.noise` | picture | picture | `amount`, `size`, `seed` (grain) |
+| `filter.noise` | picture | picture | `amount`, `size`, `seed` (grain); `space`: `linear` (default) adds it to the light, `display` to the encoded picture -- as video shows grain, the same in the shadows as in the highlights (CT-0077) |
 
 ## time
 
@@ -208,7 +208,7 @@ in the 1080-line cut. A shape's `feather` is a fraction of the frame.
 | Op | In | Out | Parameters |
 |---|---|---|---|
 | `generate.source` | -- | picture (+ sound, meta) | a take, a file or a stretch; its colour space and alpha (§2) |
-| `generate.solid` / `gradient` / `noise` | -- | picture | colour(s), kind, seed. A gradient's `kind`: `linear` (along `angle`), `radial` (the frame's own shape), `circle` (round whatever the frame), `diamond` (by \|x\| + \|y\|), `conic` (the angle clockwise from twelve o'clock, round); the distance kinds reach 1 at the corners -- so a gradient made a matte and thresholded by a join's progress is an iris, a diamond or a clock wipe (CT-0076) |
+| `generate.solid` / `gradient` / `noise` | -- | picture | colour(s), kind, seed, `repeat` (the ramp repeated: stripes, rings; CT-0077). A gradient's `kind`: `linear` (along `angle`), `radial` (the frame's own shape), `circle` (round whatever the frame), `diamond` (by \|x\| + \|y\|), `conic` (the angle clockwise from twelve o'clock, round); the distance kinds reach 1 at the corners -- so a gradient made a matte and thresholded by a join's progress is an iris, a diamond or a clock wipe (CT-0076) |
 | `generate.text` | -- | picture | text, font, size, colour, `reveal` (curve: letters shown, for typewriter-like titles) |
 | `generate.render` | -- | picture (+ signals) | a renderer's own scene (Blender, a VFX recipe), its parameters, `seed`; it may also give depth or other passes |
 
@@ -559,7 +559,9 @@ procedural look of its own). A join's matte may be a generator --
 join's graph and read as its values are (`signal.luminance`), where a
 file's grey is read as it is shown (`signal.luma`).
 
-**VFX, FFmpeg forms**:
+**VFX, FFmpeg forms** -- done in C6 (CT-0077): the fourteen are fragments of
+the graph built from each item's parameters (`compositing/effects.py`), every
+item names its primitives, and FFmpeg no longer draws them:
 - `film-grain`: `filter.noise(picture)`.
 - `vignette`: `merge.blend(picture, generate.gradient(radial); multiply)`.
 - `chromatic-aberration`: three `signal.channel` + three `warp.transform`

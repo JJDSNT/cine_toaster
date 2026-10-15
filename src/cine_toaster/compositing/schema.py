@@ -137,7 +137,8 @@ OPS: dict[str, Op] = {
     "filter.glow": Op({"in": P(*PIC)}, params={"threshold": "number", "radius": "number", "intensity": "number"}),
     "filter.edges": Op({"in": P(*PIC)}, {"out": "matte"}, {"kind": "enum:sobel|laplace|canny"}),
     "filter.morphology": Op({"in": P(*MAT)}, {"out": "matte"}, {"operation": "enum:erode|dilate", "radius": "number"}),
-    "filter.noise": Op({"in": P(*PIC)}, params={"amount": "number", "size": "number", "seed": "int"}),
+    "filter.noise": Op({"in": P(*PIC)}, params={"amount": "number", "size": "number", "seed": "int",
+                                                "space": "enum:linear|display"}),
     # -- time
     "time.remap": Op({"in": P(*TYPES[:4])}, {"out": SAME}, {"map": "number"}),
     "time.offset": Op({"in": P(*TYPES[:4])}, {"out": SAME}, {"frames": "int"}),
@@ -148,7 +149,7 @@ OPS: dict[str, Op] = {
                           {"take": "text", "file": "file", "colorspace": "text", "alpha": "enum:straight|premultiplied",
                            "start": "number", "duration": "number"}),
     "generate.solid": Op({}, params={"colour": "vector"}),
-    "generate.gradient": Op({}, params={"kind": "enum:linear|radial|circle|diamond|conic", "colours": "vector", "angle": "number"}),
+    "generate.gradient": Op({}, params={"kind": "enum:linear|radial|circle|diamond|conic", "repeat": "number", "colours": "vector", "angle": "number"}),
     "generate.noise": Op({}, params={"kind": "enum:value|perlin|grain", "scale": "number", "seed": "int"}),
     "generate.text": Op({}, params={"text": "text", "font": "file", "size": "number", "colour": "vector",
                                     "position": "vector", "reveal": "number"}),

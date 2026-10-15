@@ -38,7 +38,7 @@ CATEGORIES = ("frame", "texture", "lens", "light", "motion", "glitch", "particle
 EFFECTS = ("mirror", "crop", "fade-out", "grain", "vignette", "light-leak", "aberration", "glitch", "shake", "flash", "defocus", "old-film",
            "element", "sparks-burst", "disintegrate", "look", "ofx", "hologram", "fog", "rain", "snow", "lightning",
            "shatter", "melt", "liquid-splash")
-ENGINES = ("ffmpeg", "blender", "ofx")
+ENGINES = ("graph", "ffmpeg", "blender", "ofx")
 #: OpenFX plugins run in Natron, an OFX host driven headless (vfx_assets/_natron/chain.py).
 NATRON_CHAIN_SCRIPT = BUILTIN / "_natron" / "chain.py"
 #: Effects Blender renders as an element on the fly (vfx_assets/_blender/element.py).
@@ -83,6 +83,8 @@ def list_effects(project_root: Path | None = None) -> list[dict[str, Any]]:
                 "avoid_when": [str(item) for item in raw.get("avoid_when") or []],
                 "params": dict(raw.get("params") or {}), "effect": str(render.get("effect") or "grain"),
                 "engine": str(render.get("engine") or "ffmpeg"),
+                # The primitives it is made of, when the compositing graph draws it (C6, CT-0077).
+                "primitives": [str(op) for op in render.get("primitives") or []],
                 "plugin": str(render.get("plugin") or ""),
                 "element_category": str(render.get("element_category") or ""), "origin": origin,
                 "directory": str(manifest.parent),
@@ -222,76 +224,12 @@ def _number(params: dict[str, Any], key: str, default: float) -> float:
 
 def _chain(effect: dict[str, Any], label: str, out: str, duration: float, width: int, height: int,
            element_input: int | None) -> str:
-    """One effect as a filter-graph step from [label] to [out]."""
+    """A look or an element as a filter-graph step from [label] to [out]. Every other effect is drawn by the
+    compositing graph (`compositing.effects`, CT-0077); these two follow in C6's next stages."""
 
     params, kind = effect["params"], effect["effect"]
     strength = _number(params, "strength", 0.5)
     start = _number(params, "start", 0.0)
-    if kind == "mirror":
-        return f"[{label}]hflip[{out}]"
-    if kind == "crop":
-        # A detail of the frame, enlarged to fill it: x, y, width, height as fractions of the frame.
-        x, y = _number(params, "x", 0.0), _number(params, "y", 0.0)
-        w, h = _number(params, "width", 0.5), _number(params, "height", 0.5)
-        return (f"[{label}]crop=iw*{w:.4f}:ih*{h:.4f}:iw*{x:.4f}:ih*{y:.4f},scale={width}:{height},setsar=1[{out}]")
-    if kind == "fade-out":
-        length = min(_number(params, "length", 1.0), duration)
-        return f"[{label}]fade=t=out:st={max(0.0, duration - length):.3f}:d={length:.3f}[{out}]"
-    if kind == "grain":
-        return f"[{label}]noise=alls={max(1, round(strength * 40))}:allf=t+u[{out}]"
-    if kind == "vignette":
-        return f"[{label}]vignette=angle={0.2 + strength * 0.6:.3f}[{out}]"
-    if kind == "light-leak":
-        # A warm glow drifting across the frame, laid over the picture.
-        colour = str(params.get("color") or "#FF8A3C").lstrip("#")
-        r, g, b = (int(colour[i:i + 2], 16) for i in (0, 2, 4))
-        return (f"color=c=black:s={width}x{height}:d={duration:.3f},format=rgba,"
-                f"geq=r={r}:g={g}:b={b}:"
-                f"a='{255 * strength:.0f}*exp(-pow((X-W*(0.2+0.6*T/{max(0.1, duration):.3f}))/(W*0.3),2))'[{label}leak];"
-                f"[{label}][{label}leak]overlay=format=auto:shortest=1,format=yuv420p[{out}]")
-    if kind == "aberration":
-        shift = max(1, round(strength * 8 * width / 1280))
-        return f"[{label}]rgbashift=rh=-{shift}:bh={shift}[{out}]"
-    if kind == "glitch":
-        # Bursts of a split, noisy copy over the picture, several times a second.
-        shift = max(2, round(strength * 24 * width / 1280))
-        rate = _number(params, "rate", 0.15)
-        return (f"[{label}]split[{label}a][{label}b];[{label}b]rgbashift=rh={shift}:bh=-{shift}:edge=wrap,"
-                f"noise=alls={max(1, round(strength * 30))}:allf=t[{label}g];"
-                f"[{label}a][{label}g]overlay=enable='gt(mod(t*12\\,1)\\,{1 - rate:.3f})'[{out}]")
-    if kind == "shake":
-        amount = max(2, round(strength * 20 * width / 1280))
-        return (f"[{label}]crop=iw-{2 * amount}:ih-{2 * amount}:"
-                f"'{amount}+{amount}*sin(t*37)*sin(t*13)':'{amount}+{amount}*sin(t*29)*cos(t*17)',"
-                f"scale={width}:{height}[{out}]")
-    if kind == "flash":
-        length = _number(params, "length", 0.4)
-        return (f"[{label}]eq=brightness='{min(1.0, strength):.3f}*max(0,1-abs(t-{start:.3f})/{length:.3f})':"
-                f"eval=frame[{out}]")
-    if kind == "defocus":
-        length = _number(params, "length", 1.2)
-        # Out of focus, coming into focus: the blur shrinks over `length`.
-        return (f"[{label}]split[{label}s][{label}b];[{label}b]gblur=sigma={4 + strength * 16:.1f}[{label}bl];"
-                f"[{label}s][{label}bl]blend=all_expr='A*min(1,T/{length:.3f})+B*(1-min(1,T/{length:.3f}))'[{out}]")
-    if kind == "old-film":
-        return (f"[{label}]colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131,"
-                f"noise=alls={max(1, round(strength * 30))}:allf=t+u,vignette=angle=0.6,"
-                f"eq=brightness='0.03*sin(t*23)':eval=frame[{out}]")
-    if kind == "hologram":
-        # Cyan light, scanlines, a colour fringe and an unsteady brightness: a projection, not a person.
-        shift = max(1, round(strength * 4 * width / 1280))
-        gap = max(2, round(3 * height / 720))
-        return (f"[{label}]colorchannelmixer=.15:.25:.2:0:.25:.55:.35:0:.35:.65:.85,"
-                f"drawgrid=w=iw:h={gap}:t=1:c=black@{0.25 + 0.3 * strength:.2f},rgbashift=rh=-{shift}:bh={shift},"
-                f"eq=brightness='0.04*sin(t*31)+0.08*gt(random(1),0.93)':eval=frame,"
-                f"gblur=sigma=0.6[{out}]")
-    if kind == "fog":
-        # Soft banks of mist drifting across, laid over the picture with screen.
-        drift = _number(params, "drift", 0.5)
-        return (f"nullsrc=s={width // 4}x{height // 4}:d={duration:.3f}:r=24,"
-                f"geq=lum='128+70*sin(X/9+T*{drift:.3f})*cos(Y/7-T*{drift * 0.6:.3f})+40*sin((X+Y)/13+T*{drift * 0.3:.3f})':"
-                f"cb=128:cr=128,gblur=sigma=4,scale={width}:{height},format=gbrp[{label}fog];[{label}]format=gbrp[{label}p];"
-                f"[{label}p][{label}fog]blend=all_mode=screen:all_opacity={min(1.0, strength):.3f},format=yuv420p[{out}]")
     if kind == "look":
         # An OpenColorIO view baked to a 3D LUT (cached), for FFmpeg to apply.
         from .color import bake_look
@@ -518,6 +456,29 @@ def render(effects: list[dict[str, Any]], duration: float, output: Path, *, back
             rest = [effect for effect in effects if effect["effect"] != "ofx"]
             return render(rest, duration, output, background=treated, start=0.0, width=width, height=height,
                           fps=fps, run=run)
+    from .compositing.effects import BUILDERS
+
+    if effects and all(effect["effect"] in BUILDERS for effect in effects):
+        return render_graph(effects, duration, output, background=background, start=start, width=width,
+                            height=height, fps=fps, run=run)
+    if any(effect["effect"] in BUILDERS for effect in effects):
+        # Elements are still laid by FFmpeg (C6's next stage): the effects around them are drawn by the graph, in
+        # the order the shot gives them, each run of them in one graph.
+        with tempfile.TemporaryDirectory(prefix="fx-") as scratch:
+            current, offset = background, start
+            runs: list[list[dict[str, Any]]] = []
+            for effect in effects:
+                if runs and (effect["effect"] in BUILDERS) == (runs[-1][0]["effect"] in BUILDERS):
+                    runs[-1].append(effect)
+                else:
+                    runs.append([effect])
+            for index, part in enumerate(runs):
+                step = Path(scratch) / f"run-{index}.mp4"
+                render(part, duration, step, background=current, start=offset, width=width, height=height, fps=fps,
+                       run=run)
+                current, offset = step, 0.0
+            shutil.copyfile(current, output)
+            return output
     size = f"{width}:{height}"
     if background is not None:
         inputs = ["-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", str(background)]
@@ -548,6 +509,52 @@ def render(effects: list[dict[str, Any]], duration: float, output: Path, *, back
          "-t", f"{duration:.3f}", "-r", str(fps), "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt",
          "yuv420p", "-c:a", "aac", str(output)])
     return output
+
+
+def render_graph(effects: list[dict[str, Any]], duration: float, output: Path, *, background: Path | None = None,
+                 start: float = 0.0, width: int = 1280, height: int = 720, fps: int = 24, run=None) -> Path:
+    """Effects drawn by the compositing graph (C6, CT-0077): GL when it holds every op, the reference otherwise;
+    the background's sound kept. Without a background, a neutral picture for previews."""
+
+    import numpy as np
+
+    from .compositing import reference
+    from .compositing.effects import graph_for
+    from .compositing.gl import renderer_for
+
+    run = run or (lambda command: subprocess.run(command, check=True, capture_output=True))
+    width, height = width // 2 * 2, height // 2 * 2
+    frames = max(1, round(duration * fps))
+    if background is not None:
+        picture = reference.read(Path(background), frames, (width, height), fps, start=start)
+    else:
+        # A neutral picture for previews: a soft gradient with a dark figure in the middle.
+        ys, xs = np.mgrid[0:height, 0:width].astype(np.float32)
+        still = np.dstack([0.05 + 0.08 * xs / width, 0.07 + 0.05 * ys / height, 0.1 + 0.03 * xs / width,
+                           np.ones_like(xs)]).astype(np.float32)
+        still[int(height * 0.35):, int(width * 0.46):int(width * 0.54), :3] = 0.012
+        picture = still
+    graph = graph_for(effects, duration, fps)
+    fast = renderer_for(graph)
+    pictures, _identity, _cached = reference.render(graph, {"picture": picture}, frames=frames,
+                                                    size=(width, height), fps=fps, renderer=fast)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    silent = output.with_suffix(".picture.mp4")
+    reference.write(pictures, silent, fps)
+    if background is not None and _has_sound(Path(background)):
+        run(["ffmpeg", "-v", "error", "-y", "-i", str(silent), "-ss", f"{start:.3f}", "-t", f"{duration:.3f}",
+             "-i", str(background), "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-shortest",
+             str(output)])
+        silent.unlink(missing_ok=True)
+    else:
+        silent.replace(output)
+    return output
+
+
+def _has_sound(path: Path) -> bool:
+    completed = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index",
+                                "-of", "csv=p=0", str(path)], capture_output=True, text=True)
+    return bool(completed.stdout.strip())
 
 
 def preview_clip(item: dict[str, Any], output: Path, *, root: Path | None = None, element: str = "") -> Path:

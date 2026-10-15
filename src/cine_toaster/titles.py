@@ -138,7 +138,7 @@ def blender_binary() -> str | None:
 def engine_missing(engine: str) -> str:
     """Why an engine cannot run here, or ''."""
 
-    if engine == "ffmpeg":
+    if engine in ("ffmpeg", "graph"):  # the graph reads and writes its frames through FFmpeg
         return "" if shutil.which("ffmpeg") else "FFmpeg is not installed"
     if engine == "blender":
         return "" if blender_binary() else "Blender is not found (install it, or set CINE_TOASTER_BLENDER)"

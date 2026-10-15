@@ -11,5 +11,7 @@ avoid_when = ["Wide establishing shots meant to feel open"]
 strength = 0.5
 
 [render]
-engine = "ffmpeg"
+engine = "graph"
 effect = "vignette"
+# Drawn by the compositing graph (C6, CT-0077), of these primitives:
+primitives = ["generate.gradient", "merge.blend"]

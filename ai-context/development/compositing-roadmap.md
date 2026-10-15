@@ -251,6 +251,11 @@ as shaders, with their reasons: `pixelate`, `film-burn`.
 
 ### C6. The catalogs re-expressed
 
+In progress (`CT-0077`): stage A done -- the fourteen effects FFmpeg drew are
+fragments of the graph, every one on GL, each item naming its primitives.
+Next: elements as layers, looks as `colour.lut` on GL, titles on layers.
+
+
 - What: VFX items that are a primitive with a parameter (a colour key, a
   luma key, a blur) become presets of the primitive; element effects (fire
   over, smoke over) become layers with an alpha or luma matte; titles become

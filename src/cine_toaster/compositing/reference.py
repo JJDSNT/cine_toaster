@@ -377,6 +377,27 @@ def _picture(value: Any) -> np.ndarray:
     return value
 
 
+def noise_field(kind: str, scale: float, seed: int, frame: int, width: int, height: int) -> np.ndarray:
+    """generate.noise's values, 0 to 1: one drawing of them for every renderer (GL uploads it; CT-0077)."""
+
+    if kind == "grain":
+        grey = np.random.default_rng([seed, frame]).normal(0.5, 0.15, (height, width)).astype(np.float32)
+    else:
+        cells = max(1.0, float(scale))
+        from PIL import Image
+
+        coarse = np.random.default_rng(seed).uniform(0, 1, (int(cells * height / width) + 2, int(cells) + 2))
+        grey = np.asarray(Image.fromarray(coarse.astype(np.float32), "F").resize((width, height), Image.BICUBIC))
+    return np.clip(grey, 0, 1).astype(np.float32)
+
+
+def grain_field(seed: int, frame: int, size: float, width: int, height: int) -> np.ndarray:
+    """filter.noise's grain for a frame (mean 0), its size in pixels at 720 lines: shared by every renderer."""
+
+    grain = np.random.default_rng([seed, frame]).normal(0, 1, (height, width)).astype(np.float32)
+    return _blur(grain, max(pixels(size, height) - 1.0, 0.0))
+
+
 def _excess(rgb: np.ndarray, screen: np.ndarray) -> np.ndarray:
     """How much a colour's screen channel (the one the key colour is made of) exceeds the larger of the other two."""
 
@@ -780,6 +801,9 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             else:
                 angle = math.radians(float(param("angle", 0.0)))
                 x = ((xs + 0.5) / width - 0.5) * math.cos(angle) + ((ys + 0.5) / height - 0.5) * math.sin(angle) + 0.5
+            repeats = float(param("repeat", 1.0) or 1.0)
+            if repeats > 1.0:  # the ramp repeated: stripes, rings, bands (CT-0077)
+                x = np.mod(np.clip(x, 0, 1) * repeats, 1.0)
             x = np.clip(x, 0, 1)[..., None]
             out = colours[0] * (1 - x) + colours[-1] * x
             out[..., :3] *= out[..., 3:4]
@@ -988,18 +1012,8 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             return np.concatenate([rgb * alpha, alpha], axis=-1).astype(np.float32)
 
         if op == "generate.noise":
-            seed = int(param("seed", 0) or 0)
-            kind = param("kind", "value")
-            if kind == "grain":
-                grey = np.random.default_rng([seed, frame]).normal(0.5, 0.15, (height, width)).astype(np.float32)
-            else:
-                cells = max(1.0, float(param("scale", 8.0)))
-                from PIL import Image
-
-                coarse = np.random.default_rng(seed).uniform(0, 1, (int(cells * height / width) + 2, int(cells) + 2))
-                grey = np.asarray(Image.fromarray(coarse.astype(np.float32), "F").resize((width, height),
-                                                                                         Image.BICUBIC))
-            grey = np.clip(grey, 0, 1).astype(np.float32)
+            grey = noise_field(str(param("kind", "value")), float(param("scale", 8.0)), int(param("seed", 0) or 0),
+                               frame, width, height)
             return np.stack([grey, grey, grey, np.ones_like(grey)], axis=-1)
         if op == "generate.text":
             from ..titles import font_file
@@ -1131,11 +1145,16 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
                 np.float32)
         if op == "filter.noise":
             picture = _picture(value(node["in"], frame))
-            grain = np.random.default_rng([int(param("seed", 0) or 0), frame]).normal(0, 1, (height, width))
-            grain = _blur(grain.astype(np.float32), max(pixels(param("size", 1.0), height) - 1.0, 0.0))
+            grain = grain_field(int(param("seed", 0) or 0), frame, float(param("size", 1.0)), width, height)
+            amount = grain[..., None] * float(param("amount", 0.1)) * 0.1
             out = picture.copy()
-            out[..., :3] = np.clip(picture[..., :3] + grain[..., None] * float(param("amount", 0.1)) * 0.1
-                                   * picture[..., 3:4], 0, None)
+            if param("space", "linear") == "display":
+                # Grain as video shows it (CT-0077): added to the encoded picture, the same in the shadows as in
+                # the highlights; in linear light a little grain swamps the dark parts once encoded.
+                rgb, alpha = straight(picture)
+                out[..., :3] = decode_srgb(np.clip(encode_srgb(rgb) + amount, 0, None)) * alpha
+            else:
+                out[..., :3] = np.clip(picture[..., :3] + amount * picture[..., 3:4], 0, None)
             return out
         if op in ("time.remap", "time.offset"):
             if op == "time.offset":

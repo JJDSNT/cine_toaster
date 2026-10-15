@@ -11,5 +11,7 @@ avoid_when = ["Clean, controlled images"]
 strength = 0.4
 
 [render]
-engine = "ffmpeg"
+engine = "graph"
 effect = "aberration"
+# Drawn by the compositing graph (C6, CT-0077), of these primitives:
+primitives = ["merge.channels", "signal.channel", "warp.transform"]

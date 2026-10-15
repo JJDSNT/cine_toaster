@@ -12,5 +12,7 @@ strength = 0.25
 drift = 0.5
 
 [render]
-engine = "ffmpeg"
+engine = "graph"
 effect = "fog"
+# Drawn by the compositing graph (C6, CT-0077), of these primitives:
+primitives = ["colour.grade", "curve.keys", "filter.blur", "generate.noise", "merge.blend", "warp.transform"]

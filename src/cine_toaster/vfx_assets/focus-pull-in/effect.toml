@@ -12,5 +12,7 @@ strength = 0.6
 length = 1.2
 
 [render]
-engine = "ffmpeg"
+engine = "graph"
 effect = "defocus"
+# Drawn by the compositing graph (C6, CT-0077), of these primitives:
+primitives = ["curve.keys", "filter.blur"]

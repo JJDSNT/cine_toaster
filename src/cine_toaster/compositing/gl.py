@@ -18,6 +18,7 @@ Intel GPU through Windows): measured, a 1080p float pass is 1.5 ms on llvmpipe,
 from __future__ import annotations
 
 import struct
+import threading
 from typing import Any, Callable
 
 import numpy as np
@@ -29,14 +30,14 @@ from .semantics import blur_kernel, pixels, screen_channel, threshold_spread
 from .semantics import default as semantic_default
 
 IMPLEMENTED = {
-    "generate.source", "generate.solid", "generate.gradient",
+    "generate.source", "generate.solid", "generate.gradient", "generate.noise",
     "signal.luminance", "signal.luma", "signal.channel",
     "matte.from_signal", "matte.threshold", "matte.combine", "matte.key",
-    "merge.over", "merge.mix", "merge.blend", "merge.porter_duff",
+    "merge.over", "merge.mix", "merge.blend", "merge.porter_duff", "merge.channels",
     "warp.transform", "warp.corner_pin", "warp.surface", "warp.displace",
     "matte.shape",
     "colour.grade", "colour.invert", "colour.despill",
-    "filter.blur", "filter.morphology",
+    "filter.blur", "filter.morphology", "filter.noise",
     "curve.progress", "curve.keys", "curve.map", "curve.combine", "curve.noise", "curve.beats",
     "opaque.gl",
 }
@@ -85,11 +86,14 @@ const vec3 REC709 = vec3(0.2126, 0.7152, 0.0722);
 vec3 straight(vec4 p) { return p.a > 1e-6 ? p.rgb / p.a : vec3(0.0); }
 float encode1(float c) { c = max(c, 0.0); return c <= 0.0031308 ? c * 12.92 : 1.055 * pow(c, 1.0 / 2.4) - 0.055; }
 vec3 encode(vec3 c) { return vec3(encode1(c.r), encode1(c.g), encode1(c.b)); }
+float decode1(float c) { return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4); }
+vec3 decode(vec3 c) { return vec3(decode1(c.r), decode1(c.g), decode1(c.b)); }
 """
 
 _SHADERS = {
     "solid": "uniform vec4 colour; void main() { result = colour; }",
     "gradient": """uniform vec4 c0; uniform vec4 c1; uniform int radial; uniform float angle; uniform float aspect;
+        uniform float repeats;
         void main() {
           vec2 p = uv; vec2 d = p - 0.5; float x;
           if (radial == 1) x = length(d) / length(vec2(0.5));
@@ -97,6 +101,7 @@ _SHADERS = {
           else if (radial == 3) x = abs(d.x) + abs(d.y);
           else if (radial == 4) x = mod(atan(d.x * aspect, -d.y) / 6.283185307 - angle / 6.283185307, 1.0);
           else x = (p.x - 0.5) * cos(angle) + (p.y - 0.5) * sin(angle) + 0.5;
+          if (repeats > 1.0) x = mod(clamp(x, 0.0, 1.0) * repeats, 1.0);
           x = clamp(x, 0.0, 1.0); vec4 c = mix(c0, c1, x); result = vec4(c.rgb * c.a, c.a);
         }""",
     "luminance": """uniform sampler2D a; uniform vec3 weights; uniform int encoded;
@@ -186,6 +191,14 @@ _SHADERS = {
           vec4 v = texture(a, s);
           if (edge == 0) { vec2 inside = step(-0.5 / picture, s) * step(s, 1.0 + 0.5 / picture); v *= inside.x * inside.y; }
           result = v; }""",
+    "channels": """uniform sampler2D r; uniform sampler2D g; uniform sampler2D b; uniform sampler2D al;
+        uniform ivec4 given;
+        void main() { result = vec4(given.x == 1 ? texture(r, uv).r : 0.0, given.y == 1 ? texture(g, uv).r : 0.0,
+                                    given.z == 1 ? texture(b, uv).r : 0.0, given.w == 1 ? texture(al, uv).r : 1.0); }""",
+    "grain": """uniform sampler2D a; uniform sampler2D field; uniform float amount; uniform int shown_;
+        void main() { vec4 p = texture(a, uv); float g = texture(field, uv).r * amount * 0.1;
+          if (shown_ == 1) { vec3 s = encode(straight(p)); result = vec4(decode(max(s + g, vec3(0.0))) * p.a, p.a); }
+          else result = vec4(max(p.rgb + g * p.a, vec3(0.0)), p.a); }""",
     "morphology": """uniform sampler2D a; uniform vec2 texel; uniform int reach; uniform int grow;
         void main() { float m = grow == 1 ? 0.0 : 1.0;
           for (int y = -reach; y <= reach; y++) for (int x = -reach; x <= reach; x++) {
@@ -384,7 +397,7 @@ class GLRenderer:
             kinds = ("linear", "radial", "circle", "diamond", "conic")
             return self.draw("gradient", size, 4, {}, c0=tuple(colours[0]), c1=tuple(colours[-1]),
                              radial=kinds.index(p("kind", "linear")), angle=float(np.radians(p("angle", 0.0))),
-                             aspect=width / height)
+                             aspect=width / height, repeats=float(p("repeat", 1.0) or 1.0))
         if op in ("signal.luminance", "signal.luma"):
             weights = tuple(float(w) for w in (node.get("weights") or REC709))
             return self.draw("luminance", size, 1, {"a": value(node["picture"])}, weights=weights,
@@ -498,6 +511,26 @@ class GLRenderer:
                     self.shapes.clear()
                 self.shapes[key] = _shape(node, size, scale)
             return self.upload(self.shapes[key])
+        if op == "merge.channels":
+            textures, given = {}, []
+            for channel, uniform in (("red", "r"), ("green", "g"), ("blue", "b"), ("alpha", "al")):
+                if node.get(channel):
+                    textures[uniform] = value(node[channel])
+                given.append(int(bool(node.get(channel))))
+            return self.draw("channels", size, 4, textures, given=tuple(given))
+        if op == "generate.noise":
+            # The reference's own field, uploaded: noise drawn once, the same in both renderers (CT-0077).
+            from .reference import noise_field
+
+            grey = noise_field(str(p("kind", "value")), float(p("scale", 8.0)), int(p("seed", 0) or 0), frame,
+                               width, height)
+            return self.upload(np.stack([grey, grey, grey, np.ones_like(grey)], axis=-1))
+        if op == "filter.noise":
+            from .reference import grain_field
+
+            field = self.upload(grain_field(int(p("seed", 0) or 0), frame, float(p("size", 1.0)), width, height))
+            return self.draw("grain", size, 4, {"a": value(node["in"]), "field": field},
+                             amount=float(p("amount", 0.1)), shown_=int(p("space", "linear") == "display"))
         if op == "warp.displace":
             source, field = value(node["in"]), value(node["map"])
             direction = tuple(float(c) for c in np.broadcast_to(np.asarray(p("direction") if p("direction") is not None
@@ -603,7 +636,9 @@ def _grey(matte: np.ndarray) -> np.ndarray:
     return np.concatenate([matte, matte, matte, np.ones_like(matte)], axis=-1)
 
 
-_SHARED: list[Any] = []
+#: One renderer per thread: a GL context is current in the thread that made it, and making it current in another
+#: (a preview rendered in a worker) is refused by GLX -- Xlib then ends the process (CT-0077).
+_SHARED = threading.local()
 
 
 def gl_unavailable_reason() -> str | None:
@@ -624,16 +659,17 @@ def gl_unavailable_reason() -> str | None:
 def renderer_for(graph: dict[str, Any]) -> "GLRenderer | None":
     """The GL renderer, when GL can run here and draws every op of ``graph``; else None (the reference draws).
 
-    One context is made once and kept for the process: compiling the programs is the slow part.
+    One context is made once per thread and kept: compiling the programs is the slow part.
     """
 
     if any(node.get("op") not in IMPLEMENTED for node in (graph.get("nodes") or {}).values()):
         return None
-    if not _SHARED:
+    renderer = getattr(_SHARED, "renderer", None)
+    if renderer is None:
         if gl_unavailable_reason():
             return None
         try:
-            _SHARED.append(GLRenderer())
+            renderer = _SHARED.renderer = GLRenderer()
         except Exception:  # a context that cannot be made: the reference draws instead
             return None
-    return _SHARED[0]
+    return renderer

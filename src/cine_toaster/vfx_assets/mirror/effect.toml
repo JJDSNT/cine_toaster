@@ -8,5 +8,7 @@ use_when = ["A take whose screen direction is wrong for the cut, when nothing in
 avoid_when = ["Text, clocks, a face whose asymmetry the audience knows"]
 
 [render]
-engine = "ffmpeg"
+engine = "graph"
 effect = "mirror"
+# Drawn by the compositing graph (C6, CT-0077), of these primitives:
+primitives = ["warp.transform"]
