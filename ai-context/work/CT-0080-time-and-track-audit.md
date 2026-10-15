@@ -369,6 +369,17 @@ lost at 2x). Blind listening files (the original, then five stretchers in a
 shuffled order, the key kept apart) were given to the user; the default
 stretcher stays provisional until then.
 
+**The stretcher chosen (2026-10-15).** The user could not judge the blind
+files (the tape's excerpt was its quiet opening, -39 dB RMS -- the excerpt's
+fault, not the code's) and left the choice here: **the anchored WSOLA**, the
+only one measured to keep sync to the sample (anchored, never
+accumulating), steady tones flat and in pitch through changes of speed, and
+attacks whole on their instants, with no dependency or licence question.
+Rubber Band's native engine is better on sustained tones but smears short
+transients and would bring GPL code into the process; it and FFmpeg's
+filters stay available by name. Not yet done, recorded in the roadmap: a
+listening review of real material with representative, non-silent excerpts.
+
 **Wired into the assembly** (the architectural part, released by the user):
 `plan_scene` carries a shot's `retime_sound` (mute by default, preserve,
 stretch) and `stretch_with` (anchored by default -- provisional -- or
@@ -378,6 +389,30 @@ the same composition as everything in step 2); `_draw_shot` lays the policy's
 sound under the drawing. Ambiguous maps, reverses and freezes under
 `stretch` are refused with a note and muted. `toast doctor` reports the
 stretchers available and the default.
+
+## Step 4 -- exposure (done 2026-10-15)
+
+Compiled into the existing nodes (ADR 0022), nothing new drawn:
+- `compositing/retime.py`: a retime as written -- `speed` (a number, or keys
+  `{t | beat, speed, ease: linear | hold}`), `reverse`, `freeze`,
+  `interpolation` -- into a `time.remap` and its map: the integral of the
+  speed, exact (linear keys) where the speed holds, sampled every 1/240 s
+  where it ramps. A key on a beat takes the beat's time in the shot.
+- A shot's `retime` compiles when it is drawn (its beats known), ahead of its
+  effects and title; its sound follows `retime_sound`. A layer takes
+  `retime` (seconds only: a layer compiles before its shot is cut -- beats
+  and reverse refused with that reason), `offset` (seconds, a slope-1 map: a
+  shift to the sound and the tracks), `echo` (after the move: trails follow
+  the layer) and `pin` (`track` file or `measure` point/plane on a lower
+  layer's source, `of`, `corners`; pinned or placed, not both).
+- Found on the way: curve keys were held in float32 -- the source of the
+  6.9999 frames of step 1 -- now float64 (GL conformance unchanged).
+
+Limitations, recorded with how: a layer's retime cannot fall on beats or
+reverse yet -- how: compile layers when the shot is drawn (as a shot's
+retime is), not when the scene loads; a ramp's map is sampled every 1/240 s
+(exact at each sample) rather than exact -- how: a curve op whose segments
+are quadratic, if a use needs more.
 
 # Done
 
@@ -445,5 +480,16 @@ stretchers available and the default.
   record), and a result that cannot be recorded now fails the job
   (`tests/test_jobs.py`).
 - Full suite after step 3 wired: 885 tests pass.
+- Step 4 (`tests/test_retime_records.py`): a constant speed is an exact map
+  (2x: 1, 3, 5 ... 19); held speeds are exact and a ramp integrates its speed
+  (1x to 3x over a second: two seconds of source, 0.75 at the middle); a
+  ramp lands on a beat (1x to the second beat at 0.7 s, then 8, 11, 14); a
+  beat the shot does not have is refused; reverse and freeze; mistakes are
+  named; a layer is retimed (2x) and offset (0.3 s: three frames late); a
+  layer's retime refuses beats and reverse; trails follow a moving layer
+  (lit to its left, fading); a layer is pinned by a track of the layer below
+  (one pixel a frame); a pin says what it follows; in a cut, a shot's
+  `retime: {speed: 2}` with `stretch` lays its click at sample 12,000.
+- Full suite after step 4: 897 tests pass.
 - The probes above (reproducible with a ten-frame clip whose red channel is
   its frame number). No code changed.

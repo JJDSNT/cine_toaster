@@ -23,8 +23,9 @@ unchanged; an unchanged shot keeps its take's sound as it always has:
   sound moved by the shift, no processing; a speed is stretched by a stretcher
   the shot may name (`stretch_with`) -- by default the anchored WSOLA here,
   every grain read where the map puts it and every attack laid whole on its
-  instant (sample-exact in CT-0080's measurements), provisionally: the choice
-  waits for the user's blind listening. FFmpeg's `rubberband` and `atempo`
+  instant (sample-exact in CT-0080's measurements) -- chosen as the default
+  in CT-0080 on those measurements; no listening review of real material has
+  confirmed it yet (recorded in the roadmap). FFmpeg's `rubberband` and `atempo`
   (pieces joined in phase) are there by name, never as a silent fallback. A
   map that runs backwards or holds still (a reverse, a freeze) cannot be
   stretched: refused, explicitly, and the shot muted;
@@ -167,8 +168,8 @@ def policy_problem(policy: Any) -> str | None:
 #: The stretchers (CT-0080, measured in `scripts/research/stretch_bench.py`): `anchored` -- WSOLA on the shot's
 #: own map, attacks laid whole on their instants: length exact, tones level, clicks to the sample -- here, always;
 #: FFmpeg's `rubberband` filter, pieces joined in phase: length exact, but dips steady tones and drifts with
-#: the content; FFmpeg's `atempo`: its timing drifts and it drops transients above 2x. The default is
-#: provisional until the user's blind listening decides.
+#: the content; FFmpeg's `atempo`: its timing drifts and it drops transients above 2x. The default is the
+#: anchored one, chosen on those measurements (CT-0080); a listening review of real material is still to do.
 STRETCHERS = ("anchored", "rubberband", "atempo")
 DEFAULT_STRETCHER = "anchored"
 

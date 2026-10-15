@@ -37,7 +37,10 @@ from __future__ import annotations
 
 from typing import Any
 
-LAYER_KEYS = ("source", "start", "place", "key", "garbage", "matte", "border", "shadow", "mode", "opacity", "depth")
+LAYER_KEYS = ("source", "start", "place", "key", "garbage", "matte", "border", "shadow", "mode", "opacity", "depth",
+              "retime", "offset", "echo", "pin")
+ECHO_KEYS = ("count", "spacing", "decay")
+PIN_KEYS = ("track", "measure", "region", "of", "corners")
 PLACE_KEYS = ("translate", "scale", "rotate", "pivot", "perspective")
 #: How a layer meets what is below it: `over` by its alpha, the others by a blend of colours where the layer
 #: is, leaving what is below unchanged where it is transparent (merge.blend, W3C Compositing; CT-0075).
@@ -128,6 +131,7 @@ class _Compiler:
         reads = {"take": source} if "/" not in source and "." not in source else {"file": source}
         current = self.add(n, {"op": "generate.source", **reads,
                                **({"start": float(layer["start"])} if layer.get("start") is not None else {})})
+        current = self.timed(n, current, layer, where)
 
         # What of the source is seen, in the source's own frame: a keyer, cut down by a garbage shape.
         seen = None
@@ -163,6 +167,22 @@ class _Compiler:
                     params["depth"] = layer["depth"]
                 current = self.add(f"{n}-placed", {"op": "warp.transform", "in": current,
                                                    **{k: v for k, v in params.items() if v is not None}})
+
+        # Pinned by a track (C7, CT-0080): onto the plane, or moved with the point, another layer's source shows.
+        if layer.get("pin") is not None:
+            if layer.get("place") is not None:
+                self.problems.append(f"{where} is pinned or placed, not both")
+            else:
+                current = self.pinned(n, current, layer["pin"], index, where)
+
+        # Trails behind the layer as it moves (C7): its past frames laid under it, after the move, so the trail
+        # follows where it went.
+        if layer.get("echo") is not None:
+            echo = layer["echo"]
+            if not isinstance(echo, dict) or set(echo) - set(ECHO_KEYS):
+                self.problems.append(f"{where}'s echo is {{count, spacing (frames), decay}}")
+            else:
+                current = self.add(f"{n}-echo", {"op": "time.echo", "in": current, **{k: echo[k] for k in echo}})
 
         # A border around what is seen, in the frame, after the move: a picture shrunk into a corner
         # gets its border around its new edge, the same width whatever its size.
@@ -202,6 +222,62 @@ class _Compiler:
         if mode == "over":
             return self.add(f"{n}-over", {"op": "merge.over", "front": current, "back": below, **mixing})
         return self.add(f"{n}-{mode}", {"op": "merge.blend", "a": below, "b": current, "mode": mode, **mixing})
+
+    def timed(self, n: str, current: str, layer: dict[str, Any], where: str) -> str:
+        """The layer's source in time (C7, CT-0080): retimed (speed, freeze -- seconds, not beats: a layer is
+        compiled before its shot is cut), and offset by some seconds; each a `time.remap` the sound and the
+        tracks follow."""
+
+        from .retime import compile_retime
+
+        if layer.get("retime") is not None:
+            spec = layer["retime"]
+            speeds = spec.get("speed") if isinstance(spec, dict) else None
+            on_beats = isinstance(speeds, list) and any(isinstance(key, dict) and "beat" in key for key in speeds)
+            if isinstance(spec, dict) and (spec.get("reverse") or on_beats):
+                self.problems.append(f"{where}'s retime: reverse and beats belong to a shot's retime (a layer "
+                                     "does not know its shot's length or beats yet)")
+            else:
+                fragment, problems = compile_retime(spec, where=f"{where}'s retime", prefix=f"{n}-retime")
+                self.problems.extend(problems)
+                if fragment:
+                    for name, node in fragment["nodes"].items():
+                        self.nodes[name] = {**node, "in": current} if node["op"] == "time.remap" else node
+                    current = fragment["output"]
+        offset = layer.get("offset")
+        if offset is not None:
+            if isinstance(offset, bool) or not isinstance(offset, (int, float)):
+                self.problems.append(f"{where}'s offset is seconds (positive: shown later)")
+            else:
+                # Shown `offset` seconds late: the source's instant is the layer's minus the offset (a slope-1 map).
+                horizon = 3600.0
+                late = self.add(f"{n}-offset-map", {"op": "curve.keys", "keys": [[0, -float(offset)],
+                                                                                  [horizon, horizon - float(offset)]]})
+                current = self.add(f"{n}-offset", {"op": "time.remap", "in": current, "map": {"curve": late}})
+        return current
+
+    def pinned(self, n: str, current: str, spec: Any, index: int, where: str) -> str:
+        """The layer pinned by a track of another layer's source: read from a file, or measured here."""
+
+        if not isinstance(spec, dict) or set(spec) - set(PIN_KEYS) or not (spec.get("track") or spec.get("measure")):
+            self.problems.append(f"{where}'s pin is {{track: file | measure: point | plane, region, of: layer, "
+                                 "corners}}")
+            return current
+        of = spec.get("of", 1)
+        if not isinstance(of, int) or not 1 <= of <= index:
+            self.problems.append(f"{where}'s pin follows a layer below it: `of` is 1 to {index}")
+            return current
+        source = f"L{of}"
+        if spec.get("track"):
+            track = self.add(f"{n}-track", {"op": "track.read", "file": str(spec["track"]), "of": source})
+        else:
+            if spec["measure"] not in ("point", "plane"):
+                self.problems.append(f"{where}'s pin measures a point or a plane, not {spec['measure']!r}")
+                return current
+            track = self.add(f"{n}-track", {"op": "track.measure", "in": source, "kind": spec["measure"],
+                                            **({"region": spec["region"]} if spec.get("region") else {})})
+        return self.add(f"{n}-pinned", {"op": "warp.corner_pin", "in": current, "track": track,
+                                        **({"corners": spec["corners"]} if spec.get("corners") else {})})
 
     def key(self, name: str, picture: str, spec: Any, where: str) -> str | None:
         if not isinstance(spec, dict) or spec.get("by") not in ("luma", "luminance", "colour", "difference"):

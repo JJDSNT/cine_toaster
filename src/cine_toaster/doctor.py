@@ -470,7 +470,7 @@ def _retimed_sound() -> Capability:
         what_it_enables="a retimed shot's take sound stretched with its picture, pitch kept (retime_sound: stretch)",
         required=False,
         status=OK,
-        detail=f"default {DEFAULT_STRETCHER} (provisional, pending the listening test); available: {', '.join(found)}"
+        detail=f"default {DEFAULT_STRETCHER}; available: {', '.join(found)}"
                + ("" if "rubberband" in found else " -- FFmpeg's rubberband filter is absent: a shot asking for it "
                   "is refused, never switched"),
         remedy="",

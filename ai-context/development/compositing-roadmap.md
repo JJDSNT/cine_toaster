@@ -345,8 +345,9 @@ shot is muted. Step 2 done: source and timeline time composed through every
 path, sources' origins and pre-rolls, tracks with their own clock. Step 3:
 the sound contract wired (mute by default, preserve, stretch -- a shift
 moved, a speed stretched with attacks kept to the sample); stretchers
-benchmarked; the default stretcher provisional until the user's blind
-listening.
+benchmarked; the anchored WSOLA chosen as the default on measurements (a
+listening review still to do). Step 4 done: `retime` on a shot (keys on
+beats, reverse, freeze) and on layers, with `offset`, `echo` and `pin`.
 
 - What: retime, speed ramp, freeze, reverse, frame blending, an offset
   between layers, trails and echoes (the ADO's Infinity). Point and planar

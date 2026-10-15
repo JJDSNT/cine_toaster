@@ -223,6 +223,8 @@ def _load_shots(
                 # Its take's sound when its picture is retimed (C7, CT-0080): mute (the default), preserve or
                 # stretch; and the stretcher, by name.
                 "retime_sound": _text(field(raw, "retime_sound")),
+                # Its picture retimed (C7, CT-0080): speed (keys may fall on beats), reverse, freeze.
+                "retime": field(raw, "retime") if isinstance(field(raw, "retime"), dict) else None,
                 "stretch_with": _text(field(raw, "stretch_with")),
                 # Where a format's frame sits in the take (CT-0049): {x, y}, 0 to 1, centred by default.
                 "reframe": field(raw, "reframe") if isinstance(field(raw, "reframe"), dict) else None,

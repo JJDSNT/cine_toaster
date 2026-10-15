@@ -395,9 +395,9 @@ def keys_curve(keys: list[Any]) -> Callable[[float], Any]:
     points = []
     for key in keys:
         if isinstance(key, dict):
-            points.append((float(key["t"]), np.asarray(key["value"], dtype=np.float32), ease_of(key.get("ease", "linear"))))
+            points.append((float(key["t"]), np.asarray(key["value"], dtype=np.float64), ease_of(key.get("ease", "linear"))))
         else:
-            points.append((float(key[0]), np.asarray(key[1], dtype=np.float32), _EASES["linear"]))
+            points.append((float(key[0]), np.asarray(key[1], dtype=np.float64), _EASES["linear"]))
     points.sort(key=lambda point: point[0])
 
     def at(seconds: float) -> Any:

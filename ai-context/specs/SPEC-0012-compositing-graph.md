@@ -330,10 +330,24 @@ compiled is `layers_invalid`).
       shadow: {offset: [0.012, 0.018], blur: 14, opacity: 0.55}
       mode: over                               # over, or a blend: screen, add, multiply, lighten, darken, difference, overlay
       opacity: {beats: {low: 0.8, high: 1.0}}  # any number: a value, {keys: [...]} or {beats: {...}}
+    - source: plates/window.mp4                # time (C7, CT-0080):
+      retime: {speed: 2}                       # speed (a number, or keys [{t, speed, ease}]), freeze -- seconds
+      offset: 0.25                             # shown a quarter of a second late
+      echo: {count: 4, spacing: 2, decay: 0.6} # trails, after it is placed: they follow where it went
+      pin: {track: tracks/window.track.json, of: 1, corners: [...]}   # or {measure: plane, region: [...]}:
+                                               # pinned by a track of layer 1's source, not placed
 ```
 
-Order within a layer: the key and garbage shape cut the source down in its
-own frame; the layer is placed; its border is drawn around its placed edge
+A shot retimes its whole picture with `retime` (speed keys may fall on the
+music's beats -- `{beat: n, speed}` -- and it may `reverse`), compiled when it
+is drawn into a `time.remap` ahead of its effects and title; its take's sound
+follows its `retime_sound` policy (`mute` by default, `preserve`, `stretch`).
+A layer's retime takes seconds only: a layer is compiled before its shot is
+cut, without its length or beats.
+
+Order within a layer: its source is retimed and offset; the key and garbage
+shape cut it down in its own frame; the layer is placed, or pinned; its trails
+are laid; its border is drawn around its placed edge
 (the same width whatever its size); a matte in the frame limits where it
 shows; its shadow is cast below it, in the frame; then it meets what is below
 by its mode and opacity. Colours are as seen (`#rrggbb`, or display-encoded

@@ -390,6 +390,16 @@ Neither changes the direction; each is used at the edges (`references.md`).
   per-letter path draws coverage. How: give `_letters_coverage` an RGBA tile
   from `_colour_text`'s drawing for each glyph, the same placement kept.
 
+### A listening review of retimed sound (CT-0080)
+
+- The anchored WSOLA was chosen as `stretch`'s default on measurements
+  (sync, level, pitch, transients); no one has judged it by ear on real
+  material -- the blind files' tape excerpt was near silence. How: blind
+  files of representative excerpts (speech, music with drums, ambience,
+  Foley), checked for level before they are sent, judged by a person; and
+  an objective perceptual score where one fits (ViSQOL, Apache 2.0) to
+  compare stretchers on the same map.
+
 ### Later
 
 - Sound: generated sound and music, stems, spatial phases 2-4 (`CT-0048`,

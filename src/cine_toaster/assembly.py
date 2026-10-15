@@ -113,6 +113,8 @@ class Segment:
     #: What its take's sound does under a retime (`mute` by default, `preserve`, `stretch`), and with what.
     retime_sound: str = ""
     stretch_with: str = ""
+    #: Its picture retimed as the shot says (speed, reverse, freeze; keys on beats), compiled when drawn.
+    retime: dict[str, Any] | None = None
     #: Speech heard within a scene version, in its own seconds (a sequence's segments): music ducks under it.
     speech_spans: list[tuple[float, float]] = field(default_factory=list)
     #: A format's frame in the take ({x, y}, CT-0049), and the captions spoken in it, in the take's seconds.
@@ -424,6 +426,7 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
                                                 if name and (root / Path(scene["file"]).parent / name).is_file() else 1.4)
         segment.sound_fades_at = shot.get("sound_fades_at")
         segment.retime_sound = str(shot.get("retime_sound") or "")
+        segment.retime = shot.get("retime") if isinstance(shot.get("retime"), dict) else None
         segment.stretch_with = str(shot.get("stretch_with") or "")
         wants_frame = ((scene.get("style") or {}).get("format") or {}).get("aspect") or scene.get("deliver")
         if not segment.reframe and wants_frame:
@@ -631,7 +634,7 @@ def _drawn(segment: Segment) -> bool:
     """Whether the shot is drawn by its graph: a composite, a still picture, or a take with effects or a title
     (OpenFX plugins included: Natron runs as a node of it). A take with nothing over it is cut as it is."""
 
-    return bool(segment.composite or segment.title or segment.effects or segment.still)
+    return bool(segment.composite or segment.title or segment.effects or segment.still or segment.retime)
 
 
 def _shot_drawing(root: Path, segment: Segment, size: tuple[int, int], fps: float, beats: list[float] | None = None,
@@ -656,10 +659,20 @@ def _shot_drawing(root: Path, segment: Segment, size: tuple[int, int], fps: floa
     effects = [("fx-", effects_graph(segment.effects, length, **whole))] if segment.effects else []
     title = [("title-", title_graph(segment.title, length, root=root, **whole))] if segment.title else []
     fragments = title + effects if not (segment.media or segment.composite) else effects + title
-    base = segment.composite or None
-    graph = shot_graph(base, fragments) if base is not None or fragments else None
     # The music's beats in the shot's own seconds: a shot pulses with the cut, not with its take.
     local = [beat - at for beat in beats or [] if -1.0 <= beat - at <= length + 1.0]
+    if segment.retime and (segment.media or segment.composite):
+        # The shot's picture retimed first, so its effects and title run at the cut's speed (C7, CT-0080).
+        from .compositing.retime import compile_retime
+
+        retimed, problems = compile_retime(segment.retime, length=length,
+                                           beats=[beat for beat in local if 0 <= beat < length],
+                                           where=f"{segment.shot}'s retime")
+        if problems:
+            raise ValidationError("; ".join(problems))
+        fragments = [("retime-", retimed)] + fragments
+    base = segment.composite or None
+    graph = shot_graph(base, fragments) if base is not None or fragments else None
     # The takes read as far as the graph reaches: past the shot's end when it is retimed faster, and before its
     # cut point (a pre-roll) when a remap runs back past it, as far as the take has frames (CT-0080).
     extent = reference.reach(graph, frames, fps, local) if graph is not None else frames
