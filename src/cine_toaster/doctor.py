@@ -216,12 +216,24 @@ def _moderngl() -> Capability:
     from .compositing.gl import gl_unavailable_reason
 
     reason = gl_unavailable_reason()
+    device = ""
+    if reason is None:
+        # Which device draws: a software rasteriser (llvmpipe) is GL, but on the CPU (CT-0080, step 6).
+        import os
+
+        from .compositing.gl import renderer_for
+
+        drawing = renderer_for({"ports": {}, "nodes": {"o": {"op": "generate.solid", "colour": [0, 0, 0, 1]}},
+                                "output": "o"})
+        device = str(drawing.context.info.get("GL_RENDERER", "")) if drawing is not None else ""
+        if "llvmpipe" in device and Path("/dev/dxg").exists() and not os.environ.get("GALLIUM_DRIVER"):
+            device += " -- software, on the CPU; this WSL has a GPU: GALLIUM_DRIVER=d3d12 draws on it"
     return Capability(
         name="ModernGL",
         what_it_enables="the GL renderer of compositing graphs, and a transition's own GLSL shader instead of its FFmpeg stand-in",
         required=False,
         status=OK if reason is None else MISSING,
-        detail=reason or "",
+        detail=reason or device,
         remedy="" if reason is None else "uv sync --extra gpu   (or: pip install -e '.[gpu]')",
     )
 

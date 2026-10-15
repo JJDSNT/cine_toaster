@@ -1178,6 +1178,139 @@ def curve_factory(nodes: dict[str, Any], curves: dict[str, Callable[[float], Any
     return curve
 
 
+class TrackBook:
+    """The tracks of a graph, read the one way every renderer reads them (C7, CT-0080): a track's data -- given,
+    read from a file, a production's record (validated and corrected by `tracks.load_track`), or measured on
+    its input -- and the entry for the instant its source shows when a node is evaluated, by the track's own
+    clock (`clock`). Renderers give it how to get a picture of a node at a frame; nothing else differs."""
+
+    def __init__(self, graph: dict[str, Any], inputs: dict[str, Any], *, fps: float, frames: int,
+                 root: Path | None, origins: dict[str, Any], working: str,
+                 picture_at: Callable[[str, int], np.ndarray]) -> None:
+        self.graph, self.nodes = graph, graph.get("nodes") or {}
+        self.ports = graph.get("ports") or {}
+        self.inputs, self.fps, self.frames, self.root = inputs, fps, frames, root
+        self.origins, self.working, self.picture_at = origins, working, picture_at
+        self.cache: dict[str, dict[str, Any]] = {}
+        self.curve: Callable[[str], Callable] | None = None
+        self.reader: list[str | None] = [None]  # the node whose parameters are being read
+
+    def origin_of(self, name: str) -> Fraction:
+        """A source's media instant at its local zero: a port's given origin, a `generate.source`'s start."""
+
+        if name in self.origins:
+            given = self.origins[name]
+            return given if isinstance(given, Fraction) else Fraction(str(given))
+        node = self.nodes.get(name, {})
+        if node.get("op") == "generate.source":
+            return Fraction(str(node.get("start", 0.0)))
+        return Fraction(0)
+
+    def described(self, reference: str) -> str | None:
+        """What picture a track describes: a read track's `of`, a measured one's input."""
+
+        node = self.nodes.get(reference, {})
+        of = node.get("of") if node.get("op") == "track.read" else node.get("in") if node.get("op") == "track.measure" else None
+        return str(of).split(".")[0] if of else None
+
+    def entry(self, reference: str, consumer: str | None, seconds: float) -> dict[str, Any]:
+        """The track's entry for the instant its source shows when `consumer` is evaluated at `seconds`: by the
+        track's own clock, at the source's media instant -- right whether the track was made on the cut, on the
+        whole take or elsewhere, whatever remaps stand between. A track with no clock, or not said to describe
+        a source, is read by the consumer's frame, as before."""
+
+        from . import clock
+        from ..timebase import from_record, rate as exact_rate
+        from .semantics import remap_samples
+
+        track = self.track(reference)
+        entries = track["frames"]
+        of, spec = self.described(reference), track.get("clock")
+        fps, nodes, curve = self.fps, self.nodes, self.curve
+        frame = int(round(seconds * fps - 0.5))
+        if not spec or not of or consumer is None:
+            return entries[min(max(0, frame), len(entries) - 1)]
+        if of not in nodes and of not in self.ports:
+            raise ValidationError(f"The track {reference} describes {of!r}, which is no node or port")
+        here = clock.centre(frame, fps)
+        local = clock.instant(nodes, curve, fps, consumer, of, here)
+        if local is None:
+            # Not upstream of its reader (a window pinned on a plate it is laid over): the instant the output
+            # shows the source at -- when the reader itself is on the output's time.
+            output = str(self.graph["output"]).split(".")[0]
+            if output != consumer and clock.instants(nodes, curve, fps, output, consumer, here) not in ([], [here]):
+                raise ValidationError(f"{consumer} reads the track {reference} under a time operation that does "
+                                      f"not reach {of}: which instant of {of} it describes is ambiguous")
+            local = clock.instant(nodes, curve, fps, output, of, here)
+            if local is None:
+                raise ValidationError(f"The track {reference} describes {of}, which the graph never shows")
+        media = clock.media(local, self.origin_of(of))
+        position = media - from_record(spec["origin"])
+        index = remap_samples(position, exact_rate(spec["rate"]), "nearest")[0][0]
+        return entries[min(index, len(entries) - 1)]
+
+    def track(self, reference: str) -> dict[str, Any]:
+        """A track as data (SPEC-0012 §1): {kind, frames: [{points} or {corners}], clock}."""
+
+        if reference in self.cache:
+            return self.cache[reference]
+        if reference in self.inputs and isinstance(self.inputs[reference], dict):
+            self.cache[reference] = self.inputs[reference]
+            return self.cache[reference]
+        node, root = self.nodes[reference], self.root
+        if node["op"] == "track.read" and node.get("track"):
+            # A production's track (C7 step 5): measured on its media, corrected by a person, refused when stale.
+            from ..tracks import load_track
+
+            if root is None:
+                raise ValidationError(f"{reference} reads the production's track {node['track']!r}: give the graph "
+                                      "its production")
+            self.cache[reference] = load_track(root, str(node["track"]))
+        elif node["op"] == "track.read":
+            import json
+
+            path = Path(node["file"])
+            path = (root / path) if root and not path.is_absolute() else path
+            self.cache[reference] = json.loads(path.read_text(encoding="utf-8"))
+        else:  # track.measure: OpenCV's, on pictures of its input -- the CPU's, whoever draws
+            from ..timebase import ffmpeg_rate, to_record
+            from .tracking import measure
+
+            measured = measure(lambda index: self.picture_at(node["in"], index), node["kind"], node.get("region"),
+                               self.working, frames=self.frames)
+            # Its clock: the input's frames, from the input's media origin (C7, CT-0080).
+            source = str(node["in"]).split(".")[0]
+            measured["clock"] = {"rate": ffmpeg_rate(self.fps),
+                                 "origin": to_record(self.origin_of(source), rounding="half_even")}
+            self.cache[reference] = measured
+        return self.cache[reference]
+
+
+def pinned_corners(book: TrackBook, node: dict[str, Any], name: str, seconds: float, fps: float) -> list[list[float]]:
+    """A corner pin's corners from its track at `seconds`: a plane's corners, or the given corners moved as a
+    point track has moved since the shot's first frame -- one rule for every renderer."""
+
+    entry = book.entry(node["track"], name, seconds)
+    if "corners" in entry:
+        return [list(map(float, corner)) for corner in entry["corners"]]
+    first = book.entry(node["track"], name, 0.5 / fps)
+    shift = np.mean(entry["points"], axis=0) - np.mean(first["points"], axis=0)
+    return (np.asarray(node.get("corners") or [[0, 0], [1, 0], [1, 1], [0, 1]]) + shift).tolist()
+
+
+def open_source(path: Path, node: dict[str, Any], name: str, spans: dict[str, tuple[int, int]], extent: int,
+                size: tuple[int, int], fps: float, working: str) -> Any:
+    """A `generate.source`'s clip, read as far as the graph reaches and, before its start, as far back as a remap
+    asks and the file has frames (a pre-roll): one reading for every renderer (C7, CT-0080)."""
+
+    start = float(node.get("start", 0.0))
+    wanted = max(0, -spans.get(name, (0, 0))[0])
+    early = min(wanted, int(round(start * fps)))
+    clip = read(path, extent + early, size, fps, start=start - early / fps, colorspace=node.get("colorspace"),
+                alpha=node.get("alpha"), working=working)
+    return Shifted(clip, early) if early else clip
+
+
 def _from_held(held: Any, frame: int) -> Any:
     """A held source's frame: before what it holds, its first (a pre-roll's first when it has one); past its
     end, its last -- for an array, a clip and a shifted clip alike."""
@@ -1258,102 +1391,13 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
         elif kind in ("picture", "matte", "signal") and name not in clips:
             raise ValidationError(f"The graph's port {name!r} was given no {kind}")
 
-    reader: list[str | None] = [None]  # the node whose parameters are being read: where a track is read from
-    curve = curve_factory(nodes, curves, fps=fps, length=length, beats=beats,
-                          tracks=lambda reference: tracks(reference),
-                          track_entry=lambda reference, seconds: track_entry(reference, reader[0], seconds))
-
-    track_cache: dict[str, dict[str, Any]] = {}
-
-    def origin_of(name: str) -> Fraction:
-        """A source's media instant at its local zero: a port's given origin, a `generate.source`'s start."""
-
-        if name in origins:
-            given = origins[name]
-            return given if isinstance(given, Fraction) else Fraction(str(given))
-        node = nodes.get(name, {})
-        if node.get("op") == "generate.source":
-            return Fraction(str(node.get("start", 0.0)))
-        return Fraction(0)
-
-    def described(reference: str) -> str | None:
-        """What picture a track describes: a read track's `of`, a measured one's input."""
-
-        node = nodes.get(reference, {})
-        of = node.get("of") if node.get("op") == "track.read" else node.get("in") if node.get("op") == "track.measure" else None
-        return str(of).split(".")[0] if of else None
-
-    def track_entry(reference: str, consumer: str | None, seconds: float) -> dict[str, Any]:
-        """The track's entry for the instant its source shows when `consumer` is evaluated at `seconds` (C7,
-        CT-0080): by the track's own clock, at the source's media instant -- right whether the track was made
-        on the cut, on the whole take or elsewhere, whatever remaps stand between. A track with no clock, or
-        not said to describe a source, is read by the consumer's frame, as before."""
-
-        from . import clock
-        from ..timebase import from_record, rate as exact_rate
-        from .semantics import remap_samples
-
-        track = tracks(reference)
-        entries = track["frames"]
-        of, spec = described(reference), track.get("clock")
-        frame = int(round(seconds * fps - 0.5))
-        if not spec or not of or consumer is None:
-            return entries[min(max(0, frame), len(entries) - 1)]
-        if of not in nodes and of not in port_types:
-            raise ValidationError(f"The track {reference} describes {of!r}, which is no node or port")
-        here = clock.centre(frame, fps)
-        local = clock.instant(nodes, curve, fps, consumer, of, here)
-        if local is None:
-            # Not upstream of its reader (a window pinned on a plate it is laid over): the instant the output
-            # shows the source at -- when the reader itself is on the output's time.
-            output = str(graph["output"]).split(".")[0]
-            if output != consumer and clock.instants(nodes, curve, fps, output, consumer, here) not in ([], [here]):
-                raise ValidationError(f"{consumer} reads the track {reference} under a time operation that does "
-                                      f"not reach {of}: which instant of {of} it describes is ambiguous")
-            local = clock.instant(nodes, curve, fps, output, of, here)
-            if local is None:
-                raise ValidationError(f"The track {reference} describes {of}, which the graph never shows")
-        media = clock.media(local, origin_of(of))
-        position = media - from_record(spec["origin"])
-        index = remap_samples(position, exact_rate(spec["rate"]), "nearest")[0][0]
-        return entries[min(index, len(entries) - 1)]
-
-    def tracks(reference: str) -> dict[str, Any]:
-        """A track as data (SPEC-0012 §1): {kind, frames: [{points} or {corners}]}."""
-
-        if reference in track_cache:
-            return track_cache[reference]
-        if reference in inputs and isinstance(inputs[reference], dict):
-            track_cache[reference] = inputs[reference]
-            return track_cache[reference]
-        node = nodes[reference]
-        if node["op"] == "track.read" and node.get("track"):
-            # A production's track (C7 step 5): measured on its media, corrected by a person, refused when stale.
-            from ..tracks import load_track
-
-            if root is None:
-                raise ValidationError(f"{reference} reads the production's track {node['track']!r}: give the graph "
-                                      "its production")
-            track_cache[reference] = load_track(root, str(node["track"]))
-        elif node["op"] == "track.read":
-            import json
-
-            path = Path(node["file"])
-            path = (root / path) if root and not path.is_absolute() else path
-            track_cache[reference] = json.loads(path.read_text(encoding="utf-8"))
-        else:  # track.measure
-            from .tracking import measure
-
-            # Frame by frame: tracking holds two frames, not the clip (CT-0071).
-            measured = measure(lambda index: _picture(value(node["in"], index)), node["kind"],
-                               node.get("region"), working, frames=frames)
-            # Its clock: the input's frames, from the input's media origin (C7, CT-0080).
-            from ..timebase import ffmpeg_rate, to_record
-
-            source = str(node["in"]).split(".")[0]
-            measured["clock"] = {"rate": ffmpeg_rate(fps), "origin": to_record(origin_of(source), rounding="half_even")}
-            track_cache[reference] = measured
-        return track_cache[reference]
+    # Tracks, one way for every renderer (C7, CT-0080): read by their clock where their source is shown.
+    book = TrackBook(graph, inputs, fps=fps, frames=frames, root=root, origins=origins, working=working,
+                     picture_at=lambda name, index: _picture(value(name, index)))
+    curve = curve_factory(nodes, curves, fps=fps, length=length, beats=beats, tracks=book.track,
+                          track_entry=lambda reference, seconds: book.entry(reference, book.reader[0], seconds))
+    book.curve = curve
+    tracks = book.track
 
     def value(reference: str, frame: int) -> Any:
         if reference in clips:
@@ -1403,7 +1447,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             if given is None:
                 given = semantic_default(op, key, default)
             if isinstance(given, dict) and "curve" in given:
-                reader[0] = name
+                book.reader[0] = name
                 return curve(given["curve"])(seconds)
             return given
 
@@ -1411,13 +1455,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             if name not in clips:
                 path = Path(node.get("file") or node.get("take"))
                 path = (root / path) if root and not path.is_absolute() else path
-                start = float(node.get("start", 0.0))
-                # A pre-roll: what a remap reads before the source's start, as far as the file has it.
-                wanted = max(0, -spans.get(name, (0, 0))[0])
-                early = min(wanted, int(round(start * fps)))
-                read_clip = read(path, extent + early, size, fps, start=start - early / fps,
-                                 colorspace=node.get("colorspace"), alpha=node.get("alpha"), working=working)
-                clips[name] = Shifted(read_clip, early) if early else read_clip
+                clips[name] = open_source(path, node, name, spans, extent, size, fps, working)
             return _from_held(clips[name], frame)
         if op == "generate.solid":
             colour = np.asarray(param("colour"), dtype=np.float32)
@@ -1561,14 +1599,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             from .warp import corner_pin
 
             if node.get("track"):
-                entry = track_entry(node["track"], name, seconds)
-                # A point track moves the picture from where it was at the shot's first frame.
-                first = track_entry(node["track"], name, 0.5 / fps)
-                if "corners" in entry:
-                    corners = entry["corners"]
-                else:  # a point track moves the picture with it
-                    shift = np.mean(entry["points"], axis=0) - np.mean(first["points"], axis=0)
-                    corners = (np.asarray(node.get("corners") or [[0, 0], [1, 0], [1, 1], [0, 1]]) + shift).tolist()
+                corners = pinned_corners(book, node, name, seconds, fps)
             else:
                 corners = param("corners")
             return corner_pin(value(node["in"], frame), [list(map(float, corner)) for corner in corners], aspect)
@@ -1866,9 +1897,9 @@ def render(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size: 
         graph, inputs = stage(graph, inputs, frames=frames, size=size, fps=fps, root=root, beats=beats)
     known = {name: _input_identity(value) for name, value in inputs.items()}
     # Another renderer (GL) draws the same graph; its results are kept apart from the reference's.
-    # Sources' media origins matter to tracks, which only the reference reads (C7, CT-0080).
-    draw = renderer.evaluate if renderer is not None else (
-        lambda *args, **kwargs: evaluate(*args, origins=origins, **kwargs))
+    # Sources' media origins: where tracks are read (C7, CT-0080) -- by every renderer.
+    draw = (lambda *args, **kwargs: (renderer.evaluate if renderer is not None else evaluate)(
+        *args, origins=origins, **kwargs))
     context = {"renderer": f"gl/{renderer.name}" if renderer is not None else REFERENCE_VERSION, "numpy": np.__version__, "working": working, "fps": fps,
                "frames": frames, "size": list(size), "beats": list(beats or []),
                "origins": {name: str(value) for name, value in sorted((origins or {}).items())}}

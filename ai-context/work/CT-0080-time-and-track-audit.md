@@ -477,6 +477,70 @@ replaces one entry -- no interpolation across a range yet (how: a
 `correct_track` over `[first, last]` that interpolates between the entries
 either side); a camera solve stays out (C8, Blender).
 
+## Step 6 -- time and tracks on GL (done 2026-10-15)
+
+**The audit first** (what GL drew, what it did on the CPU, what was
+missing). In the reference and not on GL: in C7's scope `time.remap`,
+`time.offset`, `time.blend`, `time.echo`, `track.read`, `track.measure`,
+`curve.from_track` and a corner pin with a track; outside it
+`colour.curve`, `colour.posterise`, `colour.solarise`, `filter.edges`,
+`filter.glow`, `filter.sharpen`, `matte.label`, `merge.depth`,
+`signal.align_depth`, `signal.read`, `warp.procedural` (left to their own
+steps). Uploads of CPU-made data: decoded sources, text, noise, grain,
+shapes; one download per output frame. No new primitive was needed: a
+remap's blend is `mix` at a constant weight, the shutter a running mean of
+`mix`es, an echo `over` with `mixing` = decay^i (the reference's formula).
+
+**One semantics** (the user's condition): GL decides nothing about time.
+- Shared with the reference, extracted from it: `TrackBook` (a track's data
+  -- given, a file, a production record validated and corrected by
+  `tracks.load_track`, or measured -- and the entry for the instant its
+  source shows, by its clock), `pinned_corners`, `open_source` (a source read
+  to the reach and back to its pre-roll), `_from_held`; plus `clock.remap_at`,
+  `semantics.remap_samples`, `reach`, `source_extents`. GL calls them and
+  draws what they decide.
+- GL evaluates a node at any frame: values kept by (node, frame) as far back
+  as the graph's time operations reach (`temporal_window`), let go after.
+- A measured track's pictures come back to the CPU (OpenCV's), once.
+- Origins reach GL as they reach the reference (`render`).
+
+**Measured** (`scripts/research/gl_time_bench.py`, 1280x720, 48 frames):
+
+| Graph | Reference | GL, llvmpipe (software) | GL, Intel UHD 620 (D3D12) |
+|---|---|---|---|
+| remap 2x blend | 29.6 ms/frame | 33.7 (0.9x) | 41.8 (0.8x) |
+| trails | 399 | 83.9 (4.8x) | 34.0 (12.7x) |
+| pin by track | 345 | 26.4 (13.1x) | 30.8 (11.5x) |
+| all together | 678 | 74.3 (9.1x) | 37.3 (19.4x) |
+
+Before step 6 every one fell back to the reference. Bottlenecks found and
+fixed: allocating a 1280x720 float texture cost 7 ms -- more than most draws
+-- so textures let go are pooled by size (with their framebuffer, kept on
+the texture); framebuffers were made per draw. Left: a remap alone stays
+transfer-bound (two frames up, one down, 14 MB each, through WSL's D3D12
+layer) -- slower than the reference's array indexing; it gains only inside a
+larger graph. GL ran on llvmpipe here by default; the GPU is used only with
+`GALLIUM_DRIVER=d3d12` -- `toast doctor` now names the device and says so.
+
+**Conformance** (`tests/test_gl_time.py`, on both drivers): retimes (2x,
+half, reverse, freeze, an eased ramp, a turning map, before the start), each
+nearest and blended; a blend on the last frame; offsets (+3, -2, 0); the
+shutter (2, 3, 5); trails (several counts and spacings, none); nested and
+combined (a reversed remap under a 2x remap, an offset, a move, trails); a
+pin by a plane and by a point track; a pin over a plate retimed 2x, reversed
+and turning; a curve from a track; a measured track; a production track
+with a correction; a source read back past its start. Time operations
+alone are held to every pixel (under 1e-4; measured ~1e-6); graphs that
+warp, to the GL tests' mean and 99th percentile -- an Intel GPU samples a
+warped edge with its own precision (2.2e-3 at worst there).
+
+Limitations, recorded with how: a remap alone is transfer-bound -- how: keep
+decoded frames on the GPU between output frames (an upload cache by source
+frame), part of C9b's playback cache; the GL device is chosen by Mesa's
+default -- how: pick the hardware driver when present, behind the doctor's
+report (C9b); the eleven ops outside C7's scope still send a graph to the
+reference.
+
 # Done
 
 - Read every time and track node, its tests, SPEC-0012 §6, the assembly's
@@ -568,5 +632,8 @@ either side); a camera solve stays out (C8, Blender).
   reverse, each reading the entry of the media instant it shows; a layer
   pins by a production track; the command line shows its status.
 - Full suite after step 5: 907 tests pass.
+- Step 6: `tests/test_gl_time.py` (above), on llvmpipe and on the Intel GPU;
+  the GL refusal test now names an op GL still lacks (`colour.posterise`).
+- Full suite after step 6: 918 tests pass.
 - The probes above (reproducible with a ten-frame clip whose red channel is
   its frame number). No code changed.

@@ -24,7 +24,8 @@ from typing import Any, Callable
 import numpy as np
 
 from ..errors import ValidationError
-from .reference import LINEAR, REC709, Clip, _Held, curve_factory, read
+from .reference import (LINEAR, REC709, Clip, Shifted, TrackBook, _from_held, _Held, curve_factory, open_source,
+                        pinned_corners, reach, read, source_extents, temporal_window)
 from .schema import validate
 from .semantics import blur_kernel, pixels, screen_channel, threshold_spread
 from .semantics import default as semantic_default
@@ -40,6 +41,9 @@ IMPLEMENTED = {
     "filter.blur", "filter.morphology", "filter.noise", "filter.bevel",
     "curve.progress", "curve.keys", "curve.map", "curve.combine", "curve.noise", "curve.beats",
     "opaque.gl",
+    # Time and tracks (C7 step 6, CT-0080): which frames, with what weights, and where a track is read are the
+    # shared contract's (`clock`, `semantics.remap_samples`, `reference.TrackBook`); GL draws what it decides.
+    "time.remap", "time.offset", "time.blend", "time.echo", "track.read", "track.measure", "curve.from_track",
 }
 
 # A gl-transitions shader, run inside this renderer as an opaque node (SPEC-0012 §3; CT-0072, B1). The
@@ -283,10 +287,31 @@ class GLRenderer:
 
     # --- textures -----------------------------------------------------------------
 
+    #: Textures let go are kept for the next draw of their size, up to this many of each (CT-0080, step 6):
+    #: allocating one cost 7 ms at 1280x720, more than most draws.
+    POOLED = 48
+
     def texture(self, size: tuple[int, int], components: int, data: bytes | None = None):
+        pool = self.__dict__.setdefault("_pool", {}).get((tuple(size), components))
+        if pool:
+            texture = pool.pop()
+            if data is not None:
+                texture.write(data)
+            return texture
         texture = self.context.texture(size, components, data, dtype="f4")
         texture.repeat_x = texture.repeat_y = False
         return texture
+
+    def recycle(self, texture) -> None:
+        """A texture no longer needed, kept for the next of its size (its framebuffer with it)."""
+
+        pool = self.__dict__.setdefault("_pool", {}).setdefault((tuple(texture.size), texture.components), [])
+        if len(pool) < self.POOLED:
+            pool.append(texture)
+            return
+        if getattr(texture, "extra", None) is not None:
+            texture.extra.release()
+        texture.release()
 
     def upload(self, array: np.ndarray):
         array = np.ascontiguousarray(array, dtype=np.float32)
@@ -300,7 +325,9 @@ class GLRenderer:
     def draw(self, program: str, size: tuple[int, int], components: int, textures: dict[str, Any],
              **uniforms: Any):
         target = self.texture(size, components)
-        frame = self.context.framebuffer([target])
+        frame = getattr(target, "extra", None)
+        if frame is None:  # a framebuffer kept with its texture (moderngl's `extra`): made once, not every draw
+            frame = target.extra = self.context.framebuffer([target])
         frame.use()
         self.context.viewport = (0, 0, size[0], size[1])
         shader = self.programs[program]
@@ -312,15 +339,17 @@ class GLRenderer:
             if name in shader:
                 shader[name].value = value
         self.vaos[program].render()
-        frame.release()
         return target
 
     # --- the graph ------------------------------------------------------------------
 
     def evaluate(self, graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size: tuple[int, int],
                  fps: float, working: str = LINEAR, root=None, beats: list[float] | None = None,
-                 stream: bool = False) -> Any:
-        """As `reference.evaluate`, drawn in GL. Refuses, by name, what it does not implement."""
+                 stream: bool = False, origins: dict[str, Any] | None = None) -> Any:
+        """As `reference.evaluate`, drawn in GL. Refuses, by name, what it does not implement.
+
+        A node may be asked for at another frame than the one being made (a time operation): values are kept by
+        (node, frame), as long as the graph's time operations may still reach back to them."""
 
         problems = validate(graph)
         if problems:
@@ -332,34 +361,35 @@ class GLRenderer:
         width, height = size
         aspect = width / height
         length = frames / fps
+        # How far its sources are read, ahead and back: the reference's own reckoning (`clock`), not GL's.
+        extent = reach(graph, frames, fps, beats)
+        spans = source_extents(graph, frames, fps, beats)
+        window = temporal_window(graph) + 1
         curves: dict[str, Callable] = {name: value for name, value in inputs.items() if callable(value)}
         for name, kind in (graph.get("ports") or {}).items():
             if kind == "curve" and name not in curves:
                 curves[name] = lambda seconds: seconds / length if length else 0.0
-        curve = curve_factory(nodes, curves, fps=fps, length=length, beats=beats,
-                              tracks=lambda reference: (_ for _ in ()).throw(
-                                  ValidationError("The GL renderer does not read tracks")))
         clips: dict[str, Any] = {}
         for name, value in inputs.items():
-            if callable(value):
+            if callable(value) or isinstance(value, dict):
                 continue
-            if isinstance(value, (Clip, _Held)) or (isinstance(value, np.ndarray) and value.ndim == 4):
+            if isinstance(value, (Clip, _Held, Shifted)) or (isinstance(value, np.ndarray) and value.ndim == 4):
                 clips[name] = value
             elif isinstance(value, np.ndarray):
-                clips[name] = _Held(value, frames)
+                clips[name] = _Held(value, extent)
             else:
                 from pathlib import Path
 
-                clips[name] = read(Path(value), frames, size, fps, working=working)
+                clips[name] = read(Path(value), extent, size, fps, working=working)
+        kept: dict[tuple[str, int], Any] = {}  # (node, frame) -> its texture
+        temporary: list[Any] = []  # textures made on the way (a blend's steps), let go after each frame
+        book = TrackBook(graph, inputs, fps=fps, frames=frames, root=root, origins=origins or {}, working=working,
+                         picture_at=lambda name, index: self._picture(value_at(name, index)))
+        curve = curve_factory(nodes, curves, fps=fps, length=length, beats=beats, tracks=book.track,
+                              track_entry=lambda reference, seconds: book.entry(reference, book.reader[0], seconds))
+        book.curve = curve
 
-        def each():
-            for frame in range(frames):
-                # Standalone contexts share one "current" slot (another context may be current): claim ours.
-                with self.context:
-                    yield frame_of(frame)
-
-        def frame_of(frame: int) -> np.ndarray:
-            made: dict[str, Any] = {}
+        def param_at(frame: int) -> Callable:
             seconds = (frame + 0.5) / fps
 
             def param(node: dict[str, Any], key: str, default: Any = None) -> Any:
@@ -371,32 +401,61 @@ class GLRenderer:
                     return curve(given["curve"])(seconds)
                 return given
 
-            def value(reference: str):
-                if reference in made:
-                    return made[reference]
-                if reference in clips:
-                    made[reference] = self.upload(clips[reference][frame])
-                    return made[reference]
-                if reference in curves or nodes.get(reference, {}).get("op", "").startswith("curve."):
-                    return float(np.asarray(curve(reference)(seconds)).reshape(-1)[0])
-                base, _, output = reference.partition(".")
-                if output:
-                    value(base)
-                    return made[reference]
-                made[reference] = self._compute(reference, nodes[reference], value, param, size, aspect,
-                                                root, frames, fps, working, clips, frame, made)
-                return made[reference]
+            return param
 
-            result = value(graph["output"])
-            picture = self.download(result, 4) if result.components == 4 else _grey(self.download(result, 1))
-            for texture in made.values():
-                if hasattr(texture, "release"):
-                    texture.release()
-            return picture
+        def value_at(reference: str, frame: int) -> Any:
+            key = (reference, frame)
+            if key in kept:
+                return kept[key]
+            if reference in clips:
+                kept[key] = self.upload(_from_held(clips[reference], frame))
+                return kept[key]
+            if reference in curves or nodes.get(reference, {}).get("op", "").startswith("curve."):
+                return float(np.asarray(curve(reference)((frame + 0.5) / fps)).reshape(-1)[0])
+            base, _, output = reference.partition(".")
+            if output:
+                value_at(base, frame)
+                return kept[key]
+            book.reader[0] = reference
+            kept[key] = self._compute(reference, nodes[reference], lambda name: value_at(name, frame),
+                                      param_at(frame), size, aspect, root, frames, fps, working, clips, frame,
+                                      _Made(kept, frame), value_at=value_at, book=book, spans=spans, extent=extent,
+                                      temporary=temporary)
+            return kept[key]
+
+        def let_go(keep_from: int, keep_to: int) -> None:
+            held = {id(texture) for (name, frame), texture in kept.items() if keep_from <= frame <= keep_to}
+            for key in [key for key in kept if not keep_from <= key[1] <= keep_to]:
+                texture = kept.pop(key)
+                if hasattr(texture, "release") and id(texture) not in held:
+                    held.add(id(texture))  # the same texture under two keys (a remap's): let go once
+                    self.recycle(texture)
+            for texture in temporary:
+                if hasattr(texture, "release") and id(texture) not in held:
+                    held.add(id(texture))
+                    self.recycle(texture)
+            temporary.clear()
+
+        def each():
+            for frame in range(frames):
+                # Standalone contexts share one "current" slot (another context may be current): claim ours.
+                with self.context:
+                    result = value_at(graph["output"], frame)
+                    picture = self.download(result, 4) if result.components == 4 else _grey(self.download(result, 1))
+                    let_go(frame + 1 - window, frame)
+                    yield picture
+            with self.context:
+                let_go(1, 0)
 
         return each() if stream else np.stack(list(each()))
 
-    def _compute(self, name, node, value, param, size, aspect, root, frames, fps, working, clips, frame, made):
+    def _picture(self, texture: Any) -> np.ndarray:
+        """A texture as a picture on the CPU (for OpenCV's tracking): the one transfer back a track asks for."""
+
+        return self.download(texture, 4) if texture.components == 4 else _grey(self.download(texture, 1))
+
+    def _compute(self, name, node, value, param, size, aspect, root, frames, fps, working, clips, frame, made, *,
+                 value_at=None, book=None, spans=None, extent=None, temporary=None):
         op = node["op"]
         width, height = size
         p = lambda key, default=None: param(node, key, default)  # noqa: E731
@@ -406,9 +465,10 @@ class GLRenderer:
 
                 path = Path(node.get("file") or node.get("take"))
                 path = (root / path) if root and not path.is_absolute() else path
-                clips[name] = read(path, frames, size, fps, start=float(node.get("start", 0.0)),
-                                   colorspace=node.get("colorspace"), alpha=node.get("alpha"), working=working)
-            return self.upload(clips[name][frame])
+                clips[name] = open_source(path, node, name, spans or {}, extent or frames, size, fps, working)
+            return self.upload(_from_held(clips[name], frame))
+        if op in ("time.remap", "time.offset", "time.blend", "time.echo"):
+            return self._time(name, node, p, value_at, size, frames, fps, frame, temporary, book)
         if op == "generate.solid":
             colour = np.asarray(p("colour"), np.float32)
             alpha = float(colour[3]) if colour.size > 3 else 1.0
@@ -485,9 +545,11 @@ class GLRenderer:
                                             rotate=p("rotate"), pivot=p("pivot"),
                                             perspective=float(p("perspective") or 0.0), aspect=aspect,
                                             skew=float(p("skew", 0.0) or 0.0))
+            elif node.get("track"):
+                # Where the track says, read the one way (`reference.pinned_corners`): validated, corrected, by
+                # its clock -- GL draws the pin it is given.
+                corners = pinned_corners(book, node, name, (frame + 0.5) / fps, fps)
             else:
-                if node.get("track"):
-                    raise ValidationError("The GL renderer does not read tracks")
                 corners = [list(map(float, corner)) for corner in p("corners")]
             inverse = np.linalg.inv(homography(UNIT, corners))
             source = value(node["in"])
@@ -524,7 +586,7 @@ class GLRenderer:
                                half_=half)
             down = self.draw("blur", size, source.components, {"a": across}, step_=(0.0, 1.0 / height), sigma=sigma,
                              half_=half)
-            across.release()
+            self.recycle(across)
             return down
         if op == "matte.shape":
             # Drawn by the rasteriser the reference uses (one drawing of a shape), once per shape and size, and
@@ -669,6 +731,46 @@ class GLRenderer:
             return texture
         return self.draw("channel", size, 1, {"a": texture}, index=3)
 
+    def _time(self, name, node, p, value_at, size, frames, fps, frame, temporary, book):
+        """A time operation: which frames of its input, with what weights, decided by the shared contract
+        (`clock.remap_at`, `semantics.remap_samples`, the reference's clamps); GL only mixes them."""
+
+        from . import clock
+        from .semantics import remap_samples
+
+        op = node["op"]
+        if op == "time.offset":
+            return value_at(node["in"], frame - int(p("frames", 0)))
+        if op == "time.remap":
+            samples = remap_samples(clock.remap_at(node, book.nodes, book.curve, clock.centre(frame, fps)), fps,
+                                    str(node.get("interpolation") or "nearest"), clamp=False)
+            if len(samples) == 1:
+                return value_at(node["in"], samples[0][0])
+            (first, _), (second, weight) = samples
+            a, b = value_at(node["in"], first), value_at(node["in"], second)
+            return self.draw("mix", size, a.components, {"a": a, "b": b}, by_matte=0, weight=float(weight))
+        if op == "time.blend":
+            span = max(1, int(p("frames", 2)))
+            around = [int(np.clip(frame + offset, 0, frames - 1)) for offset in range(-(span // 2), span - span // 2)]
+            total = value_at(node["in"], around[0])
+            for count, index in enumerate(around[1:], 2):
+                made = self.draw("mix", size, total.components, {"a": total, "b": value_at(node["in"], index)},
+                                 by_matte=0, weight=1.0 / count)  # a running mean: the average of all
+                temporary.append(made)
+                total = made
+            return total
+        count, spacing = int(p("count", 4)), max(1, int(p("spacing", 1)))
+        decay = float(p("decay", 0.5))
+        out = self.draw("solid", size, 4, {}, colour=(0.0, 0.0, 0.0, 0.0))
+        for index in range(count, -1, -1):  # the oldest echo first, the present last, on top
+            earlier = frame - index * spacing
+            if earlier < 0:
+                continue
+            temporary.append(out)
+            out = self.draw("over", size, 4, {"front": value_at(node["in"], earlier), "back": out}, has_matte=0,
+                            mixing=float(decay ** index))
+        return out
+
     def _surface(self, node, value, p, size, aspect, made, name):
         from .warp import surface_mesh
 
@@ -711,6 +813,23 @@ class GLRenderer:
 
 def _grey(matte: np.ndarray) -> np.ndarray:
     return np.concatenate([matte, matte, matte, np.ones_like(matte)], axis=-1)
+
+
+class _Made:
+    """The values made at one frame, as a node with several outputs writes them (`made["node.depth"]`): a view of
+    the renderer's values kept by (node, frame)."""
+
+    def __init__(self, kept: dict[tuple[str, int], Any], frame: int) -> None:
+        self.kept, self.frame = kept, frame
+
+    def __getitem__(self, reference: str) -> Any:
+        return self.kept[(reference, self.frame)]
+
+    def __setitem__(self, reference: str, value: Any) -> None:
+        self.kept[(reference, self.frame)] = value
+
+    def __contains__(self, reference: str) -> bool:
+        return (reference, self.frame) in self.kept
 
 
 #: One renderer per thread: a GL context is current in the thread that made it, and making it current in another

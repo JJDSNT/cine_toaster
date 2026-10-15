@@ -351,6 +351,8 @@ beats, reverse, freeze) and on layers, with `offset`, `echo` and `pin`.
 Step 5 done: tracks as production records (`tracks/<id>`) -- measured on
 their media with a confidence per entry, reseeded and re-acquired, corrected
 apart and revertible, refused when stale, reused by any shot and retime.
+Step 6 done: time operations and tracks on GL through the shared contract
+(9-19x on the combined graph; a remap alone stays transfer-bound).
 
 - What: retime, speed ramp, freeze, reverse, frame blending, an offset
   between layers, trails and echoes (the ADO's Infinity). Point and planar

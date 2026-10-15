@@ -86,8 +86,9 @@ class ConformanceTests(unittest.TestCase):
     def test_an_op_it_does_not_draw_is_refused_by_name(self) -> None:
         from cine_toaster.errors import ValidationError
 
-        with self.assertRaisesRegex(ValidationError, "time.echo"):
-            self.gl.evaluate({"ports": {"a": "picture"}, "nodes": {"out": {"op": "time.echo", "in": "a", "count": 2}},
+        with self.assertRaisesRegex(ValidationError, "colour.posterise"):  # time ops are GL's since C7 step 6
+            self.gl.evaluate({"ports": {"a": "picture"}, "nodes": {"out": {"op": "colour.posterise", "in": "a",
+                                                                           "levels": 4}},
                               "output": "out"}, {"a": textured(1)}, frames=2, size=(W, H), fps=FPS)
 
 
