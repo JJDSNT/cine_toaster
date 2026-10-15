@@ -30,7 +30,7 @@ from .semantics import blur_kernel, pixels, screen_channel, threshold_spread
 from .semantics import default as semantic_default
 
 IMPLEMENTED = {
-    "generate.source", "generate.solid", "generate.gradient", "generate.noise",
+    "generate.source", "generate.solid", "generate.gradient", "generate.noise", "generate.text",
     "signal.luminance", "signal.luma", "signal.channel",
     "matte.from_signal", "matte.threshold", "matte.combine", "matte.key",
     "merge.over", "merge.mix", "merge.blend", "merge.porter_duff", "merge.channels",
@@ -526,6 +526,12 @@ class GLRenderer:
                     textures[uniform] = value(node[channel])
                 given.append(int(bool(node.get(channel))))
             return self.draw("channels", size, 4, textures, given=tuple(given))
+        if op == "generate.text":
+            # The reference's own drawing of the text (kept while it does not change), uploaded: one text, the same
+            # in both renderers (CT-0077).
+            from .reference import text_picture
+
+            return self.upload(text_picture(node, p, width, height, root))
         if op == "generate.noise":
             # The reference's own field, uploaded: noise drawn once, the same in both renderers (CT-0077).
             from .reference import noise_field

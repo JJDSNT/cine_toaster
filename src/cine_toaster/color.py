@@ -1,10 +1,11 @@
 """Colour management with OpenColorIO (CT-0047).
 
 Elements delivered in scene-linear light (OpenEXR from a renderer or a
-simulation) are converted to the picture's display encoding before they are
-composited, by an OCIO processor, not by guesswork. Looks (a film
-response, a grade) are OCIO transforms baked to a 3D LUT that FFmpeg
-applies (`lut3d`).
+simulation) are converted by an OCIO processor, not by guesswork -- today to
+the display encoding before they are composited, which clips them at white
+(SPEC-0012's range rule, not met yet). Looks (a film response, a grade) are
+OCIO transforms applied in the compositing graph (`colour.lut`, CT-0077);
+`bake_look` still writes one as a .cube, for another tool.
 
 The config is `CINE_TOASTER_OCIO`, else `$OCIO`, else OCIO's built-in ACES
 studio config (`ocio://studio-config-latest`), which ships inside the
@@ -145,7 +146,7 @@ def bake_look(output: Path, *, source: str = PICTURE_SPACE, working: str = "ACES
 
     The picture is decoded to linear, lifted into `working`, and shown
     through `view` (ACES 2.0's tone scale by default): a film response,
-    measured by OCIO, for FFmpeg's `lut3d`.
+    measured by OCIO, as a .cube for another tool (the graph applies the transform itself, `colour.lut`).
     """
 
     import numpy as np

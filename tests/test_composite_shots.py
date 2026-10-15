@@ -96,5 +96,33 @@ class CompositeShotTests(unittest.TestCase):
         self.assertGreater(float(loud.split("mean_volume: ")[1].split(" dB")[0]), -40)  # the take's tone is heard
 
 
+class TitledCompositeTests(unittest.TestCase):
+    def test_a_composite_with_a_title_is_drawn_as_a_composite_with_the_title_over_it(self) -> None:
+        """A shot with no take, a composite and a title is not a title card (CT-0077): its composite is drawn and
+        the title laid over it."""
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            (root / "project.yaml").write_text("id: t\ntitle: T\nframe: 160x90@24\npaths:\n  scenes: scenes\n")
+            (root / "scenes" / "010").mkdir(parents=True)
+            (root / "scenes" / "010" / "scene.yaml").write_text(textwrap.dedent("""\
+                scene: S1
+                shots:
+                  - n: 1
+                    duration: 1
+                    label: A gradient, titled.
+                    title: {id: card, text: HELLO}
+                    composite:
+                      nodes:
+                        out: {op: generate.gradient, kind: radial, colours: [[1, 1, 1, 1], [0, 0, 0, 1]]}
+                      output: out
+                """))
+            plan = plan_scene(root, load_production(root)["scenes"][0])
+        segment = plan.segments[0]
+        self.assertEqual(segment.method, "composite")
+        self.assertIsNotNone(segment.composite)
+        self.assertEqual(segment.title["id"], "card")
+
+
 if __name__ == "__main__":
     unittest.main()

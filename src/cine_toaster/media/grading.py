@@ -103,10 +103,4 @@ def write_lut(palette: Palette, destination: Path, size: int = LUT_SIZE) -> Path
     return destination
 
 
-def ffmpeg_filter(lut_path: Path) -> str:
-    """The filter string that applies this table in an ffmpeg graph."""
-
-    return f"lut3d=file={lut_path}"
-
-
-__all__ = ["LUT_SIZE", "Palette", "build_lut", "ffmpeg_filter", "hex_to_rgb", "write_lut"]
+__all__ = ["LUT_SIZE", "Palette", "build_lut", "hex_to_rgb", "write_lut"]

@@ -13,5 +13,7 @@ fade_in = 0.0
 fade_out = 0.8
 
 [render]
-engine = "ffmpeg"
+engine = "graph"
 effect = "typewriter"
+# Drawn by the compositing graph (C6, CT-0077), of these primitives:
+primitives = ["curve.keys", "generate.text", "merge.over"]

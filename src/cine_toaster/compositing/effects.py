@@ -59,10 +59,12 @@ class Fragment:
         return self.add(name, {"op": "curve.keys", "keys": keys})
 
     def sampled(self, name: str, function: Callable[[float], Any], length: float) -> dict[str, str]:
-        """A curve through a function sampled at every frame: a wobble, a flicker."""
+        """A curve through a function sampled at every frame's centre -- where a frame reads its curves (SPEC-0012
+        §6) -- so each frame gets the function's own value: a wobble, a flicker, a title's fade."""
 
         frames = max(2, int(math.ceil(length * self.fps)) + 1)
-        return self.keys(name, [[round(index / self.fps, 6), function(index / self.fps)] for index in range(frames)])
+        times = [(index + 0.5) / self.fps for index in range(frames)]
+        return self.keys(name, [[round(t, 6), function(t)] for t in times])
 
     def solid(self, name: str, colour: list[float]) -> str:
         return self.add(name, {"op": "generate.solid", "colour": colour})

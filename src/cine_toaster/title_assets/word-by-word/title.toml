@@ -13,5 +13,7 @@ spaced = false
 fade_out = 1.0
 
 [render]
-engine = "ffmpeg"
+engine = "graph"
 effect = "words"
+# Drawn by the compositing graph (C6, CT-0077), of these primitives:
+primitives = ["curve.keys", "generate.text", "merge.over"]

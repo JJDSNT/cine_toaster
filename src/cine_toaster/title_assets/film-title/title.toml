@@ -15,5 +15,7 @@ fade_out = 2.0
 enter_at = 1.0
 
 [render]
-engine = "ffmpeg"
+engine = "graph"
 effect = "fade"
+# Drawn by the compositing graph (C6, CT-0077), of these primitives:
+primitives = ["curve.keys", "generate.text", "merge.over"]

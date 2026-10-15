@@ -2,7 +2,7 @@
 id: CT-0077
 title: C6 -- the catalogs re-expressed on the primitives
 type: work
-status: doing
+status: done
 owner: unassigned
 created_at: 2026-10-14
 updated_at: 2026-10-14
@@ -101,10 +101,40 @@ compositing roadmap keeps a table of its own: *supported by the graph, not yet
 exposed to the filmmaker*, each with the nodes that already do it and the
 record that would compile into them.
 
-# Remaining
+## Stage D -- titles
 
-Stage D (titles on layers, with C6b); EXR elements in linear light (an engine
-change, in C10); the exposures in the roadmap's table.
+- `generate.text` brought to the titles' parity: alignment (left for a lower
+  third), lines and line spacing (credits), an outline and hollow letters
+  (the neon tube), a reveal by word as well as by letter. One drawing of a
+  text (`reference.text_picture`), uploaded by GL.
+- `compositing/title_graphs.py`: the nine animations -- fade, typewriter,
+  word by word, slide, grow, roll, lower third, flicker, neon -- as fragments;
+  the neon's halos are blurs added as light. The Blender titles are rendered
+  once into a clip with alpha and laid by the graph. `titles.py` holds no
+  `drawtext`, no FFmpeg graph.
+- One way of laying a treatment over a shot: `compositing/drawing.over_picture`,
+  used by the effects and the titles.
+- Found on the way, and fixed:
+  - a title whose fades do not fit its shot stayed invisible (its keys came
+    out of order); the envelope is now FFmpeg's formula, sampled;
+  - sampled curves were taken at each frame's start while frames read curves
+    at their centre (the first frame of a title was half seen);
+  - a preview's background written `0x1a1f22` was read as black;
+  - **a shot with no take, a composite and a title was assembled as a title
+    card**, its composite ignored -- the card branch came first. Now its
+    composite is drawn and the title laid over it (tested).
+- On a real production: SC-050 v4 -- the keyed presenter, the inset, a grain
+  and a lower third -- all drawn by the graph.
+- `media/grading.ffmpeg_filter` (a `lut3d` string nobody called) removed.
+
+# Remaining (recorded in the roadmap)
+
+- The frame-access range rule (SPEC-0012): float sources clipped at white --
+  before C8.
+- A shot drawn in one graph rather than three passes.
+- The exposures in the roadmap's table "supported by the graph, not yet
+  exposed".
+- C6's listed new items, with C6b.
 
 # Decisions
 
@@ -130,4 +160,13 @@ change, in C10); the exposures in the roadmap's table.
   on GL as the reference lays it, for each blend, with no green left after a
   key; a look has no fixed place in the graph -- before a merge it leaves the
   picture below untouched, after it grades it -- on GL as on the reference.
-- Full suite after stage A: 759 tests pass (2026-10-14); after B and C: 761.
+- `tests/test_title_graphs.py`: every title names its primitives truly; no
+  `drawtext` or FFmpeg graph left in `titles.py`; every animation is a valid
+  graph and runs on GL as on the reference; a title whose fades do not fit
+  still rises; a typewriter only grows; word by word in whole words; a lower
+  third on the left on its bar; credits climb; a neon lights around it; text
+  aligned left, in lines, hollow.
+- `tests/test_composite_shots.py`: a composite with a title is drawn as a
+  composite.
+- Full suite after stage A: 759 tests pass (2026-10-14); after B and C: 761;
+  at the close: 776.

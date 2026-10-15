@@ -266,14 +266,17 @@ as shaders, with their reasons: `pixelate`, `film-burn`.
   drawn the same by the reference and GL, its `morph` on a curve.
 - After C3 and C4.
 
-### C6. The catalogs re-expressed
+### ~~C6. The catalogs re-expressed~~
 
-In progress (`CT-0077`): stages A-C done -- every effect of the VFX catalog is
-drawn by the graph (the fourteen FFmpeg chains, the look as `colour.lut` with a
-display view baked for GL from the reference's own function, the stock elements
-laid by their blend), `vfx._chain` is gone, every item names its primitives.
-Next: titles on layers (stage D, with C6b).
-
+Done (`CT-0077`) as convergence: every catalog draws through the one engine --
+transitions (C5), the VFX effects, looks and stock elements, and the titles.
+No FFmpeg filter chain composites a picture any more (`vfx._chain`, the
+titles' `drawtext` and neon graph, the look's `lut3d` are gone); Blender stays
+a renderer whose clips the graph lays; every item names its primitives,
+checked against its own graph. What C6 listed as *new* items -- a horizontal
+crawl, a drop shadow on titles, title colours from the look, posterise,
+solarise and colour-cycling items, sheets for more gl-transitions shaders,
+CT-0028's Toaster-style shaders -- are additions, not convergence: with C6b.
 
 - What: VFX items that are a primitive with a parameter (a colour key, a
   luma key, a blur) become presets of the primitive; element effects (fire
@@ -411,10 +414,17 @@ prescribed here.
   and its FFmpeg stand-in goes (CT-0076).
 - A **sheet for `film-burn`** re-expressing its look with generate.noise,
   colour and merge, or keeping it as a shader for good (CT-0076).
-- **EXR elements in linear light**: `vfx.prepare_element` still turns EXR into
-  display-encoded frames (the old FFmpeg path's form), so values above white
-  are cut and a look's roll-off cannot act on a fire's highlights. Read EXR
-  straight into the graph, linear, with its alpha (CT-0077).
+- **The frame-access contract keeps a source's whole range** (SPEC-0012,
+  Frames in and out): today the reference reads 16-bit integers and
+  `vfx.prepare_element` keeps 8-bit display-encoded clips, so anything above
+  white -- EXR elements, Blender renders, a model's frames -- is clipped before
+  compositing. A contract limitation, not an EXR one: read float sources as
+  float, keep prepared clips in float. Before C8 (CT-0077).
+- **A shot drawn in one graph**: its composite, its effects and its title are
+  three passes through the same engine, each written and read back (an
+  encode between each). Chain them into one graph -- the effects' and the
+  title's fragments after the composite's output -- so the shot is drawn
+  once (CT-0077).
 - A **screen-correction plate** for colour keys on unevenly lit screens (as
   dedicated keyers have): the key's excess measured against the plate's, pixel
   by pixel, instead of one screen colour.

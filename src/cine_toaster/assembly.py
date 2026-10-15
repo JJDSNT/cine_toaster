@@ -301,8 +301,9 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         if chosen is None:
             chosen = _reused(root, scene, shot, plan)
         title = shot.get("title") if isinstance(shot.get("title"), dict) and not shot["title"].get("unknown") else None
-        if chosen is None and title:
-            # A card: the title drawn over its background, as long as the shot plays.
+        if chosen is None and title and not shot.get("composite"):
+            # A card: the title drawn over its background, as long as the shot plays (a composite with a title is
+            # drawn below, the title over it).
             length = float(shot.get("duration_seconds") or 0) or 3.0
             cut = cuts.get(shot["id"]) or {}
             segment = Segment(shot["id"], "TITLE", "", 0.0, length, cut.get("type") or "hard", "title",

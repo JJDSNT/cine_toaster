@@ -209,7 +209,7 @@ in the 1080-line cut. A shape's `feather` is a fraction of the frame.
 |---|---|---|---|
 | `generate.source` | -- | picture (+ sound, meta) | a take, a file or a stretch; its colour space and alpha (§2) |
 | `generate.solid` / `gradient` / `noise` | -- | picture | colour(s), kind, seed, `repeat` (the ramp repeated: stripes, rings; CT-0077). A gradient's `kind`: `linear` (along `angle`), `radial` (the frame's own shape), `circle` (round whatever the frame), `diamond` (by \|x\| + \|y\|), `conic` (the angle clockwise from twelve o'clock, round); the distance kinds reach 1 at the corners -- so a gradient made a matte and thresholded by a join's progress is an iris, a diamond or a clock wipe (CT-0076) |
-| `generate.text` | -- | picture | text, font, size, colour, `reveal` (curve: letters shown, for typewriter-like titles) |
+| `generate.text` | -- | picture | text (lines split by `\n`), font, size (pixels at 720 lines), colour, position (the text's centre, or its start or end by `align`: centre, left, right), `line_spacing`, `outline` and `hollow` (a stroke round the letters, or the stroke alone), `reveal` (a curve: the share shown) by `reveal_by` letter or word. Drawn once by the reference and uploaded by GL (CT-0077) |
 | `generate.render` | -- | picture (+ signals) | a renderer's own scene (Blender, a VFX recipe), its parameters, `seed`; it may also give depth or other passes |
 
 ## track and animate
@@ -256,6 +256,14 @@ One rule each, used by every renderer and by the assembly (CT-0072):
 - **Showing a frame**: a picture is converted from the working space to the
   display encoding and clipped to 0..1 over black (`reference.shown`), for a
   film written and for a still alike.
+- **Range**: every source enters the graph in linear light **with its whole
+  range** -- nothing is clipped before compositing, so a fire, a Blender
+  render or a model's frame above white keeps the light a glow, an exposure
+  change or a look's roll-off acts on. *Not met yet* (CT-0077): the reference
+  reads frames as 16-bit integers (0 to 1), and `vfx.prepare_element` turns
+  EXR into display-encoded 8-bit clips. To be met before C8 by reading float
+  sources (EXR, float TIFF, a renderer's own frames) as float, linear, and
+  keeping an element's prepared clip in float.
 - **A still** of a shot drawn by a graph is that graph run at one instant of
   the shot, at the cut's frame, rate and beats -- the frame the cut shows
   there. Titles and effects still drawn over a composite by FFmpeg are not in
@@ -599,7 +607,11 @@ can be re-expressed.
 **Titles** (`card`, `film-title`, `caption`, `lower-third`, `slide-up`,
 `grow`, `flicker`, `neon-sign`, `typewriter`, `word-by-word`,
 `credits-roll`): `generate.text` with curves on its alpha, position, size or
-`reveal`, `generate.solid` for bars, `merge.over` on the picture.
+`reveal`, `generate.solid` for bars, `merge.over` on the picture -- done in C6
+(CT-0077, `compositing/title_graphs.py`); the neon's halos are
+`filter.blur` and `colour.grade` added by `merge.blend`. The Blender titles
+(`letters-rise`, `letters-turn-in`) are rendered by Blender and laid by the
+graph.
 `letters-rise`, `letters-turn-in` (Blender, letters as objects):
 `generate.render`. Expressible; the per-letter animation of the FFmpeg forms
 is a `reveal` curve and per-word timing a `reveal` with holds.

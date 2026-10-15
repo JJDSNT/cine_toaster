@@ -489,22 +489,64 @@ NOT_IN_REFERENCE = {"signal.estimate": "a model's result is recorded, not comput
 
 @lru_cache(maxsize=64)
 def _text_coverage(text: str, shown: str, font_path: str, size_px: int, position: tuple[float, float],
-                   width: int, height: int) -> np.ndarray:
+                   width: int, height: int, align: str = "centre", spacing_px: int = 0, outline_px: int = 0,
+                   hollow: bool = False) -> np.ndarray:
     """How much of each pixel the text covers, drawn four times over and averaged. Kept: a still text (a
-    card, a title not revealing) is the same drawing on every frame."""
+    card, a title not revealing) is the same drawing on every frame.
+
+    The text is placed by its whole extent -- centred on `position`, or starting or ending there by `align` --
+    so revealed letters do not shift; lines are `spacing_px` apart beyond the font's own; an `outline` draws a
+    stroke round the letters, and `hollow` keeps only the stroke (a neon tube)."""
 
     from PIL import Image, ImageDraw, ImageFont
 
     font = ImageFont.truetype(font_path, size_px)
-    canvas = Image.new("L", (width * 4, height * 4), 0)
-    draw = ImageDraw.Draw(canvas)
-    box = draw.textbbox((0, 0), text, font=font)  # placed by the whole text, so letters do not shift
-    x = position[0] * width * 4 - (box[2] - box[0]) / 2 - box[0]
-    y = position[1] * height * 4 - (box[3] - box[1]) / 2 - box[1]
-    draw.text((x, y), shown, font=font, fill=255)
+    anchor = {"centre": "center", "left": "left", "right": "right"}[align]
+
+    def drawn(value: str, stroke: int) -> Image.Image:
+        canvas = Image.new("L", (width * 4, height * 4), 0)
+        draw = ImageDraw.Draw(canvas)
+        box = draw.multiline_textbbox((0, 0), text, font=font, spacing=spacing_px, stroke_width=stroke)
+        across = box[2] - box[0]
+        x = position[0] * width * 4 - {"center": across / 2, "left": 0.0, "right": across}[anchor] - box[0]
+        y = position[1] * height * 4 - (box[3] - box[1]) / 2 - box[1]
+        draw.multiline_text((x, y), value, font=font, fill=255, spacing=spacing_px, align=anchor,
+                            stroke_width=stroke, stroke_fill=255)
+        return canvas
+
+    canvas = drawn(shown, outline_px)
+    if hollow and outline_px:
+        inside = np.asarray(drawn(shown, 0), dtype=np.int16)
+        canvas = Image.fromarray(np.clip(np.asarray(canvas, dtype=np.int16) - inside, 0, 255).astype(np.uint8), "L")
     coverage = np.asarray(canvas.resize((width, height), Image.BOX), dtype=np.float32) / 255.0
     coverage.setflags(write=False)
     return coverage
+
+
+def text_picture(node: dict[str, Any], param: Callable[..., Any], width: int, height: int,
+                 root: Path | None) -> np.ndarray:
+    """generate.text's picture for one frame: one drawing of a text for every renderer (GL uploads it)."""
+
+    from ..titles import font_file
+
+    text = str(param("text", "")).replace("\\n", "\n")
+    reveal = param("reveal", 1.0)
+    if reveal is None:
+        shown = text
+    elif param("reveal_by", "letter") == "word":
+        words = text.split(" ")
+        shown = " ".join(words[: int(round(len(words) * float(np.clip(reveal, 0, 1))))])
+    else:
+        shown = text[: int(round(len(text) * float(np.clip(reveal, 0, 1))))]
+    size_px = max(4, int(pixels(param("size", 40), height) * 4))
+    position = np.broadcast_to(np.asarray(param("position", [0.5, 0.5]), dtype=np.float32), (2,))
+    coverage = _text_coverage(text, shown, font_file({"font": node.get("font") or ""}, root), size_px,
+                              (float(position[0]), float(position[1])), width, height,
+                              str(param("align", "centre")), int(round(pixels(param("line_spacing", 0.0), height) * 4)),
+                              int(round(pixels(param("outline", 0.0), height) * 4)), bool(param("hollow", False)))
+    colour = np.asarray(param("colour", [1, 1, 1, 1]), dtype=np.float32).reshape(-1)
+    alpha = coverage * (float(colour[3]) if colour.size > 3 else 1.0)
+    return np.concatenate([colour[:3] * alpha[..., None], alpha[..., None]], axis=-1).astype(np.float32)
 
 
 def Image_resize(data: np.ndarray, width: int, height: int) -> np.ndarray:
@@ -1041,18 +1083,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
                                frame, width, height)
             return np.stack([grey, grey, grey, np.ones_like(grey)], axis=-1)
         if op == "generate.text":
-            from ..titles import font_file
-
-            text = str(param("text", ""))
-            reveal = param("reveal", 1.0)
-            shown = text[: int(round(len(text) * float(np.clip(reveal, 0, 1))))] if reveal is not None else text
-            size_px = max(4, int(pixels(param("size", 40), height) * 4))
-            position = np.broadcast_to(np.asarray(param("position", [0.5, 0.5]), dtype=np.float32), (2,))
-            coverage = _text_coverage(text, shown, font_file({"font": node.get("font") or ""}, root), size_px,
-                                      (float(position[0]), float(position[1])), width, height)
-            colour = np.asarray(param("colour", [1, 1, 1, 1]), dtype=np.float32)
-            alpha = coverage * (colour[3] if colour.size > 3 else 1.0)
-            return np.concatenate([colour[:3] * alpha[..., None], alpha[..., None]], axis=-1).astype(np.float32)
+            return text_picture(node, param, width, height, root)
         if op == "signal.read":
             path = Path(node["file"])
             path = (root / path) if root and not path.is_absolute() else path

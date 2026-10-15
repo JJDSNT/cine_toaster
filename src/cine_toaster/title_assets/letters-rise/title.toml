@@ -16,3 +16,5 @@ fade_out = 1.0
 [render]
 engine = "blender"
 effect = "letters-rise"
+# Rendered by Blender, laid by the compositing graph (C6, CT-0077):
+primitives = ["generate.source", "merge.over"]

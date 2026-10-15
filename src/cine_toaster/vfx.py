@@ -455,48 +455,23 @@ def prepare_element(effect: dict[str, Any], duration: float, width: int, height:
 
 def render_graph(effects: list[dict[str, Any]], duration: float, output: Path, *, background: Path | None = None,
                  start: float = 0.0, width: int = 1280, height: int = 720, fps: int = 24, run=None) -> Path:
-    """Effects drawn by the compositing graph (C6, CT-0077): GL when it holds every op, the reference otherwise;
-    the background's sound kept. Without a background, a neutral picture for previews."""
+    """Effects drawn by the compositing graph (C6, CT-0077) over a clip, its sound kept; without a clip, over a
+    neutral picture for previews (a soft gradient with a dark figure in the middle)."""
 
     import numpy as np
 
-    from .compositing import reference
+    from .compositing.drawing import over_picture
     from .compositing.effects import graph_for
-    from .compositing.gl import renderer_for
 
-    run = run or (lambda command: subprocess.run(command, check=True, capture_output=True))
-    width, height = width // 2 * 2, height // 2 * 2
-    frames = max(1, round(duration * fps))
-    if background is not None:
-        picture = reference.read(Path(background), frames, (width, height), fps, start=start)
-    else:
-        # A neutral picture for previews: a soft gradient with a dark figure in the middle.
+    still = None
+    if background is None:
+        width, height = width // 2 * 2, height // 2 * 2
         ys, xs = np.mgrid[0:height, 0:width].astype(np.float32)
         still = np.dstack([0.05 + 0.08 * xs / width, 0.07 + 0.05 * ys / height, 0.1 + 0.03 * xs / width,
                            np.ones_like(xs)]).astype(np.float32)
         still[int(height * 0.35):, int(width * 0.46):int(width * 0.54), :3] = 0.012
-        picture = still
-    graph = graph_for(effects, duration, fps)
-    fast = renderer_for(graph)
-    pictures, _identity, _cached = reference.render(graph, {"picture": picture}, frames=frames,
-                                                    size=(width, height), fps=fps, renderer=fast)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    silent = output.with_suffix(".picture.mp4")
-    reference.write(pictures, silent, fps)
-    if background is not None and _has_sound(Path(background)):
-        run(["ffmpeg", "-v", "error", "-y", "-i", str(silent), "-ss", f"{start:.3f}", "-t", f"{duration:.3f}",
-             "-i", str(background), "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-shortest",
-             str(output)])
-        silent.unlink(missing_ok=True)
-    else:
-        silent.replace(output)
-    return output
-
-
-def _has_sound(path: Path) -> bool:
-    completed = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index",
-                                "-of", "csv=p=0", str(path)], capture_output=True, text=True)
-    return bool(completed.stdout.strip())
+    return over_picture(graph_for(effects, duration, fps), duration, output, background=background, still=still,
+                        start=start, width=width, height=height, fps=fps, run=run)
 
 
 def preview_clip(item: dict[str, Any], output: Path, *, root: Path | None = None, element: str = "") -> Path:
