@@ -5,7 +5,7 @@ type: index
 status: active
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-10-13
+updated_at: 2026-10-15
 tags:
   - work
   - tracker
@@ -43,6 +43,29 @@ The ordered plan in [`development/roadmap.md`](../development/roadmap.md)
 is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
 CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
+
+UX and creative-context research, made on `main` while the compositing
+work ran on its branch; renumbered on the merge of 2026-10-15 from
+CT-0064..CT-0077, which the branch had already used (each id keeps its
+meaning in the commits and code that cite it). Their frontmatter is as
+written there: some have none, some use `backlog` or `proposed`.
+
+- `CT-0095` — Visual Lab: Core gap and UX research
+- `CT-0094` — model-dependent mood and visual identity
+- `CT-0093` — location consumers and spatial continuity (CT-0092's addendum)
+- `CT-0092` — compound locations and situational context (Singular's hospital)
+- `CT-0091` — creative context Core inventory and UX contract
+- `CT-0090` — contextual creative decisions and navigation
+- `CT-0089` — cognitive ergonomics across the three workspaces
+- `CT-0088` — Production Awareness: situation awareness, explainable status
+- `CT-0087` — the production workspace's task and information priorities
+- `CT-0086` — human-centred information visibility, cognitive ergonomics
+- `CT-0085` — the three-workspace wireframe, a first UX study
+- `CT-0084` — the three-workspace UX vision and its validation
+- `CT-0083` — integrated editing and production architecture
+- `CT-0082` — Blender MCP and DCC-MCP as an agent-operated DCC interface
+
+Compositing, the demos line and earlier:
 
 - `CT-0081` — C8: signals from models and from 3D, the audit -- the
   contract (geometric, estimated, aligned depth), records with provenance,

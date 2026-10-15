@@ -110,7 +110,13 @@ fixed records missing from composite identities. C8 closed on the user's
 viewing (2026-10-15), and with it the exploratory phase of the compositing
 roadmap: C9, C9b, C11, C10, C5b and the C6b review are now paths of
 evolution taken when a production asks, not conditions for using the
-engine. Next: the priorities reorganised around making films.
+engine. The compositing branch (`ct-0064-reel-on-the-assembly-path`, C1-C8
+with the demos line's first points) was merged into `main` on 2026-10-15,
+with `main`'s UX research; that research's records were renumbered
+CT-0082..CT-0095 (their old ids were already the branch's). Next: the
+demos, produced through the production flow -- each with an intention, a
+screenplay, a storyboard -- the reel last, built from the others (the user,
+2026-10-15), on a branch of their own.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional

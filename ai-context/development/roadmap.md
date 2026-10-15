@@ -5,7 +5,7 @@ type: roadmap
 status: active
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-10-13
+updated_at: 2026-10-15
 tags:
   - development
   - roadmap
@@ -221,6 +221,77 @@ Agreed order (2026-10-04):
    through a command; a per-shot brief override.
 6. **Cast lineage** (`CT-0015`): `cast_reference_unused` and
    `_superseded`; master references attached to video generation.
+7. **Blender MCP / DCC-MCP investigation** (`CT-0082`): compare an established
+   Blender-specific MCP, DCC-MCP and the existing deterministic Blender/USD
+   path. Run the inspect -> modify -> preview -> read-back -> deterministic
+   regeneration spike before deciding adopt / narrow-adopt / wrap / defer /
+   reject. This is an explicit next investigation, not a passive backlog note.
+
+### Active investigation — integrated editing and production architecture (CT-0083)
+
+- [ ] **Audit current editing capabilities** against code: implemented / partial / missing / unknown; identify canonical edit state, timebase, versioning, trim, preview and render contracts.
+- [ ] **Select one representative fixture** with J/L cut, transition, sound stems and an alternative generated take.
+- [ ] **Prototype an editable React timeline** using existing Core commands, with agent proposal/approval and undo; do not create competing edit state.
+- [ ] **Run interoperability and engine spikes**: OpenTimelineIO round-trip/reconform and FFmpeg vs MLT vs GES comparison, with measurable acceptance criteria.
+- [ ] **Evaluate production-wide finishing**: OpenColorIO/ACES, OpenEXR, OFX-host boundary, loudness, delivery profiles and dependency-aware regeneration.
+- [ ] Record findings and decisions in [CT-0083](../work/CT-0083-integrated-editing-and-production-architecture.md); convert validated choices into ADRs and implementation tasks.
+
+This is an active research track, **not** a decision to replace the existing media engine.
+
+### Active UX investigation — three workspaces (CT-0084)
+
+- [ ] Audit current React routes, canvas, screenplay editor and control-room journeys against the three-workspace concept.
+- [ ] Define shared navigation and persistent project / sequence / scene / shot / take context.
+- [ ] Prototype Screenplay & Storyboard, Production, and Editing & Post-production layouts, including shot view versus node view.
+- [ ] Validate screenplay-to-cut, edit-to-regeneration, agent-approval and delivery journeys with existing Core data.
+- [ ] Record usability, accessibility and layout findings and convert approved designs into implementation tasks and ADRs.
+
+Track scope and acceptance criteria in [CT-0084](../work/CT-0084-three-workspace-ux-vision.md). This is a UX investigation, not a commitment to rebuild the existing interface.
+
+### UX follow-up — wireframe validation and human information needs (CT-0085, CT-0086)
+
+- [ ] Preserve the initial three-workspace wireframe as a **non-validated design study** ([CT-0085](../work/CT-0085-three-workspace-wireframe-study.md)); do not treat the three-column layout as approved.
+- [ ] Research situation awareness, cognitive load, progressive disclosure, visual hierarchy and accessible interaction ([CT-0086](../work/CT-0086-human-centered-information-visibility.md)).
+- [ ] Produce a task → decision → required information → Core source matrix, starting with Production.
+- [ ] Compare focused, balanced and advanced-density layouts on laptop and large displays, with user tasks and workload measures.
+- [ ] Update the wireframes, record accepted UX decisions and create implementation work only after validation.
+
+### Research in progress — Production information priorities (CT-0087)
+
+- [x] Create an initial Production task → information → display-priority matrix, with preliminary React code audit ([CT-0087](../work/CT-0087-production-information-priority-matrix.md)).
+- [ ] Audit control-room server pages, status APIs, FinOps and actual take-comparison flows; verify cross-room context preservation.
+- [ ] Compare Focus and Review/Expert layout variants using take selection, failed generation and agent approval tasks.
+- [ ] Extend the matrix to Screenplay & Storyboard and Editing & Post-production, and record user-test findings before approving a layout.
+
+### Research — Production Awareness and human situation awareness (CT-0088)
+
+- [x] Map situation awareness, ecological interface design, distributed cognition, attention management and human–AI interaction to Cine Toaster's existing Producer, continuity, FinOps and assistant capabilities ([CT-0088](../work/CT-0088-production-awareness-research.md)).
+- [ ] Verify primary research references and actual Core status, dependency and approval data contracts.
+- [ ] Prototype explainable **state + consequence + action** awareness items using existing records, without a new source of truth.
+- [ ] Compare status-only versus contextual-awareness layouts for stale-take, continuity, failed-job and agent-approval scenarios.
+- [ ] Validate with users before introducing UI components, priority rules or architecture decisions.
+
+### Cross-workspace cognitive UX study (CT-0089)
+
+- [x] Map narrative, operational, temporal and cross-workspace cognitive demands to the existing screenplay, storyboard, Producer, editor commands and assistant ([CT-0089](../work/CT-0089-cross-workspace-cognitive-model.md)).
+- [ ] Audit actual editing/timeline UI and persistent navigation state; inventory canonical script → board → take → assembly links.
+- [ ] Complete information-priority matrices for Screenplay/Storyboard and Editing/Post.
+- [ ] Test context-preserving cross-workspace navigation and focused versus detailed layouts with users before approving wireframes.
+
+### Contextual creative decisions and navigation (CT-0090)
+
+- [x] Audit existing sidebar, style cascading, location overrides, shot emotions and moodboard research; capture findings and navigation alternatives ([CT-0090](../work/CT-0090-contextual-creative-decisions-navigation.md)).
+- [ ] Inventory cast/look/style/location/continuity resolver fields and existing UI deep links; document source, scope, overrides and provenance.
+- [ ] Build decision → origin → scope → override → affected references matrix, distinguishing actual dependencies from unknown ones.
+- [ ] Prototype current feature menu plus inspector against a compact workspace menu with contextual creative relations.
+- [ ] Validate on film-wide style, local location override, character performance and editing trace-back tasks before changing the sidebar.
+
+### Creative context Core inventory (CT-0091)
+
+- [x] Audit Core resolvers for cast, looks, styles, locations, continuity and cuts, and document a proposed read-only contextual projection ([CT-0091](../work/CT-0091-creative-context-core-inventory.md)).
+- [ ] Trace API/client payloads and exact scene/shot binding semantics; verify editing assembly references and cross-room selection persistence.
+- [ ] Compare existing feature menu + inspector with hybrid workspace/context navigation in a focused prototype.
+- [ ] Validate decisions, provenance and local exceptions with users before an implementation ADR.
 
 ### The demos line: the music piece, then the reel (opened 2026-10-13)
 
@@ -556,3 +627,28 @@ Neither changes the direction; each is used at the edges (`references.md`).
   UI (`CT-0020`); Arcads first-hand (`CT-0024`); a finer liquid simulation
   and a running nerfstudio (`CT-0047`); MLT/Kdenlive exchange; detached
   workers; frame-accurate comparison.
+
+### Compound location consumer audit (CT-0093)
+
+- [x] Trace single-location scene resolution, location appearances, plate checks, `/api/locations`, and current set override semantics ([CT-0093](../work/CT-0093-location-consumer-and-continuity-audit.md)).
+- [ ] Inspect storyboard/render consumer paths and cross-scene editing continuity for compound-place requirements.
+- [ ] Compare optional place grouping versus explicit parent-child place/set model with a Singular hospital fixture.
+- [ ] Validate contextual navigation and only then propose a backward-compatible schema/ADR.
+
+### Model-dependent mood and master-image consistency (CT-0094)
+
+- [x] Record qualitative Singular Codex-vs-Qwen master-image texture/mood observation and UX-first research questions ([CT-0094](../work/CT-0094-model-dependent-mood-and-visual-identity.md)).
+- [ ] Audit current look/style, image-reference, provider-capability, provenance and human-approval contracts before schema changes.
+- [ ] Run controlled multi-sample comparison on one hospital shot, logging conditioning differences, settings, output, mood and continuity review.
+- [ ] Prototype UX comparison from visual intent to candidate masters to approved master and downstream shots, including aesthetic drift review.
+- [ ] Research Blender and planned Unreal roles as alternative/complementary spatial inputs, without imposing one fixed tool chain.
+
+### Visual Lab UX and Core fit (CT-0095)
+
+- [x] Inspect look/style resolution, per-shot picture approval, decision journal and image derivation tests; record UX-first gaps ([CT-0095](../work/CT-0095-visual-lab-core-gap-and-ux-research.md)).
+- [ ] Prototype representative-location visual experiments and model comparison with complete provenance.
+- [ ] Determine how a film-wide visual baseline, exceptions and revisions fit existing Core contracts without a parallel truth model.
+- [ ] Validate Visual Lab placement in navigation and downstream change-impact visibility before a UI or schema ADR.
+
+- [ ] Visual Lab: prototype separate quality / shot suitability / visual-identity fit assessments and human decisions (approve, regenerate, retain as exploration, scoped exception, fork candidate identity).
+- [ ] Visual Lab: test candidate identity across representative locations before promotion; version approved baselines and assess known/unknown downstream impact.
