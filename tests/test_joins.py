@@ -87,9 +87,11 @@ class JoinTests(unittest.TestCase):
         self.assertAlmostEqual(made["duration"], 4.0, delta=0.1)
 
     def shader(self) -> Path:
-        from cine_toaster.transitions import list_transitions
+        """A gl-transitions dissolve of the test's own: the catalog's dissolve is a recipe since CT-0076."""
 
-        return next(item["asset_path"] for item in list_transitions() if item["id"] == "cross-dissolve")
+        path = self.root / "dissolve.glsl"
+        path.write_text("vec4 transition(vec2 uv) {\n  return mix(getFromColor(uv), getToColor(uv), progress);\n}\n")
+        return path
 
     def test_a_j_cut_leads_with_the_incoming_takes_sound_from_before_its_cut_point(self) -> None:
         # B speaks (a tone) from 0.4 s to 0.9 s of its take, before its picture starts at 1.0 s.
@@ -190,7 +192,7 @@ class PlannedJoinTests(unittest.TestCase):
                               encoding="utf-8")
         second = self.plan().segments[1]
         self.assertEqual((second.transition["id"], second.transition["seconds"]), ("dip-to-black", 0.2))
-        self.assertTrue(second.transition.get("shader") or second.transition.get("mode") == "fadeblack")
+        self.assertTrue(second.transition.get("graph"))  # a recipe since CT-0076, drawn wherever it runs
         # The demo's takes are short: a long transition is cut to half the shorter shot, and said.
         scene_file.write_text(text.replace("  - n: 2\n", "  - n: 2\n    transition: {id: dip-to-black}\n", 1),
                               encoding="utf-8")

@@ -21,7 +21,7 @@ def run(command, expected_seconds=None, message="", span=None):
 class CatalogTests(unittest.TestCase):
     def test_the_displace_wipe_is_a_checked_recipe_with_its_pictures_and_preview(self) -> None:
         item = {entry["id"]: entry for entry in list_transitions()}["displace-wipe"]
-        self.assertEqual((item["kind"], item["category"]), ("graph", "wipe/displace"))
+        self.assertEqual((item["kind"], item["category"]), ("graph", "wipe/custom"))
         self.assertEqual(sorted(item["inputs"]), ["map_picture", "order_picture"])
         self.assertTrue(item["preview_path"].is_file())
         self.assertEqual(item["graph"]["output"], "out")

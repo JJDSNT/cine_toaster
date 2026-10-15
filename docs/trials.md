@@ -8,6 +8,7 @@ work records named here hold the detail.
 
 | Date | Piece | Length | File | Published |
 |---|---|---|---|---|
+| 2026-10-14 | Heat v6: its luma join as a recipe | 42 s | `trials/organic-trial-v6.mp4` | not yet |
 | 2026-10-14 | Presenter v2: the presented launch in motion | 4 s | `trials/presenter-layers-v2.mp4` | not yet |
 | 2026-10-14 | Presenter: a key, a despill, a picture presented | 4 s | `trials/presenter-layers-v1.mp4` | not yet |
 | 2026-10-14 | Window: layers, a matte in the frame | 4 s | `trials/window-layers-v1.mp4` | not yet |

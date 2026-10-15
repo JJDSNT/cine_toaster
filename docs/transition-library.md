@@ -137,5 +137,17 @@ outgoing shot and the start of the incoming one, so the running time is the
 same either way. A recipe's preview clip is drawn from its graph by
 `transitions.render_preview`.
 
+Since CT-0076 the built-in catalog is filed by family -- `dissolve`,
+`wipe/geometric`, `wipe/luma`, `wipe/custom`, `warp`, `warp-wipe`, `move`,
+`stylised` -- and its reviewed items are recipes of primitives, except two
+that say why they stay shaders (`opaque_reason`). A recipe that replaces an
+upstream shader names it in `upstream`, so the raw shader is not listed
+beside it. A join's matte may be a file or a generator:
+
+```yaml
+transition: {id: matte-wipe, matte: {gradient: {kind: conic}}}          # a clock, drawn
+transition: {id: matte-wipe, matte: {noise: {kind: perlin, scale: 4}}}  # an organic order
+```
+
 Recording a per-shot parameter override, and WebM compositing roles, are
 deferred.

@@ -1,14 +1,14 @@
 schema_version = 1
 id = "switcher-flip"
 name = "Switcher Flip"
-kind = "glsl"
-asset = "transition.glsl"
-category = "dve"
+kind = "graph"
+category = "move"
 description = "The outgoing image compresses to an edge and the incoming image unfolds from the opposite side."
 guidance = "A digital video effect inspired by the exuberant switcher vocabulary of early desktop video. It signals a constructed, graphic edit."
 energy = "high"
 motion = "horizontal flip"
 duration_ms = 850
+preview = "preview.webm"  # drawn from the graph by transitions.render_preview
 tags = ["dve", "retro", "broadcast", "flip", "toaster-like"]
 use_when = [
   "The edit should acknowledge the medium",
@@ -26,5 +26,23 @@ author = "Cine Toaster contributors"
 # wrote the item, never inferred by the renderer: a substitution nobody chose
 # is a substitution nobody can argue with.
 [render]
-ffmpeg = "hlslice"
-ffmpeg_note = "The horizontal slice is the closest honest stand-in for the flip."
+ffmpeg = "graph"
+ffmpeg_note = "Drawn from its graph by GL, or by the reference where GL cannot run: no stand-in is needed (CT-0076)."
+
+[graph]
+ports = {from = "picture", to = "picture", progress = "curve"}
+output = "out"
+
+[graph.nodes]
+# The outgoing picture folds to the right edge and darkens; the incoming one unfolds from the left edge.
+black = {op = "generate.solid", colour = [0.0, 0.0, 0.0, 1.0]}
+fold = {op = "curve.keys", in = "progress", keys = [{t = 0.0, value = [1.0, 1.0], ease = "in"}, [0.5, [0.002, 1.0]]]}
+unfold = {op = "curve.keys", in = "progress", keys = [{t = 0.5, value = [0.002, 1.0], ease = "out"}, [1.0, [1.0, 1.0]]]}
+shade_out = {op = "curve.keys", in = "progress", keys = [[0.0, 1.0], [0.5, 0.72]]}
+shade_in = {op = "curve.keys", in = "progress", keys = [[0.5, 0.72], [1.0, 1.0]]}
+from_dim = {op = "colour.grade", in = "from", gain = {curve = "shade_out"}}
+to_dim = {op = "colour.grade", in = "to", gain = {curve = "shade_in"}}
+leaving = {op = "warp.transform", in = "from_dim", scale = {curve = "fold"}, pivot = [1.0, 0.5]}
+arriving = {op = "warp.transform", in = "to_dim", scale = {curve = "unfold"}, pivot = [0.0, 0.5]}
+first = {op = "merge.over", front = "leaving", back = "black"}
+out = {op = "merge.over", front = "arriving", back = "first"}

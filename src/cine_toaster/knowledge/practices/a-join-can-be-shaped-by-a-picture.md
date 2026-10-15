@@ -3,7 +3,7 @@ id = "a-join-can-be-shaped-by-a-picture"
 title = "A join shaped by a picture says which picture, and it is there"
 domain = "editing"
 status = "convention"
-enforced_by = ["transition_input_missing", "transition_input_outside"]
+enforced_by = ["transition_input_missing", "transition_input_outside", "transition_matte_invalid"]
 evidence = ["SPEC-0011"]
 +++
 
@@ -20,3 +20,8 @@ top, like the Toaster's animated objects.
 A matte or overlay named on a join belongs to the production and must be
 there. A missing one would leave the join without the shape the editor chose,
 and the cut would not say why it looks wrong.
+
+The matte may also be drawn rather than found: a gradient (a clock, a
+diamond, a circle) or a noise, written on the join (`matte: {noise: {kind:
+perlin, scale: 4}}`). It is part of the join's own drawing, and a generator
+that cannot be drawn is refused when the scene loads.

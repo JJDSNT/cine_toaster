@@ -767,8 +767,16 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
         if op == "generate.gradient":
             colours = np.asarray(param("colours", [[0, 0, 0, 1], [1, 1, 1, 1]]), dtype=np.float32)
             ys, xs = np.mgrid[0:height, 0:width].astype(np.float32)
-            if param("kind", "linear") == "radial":
-                x = np.hypot((xs + 0.5) / width - 0.5, (ys + 0.5) / height - 0.5) / math.hypot(0.5, 0.5)
+            u, v = (xs + 0.5) / width - 0.5, (ys + 0.5) / height - 0.5  # from the centre, in frame fractions
+            kind = param("kind", "linear")
+            if kind == "radial":  # the frame's own shape, its corners at 1
+                x = np.hypot(u, v) / math.hypot(0.5, 0.5)
+            elif kind == "circle":  # round whatever the frame, its corners at 1 (CT-0076)
+                x = np.hypot(u * aspect, v) / math.hypot(0.5 * aspect, 0.5)
+            elif kind == "diamond":  # by |x| + |y| in frame fractions, its corners at 1
+                x = np.abs(u) + np.abs(v)
+            elif kind == "conic":  # the angle, clockwise from twelve o'clock, round whatever the frame
+                x = np.mod(np.arctan2(u * aspect, -v) / (2 * math.pi) - float(param("angle", 0.0)) / 360.0, 1.0)
             else:
                 angle = math.radians(float(param("angle", 0.0)))
                 x = ((xs + 0.5) / width - 0.5) * math.cos(angle) + ((ys + 0.5) / height - 0.5) * math.sin(angle) + 0.5

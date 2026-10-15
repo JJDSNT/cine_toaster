@@ -148,7 +148,7 @@ OPS: dict[str, Op] = {
                           {"take": "text", "file": "file", "colorspace": "text", "alpha": "enum:straight|premultiplied",
                            "start": "number", "duration": "number"}),
     "generate.solid": Op({}, params={"colour": "vector"}),
-    "generate.gradient": Op({}, params={"kind": "enum:linear|radial", "colours": "vector", "angle": "number"}),
+    "generate.gradient": Op({}, params={"kind": "enum:linear|radial|circle|diamond|conic", "colours": "vector", "angle": "number"}),
     "generate.noise": Op({}, params={"kind": "enum:value|perlin|grain", "scale": "number", "seed": "int"}),
     "generate.text": Op({}, params={"text": "text", "font": "file", "size": "number", "colour": "vector",
                                     "position": "vector", "reveal": "number"}),

@@ -109,6 +109,44 @@ def recipe(moving: bool, softness: float = 0.0) -> dict[str, Any]:
             "nodes": nodes, "output": "out"}
 
 
+#: The generators a join's matte may be drawn by, instead of a file (CT-0076).
+GENERATORS = {"gradient": "generate.gradient", "noise": "generate.noise"}
+
+
+def generated_node(spec: dict[str, Any]) -> dict[str, Any]:
+    """`{gradient: {kind: conic}}` or `{noise: {scale: 4, seed: 2}}` as a SPEC-0012 node."""
+
+    (name, params), = spec.items()
+    return {"op": GENERATORS[name], **(params or {})}
+
+
+def generated_problem(spec: Any) -> str | None:
+    """Why a generated matte cannot be drawn, or None; checked when the scene loads, as a graph is."""
+
+    from .compositing.schema import validate
+
+    if not isinstance(spec, dict) or len(spec) != 1 or next(iter(spec)) not in GENERATORS:
+        return f"is one of {{{' | '.join(f'{name}: {{...}}' for name in GENERATORS)}}}"
+    params = next(iter(spec.values()))
+    if params is not None and not isinstance(params, dict):
+        return "gives its generator's parameters as a mapping"
+    graph = {"ports": {}, "nodes": {"m": generated_node(spec), "out": {"op": "merge.over", "front": "m", "back": "m"}},
+             "output": "out"}
+    problems = validate(graph)
+    return problems[0][1] if problems else None
+
+
+def generated_recipe(spec: dict[str, Any], softness: float = 0.0) -> dict[str, Any]:
+    """The still-matte join whose matte is drawn by a generator, a node of the same graph: no file between."""
+
+    graph = recipe(False, softness)
+    nodes = {"matte_clip": generated_node(spec), **graph["nodes"]}
+    # A file's grey is read as it is shown (signal.luma); a generator's values are the order itself.
+    nodes["order"] = {"op": "signal.luminance", "picture": "matte_clip"}
+    return {"ports": {k: v for k, v in graph["ports"].items() if k != "matte_clip"}, "nodes": nodes,
+            "output": graph["output"]}
+
+
 def overlay_recipe(blend: str = "normal") -> dict[str, Any]:
     """An overlay with alpha laid over a joined picture, as a graph: over, or a screen or add blend."""
 

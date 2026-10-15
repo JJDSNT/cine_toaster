@@ -208,7 +208,7 @@ in the 1080-line cut. A shape's `feather` is a fraction of the frame.
 | Op | In | Out | Parameters |
 |---|---|---|---|
 | `generate.source` | -- | picture (+ sound, meta) | a take, a file or a stretch; its colour space and alpha (§2) |
-| `generate.solid` / `gradient` / `noise` | -- | picture | colour(s), kind, seed |
+| `generate.solid` / `gradient` / `noise` | -- | picture | colour(s), kind, seed. A gradient's `kind`: `linear` (along `angle`), `radial` (the frame's own shape), `circle` (round whatever the frame), `diamond` (by \|x\| + \|y\|), `conic` (the angle clockwise from twelve o'clock, round); the distance kinds reach 1 at the corners -- so a gradient made a matte and thresholded by a join's progress is an iris, a diamond or a clock wipe (CT-0076) |
 | `generate.text` | -- | picture | text, font, size, colour, `reveal` (curve: letters shown, for typewriter-like titles) |
 | `generate.render` | -- | picture (+ signals) | a renderer's own scene (Blender, a VFX recipe), its parameters, `seed`; it may also give depth or other passes |
 
@@ -546,6 +546,18 @@ gl-transitions shaders stay **opaque** nodes in the meantime.
 
 **The rest of gl-transitions** (117 shaders): opaque `opaque.gl` nodes with
 ports `from`, `to`, `progress`; portable only where a sheet re-expresses one.
+
+**Done in C5** (CT-0076): `cross-dissolve`, `dip-to-black`, `blur-dissolve`,
+`iris-open`, `clock-wipe`, `diamond-wipe`, `luma`, `displacement` and
+`switcher-flip` are recipes in the catalog, as above (the DVE flip as two
+`warp.transform` folds over black). A recipe that replaces an upstream shader
+keeps its name in `upstream`, so the raw shader is not listed beside it, and
+reads none of it. A reviewed item that stays a shader says why
+(`opaque_reason`): `pixelate` (no mosaic primitive yet) and `film-burn` (a
+procedural look of its own). A join's matte may be a generator --
+`{gradient: {...}}` or `{noise: {...}}` -- drawn as a node of the matte
+join's graph and read as its values are (`signal.luminance`), where a
+file's grey is read as it is shown (`signal.luma`).
 
 **VFX, FFmpeg forms**:
 - `film-grain`: `filter.noise(picture)`.

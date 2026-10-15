@@ -113,7 +113,7 @@ class MatteJoinTests(unittest.TestCase):
         self.assertGreater(self.pixel(out, 3.0, 4, 4)[0], 200)
 
     @unittest.skipIf(gl_unavailable_reason(), "no GL context here")
-    def test_the_shader_and_the_matte_renderer_give_the_same_luma_join(self) -> None:
+    def test_the_luma_join_is_the_same_with_and_without_gl(self) -> None:
         shader, stand_in = self.luma_by(None), self.luma_by("no GL in this test")
         for x, y in ((80, 45), (40, 20), (4, 4), (150, 80)):
             a, b = self.pixel(shader, 3.0, x, y), self.pixel(stand_in, 3.0, x, y)
@@ -122,8 +122,9 @@ class MatteJoinTests(unittest.TestCase):
     @unittest.skipIf(gl_unavailable_reason(), "no GL context here")
     def test_luma_reads_its_texture(self) -> None:
         item = next(item for item in list_transitions() if item["id"] == "luma")
-        plan, out = self.cut({"id": "luma", "seconds": 2.0, "shader": str(item["asset_path"]), "params": [],
-                              "textures": {"luma": str(item["inputs"]["luma"])}})
+        # A recipe since CT-0076: its graph reads the texture the item ships, as a port.
+        plan, out = self.cut({"id": "luma", "seconds": 2.0, "graph": item["graph"],
+                              "inputs": {"luma": str(item["inputs"]["luma"])}})
         centre, corner = self.pixel(out, 3.0, 80), self.pixel(out, 3.0, 4, 4)
         self.assertGreater(centre[2], 200)  # the radial order changes the centre first
         self.assertGreater(corner[0], 200)

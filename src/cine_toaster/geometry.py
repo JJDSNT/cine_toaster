@@ -72,6 +72,7 @@ CHECK_CODES = frozenset(
         "subjects_overlap",
         "transition_reason_missing",
         "transition_input_missing",
+        "transition_matte_invalid",
         "transition_input_outside",
         "transition_unknown",
         "unknown_camera",

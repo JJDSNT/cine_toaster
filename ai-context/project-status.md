@@ -66,7 +66,10 @@ and despill exist in both renderers, blends respect transparency, and the
 ADO move, a replaced window and a keyed person are made on real footage.
 The review of FilmCraft and EffectCraft is in `references.md` and the
 roadmap (OTIO export to do; EffectCraft as an opaque renderer and an integer
-time base to study). Next: C5, transitions as recipes, or C6.
+time base to study). C5 (CT-0076) is done: the transition catalog is recipes of primitives,
+filed by family, every one drawn by GL; two shaders stay with their reasons.
+Next: C6, the catalogs (effects, titles, looks) re-expressed on the
+primitives.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional

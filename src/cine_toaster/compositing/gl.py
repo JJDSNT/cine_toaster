@@ -33,7 +33,7 @@ IMPLEMENTED = {
     "signal.luminance", "signal.luma", "signal.channel",
     "matte.from_signal", "matte.threshold", "matte.combine", "matte.key",
     "merge.over", "merge.mix", "merge.blend", "merge.porter_duff",
-    "warp.transform", "warp.corner_pin", "warp.surface",
+    "warp.transform", "warp.corner_pin", "warp.surface", "warp.displace",
     "matte.shape",
     "colour.grade", "colour.invert", "colour.despill",
     "filter.blur", "filter.morphology",
@@ -89,10 +89,13 @@ vec3 encode(vec3 c) { return vec3(encode1(c.r), encode1(c.g), encode1(c.b)); }
 
 _SHADERS = {
     "solid": "uniform vec4 colour; void main() { result = colour; }",
-    "gradient": """uniform vec4 c0; uniform vec4 c1; uniform int radial; uniform float angle; uniform vec2 size;
+    "gradient": """uniform vec4 c0; uniform vec4 c1; uniform int radial; uniform float angle; uniform float aspect;
         void main() {
-          vec2 p = uv; float x;
-          if (radial == 1) x = length(p - 0.5) / length(vec2(0.5));
+          vec2 p = uv; vec2 d = p - 0.5; float x;
+          if (radial == 1) x = length(d) / length(vec2(0.5));
+          else if (radial == 2) x = length(vec2(d.x * aspect, d.y)) / length(vec2(0.5 * aspect, 0.5));
+          else if (radial == 3) x = abs(d.x) + abs(d.y);
+          else if (radial == 4) x = mod(atan(d.x * aspect, -d.y) / 6.283185307 - angle / 6.283185307, 1.0);
           else x = (p.x - 0.5) * cos(angle) + (p.y - 0.5) * sin(angle) + 0.5;
           x = clamp(x, 0.0, 1.0); vec4 c = mix(c0, c1, x); result = vec4(c.rgb * c.a, c.a);
         }""",
@@ -171,6 +174,18 @@ _SHADERS = {
     "invert": """uniform sampler2D a; uniform int is_matte;
         void main() { vec4 p = texture(a, uv);
           result = is_matte == 1 ? vec4(1.0 - p.r, 0.0, 0.0, 1.0) : vec4(p.a - p.rgb, p.a); }""",
+    "displace": """uniform sampler2D a; uniform sampler2D field; uniform int vectors; uniform vec2 direction;
+        uniform float strength; uniform int edge; uniform vec2 picture;
+        void main() { vec4 f = texture(field, uv); vec2 shift;
+          if (vectors == 1) shift = f.rg * strength / picture;  // pixels, as the reference reads two channels
+          else shift = (f.r - 0.5) * direction * strength;
+          vec2 s = uv - shift;
+          if (edge == 1) s = clamp(s, 0.5 / picture, 1.0 - 0.5 / picture);
+          else if (edge == 2) { vec2 c = (s * picture - 0.5) / (picture - 1.0);
+                                c = 1.0 - abs(mod(c, 2.0) - 1.0); s = (c * (picture - 1.0) + 0.5) / picture; }
+          vec4 v = texture(a, s);
+          if (edge == 0) { vec2 inside = step(-0.5 / picture, s) * step(s, 1.0 + 0.5 / picture); v *= inside.x * inside.y; }
+          result = v; }""",
     "morphology": """uniform sampler2D a; uniform vec2 texel; uniform int reach; uniform int grow;
         void main() { float m = grow == 1 ? 0.0 : 1.0;
           for (int y = -reach; y <= reach; y++) for (int x = -reach; x <= reach; x++) {
@@ -366,8 +381,10 @@ class GLRenderer:
             return self.draw("solid", size, 4, {}, colour=tuple(float(c) * alpha for c in colour[:3]) + (alpha,))
         if op == "generate.gradient":
             colours = np.asarray(p("colours", [[0, 0, 0, 1], [1, 1, 1, 1]]), np.float32)
+            kinds = ("linear", "radial", "circle", "diamond", "conic")
             return self.draw("gradient", size, 4, {}, c0=tuple(colours[0]), c1=tuple(colours[-1]),
-                             radial=int(p("kind", "linear") == "radial"), angle=float(np.radians(p("angle", 0.0))))
+                             radial=kinds.index(p("kind", "linear")), angle=float(np.radians(p("angle", 0.0))),
+                             aspect=width / height)
         if op in ("signal.luminance", "signal.luma"):
             weights = tuple(float(w) for w in (node.get("weights") or REC709))
             return self.draw("luminance", size, 1, {"a": value(node["picture"])}, weights=weights,
@@ -481,6 +498,14 @@ class GLRenderer:
                     self.shapes.clear()
                 self.shapes[key] = _shape(node, size, scale)
             return self.upload(self.shapes[key])
+        if op == "warp.displace":
+            source, field = value(node["in"]), value(node["map"])
+            direction = tuple(float(c) for c in np.broadcast_to(np.asarray(p("direction") if p("direction") is not None
+                                                                         else [1.0, 0.0], np.float32), (2,)))
+            return self.draw("displace", size, source.components, {"a": source, "field": field},
+                             vectors=int(field.components >= 2), direction=direction,
+                             strength=float(p("strength", 0.1)), picture=(float(width), float(height)),
+                             edge=("transparent", "extend", "mirror").index(str(node.get("edge", "transparent"))))
         if op == "filter.morphology":
             source = value(node["in"])
             reach = max(0, int(round(pixels(p("radius", 1.0), height))))

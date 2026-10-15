@@ -196,7 +196,10 @@ def _load_manifest(path: Path, origin: str) -> dict[str, Any]:
         raise TransitionFormatError(f"Invalid TOML in {path}: {error}") from error
 
     upstream = str(document.get("upstream", ""))
-    # A curated manifest over an upstream shader inherits its licence and author.
+    # A curated manifest over an upstream shader inherits its licence and author. A recipe that replaces one
+    # (CT-0076) keeps the name, so the raw shader is not listed beside it, but is its own work: no shader is read.
+    replaces = upstream if document.get("kind") == "graph" else ""
+    upstream = "" if replaces else upstream
     required = ("id", "name", "kind", "description") + (() if upstream else ("license",))
     missing = [key for key in required if not document.get(key)]
     if missing:
@@ -252,8 +255,10 @@ def _load_manifest(path: Path, origin: str) -> dict[str, Any]:
         "softness": softness,
         # A recipe of SPEC-0012 primitives (ADR 0022), checked when the catalog loads.
         "graph": _recipe(document.get("graph"), path),
+        # Why a reviewed shader stays a closed program and is not a recipe of primitives (CT-0076).
+        "opaque_reason": str(document.get("opaque_reason", "")),
         "curated": True,
-        "upstream": upstream or None,
+        "upstream": (upstream or replaces) or None,
         "origin": origin,
         "asset": asset_name,
         "preview": preview_name or None,
@@ -340,6 +345,11 @@ def _sample_pictures(size: tuple[int, int]) -> dict[str, Any]:
     u, v = x / max(width - 1, 1), y / max(height - 1, 1)
     warm = np.dstack([0.9 - 0.4 * v, 0.35 + 0.3 * u, 0.12 + 0.1 * v, np.ones_like(u)])
     cool = np.dstack([0.08 + 0.1 * u, 0.25 + 0.3 * v, 0.75 - 0.3 * u, np.ones_like(u)])
+    # Detail a blur or a warp can be seen on: thin lines on one, rings on the other.
+    lines = (np.abs(np.mod(x, 40) - 20) < 2) | (np.abs(np.mod(y, 40) - 20) < 2)
+    rings = np.abs(np.mod(np.hypot(x - width / 2, y - height / 2), 36) - 18) < 3
+    warm[lines, :3] *= 0.35
+    cool[rings, :3] = cool[rings, :3] * 0.4 + 0.5
     matte = np.ones_like(u)
     for cx, cy, r, shade in ((0.31, 0.47, 0.55, 0.0), (0.73, 0.33, 0.4, 0.27), (0.66, 0.83, 0.45, 0.47),
                              (0.14, 0.17, 0.32, 0.67)):
@@ -373,6 +383,9 @@ def render_preview(transition: dict[str, Any], destination: Path, *, seconds: fl
         raise TransitionFormatError(f"{transition['id']} has no graph to preview")
     frames = max(1, round(seconds * fps))
     inputs = {name: value for name, value in _sample_pictures(size).items() if name in graph["ports"]}
+    for name, path in (transition.get("inputs") or {}).items():  # the recipe's own pictures: a luma, a map
+        if name in graph["ports"]:
+            inputs[name] = reference.read(Path(path), frames, size, fps)
     pictures, _, _ = reference.render(graph, inputs, frames=frames, size=size, fps=fps, cache=False,
                                       renderer=renderer_for(graph))
     with tempfile.TemporaryDirectory() as work:

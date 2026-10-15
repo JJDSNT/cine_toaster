@@ -22,26 +22,27 @@ class TransitionTests(unittest.TestCase):
 
         self.assertIn("cross-dissolve", by_id)
         self.assertIn("analog-scan", by_id)
-        self.assertEqual(by_id["cross-dissolve"]["kind"], "glsl")
+        self.assertEqual(by_id["film-burn"]["kind"], "glsl")
+        self.assertEqual(by_id["cross-dissolve"]["kind"], "graph")  # a recipe since CT-0076
         self.assertEqual(by_id["analog-scan"]["kind"], "webm")
         self.assertTrue(by_id["analog-scan"]["asset_path"].is_file())
 
     def test_exposes_only_declared_assets(self) -> None:
         transition = next(
-            item for item in list_transitions() if item["id"] == "cross-dissolve"
+            item for item in list_transitions() if item["id"] == "film-burn"
         )
         public = public_transition(transition)
 
         self.assertNotIn("asset_path", public)
         self.assertEqual(
             public["asset_url"],
-            "/transition-assets/cross-dissolve/transition.glsl",
+            f"/transition-assets/film-burn/{transition['asset']}",
         )
         self.assertIsNotNone(
-            transition_asset_path("cross-dissolve", "transition.glsl")
+            transition_asset_path("film-burn", transition["asset"])
         )
         self.assertIsNone(
-            transition_asset_path("cross-dissolve", "transition.toml")
+            transition_asset_path("film-burn", "transition.toml")
         )
 
     def test_loads_a_production_owned_transition_from_the_amiga_demo(self) -> None:

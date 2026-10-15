@@ -1,15 +1,16 @@
 schema_version = 1
 id = "clock-wipe"
 name = "Clock Wipe"
-kind = "glsl"
-# The shader is gl-transitions' own; this manifest adds the review.
+kind = "graph"
+# Replaces gl-transitions' shader of this name; the recipe below is Cine Toaster's own (CT-0076).
 upstream = "gl-transitions:Radial"
-category = "graphic"
+category = "wipe/geometric"
 description = "The incoming shot sweeps in around the centre like a clock hand."
 guidance = "Time made visible. It works where the story counts time: a deadline, a routine, a montage of hours. Anywhere else it is decoration."
 energy = "medium"
 motion = "rotational"
 duration_ms = 1000
+preview = "preview.webm"  # drawn from the graph by transitions.render_preview
 tags = ["wipe", "time", "graphic", "montage"]
 use_when = [
   "The story is about time running",
@@ -19,9 +20,23 @@ avoid_when = [
   "An emotional scene: the device distracts",
 ]
 
+license = "CC0-1.0"
+author = "Cine Toaster contributors"
+
 # How this item renders on each engine that can execute it. Declared by whoever
 # wrote the item, never inferred by the renderer: a substitution nobody chose
 # is a substitution nobody can argue with.
 [render]
-ffmpeg = "radial"
-ffmpeg_note = "xfade's radial is the same clock sweep."
+ffmpeg = "graph"
+ffmpeg_note = "Drawn from its graph by GL, or by the reference where GL cannot run: no stand-in is needed (CT-0076)."
+
+[graph]
+ports = {from = "picture", to = "picture", progress = "curve"}
+output = "out"
+
+[graph.nodes]
+field = {op = "generate.gradient", kind = "conic"}
+order = {op = "signal.luminance", picture = "field"}
+shape = {op = "matte.from_signal", signal = "order"}
+reveal = {op = "matte.threshold", matte = "shape", progress = "progress", softness = 0.004}
+out = {op = "merge.over", front = "to", back = "from", matte = "reveal"}

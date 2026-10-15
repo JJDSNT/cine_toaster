@@ -44,6 +44,8 @@ is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
 CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
 
+- `CT-0076` — C5: the transition catalog as recipes -- nine shaders
+  re-expressed, filed by family, all on GL, generated mattes (`done`)
 - `CT-0075` — C4: layers compiled into the graph, colour (difference) and
   difference keys, despill, W3C blends, one rotation and camera for the
   warps; the ADO move, a window and a keyed person on real footage (`done`)

@@ -213,11 +213,15 @@ window replaced (SC-040 v1) and a person keyed (SC-050 v1).
   in a space with a virtual camera, parallax and occlusion without a Blender
   scene. Not built here; not precluded.
 
-### C5. Transitions as recipes, and the warp wipe
+### ~~C5. Transitions as recipes, and the warp wipe~~
 
-Started early, inside C2 (`CT-0071`): transitions of kind `graph`, the
-`warp.surface` primitive and three warp wipes (`warp-ball`, `warp-roll`,
-`page-turn`) drawn by the reference; GL and the preview's own drawing remain.
+Done (`CT-0076`): the catalog filed by family (dissolve, wipe/geometric,
+wipe/luma, wipe/custom, warp, warp-wipe, move, stylised); nine reviewed
+shaders re-expressed as recipes, their FFmpeg stand-ins gone; every recipe
+drawn by GL, checked against the reference item by item; previews drawn from
+the graphs; gradients `circle`, `diamond`, `conic` and `warp.displace` on GL;
+mattes generated on the join; a shader's texture read frame by frame. Left
+as shaders, with their reasons: `pixelate`, `film-burn`.
 
 - What: the transition catalog filed by family (dissolve, wipe -- geometric,
   luma, custom --, warp, warp wipe, move); the **warp wipe** the user asked
@@ -384,6 +388,14 @@ prescribed here.
   ...}` would put a subgraph there, its output into the same chain -- no
   other change. Built when a shot needs it, not in C4.
 - ~~Spill suppression~~: done in CT-0075 (`colour.despill`).
+- **`filter.mosaic`** (block size as a curve), so `pixelate` becomes a recipe
+  and its FFmpeg stand-in goes (CT-0076).
+- A **sheet for `film-burn`** re-expressing its look with generate.noise,
+  colour and merge, or keeping it as a shader for good (CT-0076).
+- **Generated mattes from a VFX recipe** (a Blender element as the join's
+  matte, rendered once and kept by identity): SPEC-0011's `{effect: ...}`;
+  with C6, when the VFX catalog becomes layer sources (CT-0076 built the
+  gradient and noise forms).
 - A **screen-correction plate** for colour keys on unevenly lit screens (as
   dedicated keyers have): the key's excess measured against the plate's, pixel
   by pixel, instead of one screen colour.

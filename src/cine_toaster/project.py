@@ -348,7 +348,9 @@ def _transition(raw: dict[str, Any]) -> dict[str, Any] | None:
         reference["beats"] = value.get("beats")
     # Pictures the join gives the transition, over the item's own (SPEC-0011).
     for key in ("matte", "overlay", "blend"):
-        if value.get(key):
+        if key == "matte" and isinstance(value.get(key), dict):
+            reference[key] = dict(value[key])  # a generated matte (CT-0076): {gradient: {...}} or {noise: {...}}
+        elif value.get(key):
             reference[key] = _text(value.get(key))
     if value.get("softness") is not None:
         reference["softness"] = value.get("softness")
@@ -1044,6 +1046,15 @@ def _check_transitions(
         for key in ("matte", "overlay"):
             name = reference.get(key)
             if not name:
+                continue
+            if isinstance(name, dict):
+                from .mattes import generated_problem
+
+                problem = generated_problem(name)
+                if problem:
+                    findings.append(Finding(code="transition_matte_invalid", severity="error", scene_id=scene_id,
+                                            shots=(shot["id"],),
+                                            message=f"{shot['id']}: its transition's generated matte {problem}."))
                 continue
             path = (scene_root / name).resolve()
             if not path.is_relative_to(scene_root):

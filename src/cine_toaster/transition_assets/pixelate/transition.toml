@@ -4,12 +4,13 @@ name = "Pixelate"
 kind = "glsl"
 # The shader is gl-transitions' own; this manifest adds the review.
 upstream = "gl-transitions:pixelize"
-category = "digital"
+category = "stylised"
 description = "The outgoing shot breaks into growing blocks that resolve into the incoming shot."
 guidance = "A digital fault: screens, games, surveillance, a system glitching. It belongs to the world of the film, not to the edit, so motivate it with something on screen."
 energy = "high"
 motion = "neutral"
 duration_ms = 800
+opaque_reason = "No primitive draws a mosaic yet; a `filter.mosaic` (block size as a curve) would make it a recipe -- recorded in the compositing roadmap."
 tags = ["digital", "glitch", "screen", "retro"]
 use_when = [
   "The story crosses into or out of a screen",
