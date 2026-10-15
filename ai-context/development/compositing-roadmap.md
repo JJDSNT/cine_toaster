@@ -371,7 +371,9 @@ metric from relative depth by camera, but not geometric from estimated once
 aligned; `signal.read` reads one frame; no adapter runs a model or renders
 Blender into the graph; alignment flickers per frame; depth merges per pixel;
 nothing on GL; nothing exposed. A sequence from it. The C6b review stays in
-the backlog (the user, 2026-10-15).
+the backlog (the user, 2026-10-15). Step 1 done: signals as production records
+(`signals/<id>`, ADR 0024) -- kind, origin and transformations apart,
+provenance, quality, invalidation, corrections, time.
 
 - What: depth and segmentation as signals, from a model run on a picture
   (depth estimation, a segment-anything model) or from Blender passes (Z,

@@ -1178,6 +1178,43 @@ def curve_factory(nodes: dict[str, Any], curves: dict[str, Callable[[float], Any
     return curve
 
 
+def read_signal(name: str, node: dict[str, Any], book: "TrackBook", frame: int, fps: float, width: int,
+                height: int, root: Path | None, held: dict[str, Any]) -> np.ndarray:
+    """A production signal at this frame -- one reading for every renderer: its record checked against what the
+    node says (kind, camera), the frame at the media instant its source (`of`) shows, else the graph's own frame;
+    resized to the picture -- smoothly for values, to the nearest for labels (CT-0081)."""
+
+    from ..signals import SignalReader
+
+    key = f"signal:{name}"
+    if key not in held:
+        if root is None:
+            raise ValidationError(f"{name} reads the production's signal {node['signal']!r}: give the graph its "
+                                  "production")
+        reader = SignalReader(root, str(node["signal"]))
+        record = reader.record
+        if node.get("kind") and node["kind"] != record["kind"]:
+            raise ValidationError(f"{name} reads {node['signal']} as {node['kind']}, but it is a {record['kind']}")
+        if node.get("camera") and node["camera"] != record.get("camera"):
+            raise ValidationError(f"{name} reads {node['signal']} as from the camera {node['camera']!r}, but it is "
+                                  f"from {record.get('camera')!r}")
+        held[key] = reader
+    reader = held[key]
+    seconds = (frame + 0.5) / fps
+    if node.get("of"):
+        data = reader.at(book.media_instant(str(node["of"]).split(".")[0], name, seconds, f"the signal {node['signal']}"))
+    else:
+        data = reader.frame(frame)
+    if data.shape[:2] != (height, width):
+        if reader.record["kind"] == "segmentation":
+            rows = (np.arange(height) * data.shape[0] // height)[:, None]
+            cols = (np.arange(width) * data.shape[1] // width)[None, :]
+            data = data[rows, cols]
+        else:
+            data = Image_resize(data.astype(np.float32), width, height)
+    return data.astype(np.int64 if reader.record["kind"] == "segmentation" else np.float32)
+
+
 class TrackBook:
     """The tracks of a graph, read the one way every renderer reads them (C7, CT-0080): a track's data -- given,
     read from a file, a production's record (validated and corrected by `tracks.load_track`), or measured on
@@ -1226,28 +1263,37 @@ class TrackBook:
         track = self.track(reference)
         entries = track["frames"]
         of, spec = self.described(reference), track.get("clock")
-        fps, nodes, curve = self.fps, self.nodes, self.curve
-        frame = int(round(seconds * fps - 0.5))
+        frame = int(round(seconds * self.fps - 0.5))
         if not spec or not of or consumer is None:
             return entries[min(max(0, frame), len(entries) - 1)]
+        media = self.media_instant(of, consumer, seconds, f"the track {reference}")
+        position = media - from_record(spec["origin"])
+        index = remap_samples(position, exact_rate(spec["rate"]), "nearest")[0][0]
+        return entries[min(index, len(entries) - 1)]
+
+    def media_instant(self, of: str, consumer: str, seconds: float, what: str) -> Any:
+        """The instant of `of`'s media shown when `consumer` is evaluated at `seconds`: the walk through every
+        time operation between them (`clock`), plus `of`'s origin -- where a track or a signal of that source
+        is read (C7, C8)."""
+
+        from . import clock
+
+        nodes, curve, fps = self.nodes, self.curve, self.fps
         if of not in nodes and of not in self.ports:
-            raise ValidationError(f"The track {reference} describes {of!r}, which is no node or port")
-        here = clock.centre(frame, fps)
+            raise ValidationError(f"{what} describes {of!r}, which is no node or port")
+        here = clock.centre(int(round(seconds * fps - 0.5)), fps)
         local = clock.instant(nodes, curve, fps, consumer, of, here)
         if local is None:
             # Not upstream of its reader (a window pinned on a plate it is laid over): the instant the output
             # shows the source at -- when the reader itself is on the output's time.
             output = str(self.graph["output"]).split(".")[0]
             if output != consumer and clock.instants(nodes, curve, fps, output, consumer, here) not in ([], [here]):
-                raise ValidationError(f"{consumer} reads the track {reference} under a time operation that does "
-                                      f"not reach {of}: which instant of {of} it describes is ambiguous")
+                raise ValidationError(f"{consumer} reads {what} under a time operation that does not reach {of}: "
+                                      f"which instant of {of} it describes is ambiguous")
             local = clock.instant(nodes, curve, fps, output, of, here)
             if local is None:
-                raise ValidationError(f"The track {reference} describes {of}, which the graph never shows")
-        media = clock.media(local, self.origin_of(of))
-        position = media - from_record(spec["origin"])
-        index = remap_samples(position, exact_rate(spec["rate"]), "nearest")[0][0]
-        return entries[min(index, len(entries) - 1)]
+                raise ValidationError(f"{what} describes {of}, which the graph never shows")
+        return clock.media(local, self.origin_of(of))
 
     def track(self, reference: str) -> dict[str, Any]:
         """A track as data (SPEC-0012 §1): {kind, frames: [{points} or {corners}], clock}."""
@@ -1697,6 +1743,9 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             return np.stack([grey, grey, grey, np.ones_like(grey)], axis=-1)
         if op == "generate.text":
             return text_picture(node, param, width, height, root, seconds)
+        if op == "signal.read" and node.get("signal"):
+            # A production's signal (C8 step 1): checked once, read at the instant its source shows.
+            return read_signal(name, node, book, frame, fps, width, height, root, clips)
         if op == "signal.read":
             path = Path(node["file"])
             path = (root / path) if root and not path.is_absolute() else path

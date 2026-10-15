@@ -68,7 +68,7 @@ OPS: dict[str, Op] = {
     "signal.luma": Op({"picture": P(*PIC)}, {"out": "signal"}, {"transfer": "text", "weights": "vector"}, kind="luma"),
     "signal.channel": Op({"picture": P(*PIC)}, {"out": "signal"},
                          {"channel": "enum:red|green|blue|alpha|hue|saturation"}, kind="@channel"),
-    "signal.read": Op({}, {"out": "signal"}, {"file": "file", "kind": "enum:" + "|".join(SIGNAL_KINDS),
+    "signal.read": Op({}, {"out": "signal"}, {"file": "file", "signal": "text", "of": "text", "kind": "enum:" + "|".join(SIGNAL_KINDS),
                                               "range": "vector", "camera": "text"}, kind="@kind"),
     "signal.estimate": Op({"picture": P(*PIC)}, {"out": "signal"},
                           {"kind": "enum:depth_relative|vectors|normals|segmentation", "model": "text", "seed": "int"},
@@ -187,7 +187,7 @@ KEY_NEEDS = {"luminance": ("low", "high"), "luma": ("low", "high"), "colour": ("
 
 #: Parameters an op cannot run without; "a|b" means one of them (SPEC-0012 §9, composite_param_missing).
 REQUIRED_PARAMS: dict[str, tuple[str, ...]] = {
-    "signal.channel": ("channel",), "signal.read": ("file", "kind"), "signal.estimate": ("kind", "model"),
+    "signal.channel": ("channel",), "signal.read": ("file|signal", "kind"), "signal.estimate": ("kind", "model"),
     "matte.shape": ("shape",), "matte.combine": ("how",), "matte.label": ("labels",),
     "merge.porter_duff": ("how",), "merge.blend": ("mode",),
     "warp.procedural": ("kind",), "warp.surface": ("shape",), "warp.corner_pin": ("corners|track",),

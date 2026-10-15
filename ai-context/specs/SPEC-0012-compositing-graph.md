@@ -46,7 +46,11 @@ Signal kinds: `luminance`, `luma`, `alpha`, `red`, `green`, `blue`, `hue`,
 near is small), `depth_relative` (from a monocular model: unknown scale and
 shift, possibly inverse -- not comparable with anything until aligned), `vectors` (two channels, pixels per frame),
 `normals` (three), `segmentation` (an integer label per pixel, with a table of
-labels). Two depths are comparable only if both are `depth` from the same
+labels). A recorded signal also says its **origin** -- `geometric` (a
+renderer's or surface's geometry), `estimated` (a model's), `authored` (a
+person's) -- which a transformation (an alignment) never changes, and its
+provenance, quality, clock, resolution, camera and depth conventions (ADR
+0024). Two depths are comparable only if both are `depth` from the same
 camera; `signal.align_depth` turns a `depth_relative` into a `depth` by fitting
 its scale and shift to a reference (or by values a person gives). A signal
 declares its range; a `matte` is made from a signal by an
@@ -106,7 +110,7 @@ the NumPy reference first (§7).
 | `signal.luminance` | picture | signal | `weights` (3 numbers) or `transform` |
 | `signal.luma` | picture | signal | `transfer` (default sRGB), `weights` |
 | `signal.channel` | picture | signal | `channel`: red, green, blue, alpha, hue, saturation |
-| `signal.read` | -- | signal | `file`, `kind` (depth, vectors, normals, segmentation), `range` |
+| `signal.read` | -- | signal | `file`, `kind` (depth, vectors, normals, segmentation), `range`; or a production's **signal record** by id (`signal`, C8, ADR 0024): checked once (refused when stale), read at the instant its source `of` shows (else the graph's frame), refused when its kind or camera differs from the node's; resized smoothly, labels to the nearest |
 | `signal.estimate` | picture | signal | `kind` (depth_relative, vectors, normals, segmentation), `model`, `seed`; not deterministic unless the model says so |
 | `signal.align_depth` | `depth_relative` signal, optional `depth` reference, optional region matte | `depth` signal | `method`: scale_shift (fitted to the reference over the region) or manual (`scale`, `shift`); `inverse` |
 

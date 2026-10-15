@@ -50,6 +50,11 @@ project/
   scenes/<scene>/scene.yaml       authored: direction, geography, shots
   scenes/<scene>/state.json       runtime-owned: selections, decisions, versions
   scenes/<scene>/work/            the takes, as files
+  signals/<id>/                   runtime-owned (C8, CT-0081; ADR 0024): a signal of a medium -- signal.yaml
+                                  (kind, origin, clock, size, camera, depth conventions, labels, data in use),
+                                  provenance.json (the chain: makers, inputs by hash, transformations),
+                                  quality.json (declared apart from measured), data/NNNN/ (frames, never
+                                  edited), corrections/ (a person's, apart)
   tracks/<id>/                    runtime-owned (C7, CT-0080): a track of a medium -- track.yaml (identity,
                                   media and its hash, the measurement in use), measurements/NNNN.json (each
                                   automatic measurement, never edited), corrections.json (a person's, apart)

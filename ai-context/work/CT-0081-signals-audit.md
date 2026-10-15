@@ -144,6 +144,37 @@ halo beyond a set width; GL equals the reference.
    picture, ordered by depth -- plus the films the user asked for, real
    material with AI signals and 3D.
 
+## Step 1 -- the signal record and its contract (done 2026-10-15)
+
+The user's refinements, all taken: type, origin and transformation kept
+apart (an alignment is a step of provenance, not an origin); the chain of
+provenance rebuildable; explicit invalidation (media, files, parents,
+transitively), corrections apart; time and coordinates in the contract
+(clock, resolution, camera, unit, quantity, direction); quality declared or
+measured, never invented; a signal a resource of the production. ADR 0024.
+
+- `signals.py`: `record_signal` (the one command every maker will call:
+  kind, origin -- or inherited from `derived_from` with a `transformation`
+  -- medium, clock, camera, depth conventions, labels, maker, inputs pinned
+  by hash or revision, declared and measured quality), `correct_signal`,
+  `revert_signal_corrections`, `status` (stale reasons, quality or
+  `unknown`, transformations), `SignalReader` (checked once; frames with
+  corrections; `at` a media instant by the signal's clock). Frames as float
+  EXR (OpenEXR) or .npy; labels as .npy integers.
+- The contract checked at recording (`contract_problems`): a metric depth
+  names its camera and unit; a relative depth has no unit; every depth says
+  its quantity (distance, z, inverse); a segmentation carries its labels;
+  frames are the kind's shape and one size.
+- The graph: `signal.read` takes `signal` (and `of`); the walk to a medium's
+  instant is now `TrackBook.media_instant`, shared by tracks and signals;
+  `read_signal` is one reading for every renderer.
+
+Limitations, recorded with how: signals are not yet on GL (`signal.read`
+off GL sends a graph to the reference -- step 6); a correction replaces
+values where a mask says, not a soft blend (a feathered patch when a use
+needs it); a maker's own version check (is the model installed still the
+one that made it?) belongs to its adapter (steps 2-3).
+
 # Done
 
 - Read SPEC-0012's signal types and ops, the schema's kind and camera
@@ -151,6 +182,24 @@ halo beyond a set width; GL equals the reference.
   Blender's scripts, the environments for models, and the licences.
 
 # Validation
+
+- Step 1 (`tests/test_signals.py`): depth, vectors and labels come back as
+  recorded; the contract refuses a depth without camera, unit or quantity,
+  a relative depth with a unit, labels without a table, unknown kinds or
+  origins, frames of two sizes; an aligned estimate stays estimated, its
+  history rebuildable (the model, the alignment, its reference pinned), and
+  cannot be promoted to geometric, nor derived without saying how; quality
+  is `unknown` when nothing was given, declared kept apart from measured;
+  recording emits an event; a changed input file makes a signal stale and
+  refused; staleness runs down the chain (a reference recorded again with
+  other values; the medium under everything), identical values change
+  nothing; data changed behind its commands is seen; corrections apply
+  apart and revert, the data untouched; in the graph a signal is read frame
+  by frame and at the instant its medium shows (cut later, retimed 2x); a
+  node declaring another kind or camera is refused; a relative depth cannot
+  reach `merge.depth`; labels are resized to the nearest; one signal serves
+  two readers.
+- Full suite after step 1: 934 tests pass.
 
 - Nothing built; the audit's claims are from the code read above (the
   reference's `signal.read`, `signal.align_depth`, `merge.depth`; the
