@@ -61,9 +61,104 @@ def _coloured(f: Fragment, name: str, colour: list[float], seen, length: float) 
     return f.sampled(name, lambda t: [round(c, 6) for c in colour[:3]] + [round(seen(t), 6)], length)
 
 
+STYLE_KEYS = ("fill", "outline", "bevel", "cycle", "glow", "shadow")
+
+
+def style_problem(style: Any) -> str | None:
+    """Why a title's style cannot be drawn, or None (C6b, CT-0078)."""
+
+    if style is None:
+        return None
+    if not isinstance(style, dict):
+        return f"is a mapping of {', '.join(STYLE_KEYS)}"
+    unknown = set(style) - set(STYLE_KEYS)
+    if unknown:
+        return f"has no {', '.join(sorted(unknown))} (a style has {', '.join(STYLE_KEYS)})"
+    fill = style.get("fill")
+    if fill is not None and not (isinstance(fill, dict) and len(fill) == 1 and next(iter(fill)) in ("gradient", "picture")):
+        return "fills with {gradient: {colours, angle, kind}} or {picture: a file}"
+    for key in ("outline", "bevel", "glow", "shadow", "cycle"):
+        if style.get(key) is not None and not isinstance(style[key], dict):
+            return f"gives its {key} as a mapping"
+    return None
+
+
+def _alpha_matte(f: Fragment, picture: str, name: str) -> str:
+    channel = f.add(f"{name}-a", {"op": "signal.channel", "picture": picture, "channel": "alpha"})
+    return f.add(name, {"op": "matte.from_signal", "signal": channel})
+
+
+def _filled(f: Fragment, picture: str, matte: str, name: str) -> str:
+    return f.add(name, {"op": "merge.over", "front": picture, "back": f.solid("style-clear", [0.0, 0.0, 0.0, 0.0]),
+                        "matte": matte})
+
+
+def _styled(f: Fragment, letters: str, style: dict[str, Any]) -> str:
+    """A text's look as recipes of the primitives (C6b, CT-0078) -- not an effect of its own. Everything is
+    built from the letters' alpha, so it follows their animation and fades: a fill seen through them (a
+    gradient, a picture, a video), an outline beneath, a bevel lighting them, colour cycling, a glow and a
+    shadow behind."""
+
+    name = letters
+    face = letters
+    fill = style.get("fill") or {}
+    if fill:
+        kind, spec = next(iter(fill.items()))
+        if kind == "gradient":
+            colours = [_linear(colour, "#FFFFFF") + [1.0] for colour in spec.get("colours") or ["#FFFFFF", "#888888"]]
+            source = f.add(f"{name}-fill", {"op": "generate.gradient", "kind": spec.get("kind", "linear"),
+                                            "angle": float(spec.get("angle", 90.0)), "colours": colours,
+                                            **({"repeat": spec["repeat"]} if spec.get("repeat") else {})})
+            if spec.get("span", "letters") == "letters":
+                # Spread over the lines' height where the text stands, not over the frame: a chrome's bands fall
+                # across the letters themselves.
+                node = f.nodes[letters]
+                size = float(node["size"]) if isinstance(node.get("size"), (int, float)) else 60.0
+                where = node.get("position") if isinstance(node.get("position"), list) else [0.5, 0.5]
+                band = size * 1.25 * (str(node.get("text", "")).count("\n") + 1) / FRAME_LINES
+                source = f.add(f"{name}-fill-band", {"op": "warp.transform", "in": source, "scale": [1.0, band],
+                                                     "translate": [0.0, float(where[1]) - 0.5]})
+        else:
+            source = f.add(f"{name}-fill", {"op": "generate.source", "file": str(spec)})
+        face = _filled(f, source, _alpha_matte(f, letters, f"{name}-shape"), f"{name}-filled")
+    if style.get("cycle") is not None:
+        face = f.add(f"{name}-cycled", {"op": "colour.cycle", "in": face,
+                                         "speed": float(style["cycle"].get("speed", 90.0))})
+    outline = style.get("outline")
+    if outline is not None:
+        stroke = {**f.nodes[letters], "outline": float(outline.get("width", 4.0)), "hollow": False}
+        stroked = f.add(f"{name}-stroke", stroke)
+        ring = _filled(f, f.solid(f"{name}-stroke-colour", _linear(outline.get("colour"), "#101010") + [1.0]),
+                       _alpha_matte(f, stroked, f"{name}-stroke-shape"), f"{name}-ring")
+        face = f.add(f"{name}-outlined", {"op": "merge.over", "front": face, "back": ring})
+    bevel = style.get("bevel")
+    if bevel is not None:
+        face = f.add(f"{name}-bevelled", {"op": "filter.bevel", "in": face, **{k: float(v) for k, v in bevel.items()}})
+    picture = face
+    glow = style.get("glow")
+    if glow is not None:
+        halo = f.add(f"{name}-halo", {"op": "filter.blur", "in": _alpha_matte(f, face, f"{name}-glow-shape"),
+                                      "radius": float(glow.get("radius", 18.0))})
+        light = _filled(f, f.solid(f"{name}-glow-colour", _linear(glow.get("colour"), "#FFFFFF") +
+                                   [min(1.0, float(glow.get("strength", 0.8)))]), halo, f"{name}-glow")
+        picture = f.add(f"{name}-glowing", {"op": "merge.over", "front": picture, "back": light})
+    shadow = style.get("shadow")
+    if shadow is not None:
+        soft = f.add(f"{name}-shade-soft", {"op": "filter.blur", "in": _alpha_matte(f, face, f"{name}-shade-shape"),
+                                            "radius": float(shadow.get("blur", 8.0))})
+        offset = [float(v) / FRAME_LINES for v in shadow.get("offset", [4.0, 6.0])]
+        cast = f.add(f"{name}-shade-cast", {"op": "warp.transform", "in": soft, "translate": offset})
+        shade = _filled(f, f.solid(f"{name}-shade-colour", _linear(shadow.get("colour"), "#000000") +
+                                   [min(1.0, float(shadow.get("opacity", 0.6)))]), cast, f"{name}-shade")
+        picture = f.add(f"{name}-shadowed", {"op": "merge.over", "front": picture, "back": shade})
+    return picture
+
+
 def _text(f: Fragment, name: str, text: str, size: Any, colour: Any, position: Any, **more: Any) -> str:
     node = {"op": "generate.text", "text": text, "size": size, "colour": colour, "position": position, **more}
-    return f.add(name, node)
+    letters = f.add(name, node)
+    style = getattr(f, "style", None)
+    return _styled(f, letters, style) if style else letters
 
 
 def _over(f: Fragment, front: str, back: str, name: str, **more: Any) -> str:
@@ -273,6 +368,8 @@ def graph_for(title: dict[str, Any], length: float, fps: float) -> dict[str, Any
     nodes: dict[str, Any] = {}
     f = Fragment(nodes, "T", fps)
     params = {**title["params"], **(title.get("prepared") or {})}
+    # A style dresses the letters (C6b); the neon sign is a look of its own and takes none.
+    f.style = params.get("style") if title.get("effect") != "neon" else None
     if title.get("engine") == "blender":
         clip = f.add("letters", {"op": "generate.source", "file": params["_clip"], "alpha": "straight"})
         out = _over(f, clip, "picture", "titled")

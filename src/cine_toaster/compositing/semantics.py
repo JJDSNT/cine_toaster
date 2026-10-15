@@ -26,6 +26,7 @@ DEFAULTS: dict[str, dict[str, Any]] = {
     "warp.surface": {"morph": 1.0, "rotate": [0.0, 0.0, 0.0], "translate": [0.0, 0.0, 0.0], "scale": 1.0,
                      "perspective": 35.0, "light": 0.4, "detail": 48, "supersample": 2},
     "colour.despill": {"limit": "max", "amount": 1.0},
+    "filter.bevel": {"radius": 6.0, "depth": 1.0, "angle": 135.0, "elevation": 35.0, "highlight": 0.6, "shadow": 0.6},
     "colour.grade": {"lift": 0.0, "gain": 1.0, "gamma": 1.0, "saturation": 1.0},
     "filter.blur": {"radius": 0.0, "kind": "gaussian"},
     "generate.gradient": {"kind": "linear", "colours": [[0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0, 1.0]], "angle": 0.0},
@@ -116,6 +117,25 @@ def letters_problem(spec: Any) -> str | None:
     if not keys and wave is None:
         return "has neither keys nor a wave: nothing would move"
     return None
+
+
+def light_direction(angle: float, elevation: float) -> tuple[float, float, float]:
+    """Where light comes from, for a bevel: `angle` in degrees counter-clockwise from the right as the frame is
+    seen (135 is the upper left), `elevation` above the frame; in the picture's own axes (y down)."""
+
+    a, e = math.radians(float(angle)), math.radians(float(elevation))
+    return math.cos(e) * math.cos(a), -math.cos(e) * math.sin(a), math.sin(e)
+
+
+def hue_turn(degrees: float) -> list[list[float]]:
+    """The matrix that turns colours about the grey axis by `degrees`: colour cycling (colour.cycle)."""
+
+    angle = math.radians(float(degrees))
+    cos, sin = math.cos(angle), math.sin(angle)
+    k = 1.0 / math.sqrt(3.0)
+    cross = [[0.0, -k, k], [k, 0.0, -k], [-k, k, 0.0]]
+    return [[cos * (1.0 if row == col else 0.0) + sin * cross[row][col] + (1 - cos) * k * k for col in range(3)]
+            for row in range(3)]
 
 
 def threshold_spread(softness: Any) -> float:

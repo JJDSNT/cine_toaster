@@ -47,12 +47,36 @@ lacked:
   (letters fall in turning), `type-wave` (a wave along the line), `type-pop`
   (from the centre out, a Bézier overshoot).
 
+## Stage B -- styles
+
+- **Exposed, not built** (ADR 0022's rule): a title's `style` compiles into
+  the graph's own nodes, every part made from the letters' alpha so it
+  follows their animation and fades -- `fill` (a gradient or a picture, even
+  a video, seen through the letters; a gradient spread over the lines' height
+  where the text stands, unless `span: frame`), `outline` (a ring in its
+  colour beneath), `cycle` (colour cycling), `glow` and `shadow` (behind).
+  Any title takes one; checked when the title is expanded.
+- **New primitive**: `filter.bevel` -- the picture lit as if raised, its
+  blurred alpha a height; the light's direction decided once
+  (`semantics.light_direction`), the lighting in one function for each
+  renderer, identical on GL.
+- **Gradients with up to eight stops** in both renderers (they used the first
+  and last colours only): a chrome's bands, a rainbow.
+- `colour.cycle` on GL, its hue matrix decided once (`semantics.hue_turn`).
+- Items `chrome` (metal: bands, bevel, dark rim, shadow) and `colour-font`
+  (the Amiga's ColorFonts: a rainbow cycling, a white rim, a shadow).
+- Found on the way: a gradient across the frame left the letters a near
+  uniform slice of it -- fills now follow the text's band.
+
 # Decisions
 
 - **The animator belongs to the node**, not to curve nodes: each letter needs
   the keys at its own time, which a curve of the graph cannot give per letter.
 - **A settled line is the block**: per-letter drawing reproduces the block's
   layout exactly, so animating a title never moves where it ends up.
+- **A style is recipes, not an effect**: only the bevel was missing from the
+  engine; the rest is the letters as a matte and their alpha blurred, moved
+  and filled.
 
 # Validation
 
@@ -65,3 +89,10 @@ lacked:
   each letter fading in after the one before; and the wave test averaged over
   the whole frame instead of the letters' own columns (the test's mistake).
 - Full suite after stage A: 787 tests pass.
+- `tests/test_lettering.py` (B): a style that cannot be drawn is refused; a
+  fill runs across the letters, not the frame; an outline rings them in its
+  colour; a shadow falls below and to the right; a bevel lights the faces
+  turned to the light and darkens the others; a style follows the letters'
+  animation; the items name the bevel and the cycling; GL draws the styled
+  items and many-stop gradients as the reference does.
+- Full suite after stage B: 796 tests pass.

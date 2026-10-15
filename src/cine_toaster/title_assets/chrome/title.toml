@@ -1,0 +1,27 @@
+schema_version = 1
+id = "chrome"
+name = "Chrome"
+category = "texture"
+says = "Polished metal letters: bands of light across them, a bevelled edge, a dark rim and a shadow."
+energy = "high"
+use_when = ["An eighties logo, a show's title, a demo reel; anywhere the letters are an object."]
+avoid_when = ["A quiet film whose titles should not be noticed"]
+
+# A style (C6b, CT-0078): recipes of the primitives -- the letters as a matte over a gradient, an outline, a
+# bevel, a shadow. Any title takes a `style`; this item is one dressed for you. Lengths in pixels at 720 lines.
+[params]
+size = 96
+fade_in = 0.6
+fade_out = 0.8
+
+[params.style]
+fill = {gradient = {colours = ["#FFFFFF", "#9AA0AE", "#3A3F4C", "#E6EAF2", "#7D8392"], angle = 90.0}}
+outline = {width = 3.0, colour = "#15171C"}
+bevel = {radius = 8.0, depth = 1.5, highlight = 0.8}
+shadow = {offset = [6.0, 8.0], blur = 10.0, opacity = 0.8}
+
+[render]
+engine = "graph"
+effect = "fade"
+# Drawn by the compositing graph (C6b, CT-0078), of these primitives:
+primitives = ["curve.keys", "filter.bevel", "filter.blur", "generate.gradient", "generate.solid", "generate.text", "matte.from_signal", "merge.over", "signal.channel", "warp.transform"]

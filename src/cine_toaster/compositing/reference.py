@@ -31,7 +31,7 @@ import numpy as np
 
 from ..errors import ValidationError
 from .schema import validate
-from .semantics import blur_kernel, pixels, screen_channel, threshold_spread
+from .semantics import blur_kernel, hue_turn, pixels, screen_channel, threshold_spread
 from .semantics import default as semantic_default
 
 #: The default spaces, converted by the exact sRGB transfer function; any other goes through OCIO.
@@ -473,6 +473,39 @@ def lut_colours(node: dict[str, Any], rgb: np.ndarray, working: str, root: Path 
     return convert(encoded.reshape(rgb.shape), ENCODED, working)
 
 
+def gradient_colours(colours: np.ndarray, x: np.ndarray) -> np.ndarray:
+    """Colours along a gradient: its stops evenly spaced from 0 to 1, mixed linearly between them (up to eight,
+    as GL takes them; CT-0078)."""
+
+    stops = np.asarray(colours, dtype=np.float32).reshape(-1, 4)[:8]
+    if len(stops) == 1:
+        return np.broadcast_to(stops[0], x.shape + (4,)).astype(np.float32).copy()
+    place = x * (len(stops) - 1)
+    low = np.clip(np.floor(place).astype(int), 0, len(stops) - 2)
+    weight = (place - low)[..., None]
+    return (stops[low] * (1 - weight) + stops[low + 1] * weight).astype(np.float32)
+
+
+def bevel_lit(picture: np.ndarray, relief: np.ndarray, radius_px: float, param: Callable[..., Any]) -> np.ndarray:
+    """A picture lit as if raised: its blurred alpha (`relief`) is a height, its slope (central differences, in
+    the radius's units) tilts the surface, light from `semantics.light_direction` brightens the faces turned to it
+    (by `highlight`, as white light) and darkens the others (by `shadow`). Alpha is left as it was."""
+
+    from .semantics import light_direction
+
+    lx, ly, lz = light_direction(param("angle", 135.0), param("elevation", 35.0))
+    padded = np.pad(relief, 1, mode="edge")
+    slope_x = (padded[1:-1, 2:] - padded[1:-1, :-2]) * 0.5 * max(radius_px, 1.0) * float(param("depth", 1.0))
+    slope_y = (padded[2:, 1:-1] - padded[:-2, 1:-1]) * 0.5 * max(radius_px, 1.0) * float(param("depth", 1.0))
+    length = np.sqrt(slope_x ** 2 + slope_y ** 2 + 1.0)
+    shade = ((-slope_x * lx - slope_y * ly + lz) / length) / max(lz, 1e-6)
+    lit, dark = np.clip(shade - 1.0, 0, None), np.clip(1.0 - shade, 0, None)
+    alpha = picture[..., 3:4]
+    rgb = picture[..., :3] * (1.0 - float(param("shadow", 0.6)) * dark[..., None]) \
+        + float(param("highlight", 0.6)) * lit[..., None] * alpha
+    return np.concatenate([np.clip(rgb, 0, None), alpha], axis=-1).astype(np.float32)
+
+
 def noise_field(kind: str, scale: float, seed: int, frame: int, width: int, height: int) -> np.ndarray:
     """generate.noise's values, 0 to 1: one drawing of them for every renderer (GL uploads it; CT-0077)."""
 
@@ -549,6 +582,7 @@ IMPLEMENTED = {
     "colour.grade", "colour.invert", "colour.despill", "colour.curve", "colour.lut", "colour.posterise", "colour.solarise",
     "colour.cycle",
     "filter.blur", "filter.sharpen", "filter.glow", "filter.edges", "filter.morphology", "filter.noise",
+    "filter.bevel",
     "time.remap", "time.offset", "time.blend", "time.echo",
     "track.read", "track.measure",
     "curve.progress", "curve.keys", "curve.map", "curve.combine", "curve.noise", "curve.beats", "curve.from_track",
@@ -1070,8 +1104,8 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             repeats = float(param("repeat", 1.0) or 1.0)
             if repeats > 1.0:  # the ramp repeated: stripes, rings, bands (CT-0077)
                 x = np.mod(np.clip(x, 0, 1) * repeats, 1.0)
-            x = np.clip(x, 0, 1)[..., None]
-            out = colours[0] * (1 - x) + colours[-1] * x
+            x = np.clip(x, 0, 1)
+            out = gradient_colours(colours, x)
             out[..., :3] *= out[..., 3:4]
             return out.astype(np.float32)
         if op in ("signal.luminance", "signal.luma"):
@@ -1352,12 +1386,14 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             return rebuilt(convert(encoded.astype(np.float32), ENCODED, working), alpha)
         if op == "colour.cycle":
             rgb, alpha = straight(_picture(value(node["in"], frame)))
-            angle = math.radians(float(param("speed", 90.0)) * seconds)  # hue turned, degrees per second
-            cos, sin = math.cos(angle), math.sin(angle)
-            k = np.ones(3, dtype=np.float32) / math.sqrt(3)
-            matrix = (cos * np.eye(3) + sin * np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
-                      + (1 - cos) * np.outer(k, k))
-            return rebuilt(np.clip(rgb @ matrix.T.astype(np.float32), 0, None), alpha)
+            # The hue turned, degrees per second (`semantics.hue_turn`: one matrix for both renderers).
+            matrix = np.asarray(hue_turn(float(param("speed", 90.0)) * seconds), dtype=np.float32)
+            return rebuilt(np.clip(rgb @ matrix.T, 0, None), alpha)
+        if op == "filter.bevel":
+            picture = _picture(value(node["in"], frame))
+            height_px = pixels(param("radius", 6.0), height)
+            relief = _blur(picture[..., 3], height_px)
+            return bevel_lit(picture, relief, height_px, param)
         if op == "filter.sharpen":
             picture = _picture(value(node["in"], frame))
             return np.clip(picture + float(param("amount", 0.5)) * (picture - _blur(picture, pixels(2.0, height))), 0, None)

@@ -36,8 +36,8 @@ IMPLEMENTED = {
     "merge.over", "merge.mix", "merge.blend", "merge.porter_duff", "merge.channels",
     "warp.transform", "warp.corner_pin", "warp.surface", "warp.displace",
     "matte.shape",
-    "colour.grade", "colour.invert", "colour.despill", "colour.lut",
-    "filter.blur", "filter.morphology", "filter.noise",
+    "colour.grade", "colour.invert", "colour.despill", "colour.lut", "colour.cycle",
+    "filter.blur", "filter.morphology", "filter.noise", "filter.bevel",
     "curve.progress", "curve.keys", "curve.map", "curve.combine", "curve.noise", "curve.beats",
     "opaque.gl",
 }
@@ -92,8 +92,8 @@ vec3 decode(vec3 c) { return vec3(decode1(c.r), decode1(c.g), decode1(c.b)); }
 
 _SHADERS = {
     "solid": "uniform vec4 colour; void main() { result = colour; }",
-    "gradient": """uniform vec4 c0; uniform vec4 c1; uniform int radial; uniform float angle; uniform float aspect;
-        uniform float repeats;
+    "gradient": """uniform vec4 stops[8]; uniform int count; uniform int radial; uniform float angle;
+        uniform float aspect; uniform float repeats;
         void main() {
           vec2 p = uv; vec2 d = p - 0.5; float x;
           if (radial == 1) x = length(d) / length(vec2(0.5));
@@ -102,7 +102,10 @@ _SHADERS = {
           else if (radial == 4) x = mod(atan(d.x * aspect, -d.y) / 6.283185307 - angle / 6.283185307, 1.0);
           else x = (p.x - 0.5) * cos(angle) + (p.y - 0.5) * sin(angle) + 0.5;
           if (repeats > 1.0) x = mod(clamp(x, 0.0, 1.0) * repeats, 1.0);
-          x = clamp(x, 0.0, 1.0); vec4 c = mix(c0, c1, x); result = vec4(c.rgb * c.a, c.a);
+          x = clamp(x, 0.0, 1.0); float place = x * float(count - 1);
+          int low = clamp(int(floor(place)), 0, max(count - 2, 0));
+          vec4 c = count == 1 ? stops[0] : mix(stops[low], stops[low + 1], place - float(low));
+          result = vec4(c.rgb * c.a, c.a);
         }""",
     "luminance": """uniform sampler2D a; uniform vec3 weights; uniform int encoded;
         void main() { vec3 s = straight(texture(a, uv)); if (encoded == 1) s = encode(s);
@@ -203,6 +206,18 @@ _SHADERS = {
         void main() { vec4 p = texture(a, uv); vec3 c = max(straight(p), vec3(0.0));
           vec3 u = clamp(encode(c / (1.0 + c)) / top, 0.0, 1.0);
           vec3 o = texture(table, (u * (cells - 1.0) + 0.5) / cells).rgb; result = vec4(o * p.a, p.a); }""",
+    "bevel": """uniform sampler2D a; uniform sampler2D relief; uniform vec2 texel; uniform float reach;
+        uniform float depth; uniform vec3 light; uniform float highlight; uniform float shadow_;
+        void main() { vec4 p = texture(a, uv);
+          float sx = (texture(relief, uv + vec2(texel.x, 0.0)).r - texture(relief, uv - vec2(texel.x, 0.0)).r)
+                     * 0.5 * max(reach, 1.0) * depth;
+          float sy = (texture(relief, uv + vec2(0.0, texel.y)).r - texture(relief, uv - vec2(0.0, texel.y)).r)
+                     * 0.5 * max(reach, 1.0) * depth;
+          float shade = ((-sx * light.x - sy * light.y + light.z) / sqrt(sx * sx + sy * sy + 1.0)) / max(light.z, 1e-6);
+          float lit = max(shade - 1.0, 0.0), dark = max(1.0 - shade, 0.0);
+          result = vec4(max(p.rgb * (1.0 - shadow_ * dark) + highlight * lit * p.a, vec3(0.0)), p.a); }""",
+    "cycle": """uniform sampler2D a; uniform mat3 turn;
+        void main() { vec4 p = texture(a, uv); result = vec4(max(turn * straight(p), vec3(0.0)) * p.a, p.a); }""",
     "morphology": """uniform sampler2D a; uniform vec2 texel; uniform int reach; uniform int grow;
         void main() { float m = grow == 1 ? 0.0 : 1.0;
           for (int y = -reach; y <= reach; y++) for (int x = -reach; x <= reach; x++) {
@@ -399,7 +414,9 @@ class GLRenderer:
         if op == "generate.gradient":
             colours = np.asarray(p("colours", [[0, 0, 0, 1], [1, 1, 1, 1]]), np.float32)
             kinds = ("linear", "radial", "circle", "diamond", "conic")
-            return self.draw("gradient", size, 4, {}, c0=tuple(colours[0]), c1=tuple(colours[-1]),
+            stops = [tuple(float(c) for c in colour) for colour in colours.reshape(-1, 4)[:8]]
+            return self.draw("gradient", size, 4, {}, stops=tuple(stops + [stops[-1]] * (8 - len(stops))),
+                             count=len(stops),
                              radial=kinds.index(p("kind", "linear")), angle=float(np.radians(p("angle", 0.0))),
                              aspect=width / height, repeats=float(p("repeat", 1.0) or 1.0))
         if op in ("signal.luminance", "signal.luma"):
@@ -518,6 +535,28 @@ class GLRenderer:
         if op == "colour.lut":
             table, top, cells = self._lut(node, working, root)
             return self.draw("lut", size, 4, {"a": value(node["in"]), "table": table}, top=top, cells=float(cells))
+        if op == "filter.bevel":
+            from .semantics import light_direction
+
+            source = value(node["in"])
+            reach = pixels(p("radius", 6.0), height)
+            alpha = self.draw("channel", size, 1, {"a": source}, index=3)
+            if reach > 0:
+                sigma, half = blur_kernel(reach)
+                across = self.draw("blur", size, 1, {"a": alpha}, step_=(1.0 / width, 0.0), sigma=sigma, half_=half)
+                relief = self.draw("blur", size, 1, {"a": across}, step_=(0.0, 1.0 / height), sigma=sigma, half_=half)
+            else:
+                relief = alpha
+            return self.draw("bevel", size, 4, {"a": source, "relief": relief}, texel=(1.0 / width, 1.0 / height),
+                             reach=reach, depth=float(p("depth", 1.0)),
+                             light=light_direction(p("angle", 135.0), p("elevation", 35.0)),
+                             highlight=float(p("highlight", 0.6)), shadow_=float(p("shadow", 0.6)))
+        if op == "colour.cycle":
+            from .semantics import hue_turn
+
+            matrix = hue_turn(float(p("speed", 90.0)) * (frame + 0.5) / fps)
+            column_major = tuple(matrix[row][col] for col in range(3) for row in range(3))
+            return self.draw("cycle", size, 4, {"a": value(node["in"])}, turn=column_major)
         if op == "merge.channels":
             textures, given = {}, []
             for channel, uniform in (("red", "r"), ("green", "g"), ("blue", "b"), ("alpha", "al")):

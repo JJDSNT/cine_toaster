@@ -137,6 +137,9 @@ OPS: dict[str, Op] = {
     "filter.glow": Op({"in": P(*PIC)}, params={"threshold": "number", "radius": "number", "intensity": "number"}),
     "filter.edges": Op({"in": P(*PIC)}, {"out": "matte"}, {"kind": "enum:sobel|laplace|canny"}),
     "filter.morphology": Op({"in": P(*MAT)}, {"out": "matte"}, {"operation": "enum:erode|dilate", "radius": "number"}),
+    # Letters (or any picture) lit as if raised from the frame, by their own alpha as a height (C6b, CT-0078).
+    "filter.bevel": Op({"in": P(*PIC)}, params={"radius": "number", "depth": "number", "angle": "number",
+                                                "elevation": "number", "highlight": "number", "shadow": "number"}),
     "filter.noise": Op({"in": P(*PIC)}, params={"amount": "number", "size": "number", "seed": "int",
                                                 "space": "enum:linear|display"}),
     # -- time

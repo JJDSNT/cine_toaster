@@ -192,6 +192,7 @@ or procedural warp says `edge: extend` (the border repeated) or `edge: mirror`
 a text's size -- are pixels of a frame 720 lines high, scaled to the frame
 drawn (CT-0075): a composite looks the same in a 180-line preview or still as
 in the 1080-line cut. A shape's `feather` is a fraction of the frame.
+| `filter.bevel` | picture | picture | `radius` (pixels at 720 lines), `depth`, `angle` (where light comes from, degrees counter-clockwise from the right: 135 is the upper left), `elevation`, `highlight`, `shadow`: the picture lit as if raised, its blurred alpha a height -- faces turned to the light brightened, the others darkened; alpha untouched (C6b, CT-0078) |
 | `filter.noise` | picture | picture | `amount`, `size`, `seed` (grain); `space`: `linear` (default) adds it to the light, `display` to the encoded picture -- as video shows grain, the same in the shadows as in the highlights (CT-0077) |
 
 ## time
@@ -208,7 +209,7 @@ in the 1080-line cut. A shape's `feather` is a fraction of the frame.
 | Op | In | Out | Parameters |
 |---|---|---|---|
 | `generate.source` | -- | picture (+ sound, meta) | a take, a file or a stretch; its colour space and alpha (§2) |
-| `generate.solid` / `gradient` / `noise` | -- | picture | colour(s), kind, seed, `repeat` (the ramp repeated: stripes, rings; CT-0077). A gradient's `kind`: `linear` (along `angle`), `radial` (the frame's own shape), `circle` (round whatever the frame), `diamond` (by \|x\| + \|y\|), `conic` (the angle clockwise from twelve o'clock, round); the distance kinds reach 1 at the corners -- so a gradient made a matte and thresholded by a join's progress is an iris, a diamond or a clock wipe (CT-0076) |
+| `generate.solid` / `gradient` / `noise` | -- | picture | colour(s) -- up to eight stops, evenly spaced (CT-0078) --, kind, seed, `repeat` (the ramp repeated: stripes, rings; CT-0077). A gradient's `kind`: `linear` (along `angle`), `radial` (the frame's own shape), `circle` (round whatever the frame), `diamond` (by \|x\| + \|y\|), `conic` (the angle clockwise from twelve o'clock, round); the distance kinds reach 1 at the corners -- so a gradient made a matte and thresholded by a join's progress is an iris, a diamond or a clock wipe (CT-0076) |
 | `generate.text` | -- | picture | text (lines split by `\n`), font, size (pixels at 720 lines), colour, position (the text's centre, or its start or end by `align`: centre, left, right), `line_spacing`, `outline` and `hollow` (a stroke round the letters, or the stroke alone), `reveal` (a curve: the share shown) by `reveal_by` letter or word; `letters`, an animator -- keys each letter plays from its own start (`offset` in pixels at 720 lines, `rotate`, `scale`, `opacity`, each with an ease), `stagger` seconds apart in an `order` (forward, backward, centre, random), a `start`, a `wave` along the line -- each letter placed where the whole block would put it (C6b, CT-0078). Drawn once by the reference and uploaded by GL (CT-0077) |
 | `generate.render` | -- | picture (+ signals) | a renderer's own scene (Blender, a VFX recipe), its parameters, `seed`; it may also give depth or other passes |
 

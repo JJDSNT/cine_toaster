@@ -119,6 +119,10 @@ def expand(raw: Any, catalog: dict[str, dict[str, Any]]) -> tuple[dict[str, Any]
             params[key] = value
     if params.get("position") not in POSITIONS:
         return None, f"puts its title at {params.get('position')!r}; the positions are {', '.join(POSITIONS)}"
+    from .compositing.title_graphs import style_problem
+
+    if style_problem(params.get("style")):
+        return None, f"gives its title a style that {style_problem(params.get('style'))}"
     return {"id": item["id"], "text": str(params.get("text") or ""), "params": params, "engine": item["engine"],
             "effect": item["effect"], "reason": str(declared.get("reason") or "")}, ""
 
