@@ -37,22 +37,27 @@ class CatalogTests(unittest.TestCase):
     def test_every_effect_the_graph_draws_says_its_primitives(self) -> None:
         """C6's rule: every item says which primitives it uses -- and says it truly."""
 
-        graph_drawn = [item for item in list_effects() if item["engine"] == "graph"]
-        self.assertEqual(len(graph_drawn), len(BUILDERS))  # every builder is an item of the catalog, and only those
+        graph_drawn = [item for item in list_effects() if item["engine"] in ("graph", "blender")]
+        self.assertEqual({item["effect"] for item in graph_drawn if item["engine"] == "graph"}, set(BUILDERS))
         for item in graph_drawn:
+            # A Blender effect is rendered by Blender and laid as an element: the element's primitives.
+            kind = "element" if item["engine"] == "blender" else item["effect"]
             with self.subTest(item=item["id"]):
-                self.assertEqual(sorted(item["primitives"]), primitives_of(item["effect"], item["params"]))
+                self.assertEqual(sorted(item["primitives"]), primitives_of(kind, item["params"]))
 
     def test_no_effect_is_drawn_by_an_ffmpeg_chain_of_its_own_any_more(self) -> None:
-        chain = SOURCE.read_text().split("def _chain(", 1)[1].split("\ndef ", 1)[0]
-        # (An element's opacity and key are still FFmpeg's until C6's next stage.)
-        for formula in ("hflip", "gblur", "rgbashift", "vignette=", "noise=", "drawgrid", "geq=lum", "sin(t*37)"):
-            self.assertNotIn(formula, chain, formula)
+        source = SOURCE.read_text()
+        self.assertNotIn("def _chain(", source)  # the FFmpeg filter chains are gone (CT-0077)
+        for formula in ("hflip", "gblur", "rgbashift", "vignette=", "noise=alls", "drawgrid", "colorkey=", "lut3d=",
+                        "alphamerge", "overlay=", "blend=all_mode"):
+            self.assertNotIn(formula, source, formula)
 
     def test_every_effect_is_a_valid_graph(self) -> None:
         for kind in BUILDERS:
             with self.subTest(kind=kind):
-                self.assertEqual(validate(graph_for([{"effect": kind, "params": {}}], 1.0, FPS)), [])
+                prepared = {"_clip": "element.mov"} if kind == "element" else {}
+                self.assertEqual(validate(graph_for([{"effect": kind, "params": {}, "prepared": prepared}], 1.0, FPS)),
+                                 [])
 
 
 class BehaviourTests(unittest.TestCase):
@@ -103,7 +108,7 @@ class ConformanceTests(unittest.TestCase):
 
         rng = np.random.default_rng(3)
         detail = np.dstack([rng.uniform(0.05, 0.8, (H, W, 3)).astype(np.float32), np.ones((H, W), np.float32)])
-        for kind in BUILDERS:
+        for kind in [kind for kind in BUILDERS if kind != "element"]:  # an element is tested with its clip below
             with self.subTest(kind=kind):
                 graph = graph_for([{"effect": kind, "params": {"strength": 0.6, "start": 0.1, "length": 0.2}}],
                                   0.5, FPS)
@@ -113,6 +118,63 @@ class ConformanceTests(unittest.TestCase):
                 fast = np.stack(list(renderer.evaluate(graph, {"picture": detail}, frames=6, size=(W, H), fps=FPS,
                                                        stream=True)))
                 self.assertLess(float(np.abs(exact - fast).mean()), 0.01)
+
+    def test_an_element_is_laid_on_gl_as_the_reference_lays_it(self) -> None:
+        """Each blend of a stock element -- screen for one on black, over for one with alpha, a key with its spill
+        taken out for one on green -- placed, the same in both renderers (CT-0077, C6 B). Its delay is in its
+        prepared clip (`vfx.prepare_element`), tested with the VFX catalog."""
+
+        import subprocess
+        import tempfile
+
+        from cine_toaster.compositing.gl import renderer_for
+
+        with tempfile.TemporaryDirectory() as raw:
+            clip = Path(raw) / "element.mov"
+            subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i",
+                            "color=c=0x00FF00:s=160x90:d=0.5:r=24,drawbox=x=60:y=30:w=40:h=30:color=orange:t=fill",
+                            "-c:v", "qtrle", "-pix_fmt", "argb", str(clip)], check=True)
+            for blend in ("screen", "alpha", "key"):
+                with self.subTest(blend=blend):
+                    graph = graph_for([{"effect": "element", "params": {"scale": 0.6, "x": 0.4},
+                                        "prepared": {"_clip": str(clip), "_blend": blend, "_key_color": "0x00FF00"}}],
+                                      0.5, FPS)
+                    exact = evaluate(graph, {"picture": picture()}, frames=6, size=(W, H), fps=FPS)
+                    fast = np.stack(list(renderer_for(graph).evaluate(graph, {"picture": picture()}, frames=6,
+                                                                      size=(W, H), fps=FPS, stream=True)))
+                    self.assertLess(float(np.abs(exact - fast).mean()), 0.01)
+                    if blend == "key":
+                        late = exact[-1]
+                        self.assertLess(float(late[..., 1].max() - late[..., 0].max()), 0.05)  # no green left
+
+    def test_a_look_has_no_fixed_place_in_the_graph(self) -> None:
+        """colour.lut is a node like any other (the user, 2026-10-14): on one picture before it is merged, or on
+        the merged result -- the graph decides, the op does not. Both drawn the same by GL and the reference."""
+
+        from cine_toaster.compositing.gl import renderer_for
+
+        view = "ACES 2.0 - SDR 100 nits (Rec.709)"
+        element, below = picture() * 4.0, picture()  # an element with highlights past white, over a picture
+        element[..., 3] = 1.0
+        element[:, : W // 2] = 0.0  # it covers the right half only
+        before = {"ports": {"element": "picture", "below": "picture"}, "output": "out",
+                  "nodes": {"graded": {"op": "colour.lut", "in": "element", "view": view},
+                            "out": {"op": "merge.over", "front": "graded", "back": "below"}}}
+        after = {"ports": {"element": "picture", "below": "picture"}, "output": "out",
+                 "nodes": {"merged": {"op": "merge.over", "front": "element", "back": "below"},
+                           "out": {"op": "colour.lut", "in": "merged", "view": view}}}
+        inputs = {"element": element, "below": below}
+        drawn = {}
+        for name, graph in (("before", before), ("after", after)):
+            self.assertEqual(validate(graph), [])
+            exact = evaluate(graph, inputs, frames=1, size=(W, H), fps=FPS)
+            fast = np.stack(list(renderer_for(graph).evaluate(graph, inputs, frames=1, size=(W, H), fps=FPS,
+                                                              stream=True)))
+            self.assertLess(float(np.abs(exact - fast).mean()), 0.01, name)
+            drawn[name] = exact[0]
+        # Graded before the merge, the picture below it is untouched; graded after, it is graded too.
+        np.testing.assert_allclose(drawn["before"][:, : W // 2], below[:, : W // 2], atol=1e-6)
+        self.assertGreater(float(np.abs(drawn["after"][:, : W // 2] - below[:, : W // 2]).mean()), 0.01)
 
     def test_gl_draws_in_several_threads_at_once(self) -> None:
         """Each thread has its own GL context (CT-0077): previews are drawn in workers, and a context made current

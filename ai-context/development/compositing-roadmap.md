@@ -83,6 +83,20 @@ Three things follow and every step below respects them:
 - Track: nothing.
 - Animate: nothing general; beats (CT-0067) set shot lengths only.
 
+## Supported by the graph, not yet exposed to the filmmaker
+
+ADR 0022's rule (the user, 2026-10-14): what the engine can already do is not
+built again. Each item here is a **record** to extend so that it compiles into
+nodes the graph already has and the renderers already draw -- not a new
+mechanism. What the engine itself lacks is in the steps below and in C10.
+
+| What a filmmaker cannot yet say | The graph already does it with | Exposing it |
+|---|---|---|
+| A look or a grade on one layer (`layers:`) | `colour.lut`, `colour.grade` anywhere in a chain -- tested before and after a merge (CT-0077) | `look:` / `grade:` on a layer, compiled into its chain before it is merged |
+| A look on one stock element (a shot's `effects:`) | the same, inside the element's fragment | an element's own `look:`, a `colour.lut` before it is laid |
+| A layer whose source is a graph (a surface, a composite, a generator) | any subgraph's output as a picture (C4's check 2) | `source: {graph: ...}` replacing the layer's single source node (`L<n>`) |
+| A join's matte drawn by a Blender element | `generate.source` of a rendered clip, as an element's (`vfx.prepare_element`) | `matte: {effect: ...}` on a join (SPEC-0011), the element rendered once and read |
+
 ## The steps
 
 Each step gets a work record when it starts and is struck here when done.
@@ -90,7 +104,10 @@ Each step gets a work record when it starts and is struck here when done.
 advance.
 
 **Convergence is part of every step's "done when"** (CT-0072, the user's
-rule): a step is not done while what it replaced still runs beside it. Before
+rule): a step is not done while what it replaced still runs beside it. And
+before anything is built, the graph is asked first: a capability it has but a
+record does not offer goes in the table below as *not exposed*, and is exposed
+by compiling into the graph, never by a second mechanism (ADR 0022). Before
 closing a step, search for operations it covers still executed outside the
 graph, and for **decisions** (defaults, derived values, fitting to the
 frame, display) made in more than one place; each is removed, or listed with
@@ -251,9 +268,11 @@ as shaders, with their reasons: `pixelate`, `film-burn`.
 
 ### C6. The catalogs re-expressed
 
-In progress (`CT-0077`): stage A done -- the fourteen effects FFmpeg drew are
-fragments of the graph, every one on GL, each item naming its primitives.
-Next: elements as layers, looks as `colour.lut` on GL, titles on layers.
+In progress (`CT-0077`): stages A-C done -- every effect of the VFX catalog is
+drawn by the graph (the fourteen FFmpeg chains, the look as `colour.lut` with a
+display view baked for GL from the reference's own function, the stock elements
+laid by their blend), `vfx._chain` is gone, every item names its primitives.
+Next: titles on layers (stage D, with C6b).
 
 
 - What: VFX items that are a primitive with a parameter (a colour key, a
@@ -387,20 +406,15 @@ prescribed here.
   renderer.
 - ~~Layer modes multiply, darken, overlay~~: done in CT-0075 -- `merge.blend`
   composites premultiplied pictures by W3C's rule in both renderers.
-- **A layer whose source is a graph** (a surface, another composite, a
-  generator): today a source is a take or a file. The compiler gives each
-  layer one source node (`L<n>`) feeding its chain, so a `source: {graph:
-  ...}` would put a subgraph there, its output into the same chain -- no
-  other change. Built when a shot needs it, not in C4.
 - ~~Spill suppression~~: done in CT-0075 (`colour.despill`).
 - **`filter.mosaic`** (block size as a curve), so `pixelate` becomes a recipe
   and its FFmpeg stand-in goes (CT-0076).
 - A **sheet for `film-burn`** re-expressing its look with generate.noise,
   colour and merge, or keeping it as a shader for good (CT-0076).
-- **Generated mattes from a VFX recipe** (a Blender element as the join's
-  matte, rendered once and kept by identity): SPEC-0011's `{effect: ...}`;
-  with C6, when the VFX catalog becomes layer sources (CT-0076 built the
-  gradient and noise forms).
+- **EXR elements in linear light**: `vfx.prepare_element` still turns EXR into
+  display-encoded frames (the old FFmpeg path's form), so values above white
+  are cut and a look's roll-off cannot act on a fire's highlights. Read EXR
+  straight into the graph, linear, with its alpha (CT-0077).
 - A **screen-correction plate** for colour keys on unevenly lit screens (as
   dedicated keyers have): the key's excess measured against the plate's, pixel
   by pixel, instead of one screen colour.

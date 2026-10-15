@@ -44,8 +44,9 @@ is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
 CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
 
-- `CT-0077` — C6: the catalogs re-expressed; stage A done (the effects FFmpeg
-  drew are fragments of the graph, on GL), B-D to come (`doing`)
+- `CT-0077` — C6: the catalogs re-expressed; stages A-C done (every VFX effect,
+  look and element drawn by the graph, on GL; no FFmpeg chain left), titles to
+  come (`doing`)
 - `CT-0076` — C5: the transition catalog as recipes -- nine shaders
   re-expressed, filed by family, all on GL, generated mattes (`done`)
 - `CT-0075` — C4: layers compiled into the graph, colour (difference) and

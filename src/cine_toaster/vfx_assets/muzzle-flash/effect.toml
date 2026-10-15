@@ -17,6 +17,8 @@ opacity = 1.0
 start = 0.0
 
 [render]
-engine = "ffmpeg"
+engine = "graph"
 effect = "element"
 element_category = "muzzle-flash"
+# Laid by the compositing graph (C6, CT-0077), with an alpha element; a screen or key element adds its blend:
+primitives = ["generate.source", "merge.over", "warp.transform"]

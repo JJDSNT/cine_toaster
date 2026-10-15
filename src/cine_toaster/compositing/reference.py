@@ -377,6 +377,31 @@ def _picture(value: Any) -> np.ndarray:
     return value
 
 
+def lut_colours(node: dict[str, Any], rgb: np.ndarray, working: str, root: Path | None = None) -> np.ndarray:
+    """colour.lut on straight linear colours: an OCIO look, a display view seen and brought back to linear, or a
+    .cube file (made for encoded pictures, so applied in the display encoding). One drawing of a look: GL bakes
+    its lattice from this function (CT-0077)."""
+
+    import PyOpenColorIO as ocio
+
+    from ..color import DISPLAY, _processor, config
+
+    flat = np.ascontiguousarray(rgb.reshape(-1, 3), dtype=np.float32)
+    if node.get("look"):
+        transform = ocio.LookTransform(src=working, dst=working, looks=node["look"])
+        config().getProcessor(transform).getDefaultCPUProcessor().applyRGB(flat)
+        return flat.reshape(rgb.shape)
+    if node.get("view"):
+        # Seen through a display view (a film response such as ACES 2.0's), then decoded back to light.
+        _processor(working, display=str(node.get("display") or DISPLAY), view=str(node["view"])).applyRGB(flat)
+        return convert(np.clip(flat.reshape(rgb.shape), 0.0, 1.0), ENCODED, working)
+    path = Path(node["file"])
+    path = (root / path) if root and not path.is_absolute() else path
+    encoded = np.ascontiguousarray(convert(rgb, working, ENCODED).reshape(-1, 3), dtype=np.float32)
+    config().getProcessor(ocio.FileTransform(src=str(path))).getDefaultCPUProcessor().applyRGB(encoded)
+    return convert(encoded.reshape(rgb.shape), ENCODED, working)
+
+
 def noise_field(kind: str, scale: float, seed: int, frame: int, width: int, height: int) -> np.ndarray:
     """generate.noise's values, 0 to 1: one drawing of them for every renderer (GL uploads it; CT-0077)."""
 
@@ -1084,23 +1109,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             return rebuilt(curve_of(rgb), alpha)
         if op == "colour.lut":
             rgb, alpha = straight(_picture(value(node["in"], frame)))
-            from ..color import config
-
-            import PyOpenColorIO as ocio
-
-            if node.get("look"):
-                transform = ocio.LookTransform(src=working, dst=working, looks=node["look"])
-                processor = config().getProcessor(transform).getDefaultCPUProcessor()
-                flat = np.ascontiguousarray(rgb.reshape(-1, 3), dtype=np.float32)
-                processor.applyRGB(flat)
-                return rebuilt(flat.reshape(rgb.shape), alpha)
-            path = Path(node["file"])
-            path = (root / path) if root and not path.is_absolute() else path
-            # A .cube is made for encoded pictures: applied in the display encoding, then back to linear.
-            processor = config().getProcessor(ocio.FileTransform(src=str(path))).getDefaultCPUProcessor()
-            flat = np.ascontiguousarray(convert(rgb, working, ENCODED).reshape(-1, 3), dtype=np.float32)
-            processor.applyRGB(flat)
-            return rebuilt(convert(flat.reshape(rgb.shape), ENCODED, working), alpha)
+            return rebuilt(lut_colours(node, rgb, working, root), alpha)
         if op in ("colour.posterise", "colour.solarise"):
             rgb, alpha = straight(_picture(value(node["in"], frame)))
             encoded = convert(rgb, working, ENCODED)

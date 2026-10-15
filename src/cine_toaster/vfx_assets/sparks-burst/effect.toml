@@ -21,3 +21,5 @@ view = "ACES 2.0 - SDR 100 nits (Rec.709)"
 [render]
 engine = "blender"
 effect = "sparks-burst"
+# Rendered by Blender, then laid by the compositing graph (C6, CT-0077):
+primitives = ["generate.source", "merge.over", "warp.transform"]

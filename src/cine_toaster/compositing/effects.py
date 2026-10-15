@@ -206,11 +206,59 @@ def _fog(f: Fragment, src: str, params: dict[str, Any], length: float) -> str:
                             "mix": min(1.0, 0.8 * _number(params, "strength", 0.5))})
 
 
+def _look(f: Fragment, src: str, params: dict[str, Any], length: float) -> str:
+    # The picture seen through an OCIO display view -- a film response such as ACES 2.0's -- by `strength`.
+    view = str(params.get("view") or "ACES 2.0 - SDR 100 nits (Rec.709)")
+    looked = f.add("looked", {"op": "colour.lut", "in": src, "view": view})
+    return f.add("look", {"op": "merge.over", "front": looked, "back": src,
+                          "mix": min(1.0, max(0.0, _number(params, "strength", 0.5)))})
+
+
+def _hex_linear(value: str) -> list[float]:
+    text = str(value or "0x00FF00").lower().replace("0x", "").lstrip("#")
+    return _linear("#" + text, "#00FF00")
+
+
+def _element(f: Fragment, src: str, params: dict[str, Any], length: float) -> str:
+    """A stock element laid over the picture: fire on black, smoke with alpha, sparks on green (CT-0077, C6 B).
+
+    The element's frames are prepared as one clip (`_clip`, with `_matte` when its opacity is a separate
+    picture) by `vfx.prepare_element`, already transparent until its `start`; here it is placed -- fitted within
+    `scale` of the frame, its centre at (`x`, `y`) -- and laid by its blend: screen or add for a black-backed one,
+    over for one with alpha, a colour key with its spill taken out for one on green."""
+
+    scale = max(_number(params, "scale", 1.0), 1e-3)
+    opacity = min(1.0, max(0.0, _number(params, "opacity", 1.0)))
+    element = f.add("element", {"op": "generate.source", "file": params["_clip"], "alpha": "straight"})
+    blend = params.get("_blend", "alpha")
+    seen = None
+    if params.get("_matte"):
+        plate = f.add("matte-clip", {"op": "generate.source", "file": params["_matte"]})
+        seen = f.add("matte", {"op": "matte.from_signal",
+                               "signal": f.add("matte-luma", {"op": "signal.luma", "picture": plate})})
+    if blend == "key":
+        screen = _hex_linear(params.get("_key_color", "0x00FF00"))
+        key = f.add("key", {"op": "matte.key", "picture": element, "by": "colour", "colour": screen,
+                            "tolerance": 0.05, "softness": 0.6})
+        if seen:
+            key = f.add("kept", {"op": "matte.combine", "a": key, "b": seen, "how": "intersect"})
+        element = f.add("keyed", {"op": "colour.despill", "in": element, "matte": key, "colour": screen})
+    elif seen:
+        element = f.add("seen", {"op": "merge.over", "front": element, "back": f.solid("clear", [0.0, 0.0, 0.0, 0.0]),
+                                 "matte": seen})
+    placed = f.add("placed", {"op": "warp.transform", "in": element, "scale": [min(scale, 1.0)] * 2,
+                              "translate": [_number(params, "x", 0.5) - 0.5, _number(params, "y", 0.5) - 0.5]})
+    if blend in ("screen", "add"):
+        return f.add("laid", {"op": "merge.blend", "a": src, "b": placed, "mode": blend, "mix": opacity})
+    return f.add("laid", {"op": "merge.over", "front": placed, "back": src, "mix": opacity})
+
+
 #: The effect kinds the graph draws, by the `effect` name items give in `[render]`.
 BUILDERS: dict[str, Builder] = {
     "mirror": _mirror, "crop": _crop, "fade-out": _fade_out, "grain": _grain, "vignette": _vignette,
     "light-leak": _light_leak, "aberration": _aberration, "glitch": _glitch, "shake": _shake, "flash": _flash,
-    "defocus": _defocus, "old-film": _old_film, "hologram": _hologram, "fog": _fog,
+    "defocus": _defocus, "old-film": _old_film, "hologram": _hologram, "fog": _fog, "look": _look,
+    "element": _element,
 }
 
 
@@ -224,7 +272,9 @@ def graph_for(effects: list[dict[str, Any]], length: float, fps: float) -> dict[
         if builder is None:
             raise ValidationError(f"The effect {effect['effect']!r} is not drawn by the graph",
                                   effects=sorted(BUILDERS))
-        current = builder(Fragment(nodes, f"E{index}", fps), current, effect.get("params") or {}, length)
+        # An element's prepared clip comes in with its parameters (`vfx.prepare_element`).
+        params = {**(effect.get("params") or {}), **(effect.get("prepared") or {})}
+        current = builder(Fragment(nodes, f"E{index}", fps), current, params, length)
     if current == "picture":
         nodes["out"] = {"op": "merge.over", "front": "picture", "back": "picture"}
         current = "out"
@@ -234,5 +284,6 @@ def graph_for(effects: list[dict[str, Any]], length: float, fps: float) -> dict[
 def primitives_of(effect_kind: str, params: dict[str, Any] | None = None) -> list[str]:
     """The primitives an effect is made of, as its item declares them (C6's "every item says")."""
 
-    graph = graph_for([{"effect": effect_kind, "params": params or {}}], 2.0, 24)
+    prepared = {"_clip": "element.mov", "_blend": "alpha"} if effect_kind == "element" else {}
+    graph = graph_for([{"effect": effect_kind, "params": params or {}, "prepared": prepared}], 2.0, 24)
     return sorted({node["op"] for node in graph["nodes"].values()})

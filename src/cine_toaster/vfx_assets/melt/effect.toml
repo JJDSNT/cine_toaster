@@ -18,3 +18,5 @@ begin = 0.2
 [render]
 engine = "blender"
 effect = "melt"
+# Rendered by Blender, then laid by the compositing graph (C6, CT-0077):
+primitives = ["generate.source", "merge.over", "warp.transform"]

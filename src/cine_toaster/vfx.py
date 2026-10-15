@@ -222,56 +222,6 @@ def _number(params: dict[str, Any], key: str, default: float) -> float:
         raise ValidationError(f"The effect parameter {key} must be a number") from error
 
 
-def _chain(effect: dict[str, Any], label: str, out: str, duration: float, width: int, height: int,
-           element_input: int | None) -> str:
-    """A look or an element as a filter-graph step from [label] to [out]. Every other effect is drawn by the
-    compositing graph (`compositing.effects`, CT-0077); these two follow in C6's next stages."""
-
-    params, kind = effect["params"], effect["effect"]
-    strength = _number(params, "strength", 0.5)
-    start = _number(params, "start", 0.0)
-    if kind == "look":
-        # An OpenColorIO view baked to a 3D LUT (cached), for FFmpeg to apply.
-        from .color import bake_look
-        from .jobs import state_root
-
-        view = str(params.get("view") or "ACES 2.0 - SDR 100 nits (Rec.709)")
-        name = "".join(ch if ch.isalnum() else "-" for ch in view).strip("-").lower()
-        lut = state_root() / "looks" / f"{name}.cube"
-        if not lut.is_file():
-            bake_look(lut, view=view)
-        path = str(lut).replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
-        mix = min(1.0, max(0.0, strength))
-        return (f"[{label}]split[{label}o][{label}l];[{label}l]lut3d=file='{path}'[{label}g];"
-                f"[{label}o][{label}g]blend=all_expr='A*(1-{mix:.3f})+B*{mix:.3f}'[{out}]")
-    if kind == "element":
-        element = effect["element"]
-        scale = _number(params, "scale", 1.0)
-        x, y = _number(params, "x", 0.5), _number(params, "y", 0.5)
-        opacity = _number(params, "opacity", 1.0)
-        # Fitted inside `scale` of the frame, its proportion kept, never larger than the frame.
-        box_w, box_h = max(2, round(width * min(scale, 1.0) / 2) * 2), max(2, round(height * min(scale, 1.0) / 2) * 2)
-        size = f"{box_w}:{box_h}:force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2"
-        source = f"[{element_input}:v]setpts=PTS-STARTPTS+{start:.3f}/TB"
-        if element.get("_matte_input") is not None:
-            # A separate matte: its brightness is the element's opacity.
-            matte = f"[{element['_matte_input']}:v]setpts=PTS-STARTPTS+{start:.3f}/TB,format=gray[{label}m]"
-            source = f"{matte};{source},format=rgba[{label}c];[{label}c][{label}m]alphamerge"
-        source += f",scale={size}"
-        place = f"x='W*{x:.3f}-w/2':y='H*{y:.3f}-h/2'"
-        if element["blend"] in ("screen", "add"):
-            mode = "screen" if element["blend"] == "screen" else "addition"
-            # A black-backed element: padded to the frame and blended.
-            return (f"{source},pad={width}:{height}:'{width}*{x:.3f}-iw/2':'{height}*{y:.3f}-ih/2':black,"
-                    f"format=gbrp[{label}e];[{label}]format=gbrp[{label}p];"
-                    f"[{label}p][{label}e]blend=all_mode={mode}:all_opacity={opacity:.3f}:shortest=0,format=yuv420p[{out}]")
-        if element["blend"] == "key":
-            source += f",colorkey={element['key_color']}:{_number(params, 'similarity', 0.3):.3f}:0.1"
-        return (f"{source},format=yuva420p,colorchannelmixer=aa={opacity:.3f}[{label}e];"
-                f"[{label}][{label}e]overlay={place}:eof_action=pass:format=auto[{out}]")
-    raise ValidationError(f"The effect {kind!r} is not one Cine Toaster draws", effects=list(EFFECTS))
-
-
 def natron_binary() -> str | None:
     import glob
 
@@ -456,59 +406,51 @@ def render(effects: list[dict[str, Any]], duration: float, output: Path, *, back
             rest = [effect for effect in effects if effect["effect"] != "ofx"]
             return render(rest, duration, output, background=treated, start=0.0, width=width, height=height,
                           fps=fps, run=run)
-    from .compositing.effects import BUILDERS
+    effects = [dict(effect, prepared=prepare_element(effect, duration, width, height, fps, run))
+               if effect["effect"] == "element" else effect for effect in effects]
+    return render_graph(effects, duration, output, background=background, start=start, width=width, height=height,
+                        fps=fps, run=run)
 
-    if effects and all(effect["effect"] in BUILDERS for effect in effects):
-        return render_graph(effects, duration, output, background=background, start=start, width=width,
-                            height=height, fps=fps, run=run)
-    if any(effect["effect"] in BUILDERS for effect in effects):
-        # Elements are still laid by FFmpeg (C6's next stage): the effects around them are drawn by the graph, in
-        # the order the shot gives them, each run of them in one graph.
-        with tempfile.TemporaryDirectory(prefix="fx-") as scratch:
-            current, offset = background, start
-            runs: list[list[dict[str, Any]]] = []
-            for effect in effects:
-                if runs and (effect["effect"] in BUILDERS) == (runs[-1][0]["effect"] in BUILDERS):
-                    runs[-1].append(effect)
-                else:
-                    runs.append([effect])
-            for index, part in enumerate(runs):
-                step = Path(scratch) / f"run-{index}.mp4"
-                render(part, duration, step, background=current, start=offset, width=width, height=height, fps=fps,
-                       run=run)
-                current, offset = step, 0.0
-            shutil.copyfile(current, output)
-            return output
-    size = f"{width}:{height}"
-    if background is not None:
-        inputs = ["-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", str(background)]
-        graph = [f"[0:v]scale={size}:force_original_aspect_ratio=decrease,pad={size}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
-                 f"fps={fps},format=yuv420p[v0]"]
-        sound = ["-map", "0:a?"]
-    else:
-        # A neutral picture for previews: a soft gradient with a figure-like shape.
-        inputs = ["-f", "lavfi", "-i", f"gradients=s={width}x{height}:c0=0x2a3a4a:c1=0x6a5a4a:d={duration:.3f}:r={fps}:speed=0.01:seed=7"]
-        graph = [f"[0:v]drawbox=x=iw*0.46:y=ih*0.35:w=iw*0.08:h=ih*0.65:color=0x1c1f22:t=fill,format=yuv420p[v0]"]
-        sound = []
-    label = "v0"
-    for index, effect in enumerate(effects, 1):
-        element_input = None
-        if effect["effect"] == "element":
-            element = effect["element"] = dict(effect["element"])
-            element_input = len([part for part in inputs if part == "-i"])
-            inputs += _element_input(element, element["file"], duration, width, height, fps, effect["params"], run)
-            element["_matte_input"] = None
-            if element.get("matte"):
-                element["_matte_input"] = element_input + 1
-                inputs += _element_input(element, element["matte"], duration, width, height, fps, {}, run,
-                                         matte=True)
-        graph.append(_chain(effect, label, f"v{index}", duration, width, height, element_input))
-        label = f"v{index}"
-    output.parent.mkdir(parents=True, exist_ok=True)
-    run([ffmpeg, "-v", "error", "-y", *inputs, "-filter_complex", ";".join(graph), "-map", f"[{label}]", *sound,
-         "-t", f"{duration:.3f}", "-r", str(fps), "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt",
-         "yuv420p", "-c:a", "aac", str(output)])
-    return output
+
+def prepare_element(effect: dict[str, Any], duration: float, width: int, height: int, fps: int,
+                    run) -> dict[str, Any]:
+    """An element's frames as one clip with alpha -- and its matte as another -- for the graph to read, made once
+    and kept by what they are (CT-0077). Whatever form a stock library delivers it in (a video, a sequence, EXR
+    frames, a Blender render, a splat) is turned into frames here; laying it is the graph's."""
+
+    import hashlib
+    import json
+
+    from .jobs import state_root
+
+    element = effect["element"]
+    sources = [element.get(key) for key in ("file", "matte", "project", "splat", "volume", "usd", "alembic")]
+    stats = [(source, Path(source.replace("%04d", "0001")).stat().st_size)
+             for source in sources if source and Path(source.replace("%04d", "0001")).exists()]
+    hashed = hashlib.sha256(json.dumps([element, effect["params"], duration, width, height, fps, stats],
+                                       sort_keys=True, default=str).encode()).hexdigest()[:20]
+    folder = state_root() / "vfx-elements" / "clips"
+    folder.mkdir(parents=True, exist_ok=True)
+
+    def made(name: str, file: str, matte: bool) -> str:
+        clip = folder / f"{hashed}-{name}.mov"
+        if not clip.is_file():
+            inputs = _element_input(element, file, duration, width, height, fps, effect["params"], run, matte=matte)
+            partial = clip.with_name(f".{clip.name}.part.mov")
+            # Nothing until its `start` (frame access, not compositing: the graph lays what the clip holds), and
+            # RGB with alpha even for a matte -- QuickTime RLE has no grey; FFmpeg would fall back to a palette.
+            delay = max(0.0, float(effect["params"].get("start", 0.0) or 0.0))
+            pad = [f"format=argb,tpad=start_duration={delay:.3f}:color=black@0"] if delay else ["format=argb"]
+            run([shutil.which("ffmpeg") or "ffmpeg", "-v", "error", "-y", *inputs, "-vf", ",".join(pad),
+                 "-t", f"{duration:.3f}", "-r", str(fps), "-an", "-c:v", "qtrle", "-pix_fmt", "argb", str(partial)])
+            partial.replace(clip)
+        return str(clip)
+
+    prepared = {"_clip": made("picture", element.get("file") or "", False), "_blend": element.get("blend", "alpha"),
+                "_key_color": element.get("key_color") or "0x00FF00"}
+    if element.get("matte"):
+        prepared["_matte"] = made("matte", element["matte"], True)
+    return prepared
 
 
 def render_graph(effects: list[dict[str, Any]], duration: float, output: Path, *, background: Path | None = None,

@@ -144,6 +144,14 @@ its own shader pipeline were removed. What still draws outside the graph is
 listed in CT-0072 with the step that ends it, and each compositing step's
 definition of done includes checking that it left no second path.
 
+**Supported is not exposed** (amended 2026-10-14, the user's rule): the graph
+can do more than the records a filmmaker writes (`layers:`, a shot's
+`effects:`, a join) let them say. A capability the graph has but a record does
+not offer is *not exposed* -- and exposing it means compiling the record into
+the graph's existing nodes, never a mechanism of its own. Before building
+anything, ask the graph first; the compositing roadmap keeps the two lists
+apart: what the engine lacks, and what it has but the records do not say.
+
  A graph
 may be run whole by one renderer that has all its nodes, or **split by a
 planner** across several, results handed over as files in the working space;

@@ -171,7 +171,7 @@ or procedural warp says `edge: extend` (the border repeated) or `edge: mirror`
 
 | Op | In | Out | Parameters |
 |---|---|---|---|
-| `colour.lut` | picture | picture | `file` (a .cube) or an OCIO `look` |
+| `colour.lut` | picture | picture | `file` (a .cube, applied in the display encoding it was made for), an OCIO `look`, or an OCIO display `view` (with `display`): the picture seen through it -- a film response such as ACES 2.0's, highlights above white rolled off -- and brought back to light (CT-0077). A node like any other: on one picture before it is merged, or on the result |
 | `colour.grade` | picture | picture | `lift`, `gamma`, `gain`, `saturation`, `hue` |
 | `colour.curve` | picture or matte | same | points per channel |
 | `colour.posterise` / `solarise` / `cycle` | picture | picture | levels / threshold / speed |
@@ -578,11 +578,14 @@ item names its primitives, and FFmpeg no longer draws them:
 - `hologram`: `colour.*` + `generate` scanlines + `merge.blend`: expressible.
 - `fog` (ffmpeg): `generate.noise` + `merge.blend(screen)`; its present form
   is a regular weave and should be replaced when it is re-expressed (CT-0064).
-- `aces-film-look`: `colour.lut(look)`.
+- `aces-film-look`: `colour.lut(view)`, mixed over the picture by its strength.
 - Element effects (`fire-over`, `smoke-over`, `explosion-over`,
   `muzzle-flash`, `sparks-over`): `generate.source(element)` →
   `merge.blend(screen)` for black-backed elements, `merge.over` for alpha ones,
-  `matte.key(colour)` for green ones.
+  `matte.key(colour)` and `colour.despill` for green ones, placed by
+  `warp.transform` -- done in C6 (CT-0077); the element's form (a sequence,
+  EXR, a Blender render, a splat) is turned into one clip by
+  `vfx.prepare_element`, transparent until its start.
 
 **VFX, Blender forms** (`disintegrate`, `melt`, `shatter`, `liquid-splash`,
 `lightning`, `rain`, `snow`, `sparks-burst`): `generate.render` (a Blender

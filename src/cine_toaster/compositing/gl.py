@@ -36,7 +36,7 @@ IMPLEMENTED = {
     "merge.over", "merge.mix", "merge.blend", "merge.porter_duff", "merge.channels",
     "warp.transform", "warp.corner_pin", "warp.surface", "warp.displace",
     "matte.shape",
-    "colour.grade", "colour.invert", "colour.despill",
+    "colour.grade", "colour.invert", "colour.despill", "colour.lut",
     "filter.blur", "filter.morphology", "filter.noise",
     "curve.progress", "curve.keys", "curve.map", "curve.combine", "curve.noise", "curve.beats",
     "opaque.gl",
@@ -199,6 +199,10 @@ _SHADERS = {
         void main() { vec4 p = texture(a, uv); float g = texture(field, uv).r * amount * 0.1;
           if (shown_ == 1) { vec3 s = encode(straight(p)); result = vec4(decode(max(s + g, vec3(0.0))) * p.a, p.a); }
           else result = vec4(max(p.rgb + g * p.a, vec3(0.0)), p.a); }""",
+    "lut": """uniform sampler2D a; uniform sampler3D table; uniform float top; uniform float cells;
+        void main() { vec4 p = texture(a, uv); vec3 c = max(straight(p), vec3(0.0));
+          vec3 u = clamp(encode(c / (1.0 + c)) / top, 0.0, 1.0);
+          vec3 o = texture(table, (u * (cells - 1.0) + 0.5) / cells).rgb; result = vec4(o * p.a, p.a); }""",
     "morphology": """uniform sampler2D a; uniform vec2 texel; uniform int reach; uniform int grow;
         void main() { float m = grow == 1 ? 0.0 : 1.0;
           for (int y = -reach; y <= reach; y++) for (int x = -reach; x <= reach; x++) {
@@ -251,6 +255,7 @@ class GLRenderer:
         self.opaque: dict[str, Any] = {}
         self.pool: dict[tuple, list] = {}
         self.shapes: dict[str, np.ndarray] = {}  # shapes drawn by the shared rasteriser, by what they are
+        self.luts: dict[str, Any] = {}  # looks baked from the reference's own colour function, by what they are
 
     @property
     def name(self) -> str:
@@ -511,6 +516,9 @@ class GLRenderer:
                     self.shapes.clear()
                 self.shapes[key] = _shape(node, size, scale)
             return self.upload(self.shapes[key])
+        if op == "colour.lut":
+            table, top, cells = self._lut(node, working, root)
+            return self.draw("lut", size, 4, {"a": value(node["in"]), "table": table}, top=top, cells=float(cells))
         if op == "merge.channels":
             textures, given = {}, []
             for channel, uniform in (("red", "r"), ("green", "g"), ("blue", "b"), ("alpha", "al")):
@@ -547,6 +555,25 @@ class GLRenderer:
             return self.draw("morphology", size, 1, {"a": source}, texel=(1.0 / width, 1.0 / height), reach=reach,
                              grow=int(node["operation"] == "dilate"))
         raise ValidationError(f"The GL renderer does not implement {op}")
+
+    def _lut(self, node, working, root, cells: int = 33, top: float = 0.995):
+        """A look as a 3D table, baked once by the reference's own `lut_colours` (one drawing of a look) over a
+        lattice even in the encoded value of x / (1 + x): fine in the shadows, reaching about 80 times white."""
+
+        from .reference import decode_srgb, lut_colours
+
+        key = repr((node.get("file"), node.get("look"), node.get("view"), node.get("display"), working, str(root)))
+        if key not in self.luts:
+            steps = decode_srgb(np.linspace(0.0, top, cells, dtype=np.float32))
+            light = steps / (1.0 - steps)
+            b, g, r = np.meshgrid(light, light, light, indexing="ij")  # red fastest, as a 3D texture is laid out
+            lattice = np.stack([r, g, b], axis=-1).reshape(1, -1, 3).astype(np.float32)
+            baked = lut_colours(node, lattice, working, root).reshape(cells, cells, cells, 3).astype(np.float32)
+            table = self.context.texture3d((cells, cells, cells), 3, np.ascontiguousarray(baked).tobytes(), dtype="f4")
+            table.filter = (self.gl.LINEAR, self.gl.LINEAR)
+            table.repeat_x = table.repeat_y = table.repeat_z = False
+            self.luts[key] = table
+        return self.luts[key], top, cells
 
     def _identity(self, source, size):
         return self.draw("mix", size, source.components, {"a": source, "b": source}, by_matte=0, weight=0.0)

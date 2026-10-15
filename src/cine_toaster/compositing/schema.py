@@ -118,7 +118,7 @@ OPS: dict[str, Op] = {
                           {"kind": "enum:ripple|swirl|bend|lens", "amount": "number", "frequency": "number",
                            "centre": "vector", "edge": "enum:transparent|extend|mirror"}),
     # -- colour
-    "colour.lut": Op({"in": P(*PIC)}, params={"file": "file", "look": "text"}),
+    "colour.lut": Op({"in": P(*PIC)}, params={"file": "file", "look": "text", "view": "text", "display": "text"}),
     "colour.grade": Op({"in": P(*PIC)}, params={"lift": "vector", "gamma": "vector", "gain": "vector",
                                                 "saturation": "number", "hue": "number"}),
     "colour.curve": Op({"in": P(*EITHER)}, {"out": SAME}, {"points": "vector"}),
@@ -185,7 +185,7 @@ REQUIRED_PARAMS: dict[str, tuple[str, ...]] = {
     "matte.shape": ("shape",), "matte.combine": ("how",), "matte.label": ("labels",),
     "merge.porter_duff": ("how",), "merge.blend": ("mode",),
     "warp.procedural": ("kind",), "warp.surface": ("shape",), "warp.corner_pin": ("corners|track",),
-    "colour.lut": ("file|look",), "colour.posterise": ("levels",), "colour.solarise": ("threshold",), "colour.despill": ("colour",),
+    "colour.lut": ("file|look|view",), "colour.posterise": ("levels",), "colour.solarise": ("threshold",), "colour.despill": ("colour",),
     "filter.morphology": ("operation", "radius"), "filter.blur": ("radius",),
     "time.remap": ("map",), "time.offset": ("frames",), "time.blend": ("frames",), "time.echo": ("count",),
     "generate.source": ("take|file",), "generate.solid": ("colour",), "generate.text": ("text",),
