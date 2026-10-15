@@ -143,7 +143,7 @@ OPS: dict[str, Op] = {
     "filter.noise": Op({"in": P(*PIC)}, params={"amount": "number", "size": "number", "seed": "int",
                                                 "space": "enum:linear|display"}),
     # -- time
-    "time.remap": Op({"in": P(*TYPES[:4])}, {"out": SAME}, {"map": "number"}),
+    "time.remap": Op({"in": P(*TYPES[:4])}, {"out": SAME}, {"map": "number", "interpolation": "enum:nearest|blend"}),
     "time.offset": Op({"in": P(*TYPES[:4])}, {"out": SAME}, {"frames": "int"}),
     "time.blend": Op({"in": P(*PIC)}, params={"frames": "int"}),
     "time.echo": Op({"in": P(*PIC)}, params={"count": "int", "spacing": "int", "decay": "number"}),

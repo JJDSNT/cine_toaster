@@ -23,6 +23,7 @@ import math
 import shutil
 import subprocess
 from dataclasses import dataclass, field
+from fractions import Fraction
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable
@@ -409,6 +410,51 @@ def keys_curve(keys: list[Any]) -> Callable[[float], Any]:
         return points[-1][1]
 
     return at
+
+
+def exact_keys(keys: list[Any]) -> Callable[[Fraction], Fraction] | None:
+    """`keys_curve` in exact arithmetic, for keys a remap can follow exactly: numbers, linear or held between
+    them. None when a key eases (a Bezier is not rational) or holds a vector."""
+
+    points = []
+    for key in keys:
+        t, value, ease = (key["t"], key["value"], key.get("ease", "linear")) if isinstance(key, dict) else (
+            key[0], key[1], "linear")
+        if ease not in ("linear", "hold") or isinstance(value, (list, tuple)):
+            return None
+        points.append((Fraction(str(t)), Fraction(str(value)), ease))
+    points.sort(key=lambda point: point[0])
+
+    def at(seconds: Fraction) -> Fraction:
+        if seconds <= points[0][0]:
+            return points[0][1]
+        for (t0, v0, ease), (t1, v1, _) in zip(points, points[1:]):
+            if seconds < t1:
+                return v0 if ease == "hold" else v0 + (v1 - v0) * (seconds - t0) / (t1 - t0)
+        return points[-1][1]
+
+    return at
+
+
+def remap_instant(node: dict[str, Any], nodes: dict[str, Any], curve: Callable[[str], Callable], frame: int,
+                  fps: float) -> Any:
+    """The source instant a remap reads at output frame `frame` (sampled at its centre): exact -- a Fraction --
+    when its map is a number or linear or held keys; otherwise the map curve's float (CT-0080)."""
+
+    from ..timebase import rate
+
+    given = node.get("map")
+    centre = Fraction(2 * frame + 1, 2) / rate(fps)
+    if given is None:
+        return centre
+    if isinstance(given, (int, float)):
+        return Fraction(str(given))
+    keyed = nodes.get(given["curve"], {}) if isinstance(given, dict) else {}
+    if keyed.get("op") == "curve.keys" and not keyed.get("in"):
+        exact = exact_keys(keyed["keys"])
+        if exact is not None:
+            return exact(centre)
+    return float(np.asarray(curve(given["curve"])((frame + 0.5) / fps)).reshape(-1)[0])
 
 
 def noise_curve(seed: int, frequency: float, amplitude: float, offset: float) -> Callable[[float], float]:
@@ -953,6 +999,33 @@ def node_windows(graph: dict[str, Any]) -> dict[str, int]:
     return reach
 
 
+def reach(graph: dict[str, Any], frames: int, fps: float, beats: list[float] | None = None) -> int:
+    """How many frames of its sources a graph reads to make `frames` frames (C7, CT-0080): more than it makes
+    when a remap runs faster than the picture or an offset reads ahead -- a 2x speed-up reads twice its length.
+    Its sources are read this far, so a speed-up does not freeze where the shot would have ended."""
+
+    from .semantics import remap_samples
+
+    nodes = graph.get("nodes") or {}
+    needed = frames
+    length = frames / fps if fps else 0.0
+    curve = curve_factory(nodes, {}, fps=fps, length=length, beats=beats,
+                          tracks=lambda reference: {"kind": "point", "frames": [{"points": [[0.5, 0.5]]}]})
+    for node in nodes.values():
+        if node.get("op") == "time.offset" and isinstance(node.get("frames"), int) and node["frames"] < 0:
+            needed = max(needed, frames - node["frames"])
+        if node.get("op") != "time.remap":
+            continue
+        interpolation = str(node.get("interpolation") or "nearest")
+        for frame in range(frames):  # every output frame: a map that turns back reaches its furthest, not its last
+            try:
+                at = remap_instant(node, nodes, curve, frame, fps)
+            except (ValidationError, KeyError, TypeError, ValueError):  # a map that cannot be read ahead
+                continue
+            needed = max(needed, max(index for index, _ in remap_samples(at, fps, interpolation)) + 1)
+    return needed
+
+
 def temporal_window(graph: dict[str, Any]) -> int:
     """How many frames back the graph's time operations read, so their inputs stay in memory that long.
 
@@ -1111,6 +1184,8 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
     width, height = size
     length = frames / fps
     port_types = graph.get("ports") or {}
+    # How far the sources are read: past the output when a remap or an offset reads ahead (CT-0080).
+    extent = reach(graph, frames, fps, beats)
 
     def port_kind(name: str) -> str:
         return str(port_types.get(name, ""))
@@ -1125,9 +1200,9 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             clips[name] = value
         elif isinstance(value, np.ndarray):
             per_frame = value.ndim == 4 or (port_kind(name) == "signal" and value.ndim == 3 and value.shape[0] == frames)
-            clips[name] = value if per_frame else _Held(value, frames)
+            clips[name] = value if per_frame else _Held(value, extent)
         else:
-            clips[name] = read(Path(value), frames, size, fps, working=working)
+            clips[name] = read(Path(value), extent, size, fps, working=working)
     for name, kind in port_types.items():
         if kind == "curve" and name not in curves:
             curves[name] = lambda seconds: seconds / length if length else 0.0  # a join's progress, by default
@@ -1164,7 +1239,10 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
 
     def value(reference: str, frame: int) -> Any:
         if reference in clips:
-            return clips[reference][frame]
+            held = clips[reference]
+            if isinstance(held, np.ndarray) and frame >= len(held):  # past its end: its last frame, as a clip does
+                frame = len(held) - 1
+            return held[frame]
         if reference in curves or nodes.get(reference, {}).get("op", "").startswith("curve."):
             return curve(reference)((frame + 0.5) / fps)
         key = (reference, frame)
@@ -1217,7 +1295,7 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             if name not in clips:
                 path = Path(node.get("file") or node.get("take"))
                 path = (root / path) if root and not path.is_absolute() else path
-                clips[name] = read(path, frames, size, fps, start=float(node.get("start", 0.0)),
+                clips[name] = read(path, extent, size, fps, start=float(node.get("start", 0.0)),
                                    colorspace=node.get("colorspace"), alpha=node.get("alpha"),
                                    working=working)
             return clips[name][frame]
@@ -1572,12 +1650,19 @@ def evaluate(graph: dict[str, Any], inputs: dict[str, Any], *, frames: int, size
             else:
                 out[..., :3] = np.clip(picture[..., :3] + amount * picture[..., 3:4], 0, None)
             return out
-        if op in ("time.remap", "time.offset"):
-            if op == "time.offset":
-                source_frame = frame - int(param("frames", 0))
-            else:
-                source_frame = int(round(float(param("map", seconds)) * fps - 0.5))
-            return value(node["in"], int(np.clip(source_frame, 0, frames - 1)))
+        if op == "time.offset":
+            return value(node["in"], int(np.clip(frame - int(param("frames", 0)), 0, extent - 1)))
+        if op == "time.remap":
+            # Which source instant (the map), then how it is pictured (the interpolation): two decisions.
+            from .semantics import remap_samples
+
+            samples = remap_samples(remap_instant(node, nodes, curve, frame, fps), fps,
+                                    str(node.get("interpolation") or "nearest"))
+            # Before the source: its first frame; past its end (a blend's second frame on the last): its last.
+            parts = [(value(node["in"], min(index, extent - 1)), weight) for index, weight in samples]
+            if len(parts) == 1:
+                return parts[0][0]
+            return sum(np.asarray(part, dtype=np.float32) * weight for part, weight in parts)
         if op == "time.blend":
             span = max(1, int(param("frames", 2)))
             around = [int(np.clip(frame + offset, 0, frames - 1)) for offset in range(-(span // 2), span - span // 2)]

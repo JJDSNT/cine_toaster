@@ -149,3 +149,54 @@ def blur_kernel(radius: float) -> tuple[float, int]:
 
     sigma = max(float(radius) / 2.0, 1e-3)
     return sigma, max(1, int(math.ceil(sigma * 3)))
+
+
+#: The policy for an instant that is *approximate* -- a map curve with eases, noise or combinations, computed in
+#: floating point: within this many frames of a boundary, it is on the boundary (a float32 curve puts 2x
+#: speed's instants at 6.9999999 frames where they are 7, and a plain floor stutters). An *exact* instant -- a
+#: Fraction, from a map of linear or held keys -- is never moved: a boundary stays a boundary and an instant
+#: just before it stays before it (CT-0080, after the user's review).
+BOUNDARY_TOLERANCE = 1e-6
+
+
+def _floor(frames: Any) -> int:
+    from fractions import Fraction
+
+    if isinstance(frames, Fraction):
+        return math.floor(frames)
+    return math.floor(frames + BOUNDARY_TOLERANCE)
+
+
+#: How a remap obtains the picture at a source instant (C7, CT-0080) -- apart from which instant it is.
+REMAP_INTERPOLATIONS = ("nearest", "blend")
+
+
+def remap_samples(seconds: Any, fps: Any, interpolation: str = "nearest") -> list[tuple[int, float]]:
+    """The source frames, and their weights, that make the picture at source instant `seconds`.
+
+    The remap decides *which instant*; this decides *how it is pictured* -- so an optical or a model's
+    interpolation is one more name here, not another remap. Frames are sampled at their centres:
+    - nearest: the frame whose centre is nearest, which is the frame that *contains* the instant (ADR 0023's
+      frame of an instant: the last one started) -- `floor(seconds * fps)`;
+    - blend: the two frames whose centres stand either side of the instant, weighted by where it falls
+      between them (`floor` finds them, the fraction weighs them).
+    Frames before the first are the first; past the last, the caller holds the last. An exact instant (a
+    Fraction, with the rate as one) is placed exactly; an approximate one by `BOUNDARY_TOLERANCE`.
+    """
+
+    from fractions import Fraction
+
+    if isinstance(seconds, Fraction):
+        from ..timebase import rate
+
+        fps = rate(fps)
+    if interpolation == "nearest":
+        return [(max(0, _floor(seconds * fps)), 1.0)]
+    if interpolation != "blend":
+        raise ValueError(f"interpolation is one of {', '.join(REMAP_INTERPOLATIONS)}, not {interpolation!r}")
+    position = seconds * fps - Fraction(1, 2) if isinstance(seconds, Fraction) else seconds * fps - 0.5
+    first = _floor(position)
+    weight = max(0.0, float(position - first))
+    if first < 0:
+        return [(0, 1.0)]
+    return [(first, 1.0 - weight)] + ([(first + 1, weight)] if weight > 1e-9 else [])

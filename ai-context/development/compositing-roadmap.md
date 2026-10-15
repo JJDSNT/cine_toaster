@@ -339,6 +339,8 @@ prescribed here.
 In progress (`CT-0080`): the audit done first -- the remap stutters and reads
 no further than the shot, there is no blending between source frames, tracks
 have no clock, sound ignores a retime, nothing is exposed; a sequence from it.
+Step 1 done: the remap picks the frame containing its instant, reads its
+source as far as it reaches, and blends source frames when asked.
 
 - What: retime, speed ramp, freeze, reverse, frame blending, an offset
   between layers, trails and echoes (the ADO's Infinity). Point and planar

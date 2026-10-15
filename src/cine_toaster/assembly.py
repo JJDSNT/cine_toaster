@@ -644,10 +644,18 @@ def _shot_drawing(root: Path, segment: Segment, size: tuple[int, int], fps: floa
     width, height = size
     run = (lambda command: run_process(command, expected_seconds=length, message=f"{segment.shot}: its elements")) \
         if run_process else None
+    whole = dict(width=width, height=height, fps=fps, run=run)
+    effects = [("fx-", effects_graph(segment.effects, length, **whole))] if segment.effects else []
+    title = [("title-", title_graph(segment.title, length, root=root, **whole))] if segment.title else []
+    fragments = title + effects if not (segment.media or segment.composite) else effects + title
+    base = segment.composite or None
+    graph = shot_graph(base, fragments) if base is not None or fragments else None
+    # The music's beats in the shot's own seconds: a shot pulses with the cut, not with its take.
+    local = [beat - at for beat in beats or [] if -1.0 <= beat - at <= length + 1.0]
+    # The takes read as far as the graph reaches: past the shot's end when it is retimed faster (CT-0080).
+    extent = reference.reach(graph, frames, fps, local) if graph is not None else frames
     inputs: dict[str, Any] = {}
-    base = None
     if segment.composite:
-        base = segment.composite
         for name, node in base["nodes"].items():
             if node.get("op") != "generate.source" or not node.get("take"):
                 continue
@@ -657,22 +665,15 @@ def _shot_drawing(root: Path, segment: Segment, size: tuple[int, int], fps: floa
                                       f"shot does not have ({', '.join(segment.composite_takes) or 'none'})")
             # The cut's stretch of the take, unless the node asks for another start.
             start = float(node["start"]) if node.get("start") is not None else segment.start
-            inputs[name] = reference.read(root / media, frames, size, fps, start=start,
+            inputs[name] = reference.read(root / media, extent, size, fps, start=start,
                                           colorspace=node.get("colorspace"), alpha=node.get("alpha"))
     elif segment.media:
-        inputs["picture"] = reference.read(root / segment.media, frames, size, fps, start=segment.start)
+        inputs["picture"] = reference.read(root / segment.media, extent, size, fps, start=segment.start)
     else:
         inputs["picture"] = card_picture(segment.title or {"params": {}}, width, height)
-    whole = dict(width=width, height=height, fps=fps, run=run)
-    effects = [("fx-", effects_graph(segment.effects, length, **whole))] if segment.effects else []
-    title = [("title-", title_graph(segment.title, length, root=root, **whole))] if segment.title else []
-    fragments = title + effects if not (segment.media or segment.composite) else effects + title
-    if base is None and not fragments:  # a take as it is: its own frames
+    if graph is None:  # a take as it is: its own frames
         clip = inputs["picture"]
         return (clip[index] for index in range(frames)), None, False
-    graph = shot_graph(base, fragments)
-    # The music's beats in the shot's own seconds: a shot pulses with the cut, not with its take.
-    local = [beat - at for beat in beats or [] if -1.0 <= beat - at <= length + 1.0]
     fast = renderer_for(graph)
     pictures, _identity, cached = reference.render(graph, inputs, frames=frames, size=size, fps=fps, root=root,
                                                    beats=local, renderer=fast)

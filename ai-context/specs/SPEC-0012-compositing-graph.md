@@ -199,9 +199,9 @@ in the 1080-line cut. A shape's `feather` is a fraction of the frame.
 
 | Op | In | Out | Parameters |
 |---|---|---|---|
-| `time.remap` | any value over time | same | a curve from output time to input time (retime, ramp, reverse, freeze) |
+| `time.remap` | any value over time | same | `map`, a curve from output time to input time (retime, ramp, reverse, freeze): *which* source instant; `interpolation` -- `nearest` (the frame that contains the instant, `floor`) or `blend` (the two frames either side, weighted) -- *how* it is pictured, decided apart so an optical or model interpolation is one more name (C7, CT-0080). Its input is read as far as the map reaches at any output frame (`reach`: its furthest instant, not its last), past the shot's end; before the source, its first frame; past it, its last (a blend's second frame included). A map of numbers -- linear or held keys, or a constant -- is followed **exactly** (fractions at the exact rate): a boundary stays a boundary. Only an approximate map (eases, noise, combinations, in floats) is placed by an explicit policy, `BOUNDARY_TOLERANCE` (within 1e-6 frame of a boundary, on it) |
 | `time.offset` | any | same | `frames` |
-| `time.blend` | picture | picture | frame blending for a remap |
+| `time.blend` | picture | picture | `frames`: a shutter -- the average of that many neighbouring **output** frames (a temporal blur; motion blur after a speed-up). Not the blending between source frames, which is the remap's `blend` |
 | `time.echo` | picture | picture | `count`, `spacing`, `decay` (trails) |
 
 ## generate

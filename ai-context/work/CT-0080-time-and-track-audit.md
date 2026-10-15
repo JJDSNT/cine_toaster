@@ -187,6 +187,69 @@ Tests to write, each before its fix:
 6. **GL**: time ops reading their inputs at other frames.
 7. **The done-when films**: the ramp on a beat, the trail, the window.
 
+# The user's decisions on the audit (2026-10-15)
+
+- **Mapping apart from interpolation**: the remap says which source instant;
+  `nearest` or `blend` says how it is pictured -- so optical or model
+  interpolation is a new name, not a new remap. `floor` finds the frame that
+  contains an instant, and the two either side for a blend, whose fraction
+  weighs them; it is not imposed on every sampling policy.
+- **`time.blend` keeps its meaning**, a shutter over output frames.
+- **Sound under a retime: no single policy.** Offered explicitly; `mute` the
+  default for a non-trivial retime, so nothing drifts out of sync unseen; a
+  shot without a retime keeps today's behaviour. Their limits, written
+  before building them:
+
+  | Policy | Does | Limits |
+  |---|---|---|
+  | `mute` | the take's sound silent for the shot | the shot needs another sound (music, a cue) or is silent; speech lost |
+  | `preserve` | the take's sound at speed 1 from the cut point | in sync only where the picture runs at speed 1; when the shot's length changes, the sound is cut at the shot's end or ends before it (padded with silence) -- to be stated in the plan's notes; never in sync through a ramp |
+  | `stretch` | the sound follows the picture's speed, pitch kept (`rubberband`, or `atempo` for a constant speed) | a constant speed is one filter; a ramp needs the sound cut in pieces each stretched to its speed, or a time-varying stretcher -- artefacts at extreme speeds (below 0.25x, above 4x) and on transients; reverse is not a stretch |
+  | `resample` (later) | speed and pitch change together, a tape run fast or slow | for an effect only; a ramp needs a varying resample |
+
+- **Tracking**: persistent records with the source's clock, coordinates
+  independent of the render's size (fractions of the picture, as SPEC-0012
+  §1 already stores them, with the measured size recorded), a confidence,
+  and a person's review -- not a computation repeated on every render.
+
+## Step 1 -- the remap's meaning (done 2026-10-15)
+
+- `semantics.remap_samples` (one rule for both renderers): `nearest` is the
+  frame containing the instant (`floor`); `blend` the two frames whose
+  centres stand either side, weighted by the fraction.
+- **Exact instants, after the user's review**: at 2x every instant falls on
+  a boundary, and the curve -- float32 keys -- put it at 6.9999999, so a
+  plain `floor` still stuttered (found by the test). A first fix added a
+  tolerance to every floor; the user's review pointed out that it moves an
+  instant truly before a boundary across it, against the exact base just
+  built. Now: a map of linear or held keys, or a constant, is followed in
+  exact fractions at the exact rate (`reference.exact_keys`,
+  `remap_instant`) -- no tolerance; only an approximate map (Bezier eases,
+  noise, combinations) is placed by the explicit, tested policy
+  `BOUNDARY_TOLERANCE`.
+- `time.remap` takes `interpolation` (`nearest` by default); its input is
+  read as far as the map reaches (`reference.reach`, from the map curve and
+  negative offsets), past the shot's end; past the source, its last frame
+  (also for an array input).
+- The assembly reads a shot's takes to the graph's reach.
+- `time.blend` unchanged; the spec now calls it a shutter.
+
+Implications for the next steps:
+- **Step 3 is now pressing**: a shot retimed faster already reads past its
+  cut point in the take, while its sound is still the take's span at speed
+  1 -- exactly the drift the `mute` default prevents. The audio policies
+  should come before any retime is exposed.
+- Before the source's start a remap shows its first frame: the graph's
+  extent begins at the cut point. Reading the take's frames before the cut
+  (a pre-roll, for a map that goes back past the start) needs the source
+  read from earlier with its origin -- part of step 2's clock.
+- The reach is computed per remap node at output times; a remap nested
+  under another is evaluated at the outer one's times, which the estimate
+  does not follow -- a conservative bound (the larger of the two) or a
+  composed evaluation is needed when nesting is exposed.
+- `nearest` and `blend` are the reference's; GL still refuses time ops
+  (step 6): a retimed shot draws on the reference, slower.
+
 # Done
 
 - Read every time and track node, its tests, SPEC-0012 §6, the assembly's
@@ -195,5 +258,21 @@ Tests to write, each before its fix:
 
 # Validation
 
+- Step 1 (`tests/test_time_ops.py`): nearest is the frame containing the
+  instant; blend weighs the two frames either side; 2x over ten frames
+  reads twenty, 1, 3, 5 ... 19, evenly (was 1, 3, 4, 6, 8, 9, 9 ...); half
+  speed repeats (0, 0, 1, 1) or blends (0, 0.25, 0.75, 1.25 ...); at speed
+  1 both interpolations give the source; reverse and freeze; a ramp never
+  steps back and runs faster at its end; past the source, its last frame;
+  a graph reaches as far as its remaps and negative offsets read; a source
+  file is read that far; `time.blend` stays a shutter.
+- Boundaries (after the review): an exact instant on frame 7's start is
+  frame 7, a billionth of a frame before it frame 6; the same instants in
+  floats follow the stated tolerance; keys a billionth of a second short of
+  2x give 0, 2, 4 ... (exact), on 2x 1, 3, 5 ...; an eased map stays
+  monotone; a map that turns back reaches its furthest instant (15 frames
+  for one peaking at 1.45 s and ending at 0.5 s); before the source, its
+  first frame; a blend on the last frame holds it, for an array and a clip.
+- Full suite: 855 tests pass.
 - The probes above (reproducible with a ten-frame clip whose red channel is
   its frame number). No code changed.
