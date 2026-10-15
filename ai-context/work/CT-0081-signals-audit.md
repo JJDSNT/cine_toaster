@@ -620,6 +620,46 @@ one depth for the cut-out person, 0.0524 per pixel; GL equal to the
 reference. A segmentation's cut is hard (one label a pixel), so the
 person's edge is not soft -- the soft-matte limitation of step 3.
 
+## Step 8 -- the done-when film (done 2026-10-15)
+
+The done-when, from the roadmap: a Blender-rendered object sits behind a
+person in a generated picture, ordered by depth. The user left the material
+to judgement; taken: a generated take of SINGULAR (1-02B c09, LTX: Kael in
+a hospital corridor), copied read-only into a production of its own
+(`~/cine-toaster-demos/c8-corridor`), nothing of SINGULAR run -- real
+generated material, free, its hair against a soft corridor the hardest edge
+there is. Generating a new picture was the alternative, with a cost.
+
+Made by `scripts/research/c8_film.py setup`, assembled by `toast assemble`,
+judged by `... measure` on the delivered file (`docs/trials.md`):
+
+- Video Depth Anything Small (input 392, 72 frames, 3.7 min); SAM 2 from a
+  box round Kael and a point on his face (the first try, points alone, held
+  only his head); nothing measured, so a calibration **stated** and
+  recorded as authored -- his face 1.0 m, the far door 8.5 m, a 50 mm lens
+  assumed, the uncertainty written -- the estimate aligned to it: Kael 1.01
+  m, the door 8.31 m, the left wall 4.36 m; frames held out AbsRel 0.058,
+  the last stretch 0.051, 3 mm a frame of temporal change.
+- Blender: an orb crossing 2 m from the camera at his temple, its camera
+  stated to be the shot's (`camera_id: shot-cam`).
+- The shot: three layers -- the plate by its depth, Kael cut out with one
+  depth, the orb by its own -- one graph, drawn by GL.
+- On the delivered film: on 14 frames the orb is behind him, and there his
+  pixels differ from the plate by 0.019, the encoding's noise (0.022 away
+  from the orb); where it shows, 0.245; GL equal to the reference (5e-5).
+
+Found by making it, and fixed: a node reading a record by id (a signal, a
+track, a render) was identified by the id alone, so a render made again was
+served from the composite cache under its old identity (v2). A record now
+enters a node's identity by its descriptions and corrections
+(`identity.record_identity`) -- recorded again, corrected, reverted, or
+re-rendered, another input (`tests/test_signals.py IdentityTests`). The
+same held for C7's tracks.
+
+Not C8's, seen in the film: the orb is sharp where the corridor is
+defocused, and lit brighter than the scene; a defocus by depth and a grade
+to the plate are compositing's next (the roadmap).
+
 # Done
 
 - Read SPEC-0012's signal types and ops, the schema's kind and camera
@@ -644,7 +684,7 @@ person's edge is not soft -- the soft-matte limitation of step 3.
   node declaring another kind or camera is refused; a relative depth cannot
   reach `merge.depth`; labels are resized to the nearest; one signal serves
   two readers.
-- Full suite after step 1: 934 tests pass; after step 2 and its review: 954; after step 3: 966; after step 4: 984; after step 5: 997; after step 6: 1006; after step 7: 1016.
+- Full suite after step 1: 934 tests pass; after step 2 and its review: 954; after step 3: 966; after step 4: 984; after step 5: 997; after step 6: 1006; after step 7: 1016; after step 8: 1018.
 - Step 7 (`tests/test_layer_depth.py`, 10): the layers compile into one
   graph with one `merge.depth`, an object depth, a label matte, every read
   `of` its source; she covers the square inside her cut and the square

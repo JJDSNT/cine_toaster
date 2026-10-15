@@ -58,6 +58,33 @@ def _digest(value: Any) -> str:
     return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
 
 
+#: Records a node reads by id (C7, C8): where they live in a production.
+RECORDS = {("signal.read", "signal"): "signals", ("track.read", "track"): "tracks",
+           ("generate.render", "render"): "renders/passes"}
+
+
+def record_identity(root: Path | None, folder: str, record_id: str) -> str:
+    """A production record as a node reads it: its descriptions and corrections by content (a record's data is
+    named by its own hash inside them) -- recorded again, corrected, or reverted, it is another input. A render
+    brings its signals' too (CT-0081: a re-rendered object was served from the cache under its old identity)."""
+
+    if root is None:
+        return f"no production:{record_id}"
+    base = Path(root) / folder / record_id
+    if not base.is_dir():
+        return f"missing:{folder}/{record_id}"
+    folders = [base]
+    if folder == "renders/passes" and (base / "render.json").is_file():
+        manifest = json.loads((base / "render.json").read_text(encoding="utf-8"))
+        folders += [Path(root) / "signals" / name for name in (manifest.get("signals") or {}).values()]
+    found = []
+    for place in folders:
+        for path in sorted(place.rglob("*")):
+            if path.is_file() and path.suffix in (".yaml", ".json") and "data" not in path.relative_to(place).parts:
+                found.append([path.relative_to(root).as_posix(), file_hash(path)])
+    return _digest(found)
+
+
 def identities(graph: dict[str, Any], inputs: dict[str, str], *, context: dict[str, Any],
                root: Path | None = None) -> dict[str, str]:
     """Every node's identity. ``inputs`` gives each of the graph's ports an identity already known."""
@@ -92,6 +119,8 @@ def identities(graph: dict[str, Any], inputs: dict[str, str], *, context: dict[s
             elif definition and definition.params.get(key) == "file" and isinstance(value, str):
                 path = resolve(value)
                 parts["params"][key] = {"file": file_hash(path) if path.is_file() else f"missing:{value}"}
+            elif (op, key) in RECORDS and isinstance(value, str):
+                parts["params"][key] = {"record": record_identity(root, RECORDS[(op, key)], value)}
             elif op == "generate.source" and key == "take" and isinstance(value, str) and resolve(value).is_file():
                 parts["params"][key] = {"file": file_hash(resolve(value))}
             elif op.startswith("opaque.") and key == "textures" and isinstance(value, dict):

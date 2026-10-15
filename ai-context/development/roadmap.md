@@ -431,6 +431,19 @@ Neither changes the direction; each is used at the edges (`references.md`).
   among valid neighbours on the same side of a depth discontinuity (a
   threshold on the relative jump), +inf and labels never blended.
 
+### Integration a composite still lacks (seen in CT-0081's film)
+
+- **A CG object is sharp where the plate is soft.** How: a defocus by depth
+  (`filter.blur` weighted by the merged depth's distance from a focus
+  plane, a circle of confusion from the stated lens), recorded in the
+  layer.
+- **A CG object is lit as rendered, not as the plate.** How: a grade of the
+  render to the plate (its exposure and white from the plate's region
+  behind it), and the plate's light measured (a probe) for the render.
+- **A camera is stated, not solved.** How: a camera solve of the take
+  (C7's tracking, extended to a camera) recorded as the shot's camera, its
+  lens measured instead of assumed.
+
 ### Depth in layers: what it does not do yet (CT-0081 step 7)
 
 - **A layer with a depth cannot move, pin, trail, shadow or border.** How:

@@ -188,7 +188,8 @@ def residuals(aligned: list[np.ndarray], references: list[np.ndarray], masks: li
     return {"mae": round(float(error.mean()), 5), "rmse": round(float(np.sqrt(np.mean(error ** 2))), 5),
             "abs_rel": round(float(relative.mean()), 5), "median": round(float(np.median(error)), 5),
             "p90": round(float(np.percentile(error, 90)), 5), "p95": round(float(np.percentile(error, 95)), 5),
-            "max": round(float(error.max()), 5), "correlation": round(float(np.corrcoef(zs, rs)[0, 1]), 5),
+            "max": round(float(error.max()), 5),
+            "correlation": (round(float(np.corrcoef(zs, rs)[0, 1]), 5) if zs.std() > 0 and rs.std() > 0 else None),
             "coverage": round(float(np.mean([item["coverage"] for item in per_frame])), 4),
             # Pairs of pixels ordered as the reference orders them. An alignment with s > 0 is monotone within a
             # frame, so this measures the estimate itself; the alignment cannot invert a frame's order.

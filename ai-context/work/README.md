@@ -50,8 +50,8 @@ CT-0041, CT-0052, CT-0053. `CT-0064` was opened on 2026-10-13.
   0024), step 2 (a Blender scene's passes as records, read by
   `generate.render`), step 3 (models as adapters) and step 4 (alignment
   with residuals, inverted occlusions flagged), step 5 (depth compositing
-  at edges), step 6 (signal ops on GL) and step 7 (signals in layers) done
-  (`doing`)
+  at edges), step 6 (signal ops on GL), step 7 (signals in layers) and step
+  8 (the done-when film) done; the user's viewing pending (`doing`)
 - `CT-0080` — C7: time and track -- the audit, the remap's meaning, source
   against timeline time, retimed sound, exposure, tracks as records, GL, and
   the three done-when films (`done`)

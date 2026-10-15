@@ -396,7 +396,9 @@ conformant with the reference on llvmpipe and the GPU, 2.1-2.5x faster at
 layers declare depth (a signal, a render's own, one depth for a cut-out
 object) and cuts by segmentation, compiled into one `merge.depth`; a render
 states which production camera it is; Blender and models meet in one
-composition, GL equal to the reference.
+composition, GL equal to the reference. Step 8 done: the done-when film --
+a Blender orb behind Kael in a generated corridor take, by depth, measured
+on the delivered file; awaiting the user's viewing to close C8.
 
 - What: depth and segmentation as signals, from a model run on a picture
   (depth estimation, a segment-anything model) or from Blender passes (Z,

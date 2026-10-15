@@ -102,9 +102,12 @@ grid. Step 5: depth compositing at edges -- each layer's depth carried into
 its coverage, three depth states kept, one depth per cut-out object; tests
 split into `make test-fast` and `make test-heavy`. Step 6: the signal ops on
 GL, conformant on llvmpipe and the Intel GPU. Step 7: depth and
-segmentation declared in a shot's layers, compiled into the one graph. Next:
-step 8, the done-when film -- a Blender object behind a person in a
-generated picture -- and C8's close.
+segmentation declared in a shot's layers, compiled into the one graph. Step
+8: the done-when film -- an orb rendered by Blender crossing behind Kael in
+SINGULAR's generated corridor take (copied read-only), ordered by depth,
+measured on the delivered file (`docs/trials.md`); making it found and
+fixed records missing from composite identities. Next: the user's viewing
+of the film, then C8's close and the end of the exploratory C phase.
 
 Opened on 2026-10-13, at the user's request (CT-0064, `ready`): the Amiga
 Demo Reel is to be rebuilt on the structure of NewTek's 1991 promotional

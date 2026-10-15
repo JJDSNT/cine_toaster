@@ -270,3 +270,44 @@ class GraphTests(SignalCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class IdentityTests(SignalCase):
+    """A node reading a record is known by the record's content (found in CT-0081: a re-rendered object was served
+    from the cache under its old identity)."""
+
+    def identity(self, graph: dict) -> str:
+        from cine_toaster.compositing.identity import identities
+
+        return identities(graph, {}, context={"renderer": "test"}, root=self.root)[graph["output"]]
+
+    def test_a_record_recorded_again_corrected_or_reverted_is_another_input(self) -> None:
+        self.geometric()
+        graph = {"output": "z", "nodes": {"z": {"op": "signal.read", "signal": "room-z", "kind": "depth",
+                                                "camera": "cam-a"}}}
+        seen = [self.identity(graph)]
+        self.assertEqual(self.identity(graph), seen[0])  # the same record, the same identity
+        signals.record_signal(self.root, signal_id="room-z", kind="depth", origin="geometric", frames=ramp(5, 2.0),
+                              rate=24, actor=TOOL, camera="cam-a", depth=DEPTH)
+        seen.append(self.identity(graph))
+        signals.correct_signal(self.root, signal_id="room-z", frame=0, where=np.ones((H, W), bool),
+                               values=np.zeros((H, W), np.float32), actor=PERSON)
+        seen.append(self.identity(graph))
+        signals.revert_signal_corrections(self.root, signal_id="room-z", actor=PERSON)
+        seen.append(self.identity(graph))
+        self.assertEqual(len(set(seen)), 4)
+
+    def test_a_render_rendered_again_is_another_input(self) -> None:
+        from cine_toaster.compositing.identity import record_identity
+
+        folder = self.root / "renders" / "passes" / "orb"
+        folder.mkdir(parents=True)
+        (folder / "render.json").write_text(json.dumps({"signals": {"depth": "room-z"}, "picture": {"hashes": ["a"]}}))
+        self.geometric()
+        first = record_identity(self.root, "renders/passes", "orb")
+        (folder / "render.json").write_text(json.dumps({"signals": {"depth": "room-z"}, "picture": {"hashes": ["b"]}}))
+        second = record_identity(self.root, "renders/passes", "orb")
+        signals.record_signal(self.root, signal_id="room-z", kind="depth", origin="geometric", frames=ramp(5, 3.0),
+                              rate=24, actor=TOOL, camera="cam-a", depth=DEPTH)
+        third = record_identity(self.root, "renders/passes", "orb")  # its depth recorded again
+        self.assertEqual(len({first, second, third}), 3)
