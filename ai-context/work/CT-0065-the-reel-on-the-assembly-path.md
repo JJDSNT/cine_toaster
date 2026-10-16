@@ -2,10 +2,10 @@
 id: CT-0065
 title: The reel on the assembly path -- stills as takes, narration beside the scene
 type: work
-status: doing
+status: done
 owner: unassigned
 created_at: 2026-10-13
-updated_at: 2026-10-13
+updated_at: 2026-10-15
 tags:
   - demos
   - assembly
@@ -126,3 +126,5 @@ over moving video live in the assembly. Everything the reel is to become
   second as a named alternative, nothing replaced; archival without source
   and licence refused, nothing written; a file that is not media refused.
 - Full suite: 621 tests pass (2026-10-14).
+
+**Closed (2026-10-15).** Its scope -- the reel on the assembly path, the probe's defects closed -- is done. What it left, replacing the reel's content whole, is D9: the reel made last, from the other demos, through the production flow (the user, 2026-10-15).

@@ -5,7 +5,7 @@ type: status
 status: current
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-10-13
+updated_at: 2026-10-15
 tags:
   - status
   - tracker
@@ -193,34 +193,29 @@ Cine Toaster can currently:
 
 Cine Toaster cannot yet:
 
-- execute or recover background jobs;
 - persist the multi-project registry or expose project switching in the UI;
 - run project-scoped agents;
 
 ## Active work
 
-- `CT-0017` is in `doing` for the production schema and Amiga reel.
-- `CT-0015` is ready for cast entities and reference lineage.
-- `CT-0021` is ready to evaluate Fountain editing components and Final Draft
-  FDX interchange. Current screenplay support is read-only raw-text display.
-- `CT-0020` records a future UI evaluation: Okay Wannabe as a production-stage
-  reference and a node-based way to guide clip transitions. No interface or
-  schema choice has been made.
-- `CT-0022` is in `doing`: camera movement and cuts between clips are the main
-  production pain. External references are screened and ranked in
-  `references.md`, and the SceneFlow spike is done. Briefs can be derived from
-  records, including screen sides from geometry. SPEC-0005 is implemented:
-  movement within a shot, eight new checks, and blockout paths. SPEC-0007 is
-  implemented: a cut record for every join in a scene, five checks, and join
-  cards in the Cut room.
-- `CT-0023` and `CT-0024` cover the node canvas. All six reference
-  repositories use React Flow and none uses CopilotKit. Arcads is an
-  executable graph of creative-level nodes. The corrected position is one
-  canvas with entity nodes (records) and step nodes (workflow templates);
-  steps run in the orchestration layer and results become takes with lineage.
-- `CT-0025` is in `doing`: storyboard fidelity levels. The blocking frame is
-  delivered: the camera's view computed from geometry, shown beside the
-  blockout, and available through `toast frame`.
+Open records, by what they wait for (2026-10-15; every other record is
+`done`, `ai-context/work/README.md`):
+
+- **Next, by the user's word**: the demos, produced through the production
+  flow -- an intention, a screenplay, a storyboard -- the reel last, made
+  from the others (`CT-0064`, `ready`; D8 and D9 of the roadmap).
+- **Awaiting the user's review**: SINGULAR's migration (`CT-0054`); the UX
+  research made on `main` -- production information priorities, production
+  awareness, cognitive ergonomics, creative context, compound locations,
+  model-dependent mood, the Visual Lab (`CT-0087`..`CT-0095`).
+- **Ready, not started**: Blender MCP (`CT-0082`), integrated editing
+  (`CT-0083`), the three-workspace UX vision, wireframe and information
+  visibility (`CT-0084`..`CT-0086`), surfaces from Blender (`CT-0073`, C5b),
+  the interface reference and transition graph (`CT-0020`), Video Toaster
+  transitions (`CT-0028`), learning from gate decisions (`CT-0041`), the 4K
+  upscaling spike, its cost to approve (`CT-0053`).
+- **Blocked**: spatial sound beyond 5.1, on what feeds the system
+  (`CT-0052`).
 
 ## Closed: scene import
 
@@ -242,7 +237,7 @@ required are all deleted.
 - `CT-0011` — one native format, read the production's YAML directly (`done`).
 - `CT-0012` — generation providers moved into the tool (`done`).
 
-## Ready next
+## The ordered plan of 2026-09-29 (complete)
 
 Follow the **ordered plan** in `development/roadmap.md` (2026-09-29):
 
@@ -349,7 +344,7 @@ The recommended next implementation is `select_take`, not a frontend rewrite or
 agent integration. It establishes the mutation boundary that those interfaces
 will later consume.
 
-## Recently completed
+## The first records (2026-09-20)
 
 - `CT-0007` — added Git ignore conventions and CLI protection against accidental
   in-repository runtime projects.
@@ -378,7 +373,11 @@ will later consume.
 
 ## Validation baseline
 
-On 2026-09-20, the repository test suite passed 141 tests with:
+On 2026-10-15 the whole suite passed 1018 tests (40 of them heavy: Blender,
+models, voice), with `make test` (`tests/run.py`); `make test-fast` runs the
+other 978 in about 10 minutes (`development/testing.md`).
+
+Earlier, on 2026-09-20, the repository test suite passed 141 tests with:
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v

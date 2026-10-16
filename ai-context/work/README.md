@@ -86,7 +86,7 @@ Compositing, the demos line and earlier:
   fractions to compute, ticks to store, the media clock's contract (`done`)
 - `CT-0078` — C6b: rich typography; stages A-D done (letters with their
   own time, styles, colour fonts, Lottie as a source); the user's review of
-  B and C to return to (`doing`)
+  B and C to return to (`done`)
 - `CT-0077` — C6: the catalogs re-expressed -- effects, looks, elements and
   titles drawn by the one engine, on GL; no FFmpeg compositing chain left
   (`done`)
@@ -98,7 +98,7 @@ Compositing, the demos line and earlier:
 - `CT-0074` — C3: parameters over time; eases one vocabulary, a beat's
   instant apart from the reaction, the plume on every beat (`done`)
 - `CT-0073` — surfaces from Blender: an external UV mesh for `warp.surface`,
-  evaluated and its interface documented (`proposed`)
+  evaluated and its interface documented (`ready`)
 - `CT-0072` — the post-C2 convergence audit: one GL pipeline, one place for
   each decision, cards and stills drawn by the graph, `toast build` removed
   (`done`)
@@ -108,7 +108,7 @@ Compositing, the demos line and earlier:
 - `CT-0070` — C1: the compositing graph specified, SPEC-0012 drafted
   (`review`)
 - `CT-0069` — joins shaped by a picture: mattes and overlays (SPEC-0011);
-  the preview is left (`doing`)
+  the preview is left (`done`)
 - `CT-0068` — a production declares the frame its versions are made in
   (`done`)
 - `CT-0067` — beats heard and kept beside a track; shots cut to music in
@@ -117,7 +117,7 @@ Compositing, the demos line and earlier:
   source, licence and credit (`done`)
 - `CT-0065` — the reel on the assembly path: stills as takes, narration
   beside the scene and in each line's voice; bringing material in is next
-  (`doing`)
+  (`done`)
 - `CT-0064` — the Amiga reel after the 1991 Video Toaster promo: the gap
   between the tape and what is rendered today, and the order to close it;
   nothing built yet (`ready`)

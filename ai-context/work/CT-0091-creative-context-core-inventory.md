@@ -31,7 +31,7 @@ CT-0090 established that the left sidebar groups features but does not expose ho
 | Performance emotion | `docs/emotions.md` | Character/shot-specific emotion, intensity, arc, reason | Show performance direction only when relevant | Not equivalent to visual mood or observed acting |
 | Continuity | `src/cine_toaster/continuity.py::ledger`, `state_at` | Declared subject/attribute states, transitions and provenance across scenes/shots | Show known state, origin and warning/advice distinctions | Inferred continuity is not a confirmed creative choice |
 | Editorial cuts | `src/cine_toaster/cuts.py::scene_cuts`, `frontend/src/CutEditor.tsx` | Shot transitions and continuity checks; revision-checked editing commands | Show cut rationale and affected shot pair | Does not alone prove a full take-to-assembly impact graph |
-| Visual moodboard | `docs/research/moodboard-visual-style-investigation.md` | Future investigation only | Potential film/scene reference grouping | Do not present as an implemented field or resolved value |
+| Visual moodboard | `ai-context/research/moodboard-visual-style-investigation.md` | Future investigation only | Potential film/scene reference grouping | Do not present as an implemented field or resolved value |
 | Navigation | `src/cine_toaster/web_assets/index.html` | Fixed left menu grouped Writing, Production, Reference | Global destinations remain discoverable | Menu does not itself display applicability/provenance |
 
 ## Data contract to investigate, not implement blindly

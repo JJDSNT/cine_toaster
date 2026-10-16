@@ -5,7 +5,7 @@ type: index
 status: active
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-09-20
+updated_at: 2026-10-15
 tags:
   - ai-context
   - memory
@@ -47,12 +47,19 @@ For any architectural or domain change, read:
 
 Then read the focused guidance relevant to the task:
 
+- `production-flow.md` — the two phases the product serves
+- `cinematic-intelligence-intent.md` — what agents should know of filmmaking,
+  and the filmmaker's creative freedom
 - `conventions.md`
 - `development/core.md`
 - `development/frontend.md`
-- `development/testing.md`
+- `development/testing.md` — the suite and its fast and heavy parts
+- `development/compositing-roadmap.md` — the compositing engine's steps
+- `development/architectural-convergence-lessons.md` — one engine, one place
+  for each decision
 - `decisions/README.md`
 - `specs/README.md`
+- `research/` — investigations not yet decided (a topic, its questions)
 - `references.md` — external products and repositories, with reuse licence
 
 ## Documentation authority
@@ -72,24 +79,15 @@ as part of the change.
 
 ## Current state
 
-Cine Toaster has a small dependency-free Python runtime, a `toast` CLI, a local
-HTTP control room, a filesystem project loader, a disposable SQLite index, a
-vanilla browser UI, and a transition library.
-
-The first canonical write is delivered. `select_take` and `clear_selection` run
-through one shared application command from Core, CLI, HTTP, and the browser,
-with validation, optimistic revisions, typed errors, atomic persistence, a
-durable decision record, and a post-commit event. The UI is no longer read-only:
-alternatives are compared side by side and a choice is committed with its
-rationale.
-
-Three concepts arrived with that slice and shape everything after it: authored
-files are never rewritten (`ADR 0006`), scene geometry is checkable project
-state (`ADR 0007`), and sequences are the unit a production reviews
-(`ADR 0008`).
-
-Nothing generates yet. There is no ComfyUI, RunPod, or other provider adapter,
-and no background job runtime.
+`project-status.md` is where the current state is kept; it is not repeated
+here, so it cannot drift. In outline (2026-10-15): a Python runtime and the
+`toast` CLI over filesystem productions; a control room in the browser and a
+React canvas; shared commands for every write (takes, decisions, gates);
+background jobs; generation through adapters; scene and sequence assembly
+with kept versions; one compositing engine drawn by an exact reference and
+by GL (ADR 0022), exact time (ADR 0023), and signals from models and from 3D
+as production records (ADR 0024). SINGULAR is migrated into Cine Toaster's
+own format and assembles there.
 
 ## Execution memory
 

@@ -2,10 +2,10 @@
 id: CT-0073
 title: Surfaces from Blender -- an external UV mesh for warp.surface (proposed)
 type: work
-status: proposed
+status: ready
 owner: unassigned
 created_at: 2026-10-14
-updated_at: 2026-10-14
+updated_at: 2026-10-15
 tags:
   - compositing
   - warp

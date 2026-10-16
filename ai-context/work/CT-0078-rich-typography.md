@@ -2,7 +2,7 @@
 id: CT-0078
 title: C6b -- rich typography and animated lettering
 type: work
-status: doing
+status: done
 owner: unassigned
 created_at: 2026-10-14
 updated_at: 2026-10-15
@@ -275,3 +275,5 @@ What to do when this is taken up:
   distortion and a vignette in one graph, nothing written between. A lens
   distortion at k1 = 0 differs by 0.0045 on average: the plugin's own
   resampling, not the round trip. Full suite: 823 tests pass.
+
+**Closed (2026-10-15).** Stages A-D are done; the user's review of the colour fonts and the chrome is recorded in the compositing roadmap as a path of evolution, taken when a production asks.

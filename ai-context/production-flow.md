@@ -5,7 +5,7 @@ type: context
 status: active
 owner: project
 created_at: 2026-09-29
-updated_at: 2026-09-29
+updated_at: 2026-10-15
 tags:
   - product
   - flow
@@ -41,9 +41,10 @@ versions.
 | --- | --- | --- |
 | Cast | Cast sheets (SPEC-0003 amendment): master picture, variants, names, voice identity; the Cast room; checks for drift | Lineage of the references sent to generation |
 | Master images | Discovered stills; the storyboard's best picture per shot | Generating them from blocking frame, cast and look (CT-0025 step 4, SPEC-0003) |
-| Clips | Takes per shot, as versions (`c02.mp4`, `_takes/`, `_rejected/`); `select_take`; comparison; **blocks and content-based slicing into takes with lineage** (CT-0037) | The generation adapter itself (needs a budget) |
-| Cuts and scene assembly | Cut records; **scene assembly from the chosen takes as kept versions** (`toast assemble`, versions panel); verdicts; restore | Transitions and J/L cuts in the assembly; speech-aware trims |
-| Sequences | Sequences declared in the manifest; **sequence versions assembled from the scenes' approved versions, with verdicts** (`toast assemble-sequence`, Sequences room) | Transitions between scenes; an approved sequence feeding the film's final cut |
+| Clips | Takes per shot, as versions (`c02.mp4`, `_takes/`, `_rejected/`); `select_take`; comparison; **blocks and content-based slicing into takes with lineage** (CT-0037) | done since: generation through adapters (`toast generate`: LTX, ComfyUI, Qwen Edit on Runpod), its cost allocated from the billing (`toast finops`); left: 4K finishing (CT-0053) |
+| Cuts and scene assembly | Cut records; **scene assembly from the chosen takes as kept versions** (`toast assemble`, versions panel); verdicts; restore | done since: transitions drawn by the compositing engine, J- and L-cuts, trims that follow the speech (`toast transcribe`) |
+| Sequences | Sequences declared in the manifest; **sequence versions assembled from the scenes' approved versions, with verdicts** (`toast assemble-sequence`, Sequences room) | joins between scenes done (CT-0051); left: an approved sequence feeding the film's final cut |
+| Compositing, VFX and titles | One graph per shot drawn by an exact reference and by GL (ADR 0022): layers, keys, mattes, transitions, titles, time operations, tracks; depth and segmentation from models and Blender as records (ADR 0024) | defocus by depth, grading a render to its plate, a solved camera; a compositing view for the filmmaker (C11) |
 
 ## The gate between them
 

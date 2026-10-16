@@ -2,10 +2,10 @@
 id: CT-0069
 title: Joins shaped by a picture -- mattes and overlays in the transition contract
 type: work
-status: doing
+status: done
 owner: unassigned
 created_at: 2026-10-14
-updated_at: 2026-10-14
+updated_at: 2026-10-15
 tags:
   - transitions
   - compositing
@@ -100,3 +100,5 @@ fed by track and animate.
   `luma`, assembled by the tool as `SC-020 v2` (42.3 s). The version's notes
   said the splash was retimed, did not start black, and was completed.
 - Full suite: 642 tests pass (2026-10-14); after it, only the three items' categories changed, and their tests pass.
+
+**Closed (2026-10-15).** SPEC-0011's first part is done; what it left is in the compositing roadmap (C10 and its paths of evolution), as the list above says.

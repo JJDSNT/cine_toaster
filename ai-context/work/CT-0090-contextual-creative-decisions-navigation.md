@@ -26,7 +26,7 @@ How should Cine Toaster make **film-wide creative decisions and their scene/shot
 - `docs/styles.md` already defines style axes (technique, direction, format), per-axis cascading and scene-level changes. It reports the level responsible for a style decision, and treats departures as advice rather than prohibitions.
 - `docs/locations.md` defines reusable location geometry, cameras, marks and plates. Scenes reference locations and may override parts of them. The location room links scenes that use a set; checks distinguish missing locations and local overrides.
 - `docs/emotions.md` describes shot-level performance choices, per-character emotion/intensity/arc/reason, distinct from film-wide visual style.
-- `docs/research/moodboard-visual-style-investigation.md` is exploratory only. It distinguishes visual mood/style from emotional performance; it does **not** establish an implemented first-class moodboard.
+- `ai-context/research/moodboard-visual-style-investigation.md` is exploratory only. It distinguishes visual mood/style from emotional performance; it does **not** establish an implemented first-class moodboard.
 - `src/cine_toaster/project.py` imports cast, looks, continuity and project-state logic. This indicates existing concepts to inventory precisely, not proof of a single unified creative decision graph.
 
 ## Distinctions to preserve
@@ -87,7 +87,7 @@ This is not a mandate for a new graph database or a new source of truth.
 
 Do not conflate three workspaces with three context levels. Do not convert every resource into a permanent sidebar item. Do not force all creative decisions into a rigid inheritance hierarchy. Do not claim a dependency without traceable Core evidence. Preserve author control and explicit exceptions.
 
-Related: CT-0084, CT-0085, CT-0086, CT-0087, CT-0088, CT-0089, and `docs/research/moodboard-visual-style-investigation.md`.
+Related: CT-0084, CT-0085, CT-0086, CT-0087, CT-0088, CT-0089, and `ai-context/research/moodboard-visual-style-investigation.md`.
 
 ## UX-first spatial-context validation (2026-10-08)
 

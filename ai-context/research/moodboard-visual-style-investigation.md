@@ -1,3 +1,17 @@
+---
+id: CTX-RESEARCH-MOODBOARD
+title: Moodboard and visual style references -- a future investigation
+type: research
+status: candidate
+owner: project
+created_at: 2026-10-07
+updated_at: 2026-10-15
+tags:
+  - research
+  - visual-style
+  - moodboard
+---
+
 # Moodboard / Visual Style References — Future Investigation
 
 > **Status:** investigation candidate. This document records a topic for later evaluation; it is **not** a decision to add a Moodboard feature to Cine Toaster.

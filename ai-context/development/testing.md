@@ -5,7 +5,7 @@ type: guide
 status: active
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-09-20
+updated_at: 2026-10-15
 tags:
   - development
   - testing
@@ -14,34 +14,38 @@ tags:
 
 # Testing
 
-## Current command
+## Current commands
 
-Run the repository suite with:
-
-```bash
-PYTHONPATH=src python3 -m unittest discover -s tests
-```
-
-or, in the configured environment:
+The suite is split by one mark, `@heavy("why")` (`tests/heavy.py`), on the
+tests that need Blender, a model's inference, a voice engine or a long
+render -- never on a contract:
 
 ```bash
-uv run --with pytest python -m pytest -q
+make test-fast    # every test but the heavy ones: while working (about 10 min)
+make test-heavy   # only the heavy ones: after changing an adapter
+make test         # the whole suite, the final authority: before a step closes
 ```
 
-Both run the same 140 tests. The suite needs no network and no external binary.
+Without make: `PYTHONPATH=src python3 tests/run.py [fast|heavy] [--times]`;
+`--times` lists the slowest test classes, their class set-up included. One
+module: `PYTHONPATH=src python3 -m unittest tests.test_signals`.
+
+On 2026-10-15: 1018 tests, 40 of them heavy; the whole suite about 15 to 17
+minutes on this machine. Most of the time is not in the heavy tests: retimed
+sound, deliveries and generation lead (`--times`).
+
+What a test needs and does not find -- FFmpeg, GL, Blender, the vision or
+voice environment, fetched models -- makes it skip with the reason, never
+fail; `toast doctor` says how to install each. A recorded fixture keeps a
+real case in the fast suite (`tests/fixtures/c8/da2-occlusion.npz`: a
+model's wrong occlusion, checked without the model).
 
 ## Current inventory
 
-| File | Covers |
-| --- | --- |
-| `test_commands.py` | commit, supersede, no-op repeat, stale revision, ineligible take, unknown resources, authored file untouched, unrelated state preserved, event on success only, atomic write, future schema version refused |
-| `test_http_commands.py` | HTTP reaches the same command; each domain error maps to its status code; static assets cannot escape the asset root |
-| `test_cli_takes.py` | CLI parity, JSON output, exit codes, `check` passing and failing |
-| `test_geometry.py` | geometry parsing, axis, eyeline height, eyeline direction, and sanity checks, including the cases that must produce no finding |
-| `test_assemblies.py` | version snapshots, verdicts and supersession, rollback semantics, refusal to restore a snapshotless or stale version, cut differences |
-| `test_providers.py` | graph patching, keyframe wiring, control resolution, video detection, and every branch of job persistence — all offline |
-| `test_knowledge.py` | frontmatter parsing, layer overrides, rejection of unknown checks and statuses, refuted records, provider claims, coverage arithmetic |
-| `test_project.py`, `test_index.py`, `test_scanner.py`, `test_application.py`, `test_transitions.py`, `test_web.py` | loading, indexing, classification, project identity, transitions, path safety |
+Test files are named for what they cover (`test_<area>.py`, about 100).
+GL is checked against the reference, never the reverse
+(`test_compositing_gl.py`, `test_gl_signals.py`), on llvmpipe and, with
+`GALLIUM_DRIVER=d3d12`, on WSL's GPU.
 
 A check that must stay silent is as much a test as one that must fire. The
 geometry suite asserts both, because a continuity checker that reports a correct
