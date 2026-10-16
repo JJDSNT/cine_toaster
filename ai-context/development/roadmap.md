@@ -378,8 +378,16 @@ made from the others.
 | The Last Signal | narrative, generated takes | the classic flow: screenplay, storyboard, cast, generation, verdicts, assembly |
 | The music piece (D8) | an **advertisement** for a fictitious brand, driven by its music | a brief, cuts on the beats, packshot and legal card, several deliveries from one production (30/15/6 s; 16:9, 9:16, 1:1) |
 | The animated short | a **cartoon** (2D drawn) | a character kept the same shot to shot (model sheet, style guide), lip sync to dialogue, limited animation on twos |
-| The hybrid VFX micro-scene | footage and **ray-traced CG** (Cycles) | depth, a person cut out with soft mattes, a CG object behind and in front of her |
+| The hybrid VFX micro-scene | footage and **ray-traced CG** (Cycles) | CG joining footage; the techniques are whatever its screenplay asks |
 | The reel (D9), last | the four as its sources | the tool presenting itself, on NewTek's 1991 tape; it holds a short **ray-traced scene of its own** -- a homage to Eric Graham's *Juggler* (1986, the Amiga's ray-traced animation) -- whose final shots come from Blender's blockout rendered, not generated |
+
+Order (the user, 2026-10-16): **1** the hybrid micro-scene, **2** The Last
+Signal, **3** the advertisement, **4** the cartoon, **5** the reel -- from the
+smallest and cheapest to the most open, each building on the last; paid
+generation needed from 2, the cartoon's making decided by 4. Each starts
+from its intention and screenplay, written with the user: footage, shots and
+techniques follow from them, never chosen ahead. Captures of the tool at
+work are kept along 1-4 as the reel's material.
 
 Ray tracing appears twice, in two roles: CG joining footage (the hybrid
 scene) and a film made by it alone (the Juggler scene in the reel). Open
