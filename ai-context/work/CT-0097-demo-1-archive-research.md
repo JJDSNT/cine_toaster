@@ -99,6 +99,32 @@ Chaplin titles: the Bill Sprague Collection on the Archive (16 mm prints:
 *His Favorite Pastime*), Collectie Filmcollectief (a home print of a scene
 of *The Adventurer*). None of the four chosen titles found that way yet.
 
+## A second survey, checked (2026-10-16)
+
+A survey the user brought (six copies) checked against the sources:
+
+- *A Trip to the Moon* (Méliès, 1902), Commons `Le Voyage dans la Lune
+  (1902).webm`, 1440x1080: the **work** is public domain everywhere
+  (`PD-old-auto-expired|1938`, Méliès died 1938); the **copy** has no source
+  -- the page's Source field repeats the title. A 1440x1080 transfer of 1902
+  is most likely a modern restoration's (Lobster/Flicker Alley); not cleared
+  until its origin is found. The colour version (2011 restoration, Air's
+  score) is out.
+- *The Pawnshop* 1080p and *Behind the Screen* 1440x1072: the YTS Blu-ray
+  rips found earlier -- out (restoration, illegitimate source).
+- *One Week* (Keaton, 1920): Lobster's 2016 restoration -- out by the
+  no-restoration rule; Keaton died 1966, so life + 70 runs to 2036.
+- *A Film Johnnie* 1280x720 from YouTube, *The Rink* 400x300 (the `CC_`
+  transfer, its non-free soundtrack removed): origin of the copy unknown.
+- Chaplin (a British national, died 1977) under "distributable
+  internationally": life + 70 to 2047 where that rule applies -- the risk
+  the user's requirement excludes.
+- What passes the international requirement by the work: authors dead
+  before 1956 and published before 1931 -- Méliès, the Lumières, Porter,
+  Chomón, and **D. W. Griffith's Biograph shorts (1908-1913; Griffith died
+  1948)**, many of them in the Library of Congress paper prints: dramatic
+  material, with a copy of known origin. To survey.
+
 # To do
 
 - The user's decision on the copies: low-resolution unrestored transfers of
