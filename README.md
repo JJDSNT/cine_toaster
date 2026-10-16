@@ -39,9 +39,7 @@ A candidate image raises more than one question:
 
 Those answers should not collapse into an automatic accept/reject score. The filmmaker may approve a result, regenerate it, retain it as a reference, allow an intentional exception, or investigate a new candidate visual identity without silently rewriting the film's existing decisions.
 
-**Visual Lab** is the current research direction for testing visual choices across representative scenes and environments before promoting them into a production-wide visual baseline. Its precise UX and position in the application are **not yet decided**. The intent is to make visual discovery and approval practical, traceable, and reversible — not to impose one model, one aesthetic, or one workflow on every film.
-
-See [Visual Lab research](ai-context/work/CT-0095-visual-lab-core-gap-and-ux-research.md) and [model-dependent mood research](ai-context/work/CT-0094-model-dependent-mood-and-visual-identity.md).
+**Visual Lab** is a research direction, not yet a feature: testing visual choices across representative scenes and environments before promoting them into a production-wide baseline -- practical, traceable and reversible, without imposing one model, one aesthetic or one workflow on every film.
 
 ## One film, many production methods
 
@@ -106,19 +104,21 @@ Read the [architecture](ai-context/architecture.md), [architectural decisions](d
 
 ## What works today
 
-The repository already contains executable foundations. Among the implemented capabilities are:
+Cine Toaster runs today as a Python runtime with the **`toast` CLI**, a browser-based **production control room** and a React **production canvas**, over productions that are ordinary folders on disk. By the stages of the filmmaking experience above:
 
-- A Python-based headless runtime and the **`toast` CLI**.
-- External filesystem productions, project loading, indexing, search, and browser-based production views.
-- Two independent example productions: **The Last Signal** and **Amiga Demo Reel**.
-- Shot/take discovery, side-by-side comparison, selection, revision-aware writes, decision history, and assembled-version review.
-- Scene geometry, blocking views, screenplay coverage, camera movement/cut checks, and continuity findings.
-- Production knowledge and provider observations recorded with evidence and enforcement status.
-- Selected media workflows including FFmpeg-based assembly, transitions, and audio-related tooling.
-- A compositing engine: one graph per shot, drawn by an exact NumPy reference and by GL, for layers, keys, transitions, titles, time operations and tracking -- and depth and segmentation from AI models and Blender kept as production records, so a 3D object can pass behind a person in a generated picture.
-- Additional operational and production commands developed through the *Singular* validation work.
+| Stage | Working today | Still a target |
+| --- | --- | --- |
+| **Develop the film** | Fountain screenplays with an editor in the browser; Final Draft import and export as interchange; cast sheets (pictures, variants, voice); locations shared across productions; style and emotion catalogs that reach the prompts | Richer development views across the film |
+| **Explore its visual language** | Looks applied through OpenColorIO, from the production down to a shot; a style catalog of directions, techniques and formats | The Visual Lab (research) |
+| **Plan the scenes** | Scene geometry and movement, checked before anything is generated; screenplay coverage per shot; blocking frames, light previs, camera-move previews, 3D storyboards; briefs derived from the records; the storyboard approved as a recorded human gate | A storyboard workspace that brings these together |
+| **Create alternatives** | Generation through adapters (LTX, ComfyUI, Qwen Edit, on Runpod) as background jobs, within a budget, its cost read back from the billing; takes kept as versions with their lineage; master pictures edited from a source; footage brought in with its source, licence and credit; offline narration and voice conversion | More models and providers behind the same adapters |
+| **Direct through review** | Takes compared side by side and chosen with a reason; every decision recorded, revisable, with its history; verdicts on assembled versions; human gates in workflows; an optional assistant beside the canvas, and Claude Code working on a film through an MCP server -- both through the same commands as a person | The multi-agent collaboration and its UX |
+| **Maintain continuity** | Geometry and movement checks; a continuity ledger from scene to scene; one face and one voice per person enforced; cast drift reported | Continuity across compound locations (research) |
+| **Assemble and finish** | Scenes and sequences assembled into kept versions; transitions, J- and L-cuts, joins between scenes; trims that follow the speech; one **compositing engine** per shot -- layers, keys, mattes, titles and typography, effects, retimes and tracking, and depth and segmentation from AI models and Blender, so a 3D object can pass behind a person in a generated picture -- drawn by an exact reference renderer and by GL; sound and music levelled and ducked under speech, cut to the music's beats, stems for a DAW, 5.1; deliveries in several formats | Grading and finishing tools beyond looks; 4K finishing; a compositing view for the filmmaker |
 
-These are **foundations, not a finished end-to-end filmmaking studio**. The existence of a research document, architectural adapter, command, or prototype does not imply that a complete interactive workflow is available.
+Across them: background jobs that outlive the interface, a production status per sequence, and `toast doctor`, which reports every capability on the machine with the command that installs what is missing.
+
+These are **foundations, not a finished end-to-end filmmaking studio**: many capabilities are reached through the CLI or the production files before they have an interface, and the existence of a research document, an adapter or a command does not mean a complete interactive workflow is available.
 
 ### Under development or investigation
 
@@ -148,7 +148,7 @@ Useful commands:
 | `make demo` | Create the example productions |
 | `make serve` | Open the production control room |
 | `make check` | Run production continuity/schema checks |
-| `make build` | Build the Amiga reel demonstration |
+| `make build` | Assemble the Amiga reel (a placeholder until it is remade) |
 | `make test` | Run the whole test suite |
 | `make test-fast` | Run it without the heavy tests (Blender, models) |
 | `make ui` | Build the production canvas (Node 20+ required) |
@@ -159,11 +159,10 @@ For the canvas setup, see [docs/canvas.md](docs/canvas.md). Media, GPU, audio, a
 
 ### Example productions
 
-**Amiga Demo Reel** demonstrates the project's Video Toaster heritage with cards, transitions, a coherent look, and offline rendering.
+`make demo` creates two independently identified productions, neither of them *Singular*:
 
-**The Last Signal** demonstrates a dramatic production with scene geometry, shots, takes, review, and continuity checks.
-
-These are independently identified productions, not *Singular*. Other demo concepts may be planned without being shipped yet.
+- **The Last Signal** -- a small dramatic production kept as a repeatable fixture: scene geometry, shots, takes, review and continuity checks.
+- **Amiga Demo Reel** -- a placeholder for now. The demos are being remade as productions made the way a film is -- each with its intention, a screenplay and a storyboard, produced through Cine Toaster -- and the reel comes last, assembled from the others, in the spirit of NewTek's Video Toaster tape.
 
 ## Principles
 
