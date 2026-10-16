@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import unittest
 from fractions import Fraction
+from functools import lru_cache
 from pathlib import Path
 from unittest import mock
 
@@ -53,9 +54,17 @@ def onsets(stereo: np.ndarray, threshold: float = 0.05) -> list[int]:
     return [int(v) for v in loud[np.insert(np.diff(loud) > 100, 0, True)]] if len(loud) else []
 
 
-def inverse(mapping, media: float, seconds: int = 3) -> float:
+@lru_cache(maxsize=8)
+def _table(mapping, seconds: int) -> tuple[np.ndarray, np.ndarray]:
+    """The map sampled every 10 us, once (CT-0096: rebuilt at every call, it took 75 s for 25 instants)."""
+
     grid = np.linspace(0, seconds, 300001)
-    return float(np.interp(media, [float(mapping(Fraction(t).limit_denominator(10**6))) for t in grid], grid))
+    return np.array([float(mapping(Fraction(t).limit_denominator(10**6))) for t in grid]), grid
+
+
+def inverse(mapping, media: float, seconds: int = 3) -> float:
+    media_at, grid = _table(mapping, seconds)
+    return float(np.interp(media, media_at, grid))
 
 
 class ContractTests(unittest.TestCase):

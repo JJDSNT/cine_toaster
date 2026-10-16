@@ -138,6 +138,9 @@ class AssemblyTests(unittest.TestCase):
         self.assertEqual(second["params"]["version"], "v2")
         with self.assertRaises(ValidationError):
             self.manager.submit("assemble", self.root, {"scene": "SC-030", "version": "v1"})
+        # Waited for, so it is not still writing the production while the test's folder is removed (found by
+        # running the suite in parallel, CT-0096).
+        self.manager.wait(second["id"], timeout=120)
 
     def test_a_version_file_is_never_overwritten(self) -> None:
         job = self.manager.wait(self.manager.submit("assemble", self.root, {"scene": "SC-030", "version": "cut-a"})["id"], timeout=120)

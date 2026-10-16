@@ -45,10 +45,15 @@ class ProjectFormatError(ValueError):
     """Raised when a Cine Toaster project file is invalid."""
 
 
+#: libyaml's parser when it is there (the same safe loading, about ten times faster: a decision read 27 YAML files
+#: in 0.26 s with the pure-Python one, CT-0096), the pure-Python one when it is not.
+_SAFE_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+
+
 def _read_yaml(path: Path) -> dict[str, Any]:
     try:
         with path.open(encoding="utf-8") as handle:
-            document = yaml.safe_load(handle)
+            document = yaml.load(handle, Loader=_SAFE_LOADER)  # noqa: S506 -- a safe loader, C or Python
     except yaml.YAMLError as error:
         raise ProjectFormatError(f"Invalid YAML in {path}: {error}") from error
     if document is None:
