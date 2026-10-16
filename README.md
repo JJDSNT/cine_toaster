@@ -179,8 +179,6 @@ These are independently identified productions, not *Singular*. Other demo conce
 
 The original **NewTek Video Toaster** helped make sophisticated video production accessible on the Amiga. Cine Toaster takes inspiration from that spirit: bringing powerful tools together in a creative workspace rather than requiring filmmakers to assemble disconnected systems by hand.
 
-The project also learns from open filmmaking and generative-production initiatives, including [OpenMontage](https://github.com/calesthio/OpenMontage), [AI Video Production Editor](https://github.com/LudwigKienle/ai-video-production-editor), [Kupkaprod](https://github.com/vladimirvalcourt/kupkaprod-cinema-pipeline), [Calliope](https://github.com/benjiyaya/Calliope), and [AIMovieStudio](https://github.com/Heroesjouney/AIMovieStudiov2).
-
 ---
 
 **Cine Toaster is a work in progress — an open filmmaking environment being shaped by the demands of making films, not just generating clips.**
