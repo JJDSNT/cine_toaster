@@ -1,9 +1,12 @@
-"""Master pictures made by editing another picture with cast references (CT-0037, plan step 9).
+"""Master pictures, made by whichever adapter the production chooses (CT-0037; ADR 0025).
 
 SINGULAR's method, measured on its scenes: the room is designed once in 3D
 and rendered per camera; the people are then painted into that render by an
 image editor that is told to keep the geometry, given each character's
 sheet for identity. A shot declares it as `derive: {from, with, request}`.
+That is one method, not the rule: the adapter is chosen by the cascade
+`pictures: {provider}` in project.yaml -> the scene -> `derive.provider`, and
+an adapter that composes (not only repaints) needs no `from`.
 
 Nothing is replaced. The production's picture `p<n>.png` stays; each edit is
 a version beside it (`p<n>-1.png`, `p<n>-2.png`…), with what it was made from
@@ -20,13 +23,9 @@ from typing import Any
 from .blocks import _picture_stems, reference_picture
 from .cast import _digest, cast_key
 from .errors import ValidationError
-from .providers.qwen_edit import HOURLY_RATE_USD, edit_prompt, size_like
 from .takes import shot_key, work_directory_for
 
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp")
-#: A warm edit took under a minute in SINGULAR; the estimate assumes a cold worker.
-EXECUTION_SECONDS = 45.0
-COLD_START_SECONDS = 90.0
 
 
 def relative(root: Path, path: Path) -> str:
@@ -35,8 +34,41 @@ def relative(root: Path, path: Path) -> str:
     return path.resolve().relative_to(root.resolve()).as_posix()
 
 
-def estimate(rate: float = HOURLY_RATE_USD) -> float:
-    return round((EXECUTION_SECONDS + COLD_START_SECONDS) * rate / 3600, 3)
+def edge_score(result: Path, source: Path) -> float:
+    """How closely the result's edges match the source's (PSNR of edges; higher is more faithful).
+
+    It says without looking whether the picture was repainted or recomposed,
+    whatever made it: about 17 is good, SINGULAR's accepted edits scored 20.3-20.6.
+    """
+
+    import numpy as np
+    from PIL import Image, ImageFilter
+
+    def edges(path: Path):
+        image = Image.open(path).convert("L").resize((640, 352)).filter(ImageFilter.FIND_EDGES)
+        return np.asarray(image, dtype=float)
+
+    mse = float(((edges(result) - edges(source)) ** 2).mean())
+    return round(10 * float(np.log10(255 ** 2 / mse)), 2) if mse else 99.0
+
+
+def picture_provider(production: dict[str, Any], scene: dict[str, Any] | None = None,
+                     shot: dict[str, Any] | None = None) -> tuple[str, str]:
+    """The adapter that makes this picture, and the level that chose it: the nearest wins."""
+
+    from .providers import DEFAULT_PICTURE_PROVIDER, picture_providers
+
+    def chosen(value: Any) -> str:
+        return str(value.get("provider") or "") if isinstance(value, dict) else ""
+
+    for level, value in (("shot", (shot or {}).get("derive")), ("scene", (scene or {}).get("pictures")),
+                         ("production", production.get("pictures"))):
+        if chosen(value):
+            if chosen(value) not in picture_providers():
+                raise ValidationError(f"No picture provider {chosen(value)!r} ({level}); there is "
+                                      f"{', '.join(picture_providers())}")
+            return chosen(value), level
+    return DEFAULT_PICTURE_PROVIDER, "default"
 
 
 @dataclass(slots=True)
@@ -44,13 +76,18 @@ class PicturePlan:
     scene: str
     shot: str
     stem: str
-    source: Path
+    source: Path | None
     references: list[dict[str, Any]]
     request: str
     prompt: str
     seed: int
-    size: tuple[int, int]
+    size: tuple[int, int] | None
     estimate_usd: float
+    provider: str = "qwen-image-edit"
+    provider_level: str = "default"
+    model: str = "qwen-image-edit"
+    #: "usd", held by the budget, or "quota", a subscription's: recorded, never priced.
+    cost: str = "usd"
     notes: list[str] = field(default_factory=list)
     avoid: list[str] = field(default_factory=list)
     avoid_mechanism: str = ""
@@ -59,12 +96,15 @@ class PicturePlan:
 
     def public_dict(self, root: Path) -> dict[str, Any]:
         return {
-            "scene": self.scene, "shot": self.shot, "model": "qwen-image-edit",
-            "source": {"path": relative(root, self.source), "digest": _digest(self.source)},
+            "scene": self.scene, "shot": self.shot, "model": self.model, "provider": self.provider,
+            "provider_level": self.provider_level, "cost": self.cost,
+            "source": ({"path": relative(root, self.source), "digest": _digest(self.source)}
+                       if self.source is not None else None),
             "references": [{**ref, "path": relative(root, ref["path"]), "digest": _digest(ref["path"])}
                            for ref in self.references],
             "request": self.request, "prompt": self.prompt, "seed": self.seed,
-            "width": self.size[0], "height": self.size[1], "estimate_usd": self.estimate_usd, "notes": self.notes,
+            "width": self.size[0] if self.size else None, "height": self.size[1] if self.size else None,
+            "estimate_usd": self.estimate_usd, "notes": self.notes,
             "avoid": self.avoid, "avoid_mechanism": self.avoid_mechanism, "continuity": self.continuity,
         }
 
@@ -188,7 +228,7 @@ def corrections(feedback: dict[str, Any] | None) -> str:
 
 
 def plan_picture(root: Path, production: dict[str, Any], scene_id: str, shot_id: str, seed: int = 1,
-                 rate: float = HOURLY_RATE_USD, feedback: dict[str, Any] | None = None) -> PicturePlan:
+                 rate: float | None = None, feedback: dict[str, Any] | None = None) -> PicturePlan:
     scene = next((item for item in production["scenes"] if item["id"] == scene_id), None)
     if scene is None:
         raise ValidationError(f"No scene {scene_id!r}")
@@ -196,12 +236,19 @@ def plan_picture(root: Path, production: dict[str, Any], scene_id: str, shot_id:
     if shot is None:
         raise ValidationError(f"{scene_id} has no shot {shot_id!r}")
     derive = shot.get("derive")
-    if not derive or not derive.get("from"):
+    if not derive:
         raise ValidationError(f"{shot_id} does not say what picture it is made from (derive: {{from, with, request}})")
+    from .providers import picture_providers
+
+    provider_id, level = picture_provider(production, scene, shot)
+    provider = picture_providers()[provider_id]()
+    if not derive.get("from") and provider.needs_source:
+        raise ValidationError(f"{shot_id} does not say what picture it is made from (derive: {{from, with, request}}); "
+                              f"{provider_id} only repaints a picture")
     if not derive.get("request"):
         raise ValidationError(f"{shot_id} does not say what the picture should become (derive: request)")
-    source = source_picture(root, scene, derive["from"], shot)
-    if source is None:
+    source = source_picture(root, scene, derive["from"], shot) if derive.get("from") else None
+    if derive.get("from") and source is None:
         camera = location_camera(derive["from"], shot)
         if camera is not None:
             raise ValidationError(
@@ -218,7 +265,7 @@ def plan_picture(root: Path, production: dict[str, Any], scene_id: str, shot_id:
     if shot.get("picture"):
         notes.append("The picture description is what the video model is told this image shows; "
                      "check the result against it.")
-    if str(derive["from"]).lower().startswith("board"):
+    if str(derive.get("from") or "").lower().startswith("board"):
         from .board import stale
 
         if stale(root, scene, shot_id, "end" if str(derive["from"]).lower().endswith("end") else "start"):
@@ -235,6 +282,8 @@ def plan_picture(root: Path, production: dict[str, Any], scene_id: str, shot_id:
 
     avoid = avoidance(production, scene, [shot])
     avoided = f"Avoid: {'; '.join(item.rstrip('.') for item in avoid)}." if avoid else ""
+    if level != "default":
+        notes.append(f"Made by {provider_id}, chosen by the {level}.")
     from .continuity import describe, state_at
 
     continuity = describe(state_at(production, scene_id, shot_id), scene_id)
@@ -243,10 +292,11 @@ def plan_picture(root: Path, production: dict[str, Any], scene_id: str, shot_id:
         scene=scene_id, shot=shot_id, stem=picture_stem(work_directory_for(root / scene["file"]), str(shot["number"])),
         source=source,
         references=references, request=derive["request"],
-        prompt=edit_prompt(" ".join(filter(None, [derive["request"], styled, avoided, corrections(feedback)])),
-                           bool(references)),
-        seed=seed, size=size_like(source), estimate_usd=estimate(rate), notes=notes,
+        prompt=provider.prompt(" ".join(filter(None, [derive["request"], styled, avoided, corrections(feedback)])),
+                               source=source is not None, references=len(references)),
+        seed=seed, size=provider.size(source), estimate_usd=provider.estimate_usd(rate), notes=notes,
         avoid=avoid, avoid_mechanism="in the prompt: the edit model has no negative input" if avoid else "",
+        provider=provider_id, provider_level=level, model=provider.model, cost=provider.cost,
     )
 
 
@@ -262,7 +312,7 @@ def scene_pictures(root: Path, scene: dict[str, Any]) -> list[dict[str, Any]]:
         if not derive:
             continue
         stem = picture_stem(work, str(shot["number"]))
-        source = source_picture(root, scene, derive.get("from", ""), shot)
+        source = source_picture(root, scene, derive["from"], shot) if derive.get("from") else None
         found.append({
             "shot": shot["id"], "number": shot["number"], "label": shot.get("label", ""), "derive": derive,
             "source": relative(root, source) if source else "",

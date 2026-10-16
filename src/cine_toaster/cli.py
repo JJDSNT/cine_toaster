@@ -579,7 +579,10 @@ def command_generate(args: argparse.Namespace) -> int:
         print(f"  guide at frame {guide.frame:4}: {guide.path.relative_to(root)} ({guide.role})")
     for note in plan.notes:
         print(f"  note: {note}")
-    print(f"  estimate US$ {plan.estimate_usd:.3f}; spent US$ {spend.spent():.2f} of US$ {spend.load().get('limit_usd') or 0:.2f}")
+    if plan.cost == "usd":
+        print(f"  estimate US$ {plan.estimate_usd:.3f}; spent US$ {spend.spent():.2f} of US$ {spend.load().get('limit_usd') or 0:.2f}")
+    else:
+        print(f"  cost: {plan.cost} (not dollars; the budget does not hold it)")
     print("\n" + plan.prompt + "\n")
     if plan.avoid:
         # What the generation must not do, apart from the directing words, and how the provider carries it.
@@ -1261,7 +1264,9 @@ def command_picture(args: argparse.Namespace) -> int:
         return 0
     from .pictures import relative
 
-    print(f"{plan.scene} {plan.shot}: edit {relative(root, plan.source)} at {plan.size[0]}x{plan.size[1]}, seed {plan.seed}")
+    made_from = f"edit {relative(root, plan.source)}" if plan.source is not None else "compose from the description"
+    sized = f" at {plan.size[0]}x{plan.size[1]}" if plan.size else ""
+    print(f"{plan.scene} {plan.shot}: {made_from}{sized}, seed {plan.seed}; by {plan.provider} ({plan.provider_level})")
     for ref in plan.references:
         print(f"  identity: {ref['member']}" + (f" ({ref['variant']})" if ref["variant"] else "")
               + f" from {relative(root, ref['path'])}")
@@ -1303,8 +1308,11 @@ def command_picture(args: argparse.Namespace) -> int:
     finally:
         manager.shutdown()
     summary = job["result"]["summary"]
-    print(f"Made {summary['picture']} for US$ {summary['cost_usd']:.3f}; edges kept from the source: "
-          f"{summary['edge_score']} (under 17: recomposed). A moved subject can still score well: look at it.")
+    paid = (f"for US$ {summary['cost_usd']:.3f}" if summary.get("cost", "usd") == "usd"
+            else f"by {summary.get('provider')}, on subscription quota")
+    print(f"Made {summary['picture']} {paid}" + (
+        f"; edges kept from the source: {summary['edge_score']} (under 17: recomposed). "
+        "A moved subject can still score well: look at it." if summary.get("edge_score") is not None else "."))
     return 0
 
 

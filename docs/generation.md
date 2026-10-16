@@ -2,6 +2,25 @@
 
 ## Master pictures
 
+Which model makes a master picture is the production's choice, not the
+tool's (ADR 0025). The nearest level wins:
+
+```yaml
+# project.yaml                     # scene.yaml              # a shot
+pictures:                          pictures:                 derive:
+  provider: codex-image              provider: qwen-image-edit   provider: codex-image
+```
+
+| Adapter | Needs `from` | Paid in | Notes |
+| --- | --- | --- | --- |
+| `qwen-image-edit` (default) | yes: it repaints | dollars, held by the budget | Runpod; the geometry is kept, the edge score says how well |
+| `codex-image` | no: it can compose | the ChatGPT subscription's quota | `from`, when given, is the composition to keep; the cast's pictures give identity |
+
+`toast picture <film> <scene> <shot> --dry-run` names the adapter and the
+level that chose it.
+
+### Repainting a render (SINGULAR's method)
+
 A master picture is made by **editing** another picture, usually a render
 of the 3D set, with the cast's faces. It is not generated from words: the
 render decides where everything is, and the cast sheets decide who.

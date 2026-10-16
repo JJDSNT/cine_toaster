@@ -299,11 +299,16 @@ def _derive(value: Any) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         return None
     cast = value.get("with") or []
-    return {
+    derived = {
         "from": _text(value.get("from")),
         "with": [_text(item) for item in (cast if isinstance(cast, list) else [cast])],
         "request": " ".join(_text(value.get("request")).split()),
     }
+    if value.get("provider"):  # the adapter for this picture alone (ADR 0025)
+        derived["provider"] = _text(value.get("provider"))
+    if "style" in value:
+        derived["style"] = value.get("style")
+    return derived
 
 
 def _notes(raw: dict[str, Any]) -> list[str]:
@@ -968,6 +973,8 @@ def _load_scene(
         "deliver": renditions,
         # What any generation in this scene must not do (negative guidance), beside the production's.
         "avoid": _avoid(document.get("avoid")),
+        # Which adapter makes its master pictures (ADR 0025): {provider}; the production's otherwise.
+        "pictures": document.get("pictures") if isinstance(document.get("pictures"), dict) else None,
         # Subtitles in the film's language, timed to the speech (CT-0054): {burn: true|false}.
         "subtitles": _subtitles(document.get("subtitles") if document.get("subtitles") is not None else project_subtitles),
         # A surround mix beside the stereo, as a second track ("5.1", CT-0052).
@@ -1811,6 +1818,8 @@ def load_production(root: Path) -> dict[str, Any]:
         "deliver": manifest.get("deliver"),
         "frame": frame,
         "avoid": _avoid(manifest.get("avoid")),
+        # Which adapter makes master pictures (ADR 0025): {provider}; a scene or a shot may name another.
+        "pictures": manifest.get("pictures") if isinstance(manifest.get("pictures"), dict) else None,
         "renders": discover_renders(root),
         "script_path": _script_path(manifest, root),
         "script_files": script_files,

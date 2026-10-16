@@ -710,6 +710,8 @@ Neither changes the direction; each is used at the edges (`references.md`).
 - [x] An agent can make a reference: MCP `generate_reference`, recorded as asked by `claude-code` (CT-0101). Adding a file it did not make is still not offered.
 - [ ] Reference findings are not in `toast check` or the control room. Solve: add them to the production's attention list and a References panel (CT-0100).
 - [x] Codex image generation through an adapter: `toast references generate`, MCP `generate_reference`, provenance with thread, tokens and quota (CT-0101).
-- [ ] Codex pictures reach references only; master pictures (`toast picture`, workflows) are still Qwen's. Solve: an image provider interface `generate(prompt, references, output)` that `plan_picture` chooses by the shot or production, with Qwen's repaint rules kept in its adapter (CT-0101).
+- [x] Master pictures choose their adapter -- production, scene, shot; Qwen the default; `derive.from` only when the adapter repaints (ADR 0025, CT-0102).
+- [ ] Video generation is still bound to LTX. Solve: the same move as ADR 0025 for an image-to-video interface when a second video model is wanted (CT-0102).
+- [ ] The control room's Pictures panel and the workflow's gate assume a source to show beside the candidates. Solve: show the cast and style references instead when a picture has no source (CT-0102).
 - [ ] A Gemini image adapter: the Gemini CLI here is logged in by Google account and has no image generation; Gemini's images need an API key with billing. Solve: when the user wants it, a `gemini-image` adapter over the API behind the same interface, its cost in dollars (CT-0101).
 - [ ] Quota spent through Codex is not visible to `toast finops`. Solve: count generations and tokens per film from the references' `generation` records, shown apart from dollars (CT-0101).

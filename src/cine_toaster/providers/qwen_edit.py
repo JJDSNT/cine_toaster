@@ -20,6 +20,8 @@ from .runpod import Transport, run_job
 MODEL = "qwen-image-edit"
 #: SINGULAR's figure for this endpoint (RTX 4090 / Ada 24 GB pools).
 HOURLY_RATE_USD = 1.58
+EXECUTION_SECONDS = 45.0
+COLD_START_SECONDS = 90.0
 
 #: Without these the editor recomposes instead of repainting, and the 3D
 #: model's geometry -- the reason the render exists -- is lost (claim
@@ -72,27 +74,29 @@ def padded(path: Path, width: int, height: int) -> bytes:
     return buffer.getvalue()
 
 
-def edge_score(result: Path, source: Path) -> float:
-    """How closely the result's edges match the source's (PSNR of edges; higher is more faithful).
-
-    It says without looking whether the editor repainted or recomposed:
-    about 17 is good, SINGULAR's accepted edits scored 20.3–20.6.
-    """
-
-    import numpy as np
-    from PIL import Image, ImageFilter
-
-    def edges(path: Path):
-        image = Image.open(path).convert("L").resize((640, 352)).filter(ImageFilter.FIND_EDGES)
-        return np.asarray(image, dtype=float)
-
-    mse = float(((edges(result) - edges(source)) ** 2).mean())
-    return round(10 * float(np.log10(255 ** 2 / mse)), 2) if mse else 99.0
-
-
 class QwenEditProvider:
     id = "qwen-image-edit"
     model = MODEL
+    needs_source = True
+    cost = "usd"
+
+    def prompt(self, request: str, *, source: bool, references: int) -> str:
+        return edit_prompt(request, bool(references))
+
+    def size(self, source: Path | None) -> tuple[int, int] | None:
+        return size_like(source) if source is not None else None
+
+    def estimate_usd(self, rate: float | None = None) -> float:
+        # A warm edit took under a minute in SINGULAR; the estimate assumes a cold worker.
+        return round((EXECUTION_SECONDS + COLD_START_SECONDS) * (rate or HOURLY_RATE_USD) / 3600, 3)
+
+    def make(self, *, source: Path | None, references: list[Path], prompt: str, seed: int,
+             size: tuple[int, int] | None, output: Path, label: str = "picture",
+             state_file: Path | None = None) -> dict[str, Any]:
+        if source is None or size is None:
+            raise ProviderError(f"{label}: Qwen Image Edit repaints a picture and needs one to start from")
+        return self.edit(source=source, references=references, prompt=prompt, seed=seed, size=size,
+                         output=output, label=label, state_file=state_file)
 
     def __init__(self, endpoint_id: str | None = None, *, transport: Transport | None = None) -> None:
         self.endpoint_id = endpoint_id or os.environ.get("RUNPOD_QWEN_ENDPOINT_ID", "")
@@ -117,3 +121,6 @@ class QwenEditProvider:
         temporary.write_bytes(base64.b64decode(str(data).split(",", 1)[-1]))
         os.replace(temporary, output)
         return {"endpoint": self.endpoint_id, "width": width, "height": height}
+
+
+from ..pictures import edge_score  # noqa: E402  (kept importable from here; the measure is the film's)

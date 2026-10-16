@@ -129,3 +129,35 @@ class CodexImageProvider:
             "usage": usage,
             "cost": {"kind": "subscription quota", "usd": None},
         }
+
+    # --- as a PictureProvider (ADR 0025) ----------------------------------------------------
+
+    needs_source = False
+    cost = "quota"
+
+    def prompt(self, request: str, *, source: bool, references: int) -> str:
+        parts = []
+        if source:
+            parts.append("Image 1 is the composition: keep its camera, framing and where everything is, and "
+                         "redraw what is in it.")
+        if references:
+            first = 2 if source else 1
+            parts.append(f"Image{'s' if references > 1 else ''} {first}"
+                         + (f" to {first + references - 1}" if references > 1 else "")
+                         + " say who each person is: take identity from them, not their composition or background.")
+        parts.append(" ".join(request.split()))
+        return " ".join(parts)
+
+    def size(self, source: Path | None) -> tuple[int, int] | None:
+        return None  # codex chooses; the result's size is recorded
+
+    def estimate_usd(self, rate: float | None = None) -> float:
+        return 0.0
+
+    def make(self, *, source: Path | None, references: list[Path], prompt: str, seed: int,
+             size: tuple[int, int] | None, output: Path, label: str = "picture",
+             state_file: Path | None = None) -> dict[str, Any]:
+        made = self.generate(prompt=prompt, references=([source] if source else []) + list(references),
+                             output=output, label=label)
+        made["seed"] = "not supported by codex"
+        return made

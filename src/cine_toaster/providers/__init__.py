@@ -74,7 +74,48 @@ class ImageToVideoProvider(Protocol):
     ) -> GenerationResult: ...
 
 
+class PictureProvider(Protocol):
+    """Makes a shot's master picture (ADR 0025). The picture belongs to the film; the model to the adapter.
+
+    What differs between models stays here: whether a source picture is needed,
+    how the request is worded, the size, how it is paid. `pictures.py` chooses
+    an adapter by the cascade production -> scene -> shot and asks it these.
+    """
+
+    id: str
+    model: str
+    #: True when the model can only repaint a picture (it has no way to compose one).
+    needs_source: bool
+    #: "usd" (held by the budget) or "quota" (a subscription's; recorded, never priced).
+    cost: str
+
+    def prompt(self, request: str, *, source: bool, references: int) -> str: ...
+
+    def size(self, source: Path | None) -> tuple[int, int] | None: ...
+
+    def estimate_usd(self, rate: float | None = None) -> float: ...
+
+    def make(self, *, source: Path | None, references: list[Path], prompt: str, seed: int,
+             size: tuple[int, int] | None, output: Path, label: str = "picture",
+             state_file: Path | None = None) -> dict[str, Any]: ...
+
+
+DEFAULT_PICTURE_PROVIDER = "qwen-image-edit"
+
+
+def picture_providers() -> dict[str, type]:
+    """Every adapter that can make a master picture, by id."""
+
+    from .codex_image import CodexImageProvider
+    from .qwen_edit import QwenEditProvider
+
+    return {QwenEditProvider.id: QwenEditProvider, CodexImageProvider.id: CodexImageProvider}
+
+
 __all__ = [
+    "DEFAULT_PICTURE_PROVIDER",
+    "PictureProvider",
+    "picture_providers",
     "GenerationResult",
     "ImageToVideoProvider",
     "ProviderError",

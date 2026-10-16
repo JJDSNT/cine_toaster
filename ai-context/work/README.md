@@ -69,6 +69,8 @@ the user's validation).
 
 Compositing, the demos line and earlier:
 
+- `CT-0102` — master pictures not bound to a model: the adapter by
+  production, scene or shot; ADR 0025 (done)
 - `CT-0101` — the `codex-image` adapter: `toast references generate`, MCP
   `generate_reference`, `toast doctor`; Gemini noted (done)
 - `CT-0100` — a film's references: `references/<id>/reference.yaml`,

@@ -1421,8 +1421,8 @@ def _picture_plan(root: Path, params: dict[str, Any]):
 
     from .providers.qwen_edit import HOURLY_RATE_USD
 
+    # The Qwen endpoint's declared price, else the editor's own (not LTX's); other adapters ignore it.
     endpoint = os.environ.get("RUNPOD_QWEN_ENDPOINT_ID", "")
-    # The production's declared price for this endpoint, else the editor's own (not LTX's).
     rate = float(_declared_rates(root).get(endpoint, HOURLY_RATE_USD))
     feedback = params.get("feedback") if isinstance(params.get("feedback"), dict) else None
     plan = plan_picture(root, load_production(root), str(params.get("scene", "")).strip(),
@@ -1441,10 +1441,12 @@ def _validate_picture(root: Path, params: dict[str, Any]) -> dict[str, Any]:
     from . import spend
 
     plan, endpoint, _ = _picture_plan(root, params)
-    if GENERATION_TRANSPORT is None and not (endpoint and os.environ.get("RUNPOD_API_KEY")):
+    if plan.provider == "qwen-image-edit" and GENERATION_TRANSPORT is None and not (
+            endpoint and os.environ.get("RUNPOD_API_KEY")):
         raise ValidationError("A picture edit needs RUNPOD_API_KEY and RUNPOD_QWEN_ENDPOINT_ID in the environment "
                               "(toast picture --env-file <file> reads them without printing them)")
-    spend.check(plan.estimate_usd, f"Picture {plan.shot} of {plan.scene}")
+    if plan.cost == "usd":
+        spend.check(plan.estimate_usd, f"Picture {plan.shot} of {plan.scene}")
     checked = {"scene": plan.scene, "shot": plan.shot, "seed": plan.seed}
     if isinstance(params.get("feedback"), dict):
         checked["feedback"] = {"reasons": [str(item) for item in params["feedback"].get("reasons") or []],
@@ -1453,18 +1455,20 @@ def _validate_picture(root: Path, params: dict[str, Any]) -> dict[str, Any]:
 
 
 def _run_picture(context: JobContext) -> dict[str, Any]:
-    """One paid edit: the source repainted with the cast, kept as a new version of the picture."""
+    """One master picture by the adapter the production chose, kept as a new version of the picture."""
 
     from . import spend
-    from .pictures import picture_versions
+    from .pictures import edge_score, picture_versions
     from .project import load_production
-    from .providers.qwen_edit import QwenEditProvider, edge_score
+    from .providers import picture_providers
+    from .providers.qwen_edit import QwenEditProvider
     from .takes import JOB_SUFFIX, work_directory_for
 
     root = context.project_root
     plan, endpoint, rate = _picture_plan(root, context.params)
     what = f"Picture {plan.shot} of {plan.scene}"
-    spend.check(plan.estimate_usd, what)
+    if plan.cost == "usd":
+        spend.check(plan.estimate_usd, what)
 
     scene_file = next(item["file"] for item in load_production(root)["scenes"] if item["id"] == plan.scene)
     work = work_directory_for(root / scene_file)
@@ -1473,6 +1477,22 @@ def _run_picture(context: JobContext) -> dict[str, Any]:
     name = f"{plan.stem}-{max(numbers, default=0) + 1}.png"
     output = context.staging / name
     context.progress(0.02, "Sending the picture")
+    if plan.provider != QwenEditProvider.id:
+        # An adapter that is not paid by the hour on a remote worker: no remote job record, no spend entry.
+        settings = picture_providers()[plan.provider]().make(
+            source=plan.source, references=[ref["path"] for ref in plan.references], prompt=plan.prompt,
+            seed=plan.seed, size=plan.size, output=output, label=what)
+        score = edge_score(output, plan.source) if plan.source is not None else None
+        provenance = {"kind": "picture-derivation", **plan.public_dict(root), "settings": settings,
+                      "feedback": context.params.get("feedback"), "edge_score": score, "cost_usd": 0.0,
+                      "job_id": context.job_id}
+        (context.staging / f"{name}.provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
+        destination = (work / name).relative_to(root).as_posix()
+        files = [{"staged": name, "destination": destination},
+                 {"staged": f"{name}.provenance.json", "destination": destination + ".provenance.json"}]
+        return {"files": files, "summary": {"scene": plan.scene, "shot": plan.shot, "picture": destination,
+                                            "edge_score": score, "cost_usd": 0.0, "cost": plan.cost,
+                                            "provider": plan.provider, "estimate_usd": plan.estimate_usd}}
     provider = QwenEditProvider(endpoint, transport=_paid_transport(context, endpoint, "Painting"))
     record_path = output.with_name(name + JOB_SUFFIX)
     pending = _remote_record("derive_picture", plan.public_dict(root))
@@ -1499,8 +1519,8 @@ def _run_picture(context: JobContext) -> dict[str, Any]:
              {"staged": record_path.name, "destination": destination + JOB_SUFFIX},
              {"staged": f"{name}.provenance.json", "destination": destination + ".provenance.json"}]
     return {"files": files, "summary": {"scene": plan.scene, "shot": plan.shot, "picture": destination,
-                                        "edge_score": score, "cost_usd": round(cost, 4),
-                                        "estimate_usd": plan.estimate_usd}}
+                                        "edge_score": score, "cost_usd": round(cost, 4), "cost": plan.cost,
+                                        "provider": plan.provider, "estimate_usd": plan.estimate_usd}}
 
 
 register(JobKind("derive_picture", _validate_picture, _run_picture))

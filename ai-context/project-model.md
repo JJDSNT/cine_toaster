@@ -58,6 +58,8 @@ project/
   tracks/<id>/                    runtime-owned (C7, CT-0080): a track of a medium -- track.yaml (identity,
                                   media and its hash, the measurement in use), measurements/NNNN.json (each
                                   automatic measurement, never edited), corrections.json (a person's, apart)
+  pictures: {provider}            in project.yaml or a scene.yaml: the adapter that makes master
+                                  pictures; `derive.provider` on a shot (ADR 0025)
   references/<id>/                authored (CT-0100): what the film looks at, not its material --
                                   reference.yaml (title, kind, made_by, prompt, from, licence, files by
                                   sha256) and its files
