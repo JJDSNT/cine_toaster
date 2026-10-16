@@ -153,6 +153,34 @@ A survey the user brought (six copies) checked against the sources:
   scenes (1899-1900). Each title's authors still to be checked against the
   life + 70 criterion; anonymous fragments run 70 years from publication.
 
+## Round 1 under way (2026-10-16)
+
+The production: `~/cine-toaster-demos/archive-hybrid/` (working title; the
+story comes from the material). Its own tool, `tools/archive_research.py`
+-- the production's, not Cine Toaster's yet (the capability found by the
+production, ADR-free until the experience says what to keep):
+
+- `research/archive/sources/<id>/original.<ext>`: the copy as the archive
+  gives it, SHA-1 checked against the archive's, read-only; a download cut
+  short is detected by its hash and fetched again.
+- `sources/<id>/source.yaml`: the work (as the archive describes it, the
+  licence templates it carries, a first status a person confirms), the
+  copy (holder, catalogue numbers, file, hashes, size, intervention), the
+  access terms, restrictions, evidence (the file page and the API's answer
+  as consulted, with the time), status.
+- `derived/<id>/shots.yaml` and `sheet-NN.jpg`: cuts found by FFmpeg's scene
+  score (a derivative, never truth -- a flash or a splice may read as one),
+  each shot's timecodes, contact sheets a shot a tile.
+- `inventory.yaml`: the selects, narrative value and technical complexity
+  apart.
+
+Round 1: 43 Eye copies (1.4 GB) -- the Bits & Pieces fragments, the
+Biograph scenes (1899-1900), Griffith (died 1948), Porter (1941), Cabanne
+(1950), Ditmars (1942). Wikimedia answers 429 to a quick succession: the
+tool waits as asked. Found on the way: Eye's pages say more than titles
+(synopsis, tinting, genre, maker: BP113 is Pathé Frères, tinted brown) and
+carry `PD-old-70` / `PD-anon-70-EU`.
+
 # To do
 
 - The user's decision on the copies: low-resolution unrestored transfers of
