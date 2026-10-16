@@ -60,7 +60,49 @@ def voice_path(voices_directory: Path, voice: str) -> Path:
     return voices_directory / f"{voice}.onnx"
 
 
-def ensure_voice(voices_directory: Path, voice: str = DEFAULT_VOICE) -> Path:
+#: Where Piper's voices are published (Piper's own download module reads the same place).
+VOICE_URL = ("https://huggingface.co/rhasspy/piper-voices/resolve/main/{family}/{code}/{name}/{quality}/"
+             "{code}-{name}-{quality}{extension}?download=true")
+#: Seconds without a byte before a download is a stalled connection, not a slow one; and how many tries.
+STALL_SECONDS = 30
+ATTEMPTS = 3
+
+
+def _voice_urls(voice: str) -> list[tuple[str, str]]:
+    try:
+        code, name, quality = voice.split("-", 2)
+    except ValueError:
+        raise PiperVoiceMissing(f"{voice!r} is not a Piper voice name (language-name-quality)") from None
+    family = code.split("_")[0]
+    return [(VOICE_URL.format(family=family, code=code, name=name, quality=quality, extension=extension), extension)
+            for extension in (".onnx", ".onnx.json")]
+
+
+def _download(url: str, target: Path, opener=None) -> None:
+    """One file, written beside its place and moved there whole; a connection silent for `STALL_SECONDS` is given
+    up and tried again, up to `ATTEMPTS` times -- a slow network still finishes, a stalled one no longer hangs
+    the build (CT-0096: Piper's own download waited ten minutes on a stalled connection)."""
+
+    import socket
+    import urllib.request
+
+    opener = opener or urllib.request.urlopen
+    partial = target.with_name(target.name + ".part")
+    last = None
+    for _ in range(ATTEMPTS):
+        try:
+            with opener(url, timeout=STALL_SECONDS) as response, open(partial, "wb") as handle:
+                shutil.copyfileobj(response, handle, 1 << 20)
+            partial.replace(target)
+            return
+        except (OSError, socket.timeout) as error:  # URLError, a reset, a stall: try again
+            last = error
+            partial.unlink(missing_ok=True)
+    raise ProviderError(f"Downloading {target.name} failed {ATTEMPTS} times ({last}); check the connection and run "
+                        "again")
+
+
+def ensure_voice(voices_directory: Path, voice: str = DEFAULT_VOICE, opener=None) -> Path:
     """Download the voice once, into the production, and return its file.
 
     A voice that lives only in a user's home directory makes a production
@@ -70,33 +112,10 @@ def ensure_voice(voices_directory: Path, voice: str = DEFAULT_VOICE) -> Path:
 
     voices_directory.mkdir(parents=True, exist_ok=True)
     model = voice_path(voices_directory, voice)
-    if model.is_file():
+    if model.is_file() and model.with_name(model.name + ".json").is_file():
         return model
-
-    try:
-        completed = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "piper.download_voices",
-                voice,
-                "--download-dir",
-                str(voices_directory),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=600,
-        )
-    except FileNotFoundError as error:  # pragma: no cover - interpreter is always there
-        raise PiperNotInstalled(str(error)) from error
-    except subprocess.TimeoutExpired as error:
-        raise ProviderError(f"Downloading the voice {voice!r} timed out.") from error
-
-    if completed.returncode != 0 or not model.is_file():
-        raise PiperVoiceMissing(
-            f"Could not download the voice {voice!r}. "
-            f"{(completed.stderr or completed.stdout or '').strip()[:300]}"
-        )
+    for url, extension in _voice_urls(voice):
+        _download(url, voices_directory / f"{voice}{extension}", opener)
     return model
 
 

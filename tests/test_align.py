@@ -19,7 +19,7 @@ from cine_toaster.errors import ValidationError
 from cine_toaster.state import Actor
 
 sys.path.insert(0, str(Path(__file__).parent))
-from heavy import heavy  # noqa: E402
+from heavy import heavy, needs  # noqa: E402
 
 TOOL = Actor(id="aligner", kind="system")
 W, H, FRAMES = 80, 48, 6
@@ -410,6 +410,7 @@ OCCLUSION = {
 
 @heavy("renders with Blender and runs two models")
 @unittest.skipIf(_models_and_blender(), _models_and_blender())
+@needs("OpenEXR")
 class OnARenderedDolly(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:

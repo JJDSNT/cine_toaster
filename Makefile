@@ -128,7 +128,7 @@ ui-test:
 		echo "Skipping the canvas tests: run make ui first."; \
 	fi
 
-setup: install-media install-audio install-gpu ui
+setup: install-media install-audio install-gpu install-vfx ui
 	@$(TOAST) doctor
 	@echo "Next:  make demo    then    make serve"
 

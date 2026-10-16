@@ -62,6 +62,32 @@ of the three makes everything after it cheaper or possible.
   minutes of all the cores); lower would mean rendering less in those
   tests, which is the user's call.
 
+## 2. A clean install checked (2026-10-16)
+
+A fresh clone of this branch from GitHub, in a temporary folder, the
+demos there too:
+
+- `make setup` worked (3.2 min: the submodule, the canvas built, a coherent
+  doctor) -- but **without the `vfx` extra** (OpenEXR, OpenColorIO), which
+  since C6 and C8 carries signals, renders, Natron's frames and looks. The
+  suite then **failed: 26 errors** on `import OpenEXR` / `PyOpenColorIO`, and
+  a 27th masked behind them.
+  - `make setup` installs `vfx` now: the clone's suite passes (1018, 51
+    skipped: the voice and vision environments, USD, splats).
+  - A minimal install still never fails for a missing extra:
+    `@needs("OpenEXR")` in `tests/heavy.py` skips with the make target to
+    run; without `vfx` the suite passes with 87 skipped.
+- `make build` **failed**: Piper's own voice download stalled and waited out
+  its ten minutes; retried by hand it took 8 s. It had also left a truncated
+  model, which the old code accepted as a voice. `providers/piper.py`
+  downloads the voice itself now -- a stall limit of 30 s a read, three
+  tries, written whole or not at all, the model and its configuration both
+  required (`tests/test_narration.py`, offline). `make build` then made the
+  reel in 3.4 min.
+- `make demo` worked.
+- `scripts/fresh_clone_check.sh` repeats the whole path on a fresh clone,
+  timing each step.
+
 # To do
 
 # Decisions

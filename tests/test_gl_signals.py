@@ -21,7 +21,7 @@ from cine_toaster.state import Actor
 from cine_toaster.titles import blender_binary
 
 sys.path.insert(0, str(Path(__file__).parent))
-from heavy import heavy  # noqa: E402
+from heavy import heavy, needs  # noqa: E402
 from test_depth_edges import disc  # noqa: E402
 
 TOOL = Actor(id="compositor", kind="system")
@@ -218,6 +218,7 @@ class SignalConformance(unittest.TestCase):
 
 @heavy("renders a scene with Blender")
 @unittest.skipIf(gl_unavailable_reason() or not blender_binary(), "needs GL and Blender")
+@needs("OpenEXR")
 class RenderConformance(unittest.TestCase):
     def test_a_render_its_depth_and_its_objects_drawn_alike(self) -> None:
         import json

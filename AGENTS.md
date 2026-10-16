@@ -89,7 +89,10 @@ make test         # the whole suite, the final authority: before a step closes
 ```
 
 `PYTHONPATH=src python3 tests/run.py [fast|heavy] [--times]` runs the same
-without make; `--times` lists the slowest test classes.
+without make, its modules in parallel; `--times` lists the slowest. A test
+needing an optional module says so with `@needs(...)` and skips without it.
+`scripts/fresh_clone_check.sh` checks the whole first-day path on a fresh
+clone.
 
 Code, comments, and repository documentation are written in English. The schema
 is English too -- directory, file, field and enum names -- while a production's

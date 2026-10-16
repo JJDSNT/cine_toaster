@@ -40,8 +40,16 @@ whole suite's floor is its heavy work -- Blender's renders and the models,
 about seven minutes of all the cores between them.
 
 What a test needs and does not find -- FFmpeg, GL, Blender, the vision or
-voice environment, fetched models -- makes it skip with the reason, never
-fail; `toast doctor` says how to install each. Parallel runs found a test that left a background job writing into its
+voice environment, fetched models, an optional Python module -- makes it skip
+with the reason, never fail; `toast doctor` says how to install each. An
+optional module is declared with `@needs("OpenEXR")` (`tests/heavy.py`),
+whose reason names the make target that installs it.
+
+`scripts/fresh_clone_check.sh [branch]` does what someone arriving at the
+repository does, on a fresh clone in a temporary folder: `make setup`,
+`make demo`, `make test`, `make build`, each timed, stopping at the first
+that fails. About fifteen minutes with the network; not part of the suite --
+run it before showing the repository. Parallel runs found a test that left a background job writing into its
 folder while the folder was removed; a test waits for what it starts. A
 recorded fixture keeps a
 real case in the fast suite (`tests/fixtures/c8/da2-occlusion.npz`: a
