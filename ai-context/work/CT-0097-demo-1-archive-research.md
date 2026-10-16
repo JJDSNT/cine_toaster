@@ -133,6 +133,26 @@ A survey the user brought (six copies) checked against the sources:
   1948)**, many of them in the Library of Congress paper prints: dramatic
   material, with a copy of known origin. To survey.
 
+## Safe sources, first look (2026-10-16)
+
+- **Library of Congress** (paper prints): its site and API answer automated
+  requests with a Cloudflare challenge or 403 -- browsed by a person, or
+  through copies elsewhere that cite it.
+- **Griffith Biograph on Commons**: almost every copy is from YouTube or
+  Vimeo -- the copy's origin unknown.
+- **Eye Filmmuseum on Commons** (102 files, uploaded from Open Images /
+  openbeelden.nl): each copy is the archive's own transfer of its print,
+  with its catalogue numbers (`EYE FLMnnnn`, `OB nnnnnn`) and a public
+  domain statement -- the copy's origin documented by the holder of the
+  print. 720x404 to 768x576. Among them **Bits & Pieces**: Eye's collection
+  of unidentified fragments (a man spying on others, falling down the
+  stairs, a love scene, two drunkards, a photo album, glass blowing,
+  winter landscapes 1913, quick portrait artists c. 1900...) -- anonymous,
+  out of their context, raw: material made for a new narrative. Also whole
+  1910s-20s American and European shorts, and American Mutoscope & Biograph
+  scenes (1899-1900). Each title's authors still to be checked against the
+  life + 70 criterion; anonymous fragments run 70 years from publication.
+
 # To do
 
 - The user's decision on the copies: low-resolution unrestored transfers of
