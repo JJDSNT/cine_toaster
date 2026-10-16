@@ -49,6 +49,14 @@ not have yet: archive research / footage selects.
   records and contact sheets; what deserves to become a feature is decided
   by the experience.
 - The story is not chosen before the best selects are watched.
+- **Modernisation is a narrative tool** (the user, 2026-10-16: "more
+  elegant"): the archive starts as it survived and is modernised *within*
+  the film, as the CG comes in -- not restored beforehand to match it, nor
+  the CG aged to hide it. It fits "no restored material": the restoration
+  is ours, on screen, as traceable derivatives (super-resolution, deflicker,
+  stabilisation, cleaning), and the copy's quality still bounds what can be
+  recovered. Pulls the restoration chain as a capability (the upscale spike,
+  CT-0053).
 - **Only the law filters** (2026-10-16): the work, the copy and the
   archive's terms must pass; everything else is noted, never a filter. A
   moving camera, hard occlusions, complex light are technical complexity,
