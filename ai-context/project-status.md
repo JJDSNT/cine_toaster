@@ -373,9 +373,14 @@ will later consume.
 
 ## Validation baseline
 
-On 2026-10-15 the whole suite passed 1018 tests (40 of them heavy: Blender,
-models, voice), with `make test` (`tests/run.py`); `make test-fast` runs the
-other 978 in about 10 minutes (`development/testing.md`).
+On 2026-10-16 the whole suite passed 1018 tests (40 of them heavy: Blender,
+models, voice) in 8.2 minutes with `make test`, its modules in parallel
+(`tests/run.py`); `make test-fast` runs the other 978 in 2.4 minutes
+(`development/testing.md`, CT-0096).
+
+A fresh clone sets up, tests and builds (`scripts/fresh_clone_check.sh`), and a
+kept version can carry its cut as OpenTimelineIO (`toast assemble --otio`,
+`docs/otio.md`), CT-0096.
 
 Earlier, on 2026-09-20, the repository test suite passed 141 tests with:
 

@@ -12,7 +12,7 @@ RUN = $(VENV)/bin/python
 TOAST = $(VENV)/bin/toast
 
 .DEFAULT_GOAL := setup
-.PHONY: ui ui-test test-fast test-heavy setup environment submodules install install-media install-audio install-gpu install-voice install-vision install-agents install-mcp install-vfx install-usd install-splat test check demo doctor serve clean help voice build
+.PHONY: ui ui-test test-fast test-heavy setup environment submodules install install-media install-audio install-gpu install-voice install-vision install-otio install-agents install-mcp install-vfx install-usd install-splat test check demo doctor serve clean help voice build
 
 help:
 	@echo "make setup     install and report what works"
@@ -91,6 +91,10 @@ install-usd: install
 	@echo "==> Installing OpenUSD (the plan exported as a USD stage)"
 	@$(RUN) -m pip install --quiet -e '.[usd]'
 
+install-otio: install
+	@echo "==> Installing OpenTimelineIO (a version's cut, to finish it in an editor)"
+	@$(RUN) -m pip install --quiet -e '.[otio]'
+
 install-mcp: install
 	@echo "==> Installing the MCP server (Claude Code through Cine Toaster)"
 	@$(RUN) -m pip install --quiet -e '.[mcp]'
@@ -128,7 +132,7 @@ ui-test:
 		echo "Skipping the canvas tests: run make ui first."; \
 	fi
 
-setup: install-media install-audio install-gpu ui
+setup: install-media install-audio install-gpu install-vfx ui
 	@$(TOAST) doctor
 	@echo "Next:  make demo    then    make serve"
 

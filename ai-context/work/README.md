@@ -69,6 +69,8 @@ the user's validation).
 
 Compositing, the demos line and earlier:
 
+- `CT-0096` — Foundations before the demos: the suite in parallel, a fresh
+  clone checked end to end, a version's cut as OpenTimelineIO (done)
 - `CT-0081` — C8: signals from models and from 3D, the audit -- the
   contract (geometric, estimated, aligned depth), records with provenance,
   the Blender and model adapters, a sequence; step 1 (signal records, ADR

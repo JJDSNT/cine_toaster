@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import shutil
 import subprocess
 import tempfile
@@ -13,6 +14,9 @@ import numpy as np
 from cine_toaster.compositing.reference import evaluate
 from cine_toaster.compositing.schema import validate
 from cine_toaster.compositing.shot import chain, shot_graph
+
+sys.path.insert(0, str(Path(__file__).parent))
+from heavy import needs  # noqa: E402
 
 DEMO = Path(__file__).parents[1] / "examples" / "demo-project"
 HAS_FFMPEG = bool(shutil.which("ffmpeg") and shutil.which("ffprobe"))
@@ -134,6 +138,7 @@ def _natron() -> str:
 
 
 @unittest.skipUnless(HAS_FFMPEG and _natron(), "Natron (the OpenFX host) is not installed")
+@needs("OpenEXR")
 class NatronTests(unittest.TestCase):
     def test_frames_go_to_natron_and_back_unchanged(self) -> None:
         """Float OpenEXR both ways: an empty chain returns the picture to half-float precision, light above

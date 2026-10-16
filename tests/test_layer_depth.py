@@ -24,7 +24,7 @@ from cine_toaster.errors import ValidationError
 from cine_toaster.state import Actor
 
 sys.path.insert(0, str(Path(__file__).parent))
-from heavy import heavy  # noqa: E402
+from heavy import heavy, needs  # noqa: E402
 from test_depth_edges import FLAT, _down, _grown, disc  # noqa: E402
 
 TOOL = Actor(id="compositor", kind="system")
@@ -235,6 +235,7 @@ def _here() -> str:
 
 @heavy("renders with Blender, runs Video Depth Anything and SAM 2")
 @unittest.skipIf(_here(), _here())
+@needs("OpenEXR")
 class SourcesMeetInLayers(unittest.TestCase):
     """Blender and models in one composition, declared as layers: a plate (the stage rendered flat, standing for
     footage) with Video Depth Anything's depth aligned to its floor, the pillar cut out by SAM 2's segmentation

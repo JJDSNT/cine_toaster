@@ -98,3 +98,50 @@ class NarrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VoiceDownloadTests(unittest.TestCase):
+    """A voice is fetched with a stall limit and retries (CT-0096: Piper's own download hung ten minutes on a
+    stalled connection and failed the build). No network: the opener is given."""
+
+    def setUp(self) -> None:
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.voices = Path(directory.name) / "voices"
+
+    @staticmethod
+    def opener(script: list):
+        import io
+        import socket
+
+        calls = []
+
+        def open_url(url, timeout=None):
+            calls.append((url, timeout))
+            step = script.pop(0)
+            if step == "stall":
+                raise socket.timeout("timed out")
+            return io.BytesIO(step)
+
+        open_url.calls = calls
+        return open_url
+
+    def test_a_stalled_connection_is_tried_again_and_the_voice_kept_whole(self) -> None:
+        from cine_toaster.providers import piper
+
+        opener = self.opener(["stall", b"model bytes", b"{}"])
+        model = piper.ensure_voice(self.voices, "en_US-lessac-medium", opener=opener)
+        self.assertEqual(model.read_bytes(), b"model bytes")
+        self.assertEqual((self.voices / "en_US-lessac-medium.onnx.json").read_bytes(), b"{}")
+        self.assertEqual([timeout for _, timeout in opener.calls], [piper.STALL_SECONDS] * 3)
+        self.assertIn("/en/en_US/lessac/medium/en_US-lessac-medium.onnx", opener.calls[0][0])
+        self.assertFalse(list(self.voices.glob("*.part")))
+        # Kept, it is not fetched again.
+        self.assertEqual(piper.ensure_voice(self.voices, "en_US-lessac-medium", opener=self.opener([])), model)
+
+    def test_a_connection_that_never_answers_fails_after_its_tries_leaving_nothing_half_written(self) -> None:
+        from cine_toaster.providers import ProviderError, piper
+
+        with self.assertRaisesRegex(ProviderError, "failed 3 times"):
+            piper.ensure_voice(self.voices, "en_US-lessac-medium", opener=self.opener(["stall"] * 3))
+        self.assertEqual(list(self.voices.iterdir()), [])

@@ -232,11 +232,13 @@ Agreed order (2026-10-04):
 - [ ] **Audit current editing capabilities** against code: implemented / partial / missing / unknown; identify canonical edit state, timebase, versioning, trim, preview and render contracts.
 - [ ] **Select one representative fixture** with J/L cut, transition, sound stems and an alternative generated take.
 - [ ] **Prototype an editable React timeline** using existing Core commands, with agent proposal/approval and undo; do not create competing edit state.
-- [ ] **Run interoperability and engine spikes**: OpenTimelineIO round-trip/reconform and FFmpeg vs MLT vs GES comparison, with measurable acceptance criteria.
+- [ ] **Run interoperability and engine spikes**: OpenTimelineIO round-trip/reconform (the export is done, CT-0096: `versions/vN.otio`; OpenRV, which reads OTIO, is the natural review player to try it with) and FFmpeg vs MLT vs GES comparison, with measurable acceptance criteria.
 - [ ] **Evaluate production-wide finishing**: OpenColorIO/ACES, OpenEXR, OFX-host boundary, loudness, delivery profiles and dependency-aware regeneration.
 - [ ] Record findings and decisions in [CT-0083](../work/CT-0083-integrated-editing-and-production-architecture.md); convert validated choices into ADRs and implementation tasks.
 
 This is an active research track, **not** a decision to replace the existing media engine.
+
+Reference for the track: [awesome-cg-vfx-pipeline](https://github.com/cgwire/awesome-cg-vfx-pipeline). Most of its creation-side entries are already in place or recorded (OpenColorIO, OpenUSD, Natron/OFX, COLMAP, splats: CT-0047). What it adds is production tracking: compare Kitsu's model (projects, sequences, shots, tasks, previews, statuses) with ours -- to learn from, and as a possible export of shots and versions for a studio already on it -- never as the authority over the filesystem project.
 
 ### Active UX investigation — three workspaces (CT-0084)
 
@@ -368,12 +370,13 @@ in its own order; then D8 and D9.
 
 Neither changes the direction; each is used at the edges (`references.md`).
 
-- **Do -- a version exported as OpenTimelineIO.** The cut (shots, takes,
-  in and out points, joins, sound) as an `.otio` beside the version, so it
-  opens in FilmCraft, Resolve or Premiere for finishing: the picture's
-  counterpart of the stems for a DAW (CT-0063). How: the plan already holds
-  every segment; write it with the `opentimelineio` library behind an
-  adapter, a composite or a join rendered as its own clip.
+- ~~**Do -- a version exported as OpenTimelineIO.**~~ Done (CT-0096,
+  `toast assemble --otio`, `docs/otio.md`): the cut, its transitions, the
+  drawn shots kept beside the version, the mix and the stems. Left, each with
+  how: J- and L-cuts split across the tracks (the sound's own clips placed by
+  the plan's `split`); a transition's look beyond a dissolve (OTIO's
+  transition types, or the drawn join as a clip); a sequence's cut (its
+  scene versions as clips, the scene joins as transitions).
 - **Spike, when C6b or C8 need it -- EffectCraft as an opaque renderer.**
   `opaque.effectcraft`: a node whose picture is a render of a small JSON
   project by `effectcraft-cli render`, for what our graph does not hold

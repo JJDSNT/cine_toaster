@@ -404,7 +404,8 @@ def command_assemble(args: argparse.Namespace) -> int:
     try:
         job = manager.submit("assemble", args.project, {"scene": args.scene, "version": args.version or "",
                                                         "summary": args.summary or "",
-                                                        "stems": bool(getattr(args, "stems", False))})
+                                                        "stems": bool(getattr(args, "stems", False)),
+                                                        "otio": bool(getattr(args, "otio", False))})
         job = manager.wait(job["id"])
         if job["state"] != "succeeded":
             print(f"assemble {job['state']}: {job.get('error') or job['message']}  (job {job['id']})", file=sys.stderr)
@@ -2119,6 +2120,8 @@ def build_parser() -> argparse.ArgumentParser:
     assemble_parser.add_argument("--summary", help="what changed in this version")
     assemble_parser.add_argument("--stems", action="store_true",
                                  help="also the sound in its parts (dialogue, room, effects, ambience, music) for a DAW")
+    assemble_parser.add_argument("--otio", action="store_true",
+                                 help="also the cut as OpenTimelineIO (vN.otio), to finish it in an editor")
     assemble_parser.set_defaults(function=command_assemble)
 
     sequence_parser = subparsers.add_parser(

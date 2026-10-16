@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import threading
 import unittest
 from pathlib import Path
@@ -13,6 +14,9 @@ from cine_toaster.compositing.gl import gl_unavailable_reason
 from cine_toaster.compositing.reference import evaluate
 from cine_toaster.compositing.schema import validate
 from cine_toaster.vfx import list_effects
+
+sys.path.insert(0, str(Path(__file__).parent))
+from heavy import needs  # noqa: E402
 
 W, H, FPS = 128, 72, 24
 SOURCE = Path(__file__).parents[1] / "src" / "cine_toaster" / "vfx.py"
@@ -103,6 +107,7 @@ class BehaviourTests(unittest.TestCase):
 
 @unittest.skipIf(gl_unavailable_reason(), "no GL context here")
 class ConformanceTests(unittest.TestCase):
+    @needs("PyOpenColorIO")
     def test_every_effect_runs_on_gl_as_the_reference_draws_it(self) -> None:
         from cine_toaster.compositing.gl import renderer_for
 
@@ -147,6 +152,7 @@ class ConformanceTests(unittest.TestCase):
                         late = exact[-1]
                         self.assertLess(float(late[..., 1].max() - late[..., 0].max()), 0.05)  # no green left
 
+    @needs("PyOpenColorIO")
     def test_a_look_has_no_fixed_place_in_the_graph(self) -> None:
         """colour.lut is a node like any other (the user, 2026-10-14): on one picture before it is merged, or on
         the merged result -- the graph decides, the op does not. Both drawn the same by GL and the reference."""

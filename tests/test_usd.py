@@ -12,7 +12,7 @@ from pathlib import Path
 from cine_toaster.usd_export import available
 
 sys.path.insert(0, str(Path(__file__).parent))
-from heavy import heavy  # noqa: E402
+from heavy import heavy, needs  # noqa: E402
 
 DEMO = Path(__file__).parents[1] / "examples" / "demo-project"
 
@@ -76,6 +76,7 @@ USD_TEAPOT = Path.home() / ".local/share/cine-toaster/assets/usd-wg-assets/full_
                      and __import__("cine_toaster.titles").titles.blender_binary(),
                      "needs Blender, FFmpeg and the USD-WG Teapot sample")
 @heavy("renders a USD stage with Blender")
+@needs("OpenEXR")
 class ImportTests(unittest.TestCase):
     def test_a_usd_stage_is_rendered_as_an_element(self) -> None:
         from cine_toaster.vfx import expand, list_effects, list_elements, render

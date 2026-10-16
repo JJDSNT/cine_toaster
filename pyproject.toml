@@ -40,6 +40,8 @@ mcp = ["mcp>=2.2"]
 vfx = ["opencolorio>=2.3", "OpenEXR>=3.2", "numpy>=1.26", "pillow>=10"]
 # The plan as an OpenUSD stage (CT-0047): Pixar's USD (modified Apache 2.0).
 usd = ["usd-core>=25.5"]
+# The cut as OpenTimelineIO, to finish it in an editor (CT-0096).
+otio = ["opentimelineio>=0.17"]
 # Lottie animations read as a source (CT-0078): ThorVG (MIT) through thorvg-python (LGPL 2.1, used as a library).
 motion = ["thorvg-python>=1.1", "numpy>=1.26"]
 # Gaussian splats drawn by Spark in a headless Chromium (CT-0047).

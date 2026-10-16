@@ -169,6 +169,12 @@ class Plan:
     #: Write the sound's parts beside the version, for a final mix in a DAW (CT-0063); once rendered, where.
     stems: bool = False
     stems_folder: str = ""
+    #: The cut as OpenTimelineIO beside the version (CT-0096): asked for, then the cut as it was made -- each
+    #: shot's picture, where it starts in it, its frames on the timeline, the transition into it.
+    otio: bool = False
+    timeline: list[dict[str, Any]] = field(default_factory=list)
+    rate: Any = None
+    size: tuple[int, int] = (0, 0)
     #: Subtitles in the film's language (CT-0054): {burn: bool}; once rendered, the .srt written beside.
     subtitles: dict[str, Any] = field(default_factory=dict)
     subtitle_file: str = ""
@@ -975,6 +981,20 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
         frames_in += count[index]
     duration = float(timebase.seconds_of(frames_in, fps))
     plan_duration_frames = round(duration * fps)
+    plan.rate, plan.size = fps, (width, height)
+    plan.timeline = []
+    for index, segment in enumerate(plan.segments):
+        if segment.piece:  # drawn by its graph: its own piece, from its first frame
+            kind, file, source_in = "drawn", segment.piece, 0.0
+        elif segment.source and segment.method.startswith("solid:"):
+            kind, file, source_in = "solid", "", 0.0
+        else:
+            kind, file, source_in = "take", str(Path(segment.source) if segment.source else root / segment.media), \
+                segment.start
+        plan.timeline.append({"shot": segment.shot, "take": segment.take, "kind": kind, "file": file,
+                              "source_in": source_in, "frames": count[index], "overlap_in": overlap[index],
+                              "transition": segment.transition,
+                              **({"colour": segment.method.split(":", 1)[1]} if kind == "solid" else {})})
     for index, segment in enumerate(plan.segments):
         source = Path(segment.source) if segment.source else root / segment.media
         sound = Path(segment.sound) if segment.sound and not segment.source else None

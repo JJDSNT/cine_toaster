@@ -21,22 +21,37 @@ tests that need Blender, a model's inference, a voice engine or a long
 render -- never on a contract:
 
 ```bash
-make test-fast    # every test but the heavy ones: while working (about 10 min)
+make test-fast    # every test but the heavy ones: while working (about 2.5 min)
 make test-heavy   # only the heavy ones: after changing an adapter
 make test         # the whole suite, the final authority: before a step closes
 ```
 
-Without make: `PYTHONPATH=src python3 tests/run.py [fast|heavy] [--times]`;
-`--times` lists the slowest test classes, their class set-up included. One
-module: `PYTHONPATH=src python3 -m unittest tests.test_signals`.
+Without make: `PYTHONPATH=src python3 tests/run.py [fast|heavy] [--times]
+[-j N]`. Modules run in parallel, one fresh process each, as many as the
+machine has cores, the slowest first; a module that took over a minute last
+time is split by class. Their times are kept in a disposable cache
+(`~/.cache/cine-toaster/test-times.json`); `--times` lists the slowest;
+`-j 1` runs in one process as before. One module:
+`PYTHONPATH=src python3 -m unittest tests.test_signals`.
 
-On 2026-10-15: 1018 tests, 40 of them heavy; the whole suite about 15 to 17
-minutes on this machine. Most of the time is not in the heavy tests: retimed
-sound, deliveries and generation lead (`--times`).
+On 2026-10-16 (CT-0096): 1018 tests, 40 of them heavy; the whole suite 8.2
+minutes, the fast part 2.4 (from about 17 and 10 in one process). The
+whole suite's floor is its heavy work -- Blender's renders and the models,
+about seven minutes of all the cores between them.
 
 What a test needs and does not find -- FFmpeg, GL, Blender, the vision or
-voice environment, fetched models -- makes it skip with the reason, never
-fail; `toast doctor` says how to install each. A recorded fixture keeps a
+voice environment, fetched models, an optional Python module -- makes it skip
+with the reason, never fail; `toast doctor` says how to install each. An
+optional module is declared with `@needs("OpenEXR")` (`tests/heavy.py`),
+whose reason names the make target that installs it.
+
+`scripts/fresh_clone_check.sh [branch]` does what someone arriving at the
+repository does, on a fresh clone in a temporary folder: `make setup`,
+`make demo`, `make test`, `make build`, each timed, stopping at the first
+that fails. About fifteen minutes with the network; not part of the suite --
+run it before showing the repository. Parallel runs found a test that left a background job writing into its
+folder while the folder was removed; a test waits for what it starts. A
+recorded fixture keeps a
 real case in the fast suite (`tests/fixtures/c8/da2-occlusion.npz`: a
 model's wrong occlusion, checked without the model).
 

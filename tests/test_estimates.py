@@ -26,7 +26,7 @@ from cine_toaster.state import Actor
 from cine_toaster.titles import blender_binary
 
 sys.path.insert(0, str(Path(__file__).parent))
-from heavy import heavy  # noqa: E402
+from heavy import heavy, needs  # noqa: E402
 
 TOOL = Actor(id="estimator", kind="system")
 W, H = 64, 36
@@ -225,6 +225,7 @@ def _models_here() -> str:
 
 @heavy("renders with Blender and runs three models")
 @unittest.skipIf(_models_here(), _models_here())
+@needs("OpenEXR")
 class OnAKnownScene(unittest.TestCase):
     """The three models on a rendered scene (tests/test_renders.py's: a wall, a ball, a box, a post and a
     drone; the camera dollying in), measured against the render's own depth and object index."""

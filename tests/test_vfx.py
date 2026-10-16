@@ -13,7 +13,7 @@ from pathlib import Path
 from cine_toaster.vfx import BLENDS, CATEGORIES, EFFECTS, expand, list_effects, list_elements, preview, render
 
 sys.path.insert(0, str(Path(__file__).parent))
-from heavy import heavy  # noqa: E402
+from heavy import heavy, needs  # noqa: E402
 
 DEMO = Path(__file__).parents[1] / "examples" / "demo-project"
 HAS_FFMPEG = shutil.which("ffmpeg") is not None
@@ -62,6 +62,7 @@ class DrawingTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
 
+    @needs("PyOpenColorIO")
     def test_every_procedural_effect_draws(self) -> None:
         for item in list_effects():
             if item["effect"] != "element":
@@ -176,6 +177,7 @@ class ModalityTests(unittest.TestCase):
                                 check=True).stdout
         return max(centre)
 
+    @needs("PyOpenColorIO", "OpenEXR")
     def test_png_sequence_video_with_a_matte_and_exr_through_opencolorio(self) -> None:
         import numpy as np
 
@@ -218,6 +220,7 @@ class ModalityTests(unittest.TestCase):
                                  "crop=20:20:10:10,format=gray", "-f", "rawvideo", "-"], capture_output=True).stdout
         self.assertLess(max(corner), 180)
 
+    @needs("PyOpenColorIO", "OpenEXR")
     def test_a_look_is_an_opencolorio_transform_baked_for_ffmpeg(self) -> None:
         from cine_toaster.color import bake_look
 
@@ -233,6 +236,7 @@ class ModalityTests(unittest.TestCase):
     @heavy("renders every modality, Blender's among them")
     @unittest.skipUnless(shutil.which("ffmpeg") and __import__("cine_toaster.titles").titles.blender_binary(),
                          "Blender is not installed")
+    @needs("OpenEXR")
     def test_every_example_modality_is_built_and_composited(self) -> None:
         from cine_toaster.vfx_examples import build
 
@@ -250,6 +254,7 @@ VDB = Path.home() / ".local" / "share" / "cine-toaster" / "assets" / "openvdb" /
 @heavy("renders a volume with Blender")
 @unittest.skipUnless(HAS_FFMPEG and VDB.is_file() and __import__("cine_toaster.titles").titles.blender_binary(),
                      "needs Blender and OpenVDB's smoke.vdb (toast vfx examples downloads it)")
+@needs("OpenEXR")
 class OpenVdbTests(unittest.TestCase):
     def test_a_volume_is_rendered_by_blender_and_composited(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -282,6 +287,7 @@ class OpenVdbTests(unittest.TestCase):
 
 @unittest.skipUnless(HAS_FFMPEG and __import__("cine_toaster.vfx").vfx.natron_binary(),
                      "Natron (the OpenFX host) is not installed")
+@needs("OpenEXR")
 class OpenFxTests(unittest.TestCase):
     def test_openfx_plugins_run_in_natron_before_the_rest(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -307,6 +313,7 @@ class OpenFxTests(unittest.TestCase):
 
 @heavy("renders effects with Blender")
 @unittest.skipUnless(HAS_FFMPEG and __import__("cine_toaster.titles").titles.blender_binary(), "Blender is not installed")
+@needs("OpenEXR")
 class BlenderEffectTests(unittest.TestCase):
     """Weather, electricity, destruction and liquids, rendered by Blender for the shot (CT-0047)."""
 
@@ -333,6 +340,7 @@ class BlenderEffectTests(unittest.TestCase):
 
 @heavy("renders Alembic with Blender")
 @unittest.skipUnless(HAS_FFMPEG and __import__("cine_toaster.titles").titles.blender_binary(), "Blender is not installed")
+@needs("OpenEXR")
 class AlembicTests(unittest.TestCase):
     def test_an_alembic_cache_is_played_and_composited(self) -> None:
         from cine_toaster.titles import blender_binary

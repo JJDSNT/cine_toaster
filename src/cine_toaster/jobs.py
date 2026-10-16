@@ -644,8 +644,14 @@ def _validate_assemble(root: Path, params: dict[str, Any]) -> dict[str, Any]:
     version = str(params.get("version") or "").strip() or _next_version(root, scene_id)
     if any(item["id"] == version for item in scene.get("assemblies") or []):
         raise ValidationError(f"{scene_id} already has a version {version!r}")
+    if params.get("otio"):
+        from .otio_export import unavailable_reason
+
+        reason = unavailable_reason()
+        if reason:  # said when asked, not after the cut has been rendered
+            raise ValidationError(f"The cut as OpenTimelineIO cannot be written: {reason}")
     return {"scene": scene_id, "version": version, "summary": str(params.get("summary") or ""),
-            "stems": bool(params.get("stems"))}
+            "stems": bool(params.get("stems")), "otio": bool(params.get("otio"))}
 
 
 def _voices_for_cut(context: JobContext, production: dict[str, Any], scene_id: str, plan) -> dict[str, Any]:
@@ -721,6 +727,7 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
     # The same cut in every format it is delivered in (CT-0049): planned once, rendered per format.
     deliveries = [(item, copy.deepcopy(plan)) for item in scene.get("deliver") or []]
     plan.stems = bool(context.params.get("stems"))  # the main cut only: a format's stems are the same sound
+    plan.otio = bool(context.params.get("otio"))
     share = 1.0 / (1 + len(deliveries))
     start = 0.6 if voices else 0.0
     render(context.project_root, plan, output, context.staging / "work", context.run_process,
@@ -739,12 +746,32 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
         (context.staging / "stills").mkdir(exist_ok=True)
         shutil.move(path, context.staging / "stills" / f"{shot}.png")
         stills.append(shot)
-    shutil.rmtree(context.staging / "work", ignore_errors=True)
     scene_id, version = context.params["scene"], context.params["version"]
     # A version lives with its scene, beside the breakdown that made it (ADR 0021).
     from .versions import scene_versions
 
     folder = scene_versions(scene["file"])
+    media = []
+    if plan.otio:
+        # The cut for an editor (CT-0096): drawn shots kept beside the version, the timeline pointing where every
+        # file will be once the version is adopted.
+        from .otio_export import write as write_otio
+
+        final = context.project_root / folder
+        items = []
+        for item in plan.timeline:
+            if item["kind"] == "drawn":
+                (context.staging / "media").mkdir(exist_ok=True)
+                name = f"{item['shot']}{Path(item['file']).suffix}"
+                shutil.move(item["file"], context.staging / "media" / name)
+                media.append(name)
+                item = {**item, "file": str(final / f"{version}.media" / name)}
+            items.append(item)
+        write_otio(items, root=context.project_root, name=f"{scene_id} {version}", fps=plan.rate, size=plan.size,
+                   version_file=final / f"{version}.mp4",
+                   stems={Path(name).stem: final / f"{version}.stems" / name for name in stems},
+                   output=context.staging / "assembly.otio")
+    shutil.rmtree(context.staging / "work", ignore_errors=True)
     shutil.copyfile(context.project_root / scene["file"], context.staging / "assembly.scene.yaml")
     renditions = []
     for index, (item, copied) in enumerate(deliveries, 1):
@@ -764,6 +791,10 @@ def _run_assemble(context: JobContext) -> dict[str, Any]:
                   {"staged": "assembly.scene.yaml", "destination": f"{folder}/{version}.scene.yaml"},
                   *([{"staged": "assembly.srt", "destination": f"{folder}/{version}.srt"}]
                     if (context.staging / "assembly.srt").is_file() else []), *renditions,
+                  # The cut for an editor, and the drawn shots it points at (CT-0096).
+                  *([{"staged": "assembly.otio", "destination": f"{folder}/{version}.otio"}]
+                    if (context.staging / "assembly.otio").is_file() else []),
+                  *[{"staged": f"media/{name}", "destination": f"{folder}/{version}.media/{name}"} for name in media],
                   # The sound in its parts, beside the version, for a DAW (CT-0063).
                   *[{"staged": f"stems/{name}", "destination": f"{folder}/{version}.stems/{name}"} for name in stems],
                   # A still is a drawing of the latest cut, disposable: it replaces the one before.

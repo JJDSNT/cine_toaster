@@ -22,7 +22,7 @@ from cine_toaster.state import Actor
 from cine_toaster.titles import blender_binary
 
 sys.path.insert(0, str(Path(__file__).parent))
-from heavy import heavy  # noqa: E402
+from heavy import heavy, needs  # noqa: E402
 
 TOOL = Actor(id="compositor", kind="system")
 W, H, S = 48, 32, 16
@@ -229,6 +229,7 @@ FLAT = {
 
 @heavy("renders four scenes with Blender at four times the size")
 @unittest.skipUnless(blender_binary(), "Blender is not installed")
+@needs("OpenEXR")
 class AgainstARenderedTruth(unittest.TestCase):
     """Flat-shaded, so layers composite exactly but for their edges: the whole scene (at 4x, averaged down) is
     the truth; the ball, the pillar and the room are layers, each depth one sample a pixel."""
@@ -295,6 +296,7 @@ def _models_and_blender() -> str:
 
 @heavy("renders four scenes with Blender at 4x, runs Video Depth Anything on a plate of one")
 @unittest.skipIf(_models_and_blender(), _models_and_blender())
+@needs("OpenEXR")
 class OnAnEstimatedPlate(unittest.TestCase):
     """The done-when film's shape: a plate (the stage rendered flat, standing in for footage) whose depth is
     estimated by Video Depth Anything and aligned to its floor alone (a proxy), a person (the pillar) cut out

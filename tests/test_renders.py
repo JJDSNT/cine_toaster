@@ -23,7 +23,7 @@ from cine_toaster.state import Actor
 from cine_toaster.titles import blender_binary
 
 sys.path.insert(0, str(Path(__file__).parent))
-from heavy import heavy  # noqa: E402
+from heavy import heavy, needs  # noqa: E402
 
 TOOL = Actor(id="renderer", kind="system")
 W, H = 96, 54
@@ -96,6 +96,7 @@ class Refusals(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "render_passes"):
             evaluate(graph, {}, frames=1, size=(W, H), fps=24, root=self.root)
 
+    @needs("OpenEXR")
     def test_every_part_of_a_multipart_exr_is_read(self) -> None:
         import OpenEXR
 
@@ -115,6 +116,7 @@ class Refusals(unittest.TestCase):
         np.testing.assert_array_equal(read_exr(path), combined)  # a multilayer file's picture is its Combined
 
 
+@needs("OpenEXR")
 class ExrFiles(unittest.TestCase):
     """Plain and multilayer EXRs, one part or one a pass, read by name and never by guess; special depths."""
 
@@ -195,6 +197,7 @@ class ExrFiles(unittest.TestCase):
 
 @heavy("renders a scene's passes with Blender")
 @unittest.skipUnless(blender_binary(), "Blender is not installed")
+@needs("OpenEXR")
 class BlenderPasses(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -363,6 +366,7 @@ def png(path: Path, value: int) -> None:
 
 @heavy("renders scenes with Blender, several times")
 @unittest.skipUnless(blender_binary(), "Blender is not installed")
+@needs("OpenEXR")
 class Invalidation(unittest.TestCase):
     def render(self, root: Path, **scene) -> None:
         renders.render_passes(root, render_id="room", camera="cam", first=1, last=1, size=(32, 18), fps=24,
