@@ -49,6 +49,24 @@ not have yet: archive research / footage selects.
   records and contact sheets; what deserves to become a feature is decided
   by the experience.
 - The story is not chosen before the best selects are watched.
+- **Only the law filters** (2026-10-16): the work, the copy and the
+  archive's terms must pass; everything else is noted, never a filter. A
+  moving camera, hard occlusions, complex light are technical complexity,
+  recorded apart from narrative value: chosen, they become the tool's work
+  (the camera solve is in the roadmap; the material pulls it). The agent had
+  proposed a fixed camera as a search criterion -- the material bent to the
+  tool, against the policy of development pulled by productions; withdrawn.
+  The copy's own limits (scan resolution, defects) are recorded as data of
+  the copy: derivatives can treat them, not recover what is not there.
+- The legal criterion proposed (diligence documented, not a lawyer's
+  guarantee): public domain everywhere -- published before 1931 (US) and
+  authors dead before 1956 (life + 70) -- or an explicit licence by the
+  holder (CC0, CC BY, CC BY-SA); a faithful scan, no restoration, music,
+  remade titles or colour; the archive's terms; people's image and
+  trademarks. Sources by certainty: Library of Congress paper prints,
+  Prelinger Archives, US National Archives, Open Images / Beeld en Geluid /
+  EYE / Europeana, archive copies of authors dead before 1956 (Méliès,
+  Lumière, Chomón, Porter). Open: the jurisdiction the demo answers to.
 
 # Done
 
