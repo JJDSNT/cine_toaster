@@ -73,6 +73,8 @@ class LayersWithDepth(unittest.TestCase):
         signals.record_signal(self.root, signal_id="people", kind="segmentation", origin="estimated", rate=24,
                               actor=TOOL, frames=[self.people] * FRAMES, labels={0: "nothing", 1: "her"},
                               labels_are="instances")
+        signals.record_signal(self.root, signal_id="people-alpha-1", kind="alpha", origin="estimated", rate=24,
+                              actor=TOOL, frames=[self.coverage.astype(np.float32)] * FRAMES)
         signals.record_signal(self.root, signal_id="cg-z", kind="depth", origin="geometric", rate=24, actor=TOOL,
                               frames=[cg_depth] * FRAMES, camera=CAM, depth=DEPTH)
 
@@ -125,12 +127,27 @@ class LayersWithDepth(unittest.TestCase):
         self.assertEqual(lost(self.draw(LAYERS)), 0)  # one depth for her: none of her pixels behind the square
         self.assertGreater(lost(self.draw(per_pixel)), 10)  # per pixel her soft-depth edge falls behind it
 
+    def test_a_soft_cut_keeps_her_edge_as_the_model_saw_it(self) -> None:
+        hard = self.draw([{"source": "plate.mkv", "cut": {"signal": "people", "labels": [1]}}])[0][..., 3]
+        soft = self.draw([{"source": "plate.mkv", "cut": {"signal": "people", "labels": [1], "soft": True}}])[0][..., 3]
+        self.assertEqual(set(np.unique(hard).tolist()), {0.0, 1.0})  # one label a pixel: her edge aliases
+        np.testing.assert_allclose(soft, self.coverage, atol=1e-6)  # her coverage, edge and all
+        # One depth for all of her holds with a soft cut: none of her solid pixels behind the square.
+        layers = [dict(layer) for layer in LAYERS]
+        layers[1] = {**LAYERS[1], "cut": {**LAYERS[1]["cut"], "soft": True}}
+        out = self.draw(layers)[0]
+        solid = (self.coverage >= 0.999) & (self.cg[..., 3] > 0)
+        np.testing.assert_allclose(out[solid], self.picture[solid], atol=1e-6)
+
     @unittest.skipIf(gl_unavailable_reason(), "no GL context here")
     def test_gl_draws_the_layers_alike(self) -> None:
-        graph, _ = self.graph(LAYERS)
-        renderer = renderer_for(graph)
-        self.assertIsNotNone(renderer)
-        np.testing.assert_allclose(self.draw(LAYERS, renderer), self.draw(LAYERS), atol=1e-5)
+        soft = [dict(layer) for layer in LAYERS]
+        soft[1] = {**LAYERS[1], "cut": {**LAYERS[1]["cut"], "soft": True}}
+        for layers in (LAYERS, soft):
+            graph, _ = self.graph(layers)
+            renderer = renderer_for(graph)
+            self.assertIsNotNone(renderer)
+            np.testing.assert_allclose(self.draw(layers, renderer), self.draw(layers), atol=1e-5)
 
     def test_a_title_without_depth_keeps_its_place_over_them(self) -> None:
         title = np.zeros((H, W, 4), np.float32)
@@ -185,6 +202,7 @@ class LayersWithDepth(unittest.TestCase):
             "a render's depth without a render": [{"source": "a.png", "depth": {"render": True, "camera": CAM}}],
             "a source and a render": [{"source": "a.png", "render": "lamp"}],
             "a cut without labels": [{"source": "a.png", "cut": {"signal": "people"}}],
+            "a cut soft in words": [{"source": "a.png", "cut": {"signal": "people", "labels": [1], "soft": "yes"}}],
             "two ways with the unknown": [
                 {"source": "a.png", "depth": {"signal": "plate-z", "camera": CAM, "unknown": "behind"}},
                 {"source": "b.png", "depth": {"signal": "cg-z", "camera": CAM, "unknown": "front"}}],
@@ -339,6 +357,23 @@ class SourcesMeetInLayers(unittest.TestCase):
         for signal_id, maker in (("plate-people", "sam2.1-hiera-tiny"), ("plate-vda", "video-depth-anything-small")):
             self.assertEqual(signals.load_record(self.root, signal_id)["provenance"][-1]["maker"]["name"], maker)
         self.assertEqual(signals.status(self.root, "plate-vda-z")["transformations"], ["align_depth"])
+
+    def test_sam2s_soft_matte_is_nearer_the_pillars_edge_than_its_labels(self) -> None:
+        k, names = self.K, self.renders["whole"].manifest["objects"]
+        pillar = next(int(n) for n, v in names.items() if v == "pillar")
+        hard_errors, soft_errors = [], []
+        labels, soft = signals.SignalReader(self.root, "plate-people"), signals.SignalReader(self.root,
+                                                                                             "plate-people-alpha-1")
+        for index in range(8):
+            objects = signals.SignalReader(self.root, "whole-objects").frame(index)
+            # The pillar's true coverage of each plate pixel: its share of the k x k render pixels under it.
+            truth = (objects == pillar).reshape(180, k, 320, k).mean(axis=(1, 3))
+            edge = (truth > 0) & (truth < 1)
+            hard_errors.append(np.abs((labels.frame(index) == 1) - truth)[edge].mean())
+            soft_errors.append(np.abs(soft.frame(index) - truth)[edge].mean())
+        measured = (float(np.mean(hard_errors)), float(np.mean(soft_errors)))
+        print(f"\n  the pillar's edge, mean coverage error: labels {measured[0]:.4f}, soft matte {measured[1]:.4f}")
+        self.assertLess(measured[1], measured[0], measured)
 
     @unittest.skipIf(gl_unavailable_reason(), "no GL context here")
     def test_gl_draws_it_alike(self) -> None:

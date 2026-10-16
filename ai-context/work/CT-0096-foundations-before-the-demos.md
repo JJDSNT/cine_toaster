@@ -1,6 +1,6 @@
 ---
 id: CT-0096
-title: Foundations before the demos -- a faster suite, a clean install checked, the cut as OpenTimelineIO
+title: Foundations before the demos -- a faster suite, a clean install checked, the cut as OpenTimelineIO, SAM 2's soft mattes
 type: work
 status: done
 owner: claude (agent)
@@ -11,6 +11,7 @@ tags:
   - install
   - otio
   - demos
+  - signals
 ---
 
 # What
@@ -30,6 +31,11 @@ independent of what the demos will reveal:
 3. **The cut as OpenTimelineIO** (in the roadmap as "to do"): a version's
    cut -- shots, takes, in and out, joins, sound -- as `.otio`, to finish in
    Resolve, Premiere or FilmCraft; the picture's counterpart of the stems.
+4. **SAM 2's soft mattes** (added after, the user: "before the demos, the
+   point 4 you said was cheap"): the cheapest of C8's leftovers, and the one
+   that most improves cutting a person out. SAM 2's per-object
+   probabilities were thrown away when its labels were made, so a cut-out
+   aliased at its edge.
 
 # Why
 
@@ -108,6 +114,22 @@ demos there too:
 - `docs/otio.md`. What it leaves is in the roadmap: J/L-cuts split on the
   tracks, a transition's look beyond a dissolve, a sequence's cut.
 
+## 4. SAM 2's soft mattes (2026-10-16)
+
+- The worker keeps each object's probability (the sigmoid of its mask
+  logit, at the medium's size; below 1/512 snapped to 0 and above 1-1/512 to
+  1, so a matte ends -- `signal.object_depth` takes `alpha > 0` as the
+  object's extent). Overlaps are kept, each object's alpha its own.
+- `estimate` records it beside the segmentation as an `alpha` signal per
+  object, `<id>-alpha-<label>`, from the same run (its maker names the
+  object; the segmentation's maker lists them; `repeat` compares them too).
+  A worker that gives none is refused; an id too long to name them is
+  refused before the model runs.
+- A layer's `cut` takes `soft: true`: each label's soft matte
+  (`signal.read` of the alpha, `matte.from_signal`, the union of several) in
+  place of `matte.label`. Hard stays the default -- records made before have
+  no alphas.
+
 # To do
 
 # Decisions
@@ -127,5 +149,11 @@ demos there too:
   and a titled shot, adopted and read back by OpenTimelineIO -- one clip a
   shot in order, one transition, the timeline exactly the version's frames,
   every file it points at present, the drawn shot in `v1.media/`.
+- Soft mattes: the contract with a fake worker (`tests/test_estimates.py`:
+  the alpha recorded, refused without it or with too long an id); a soft cut
+  is the coverage exactly where labels alias, one depth for all of her still
+  holds, GL alike (`tests/test_layer_depth.py`). With SAM 2 itself on the
+  rendered stage (heavy): the pillar's edge, mean coverage error against the
+  render's own (4x supersampled) coverage -- labels 0.355, soft matte 0.184.
 - `tests/test_narration.py`: a stalled voice download tried again and kept
   whole; one that never answers fails after three tries leaving nothing.
