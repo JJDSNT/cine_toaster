@@ -5,7 +5,7 @@ type: status
 status: current
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-10-15
+updated_at: 2026-10-16
 tags:
   - status
   - tracker
@@ -14,7 +14,7 @@ tags:
 
 # Project status
 
-Last updated: 2026-10-15
+Last updated: 2026-10-16
 
 ## Current phase
 
@@ -201,6 +201,10 @@ Cine Toaster cannot yet:
 Open records, by what they wait for (2026-10-15; every other record is
 `done`, `ai-context/work/README.md`):
 
+- **Doing, first demo**: the evolution of animation (`CT-0099`,
+  `~/films/demo-01`), replacing the hybrid scene (`CT-0097`, paused). The
+  `codex-image` adapter is done (CT-0101); next: the cast sheet and the
+  eras, then the identity and transformation trials.
 - **Next, by the user's word**: the demos, produced through the production
   flow -- an intention, a screenplay, a storyboard -- the reel last, made
   from the others (`CT-0064`, `ready`; D8 and D9 of the roadmap). Each demo
@@ -211,6 +215,12 @@ Open records, by what they wait for (2026-10-15; every other record is
   Signal, the advertisement, the cartoon, the reel. First: the hybrid
   scene's intention and screenplay, with the user. Open: how the cartoon is
   made, the generation budget.
+- **Doing**: starting a film and onboarding a production agent (`CT-0098`):
+  `toast new` (empty or from a screenplay, one linked breakdown per scene),
+  `docs/making-a-film.md` (the two phases, the commands, what is the
+  director's), and the guide and practices as MCP reads. Left: the film's
+  own pointer for an agent opened in its folder, and the tools the MCP
+  surface still lacks.
 - **Awaiting the user's review**: SINGULAR's migration (`CT-0054`); the UX
   research made on `main` -- production information priorities, production
   awareness, cognitive ergonomics, creative context, compound locations,

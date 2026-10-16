@@ -2,7 +2,7 @@
 id: CT-0097
 title: Demo 1 (hybrid VFX) -- archive research before the screenplay
 type: work
-status: doing
+status: blocked
 owner: claude (agent)
 created_at: 2026-10-16
 updated_at: 2026-10-16
@@ -14,6 +14,9 @@ tags:
 ---
 
 # What
+
+**Paused (2026-10-16):** the user chose another first demo, the evolution
+of animation (CT-0099). This research is kept as it is for a later demo.
 
 The first demo (footage joined by ray-traced CG, roadmap "demo set") starts
 from found material, not from a script (the user, 2026-10-16: "the

@@ -12,6 +12,7 @@ wrong without saying what to type is half a report.
 from __future__ import annotations
 
 import importlib.util
+import os
 import shutil
 import sys
 from dataclasses import dataclass
@@ -210,6 +211,22 @@ def _blender() -> Capability:
         detail=path or "",
         remedy="" if path else "https://www.blender.org/download/ (4.2 LTS or newer), unpacked in ~/.local/opt, "
                                "or set CINE_TOASTER_BLENDER",
+    )
+
+
+def _codex_image() -> Capability:
+    from .providers.codex_image import CodexImageProvider
+
+    path = CodexImageProvider().binary
+    logged_in = bool(path) and (Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "auth.json").is_file()
+    return Capability(
+        name="Codex image generation",
+        what_it_enables="pictures made from a description and earlier references, kept as the film's references "
+                        "(`toast references generate`, MCP `generate_reference`; CT-0101), on the ChatGPT subscription",
+        required=False,
+        status=OK if logged_in else MISSING,
+        detail=path if logged_in else (f"{path}: not logged in" if path else ""),
+        remedy="" if logged_in else ("codex login" if path else "npm install -g @openai/codex, then codex login"),
     )
 
 
@@ -566,6 +583,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     # Detected, not yet used. See `report`.
     _sox,
     _blender,
+    _codex_image,
     _vision,
     _otio,
     _moderngl,

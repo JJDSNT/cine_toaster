@@ -5,7 +5,7 @@ type: architecture
 status: accepted
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-09-22
+updated_at: 2026-10-16
 tags:
   - project-core
   - filesystem
@@ -58,6 +58,9 @@ project/
   tracks/<id>/                    runtime-owned (C7, CT-0080): a track of a medium -- track.yaml (identity,
                                   media and its hash, the measurement in use), measurements/NNNN.json (each
                                   automatic measurement, never edited), corrections.json (a person's, apart)
+  references/<id>/                authored (CT-0100): what the film looks at, not its material --
+                                  reference.yaml (title, kind, made_by, prompt, from, licence, files by
+                                  sha256) and its files
   assets/
   renders/                        assembled files; renders/passes/<id>/ (C8, CT-0081): a 3D scene's render --
                                   render.json (renderer, scene and its files by hash, the camera at every

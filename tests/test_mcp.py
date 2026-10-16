@@ -75,6 +75,23 @@ class McpTests(unittest.TestCase):
         self.assertTrue(any(item["id"] == "dread" for item in self.call("list_emotions")))
         self.assertTrue(any(item["id"] == "viral-vertical" for item in self.call("list_styles")))
 
+    def test_an_agent_learns_the_flow_and_the_practices_from_the_product(self) -> None:
+        import anyio
+
+        self.assertIn("phase", self.server.instructions or "")
+        guide = self.call("how_to_make_a_film")
+        self.assertIn("Phase 1", guide)
+        self.assertIn("toast storyboard approve", guide)
+        practices = self.call("list_practices")
+        self.assertTrue(any(item["id"] == "every-line-is-filmed" for item in practices))
+        practice = self.call("read_practice", {"practice": "every-line-is-filmed"})
+        self.assertIn("dialogue_uncovered", practice["enforced_by"])
+        self.assertIn("refused", self.call("read_practice", {"practice": "no-such-practice"}))
+        self.assertEqual(self.call("list_references"), [])
+        reads = {tool.name for tool in anyio.run(self.server.list_tools) if tool.annotations.read_only_hint}
+        self.assertTrue({"how_to_make_a_film", "list_practices", "read_practice", "list_references"} <= reads)
+        self.assertNotIn("generate_reference", reads)
+
     def test_a_decision_is_recorded_as_claude_codes_and_a_refusal_is_an_answer(self) -> None:
         answer = self.call("set_cut", {"scene": "SC-030", "shot": "P2", "cut_type": "match", "why": "the stack's light"})
         self.assertEqual((answer["type"], answer["revision"]), ("cut.set", 1))

@@ -140,6 +140,15 @@ make serve
 
 `make setup` installs the application and reports available capabilities. `make demo` creates example productions outside the source checkout, and `make serve` opens the browser-based control room.
 
+To start your own film, from nothing or from a screenplay (Fountain or Final Draft):
+
+```bash
+toast new ~/films/my-film --title "My Film" --screenplay draft.fountain
+toast serve ~/films/my-film
+```
+
+[Making a film](docs/making-a-film.md) walks through the production's folder, the two phases, the commands for each step, and what stays the director's -- for a person, or for Claude Code connected through [MCP](docs/mcp.md).
+
 Useful commands:
 
 | Command | Purpose |
@@ -152,6 +161,7 @@ Useful commands:
 | `make test` | Run the whole test suite |
 | `make test-fast` | Run it without the heavy tests (Blender, models) |
 | `make ui` | Build the production canvas (Node 20+ required) |
+| `toast new` | Start a new production, empty or from a screenplay |
 | `toast doctor` | Inspect installed and missing capabilities |
 | `toast --help` | Explore the CLI |
 

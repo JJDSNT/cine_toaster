@@ -381,6 +381,11 @@ made from the others.
 | The hybrid VFX micro-scene | footage and **ray-traced CG** (Cycles) | CG joining footage; the techniques are whatever its screenplay asks |
 | The reel (D9), last | the four as its sources | the tool presenting itself, on NewTek's 1991 tape; it holds a short **ray-traced scene of its own** -- a homage to Eric Graham's *Juggler* (1986, the Amiga's ray-traced animation) -- whose final shots come from Blender's blockout rendered, not generated |
 
+**Changed later the same day:** the first demo is the evolution of
+animation (CT-0099) -- a girl maturing while the animation does, the
+cartoon approach taken first and widened; the hybrid scene is paused
+(CT-0097). The order below stands for the rest.
+
 Order (the user, 2026-10-16): **1** the hybrid micro-scene, **2** The Last
 Signal, **3** the advertisement, **4** the cartoon, **5** the reel -- from the
 smallest and cheapest to the most open, each building on the last; paid
@@ -691,3 +696,20 @@ Neither changes the direction; each is used at the edges (`references.md`).
 
 - [ ] Visual Lab: prototype separate quality / shot suitability / visual-identity fit assessments and human decisions (approve, regenerate, retain as exploration, scoped exception, fork candidate identity).
 - [ ] Visual Lab: test candidate identity across representative locations before promotion; version approved baselines and assess known/unknown downstream impact.
+
+### Starting a film and onboarding a production agent (CT-0098)
+
+- [x] `toast new`: a production, empty or from a screenplay (Fountain or FDX), one linked breakdown per scene ([CT-0098](../work/CT-0098-starting-a-film.md)).
+- [x] `docs/making-a-film.md`, packaged in the wheel and served over MCP as `how_to_make_a_film`; the two phases in the MCP instructions; `list_practices`, `read_practice`.
+- [ ] An agent opened in a film's folder is not told to use the MCP server. Solve: `toast new` writes a short, generated pointer in the film (what the folder is, `toast mcp <film>`, the guide), never repository memory.
+- [ ] `toast new` does not start git for the film's text, as `toast migrate` does (ADR 0021). Solve: reuse migrate's `.gitignore` and `git init`, with `--no-git`.
+- [ ] The MCP surface has about 30 tools against 90 CLI commands; phase 1 is the thinnest (no `cast propose`, `brief`, `script link`, `storyboard` state beyond reads). Solve: add phase-1 reads first, then name in the instructions what the agent must ask the person to run.
+- [ ] A screenplay changed after `toast new` gets no new breakdowns. Solve: a `toast script scenes` that proposes breakdowns for unbroken screenplay scenes, as a diff the person accepts (ADR 0016).
+- [x] The guide's commands could drift from the CLI: a test checks every `toast <command> [<action>]` it names exists.
+- [x] Film-level references: `references/<id>/reference.yaml`, `toast references add|list`, MCP `list_references` (CT-0100).
+- [x] An agent can make a reference: MCP `generate_reference`, recorded as asked by `claude-code` (CT-0101). Adding a file it did not make is still not offered.
+- [ ] Reference findings are not in `toast check` or the control room. Solve: add them to the production's attention list and a References panel (CT-0100).
+- [x] Codex image generation through an adapter: `toast references generate`, MCP `generate_reference`, provenance with thread, tokens and quota (CT-0101).
+- [ ] Codex pictures reach references only; master pictures (`toast picture`, workflows) are still Qwen's. Solve: an image provider interface `generate(prompt, references, output)` that `plan_picture` chooses by the shot or production, with Qwen's repaint rules kept in its adapter (CT-0101).
+- [ ] A Gemini image adapter: the Gemini CLI here is logged in by Google account and has no image generation; Gemini's images need an API key with billing. Solve: when the user wants it, a `gemini-image` adapter over the API behind the same interface, its cost in dollars (CT-0101).
+- [ ] Quota spent through Codex is not visible to `toast finops`. Solve: count generations and tokens per film from the references' `generation` records, shown apart from dollars (CT-0101).

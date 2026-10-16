@@ -5,7 +5,7 @@ type: context
 status: active
 owner: project
 created_at: 2026-09-29
-updated_at: 2026-10-15
+updated_at: 2026-10-16
 tags:
   - product
   - flow
@@ -31,6 +31,12 @@ each other until what will be shot is defined.
 | Blockouts | Scene geometry and movement; blocking frame; light previs | SPEC-0005, CT-0025, CT-0029 |
 
 Nothing in phase 1 costs money or waits on a model.
+
+A film starts with `toast new` (CT-0098): empty, or from a screenplay with
+one breakdown per screenplay scene, linked and with no shots yet. The
+product-facing statement of this flow, for people and production agents,
+is `docs/making-a-film.md`, served over MCP as `how_to_make_a_film`; keep
+the two in step.
 
 ## Phase 2 — producing what was defined
 

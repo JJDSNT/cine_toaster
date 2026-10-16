@@ -5,7 +5,7 @@ type: index
 status: active
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-10-15
+updated_at: 2026-10-16
 tags:
   - work
   - tracker
@@ -69,8 +69,17 @@ the user's validation).
 
 Compositing, the demos line and earlier:
 
+- `CT-0101` — the `codex-image` adapter: `toast references generate`, MCP
+  `generate_reference`, `toast doctor`; Gemini noted (done)
+- `CT-0100` — a film's references: `references/<id>/reference.yaml`,
+  `toast references`, MCP `list_references`; found by CT-0099 (done)
+- `CT-0099` — Demo 01, the evolution of animation: the production and
+  a trial of the tool; `~/films/demo-01` (doing)
+- `CT-0098` — starting a film: `toast new`, the product guide
+  (`docs/making-a-film.md`), the flow and practices over MCP (doing)
 - `CT-0097` — Demo 1 (hybrid VFX): archive research before the screenplay --
-  Chaplin's 1914-16 shorts, rights of the work and of each copy apart (doing)
+  Chaplin's 1914-16 shorts, rights of the work and of each copy apart
+  (blocked: paused for CT-0099)
 - `CT-0096` — Foundations before the demos: the suite in parallel, a fresh
   clone checked end to end, a version's cut as OpenTimelineIO (done)
 - `CT-0081` — C8: signals from models and from 3D, the audit -- the

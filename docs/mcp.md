@@ -5,7 +5,8 @@ own commands instead of editing files and writing scripts:
 
 ```bash
 make install-mcp
-claude mcp add cine-toaster -- toast mcp ~/confyui/singular --env-file ~/confyui/.env
+toast new ~/films/my-film --title "My Film" --screenplay draft.fountain   # or any production
+claude mcp add cine-toaster -- toast mcp ~/films/my-film --env-file ~/.config/cine-toaster/.env
 ```
 
 `--env-file` is needed only for paid generation; the credentials are read,
@@ -13,7 +14,8 @@ never printed. `toast doctor` reports whether the MCP server can run.
 
 ## What it can do
 
-- **Read:** `film_overview`, `read_scene`, `read_shot`, `read_cast`,
+- **Read:** `how_to_make_a_film` (the guide, [making-a-film.md](making-a-film.md)),
+  `list_practices`, `read_practice`, `list_references`, `film_overview`, `read_scene`, `read_shot`, `read_cast`,
   `search_screenplay`, `read_budget`, `check_scene`, `list_locations`,
   `list_camera_moves`, `plan_generation`, `plan_picture`, `job_status`.
 - **Decide over the breakdown** (recorded as `claude-code`, an agent, with
@@ -22,6 +24,9 @@ never printed. `toast doctor` reports whether the MCP server can run.
 - **Make things:** `start_workflow`, `resume_workflow`, `assemble_scene`,
   `slice_block`, `revoice_take`; follow a job with `wait_for_job`, which
   brings what it made into the film, or stop it with `cancel_job`.
+- **Generate a reference:** `generate_reference` makes a picture through
+  Codex (subscription quota) from a description and earlier references,
+  kept as a reference asked by `claude-code`.
 - **Pay:** `generate` and `make_picture` need `max_usd` at or above the
   estimate `plan_generation` or `plan_picture` gives. The budget ceiling
   (`toast budget`) holds whatever is passed.

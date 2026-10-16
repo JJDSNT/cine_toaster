@@ -205,6 +205,88 @@ def command_demo(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_new(args: argparse.Namespace) -> int:
+    """A new production, from nothing or from a screenplay (CT-0098)."""
+
+    from .new_production import create_production
+
+    destination = args.destination.expanduser().resolve()
+    checkout = _source_checkout_root()
+    if checkout is not None and _is_within(destination, checkout):
+        print(f"Refusing to create a production inside the Cine Toaster source repository: {destination}\n"
+              "A film lives outside the checkout.", file=sys.stderr)
+        return 2
+    try:
+        created = create_production(destination, args.title, screenplay=args.screenplay,
+                                    project_id=args.id or "", logline=args.logline or "")
+        production = load_production(created.root)
+    except CineToasterError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    for note in created.notes:
+        print(note)
+    print(f"Created {production['title']} ({created.project_id}) at {created.root}")
+    if created.scenes:
+        print(f"{len(created.scenes)} scene(s) from the screenplay, each a breakdown with no shots yet.")
+    else:
+        print("No scenes yet: write the screenplay in story/screenplay.fountain, or the breakdowns in scenes/.")
+    print("Next: toast serve {0}  |  toast check {0}  |  toast script show {0}".format(created.root))
+    print("How a film is made here, in two phases: docs/making-a-film.md")
+    return 0
+
+
+def command_references(args: argparse.Namespace) -> int:
+    """A film's references, with where each came from (CT-0100)."""
+
+    from .references import add_reference, generate_reference, load_references, reference_images
+
+    if args.references_command == "generate":
+        try:
+            if args.dry_run:
+                from .providers.codex_image import instruction
+
+                pictures = reference_images(args.project, args.parent or [])
+                print(f"provider: {args.provider} (subscription quota, no dollars)")
+                for picture in pictures:
+                    print(f"reference: {picture}")
+                print(f"instruction: {instruction(args.prompt, len(pictures))}")
+                return 0
+            folder = generate_reference(args.project, prompt=args.prompt, title=args.title,
+                                        parents=args.parent or [], provider=args.provider,
+                                        requested_by=args.requested_by or "", notes=args.note or [],
+                                        name=args.name or "")
+        except CineToasterError as error:
+            print(str(error), file=sys.stderr)
+            return 2
+        print(f"Generated {folder.name}: {folder / 'image.png'}")
+        return 0
+    if args.references_command == "add":
+        try:
+            folder = add_reference(args.project, args.files, title=args.title, kind=args.kind,
+                                   made_by=args.made_by or "", made_on=args.made_on or "", source=args.source or "",
+                                   prompt=args.prompt or "", parents=args.parent or [], licence=args.licence or "",
+                                   credit=args.credit or "", notes=args.note or [], name=args.name or "")
+        except CineToasterError as error:
+            print(str(error), file=sys.stderr)
+            return 2
+        print(f"Added {folder.name}")
+        return 0
+    references = load_references(args.project)
+    if args.json:
+        print(json.dumps(references, ensure_ascii=False, indent=2))
+        return 1 if any(item["severity"] == "error" for ref in references for item in ref["findings"]) else 0
+    if not references:
+        print("No references yet: toast references add <film> <file> --title ... --kind generated|found|made")
+    errors = 0
+    for reference in references:
+        made = ", ".join(str(reference[key]) for key in ("kind", "made_by", "made_on") if reference.get(key))
+        print(f"{reference['id']}  {reference.get('title', '')}" + (f"  ({made})" if made else ""))
+        for finding in reference["findings"]:
+            errors += finding["severity"] == "error"
+            print(f"  {finding['severity'].upper()}  {finding['code']}: {finding['message']}")
+    return 1 if errors else 0
+
+
 def _resolve_actor(args: argparse.Namespace) -> Actor:
     name = args.actor or os.environ.get("CINE_TOASTER_ACTOR") or getpass.getuser()
     return Actor(id=name, kind=args.actor_kind)
@@ -1983,6 +2065,51 @@ def build_parser() -> argparse.ArgumentParser:
         help="Allow intentional creation inside the Cine Toaster source checkout",
     )
     demo_parser.set_defaults(function=command_demo)
+
+    new_parser = subparsers.add_parser(
+        "new", help="Start a new production, empty or from a screenplay (.fountain or .fdx)")
+    new_parser.add_argument("destination", type=Path, help="a new or empty directory, outside the checkout")
+    new_parser.add_argument("--title", required=True)
+    new_parser.add_argument("--screenplay", type=Path, help="one breakdown is made per scene it has")
+    new_parser.add_argument("--id", help="the production's stable id (default: from the title)")
+    new_parser.add_argument("--logline")
+    new_parser.set_defaults(function=command_new)
+
+    references_parser = subparsers.add_parser(
+        "references", help="What the film looks at -- drafts, probes, paintings -- with where each came from")
+    references_actions = references_parser.add_subparsers(dest="references_command", required=True)
+    references_list = references_actions.add_parser("list", help="Every reference and what is wrong with it")
+    references_list.add_argument("project", type=Path)
+    references_list.add_argument("--json", action="store_true")
+    references_list.set_defaults(function=command_references)
+    references_add = references_actions.add_parser("add", help="Copy files in as a new reference, with its record")
+    references_add.add_argument("project", type=Path)
+    references_add.add_argument("files", type=Path, nargs="+")
+    references_add.add_argument("--title", required=True, help="what it is")
+    references_add.add_argument("--kind", required=True, choices=("generated", "found", "made"))
+    references_add.add_argument("--made-by", help="who or what made it: a person, a tool and its model")
+    references_add.add_argument("--made-on", help="the date it was made (default: today)")
+    references_add.add_argument("--source", help="where it came from: a URL, a book, a session")
+    references_add.add_argument("--prompt", help="the prompt it was generated from")
+    references_add.add_argument("--from", dest="parent", action="append", help="a reference it was made from")
+    references_add.add_argument("--licence")
+    references_add.add_argument("--credit")
+    references_add.add_argument("--note", action="append", help="an observation; repeatable")
+    references_add.add_argument("--name", help="the folder's name after the date (default: from the title)")
+    references_add.set_defaults(function=command_references)
+    references_generate = references_actions.add_parser(
+        "generate", help="Make a picture from a description and earlier references, kept as a new reference")
+    references_generate.add_argument("project", type=Path)
+    references_generate.add_argument("--prompt", required=True, help="what to make, and what to take from each reference")
+    references_generate.add_argument("--title", required=True, help="what it is")
+    references_generate.add_argument("--from", dest="parent", action="append",
+                                     help="a reference whose pictures it is shown, in order; repeatable")
+    references_generate.add_argument("--provider", default="codex-image", choices=("codex-image",))
+    references_generate.add_argument("--requested-by", help="who asked for it, when not the person at the terminal")
+    references_generate.add_argument("--note", action="append")
+    references_generate.add_argument("--name")
+    references_generate.add_argument("--dry-run", action="store_true", help="show what would be sent; make nothing")
+    references_generate.set_defaults(function=command_references)
 
     shots_parser = subparsers.add_parser(
         "shots", help="List shots, registered takes, and the current selection"

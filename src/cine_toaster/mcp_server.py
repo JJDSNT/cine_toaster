@@ -1,6 +1,6 @@
 """Cine Toaster as an MCP server: Claude Code working on a film through the product (CT-0045).
 
-A person who works with Claude Code, as SINGULAR was made, connects it here
+A person who works on a film with Claude Code connects it here
 instead of letting it edit files and write scripts of its own. Every tool is
 a query or one of the application's commands, the same the control room, the
 CLI and the assistant use, so what Claude Code does lands with records,
@@ -18,7 +18,7 @@ files (breakdowns, the screenplay) are not written by any tool here.
 
 The server runs in its own process, on one project, over stdio:
 
-    toast mcp <project> [--env-file ~/confyui/.env]
+    toast mcp <project> [--env-file <credentials>]
     claude mcp add cine-toaster -- toast mcp <project>
 """
 
@@ -35,7 +35,12 @@ ACTOR = {"id": "claude-code", "kind": "agent"}
 INSTRUCTIONS = (
     "Cine Toaster holds a film as files: breakdowns, a screenplay, cast sheets, takes. Work on it through these "
     "tools, not by editing its files: every change here is a recorded decision with a revision. Start with "
-    "film_overview, then read_scene or read_shot. Cuts, references and voices are decisions over the breakdown; "
+    "film_overview, then read_scene or read_shot; how_to_make_a_film is the whole guide. A scene goes through two "
+    "phases. Phase 1 fits the screenplay and the storyboard together; it is cheap and iterative, and nothing in it "
+    "is paid. A person then approves the scene's storyboard (each scene shows its phase), and phase 2 produces it: "
+    "master pictures, clips as takes, scene versions, sequences, every result kept as a version. Do not spend on "
+    "a scene whose storyboard is not approved without saying so. list_practices and read_practice give the "
+    "filmmaking practices the checks enforce. Cuts, references and voices are decisions over the breakdown; "
     "workflows and jobs make pictures, video, takes and versions. Paid generation needs max_usd at or above the "
     "estimate plan_generation gives, and the budget ceiling holds whatever you pass. Approving or refusing a "
     "picture, choosing a take and approving the storyboard are the director's: explain the candidates, never "
@@ -123,6 +128,61 @@ def build(root: Path, manager=None):
     def read_shot(scene: str, shot: str) -> str:
         """One shot: action, camera, lines, master picture, and its takes with where they came from."""
         return read(runtime, "shot", {"scene": scene, "shot": shot})
+
+    @server.tool(annotations=reading)
+    def how_to_make_a_film() -> str:
+        """The guide to making a film here: the production's folder, the two phases and the storyboard gate between
+        them, the commands for each step, and what is the director's (docs/making-a-film.md)."""
+        from .new_production import guide_text
+
+        return guide_text()
+
+    @server.tool(annotations=reading)
+    def list_practices() -> list[dict[str, Any]]:
+        """The filmmaking practices this production follows -- Cine Toaster's and its own -- and which checks
+        enforce each (a finding's code names the check)."""
+        from .knowledge import load_practices
+
+        return [{"id": item.id, "title": item.title, "domain": item.domain, "status": item.status,
+                 "enforced_by": list(item.enforced_by), "origin": item.origin}
+                for item in load_practices(runtime.root)]
+
+    @server.tool(annotations=reading)
+    def read_practice(practice: str) -> dict[str, Any]:
+        """One practice in full: what it says, why, and what enforces it."""
+        from .knowledge import load_practices
+
+        found = next((item for item in load_practices(runtime.root) if item.id == practice), None)
+        if found is None:
+            return {"refused": f"No practice {practice!r}; list_practices gives the ids"}
+        return {"id": found.id, "title": found.title, "domain": found.domain, "status": found.status,
+                "body": found.body, "enforced_by": list(found.enforced_by), "evidence": list(found.evidence)}
+
+    @server.tool(annotations=reading)
+    def list_references() -> list[dict[str, Any]]:
+        """What the film looks at -- draft boards, probes, paintings -- each with who or what made it, its prompt,
+        the references it came from, its licence and what is wrong with its record. Not material of the film;
+        adding one is the director's (toast references add)."""
+        from .references import load_references
+
+        return [{key: value for key, value in item.items() if key != "path"} for item in load_references(runtime.root)]
+
+    @server.tool(annotations=paying)
+    def generate_reference(title: str, prompt: str, from_references: list[str] | None = None, name: str = "",
+                           notes: list[str] | None = None) -> dict[str, Any]:
+        """Make one picture through Codex's image generation (the director's ChatGPT subscription quota, no
+        dollars) from a description and the pictures of earlier references, and keep it as a new reference
+        recorded as asked by claude-code. A reference is something to look at -- a probe, a trial of an era or
+        a face -- never material of the film. The description says what to take from each reference. Takes a
+        couple of minutes."""
+        from .references import generate_reference as make
+
+        try:
+            folder = make(runtime.root, prompt=prompt, title=title, parents=list(from_references or []),
+                          requested_by=ACTOR["id"], notes=list(notes or []), name=name)
+        except CineToasterError as error:
+            return {"refused": str(error)}
+        return {"reference": folder.name, "image": str(folder / "image.png")}
 
     @server.tool(annotations=reading)
     def read_cast() -> str:
