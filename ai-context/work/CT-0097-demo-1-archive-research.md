@@ -209,10 +209,41 @@ carry `PD-old-70` / `PD-anon-70-EU`.
   Spiess, a 1920s German film): their makers are findable, so their rights
   are not settled by anonymity.
 
+## Curation step 2 (2026-10-16)
+
+At the user's request: the long films finished, the selects studied in
+motion, feasibility by dimension, rights in three layers, three treatments.
+
+- `tools/shot_study.py`: every frame of each select measured (camera drift
+  and jolts by phase correlation, gate weave, flicker, hidden cuts) and a
+  ten-frame filmstrip seen -- measured and sampled, not watched; noisy where
+  large figures move, so each reading checked on its strip.
+- `research/archive/curation-2.yaml`: corrections (BP300's sphere shot is two
+  shots, and a hand touches the sphere; BP342 is a c. 1900 lightning-sketch
+  trick film -- the drawing comes alive by substitution; the lighthouse's
+  dilemma intertitle, "whom must I save?"; BP168 has no object between the
+  hands), feasibility 1-5 by tracking / roto / depth / occlusion /
+  reconstruction, rights as authorship / copy / reuse.
+- Rights found: F. S. Armitage died 1933, George D. Baker (Bella Butts)
+  died 1933 -- both past life + 70. Still open: BP300's "J.P. Smits" (Eye's
+  database knows a Jan Smits, actor-producer 1926 -- not established as the
+  same), BP125's film (not found: blocked). Next: ask Eye (Eye Film Sales).
+- The archive's chrome sphere is a light probe: unwrapped, it gives the
+  street's light of that day to light the CG.
+- `research/treatments-round-1.md` (Portuguese, the film's language for the
+  user): A *O operador* (the user's idea: a cameraman films the impossible;
+  it appears in other archive films, reflection first, then the sphere,
+  then out of the frame into the digital), B *Nevermore* (Griffith's raven
+  answers the poet; his 1909 gesture becomes the reply), C *Luz sólida* (a
+  glassblower's sphere becomes the lighthouse's lens).
+- Speed (the user): the historical cadence stays; any change is an
+  artistic decision per shot, recorded.
+
 # To do
 
-- The user watches the selects (the review reel, the sheets) -- the story is
-  chosen after.
+- The user watches the selects (the review reel, the sheets) and the three
+  treatments -- the story is chosen after.
+- Ask Eye about BP300 (maker, date) and BP352; confirm the anonymous fragments.
 - Rights of the chosen selects confirmed: makers named on cards (J.P. Smits;
   the glass-mountain film; Vitagraph 1915; F. S. Armitage) found and their
   deaths checked; anonymous fragments confirmed with Eye's records.
