@@ -378,6 +378,10 @@ models, voice) in 8.2 minutes with `make test`, its modules in parallel
 (`tests/run.py`); `make test-fast` runs the other 978 in 2.4 minutes
 (`development/testing.md`, CT-0096).
 
+A fresh clone sets up, tests and builds (`scripts/fresh_clone_check.sh`), and a
+kept version can carry its cut as OpenTimelineIO (`toast assemble --otio`,
+`docs/otio.md`), CT-0096.
+
 Earlier, on 2026-09-20, the repository test suite passed 141 tests with:
 
 ```bash

@@ -309,6 +309,21 @@ def _voice() -> Capability:
     )
 
 
+def _otio() -> Capability:
+    from .otio_export import unavailable_reason
+
+    reason = unavailable_reason()
+    return Capability(
+        name="OpenTimelineIO",
+        what_it_enables="a version's cut as OpenTimelineIO, to finish it in Resolve, Premiere or FilmCraft "
+                        "(`toast assemble --otio`, CT-0096)",
+        required=False,
+        status=OK if not reason else MISSING,
+        detail=reason,
+        remedy="" if not reason else "make install-otio",
+    )
+
+
 def _vision() -> Capability:
     from .models import describe, vision_unavailable_reason
 
@@ -552,6 +567,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _sox,
     _blender,
     _vision,
+    _otio,
     _moderngl,
     _compositing,
     _whisper,

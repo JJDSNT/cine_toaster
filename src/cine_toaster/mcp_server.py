@@ -317,10 +317,13 @@ def build(root: Path, manager=None):
                                 for key in ("id", "kind", "state", "message")})
 
     @server.tool(annotations=working)
-    def assemble_scene(scene: str, version: str = "", summary: str = "", stems: bool = False) -> dict[str, Any]:
+    def assemble_scene(scene: str, version: str = "", summary: str = "", stems: bool = False,
+                       otio: bool = False) -> dict[str, Any]:
         """Assemble a new version of a scene from its chosen takes (a job; follow it with wait_for_job).
-        With stems, the sound is also written in its parts (dialogue, room, effects, ambience, music) for a DAW."""
-        return submit("assemble", {"scene": scene, "version": version, "summary": summary, "stems": stems})
+        With stems, the sound is also written in its parts (dialogue, room, effects, ambience, music) for a DAW;
+        with otio, the cut as OpenTimelineIO, to finish it in an editor."""
+        return submit("assemble", {"scene": scene, "version": version, "summary": summary, "stems": stems,
+                                   "otio": otio})
 
     @server.tool(annotations=working)
     def slice_block(scene: str, block: str, clip: str = "") -> dict[str, Any]:

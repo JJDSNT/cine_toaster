@@ -2,7 +2,7 @@
 id: CT-0096
 title: Foundations before the demos -- a faster suite, a clean install checked, the cut as OpenTimelineIO
 type: work
-status: doing
+status: done
 owner: claude (agent)
 created_at: 2026-10-16
 updated_at: 2026-10-16
@@ -88,8 +88,44 @@ demos there too:
 - `scripts/fresh_clone_check.sh` repeats the whole path on a fresh clone,
   timing each step.
 
+## 3. The cut as OpenTimelineIO (2026-10-16)
+
+- `otio_export.py` (adapter; OpenTimelineIO, Apache-2.0, as the `otio`
+  extra, `make install-otio`, a doctor capability): V1 the cut -- a take
+  from its cut point, a drawn shot from its own picture, a solid screen a
+  generator, each clip's shot, take and production path in its metadata;
+  transitions centred on the cut over the frames the assembly overlapped
+  (OTIO's `in_offset` from the entering shot's head, `out_offset` from the
+  leaving shot's tail, trimmed so the timeline keeps the cut's length); V2
+  the version, disabled; A1 the mix; A2... the stems.
+- The assembly records the cut as it made it (`Plan.timeline`: each piece's
+  file, its in point, its frames, the overlap into it); the job keeps the
+  drawn shots beside the version (`vN.media/`), since its work folder is
+  removed, and writes `vN.otio` with the files' final places.
+- `toast assemble --otio`, and `otio` on the MCP server's `assemble_scene`:
+  one command for every interface. Asked for without the extra, it is
+  refused when submitted, with the command to run.
+- `docs/otio.md`. What it leaves is in the roadmap: J/L-cuts split on the
+  tracks, a transition's look beyond a dissolve, a sequence's cut.
+
 # To do
 
 # Decisions
 
 # Validation
+
+- The suite in parallel: whole 8.2 min, fast part 2.4 min, green
+  (`tests/run.py`).
+- A fresh clone from GitHub: `make setup` 3.2 min; `make demo`; `make test`
+  1018 passed, 51 skipped; `make build` 3.4 min -- after the fixes above.
+  Without `vfx`: 1018 passed, 87 skipped. `scripts/fresh_clone_check.sh`
+  repeats it; its own run on the branch passed end to end (setup 137 s,
+  test 198 s, build 279 s; OK, 51 skipped).
+- The whole suite with the OpenTimelineIO export: 1022 tests, OK, 8.9 min.
+- `tests/test_otio.py`: the adapter's arithmetic (handles trimmed, the cut's
+  length kept, a generator for a solid); a real assembly with a transition
+  and a titled shot, adopted and read back by OpenTimelineIO -- one clip a
+  shot in order, one transition, the timeline exactly the version's frames,
+  every file it points at present, the drawn shot in `v1.media/`.
+- `tests/test_narration.py`: a stalled voice download tried again and kept
+  whole; one that never answers fails after three tries leaving nothing.

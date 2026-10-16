@@ -9,7 +9,7 @@ import unittest
 from typing import Any, Callable
 
 #: The make target that installs each optional module a test may need.
-INSTALLED_BY = {"OpenEXR": "make install-vfx", "PyOpenColorIO": "make install-vfx"}
+INSTALLED_BY = {"OpenEXR": "make install-vfx", "PyOpenColorIO": "make install-vfx", "opentimelineio": "make install-otio"}
 
 
 def heavy(reason: str) -> Callable[[Any], Any]:
