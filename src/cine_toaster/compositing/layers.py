@@ -17,10 +17,14 @@ everything below it. A layer's source may be a Blender render's record
       - source: plates/street.mp4                 # the plate, its estimated depth per pixel
         depth: {signal: street-z, camera: shot-cam, estimated: true}
       - source: plates/street.mp4                 # the person, cut out, one depth for all of her
-        cut: {signal: street-people, labels: [1]}
+        cut: {signal: street-people, labels: [1], soft: true}
         depth: {signal: street-z, camera: shot-cam, estimated: true, object: true}
       - render: lamp                              # a Blender object, its own depth
         depth: {render: true, camera: shot-cam}
+
+A cut is the segmentation's labels, one a pixel, unless it says `soft: true`:
+then each object's soft matte (`<signal>-alpha-<label>`, which an estimate
+records beside its labels), its edge as the model saw it.
 
 The layers are a way of writing a composite, not a second way of drawing
 one: they become nodes of the one graph, checked, cached and drawn by the
@@ -109,16 +113,29 @@ class _Compiler:
         return self.add(f"depth-merge{index}-over", {"op": "merge.over", "front": merged, "back": below})
 
     def cut(self, n: str, spec: Any, where: str) -> str | None:
-        """A segmentation of the source's own pixels, its labels kept: a matte (C8 step 7)."""
+        """A segmentation of the source's own pixels, its labels kept: a matte (C8 step 7). `soft: true` takes
+        each label's soft matte instead (`<signal>-alpha-<label>`, an estimate's alpha signals): the object's
+        edge as the model saw it, not one label a pixel."""
 
         if not isinstance(spec, dict) or not isinstance(spec.get("signal"), str) \
-                or not isinstance(spec.get("labels"), list) or not spec["labels"] or set(spec) - {"signal", "labels"}:
-            self.problems.append(f"{where} is {{signal: a segmentation's id, labels: [numbers]}}")
+                or not isinstance(spec.get("labels"), list) or not spec["labels"] \
+                or not isinstance(spec.get("soft", False), bool) or set(spec) - {"signal", "labels", "soft"}:
+            self.problems.append(f"{where} is {{signal: a segmentation's id, labels: [numbers], soft: true|false}}")
             return None
         source = self.nodes.get(n, {})
-        labels = self.add(f"{n}-cut-labels", {"op": "signal.read", "signal": spec["signal"], "kind": "segmentation",
-                                              **({"of": n} if source.get("op") == "generate.source" else {})})
-        return self.add(f"{n}-cut", {"op": "matte.label", "signal": labels, "labels": spec["labels"]})
+        of = {"of": n} if source.get("op") == "generate.source" else {}
+        if not spec.get("soft"):
+            labels = self.add(f"{n}-cut-labels", {"op": "signal.read", "signal": spec["signal"],
+                                                  "kind": "segmentation", **of})
+            return self.add(f"{n}-cut", {"op": "matte.label", "signal": labels, "labels": spec["labels"]})
+        cut = None
+        for label in spec["labels"]:  # several objects: the union of their soft mattes
+            read = self.add(f"{n}-cut-alpha{label}", {"op": "signal.read", "signal": f"{spec['signal']}-alpha-{label}",
+                                                      "kind": "alpha", **of})
+            matte = self.add(f"{n}-cut{label}", {"op": "matte.from_signal", "signal": read})
+            cut = matte if cut is None else self.add(f"{n}-cut-to{label}", {"op": "matte.combine", "a": cut, "b": matte,
+                                                                            "how": "union"})
+        return cut
 
     def depth_of(self, n: str, current: str, spec: Any, where: str) -> str | None:
         """A layer's depth node: a signal record of its source (read at the instant the source shows), or the

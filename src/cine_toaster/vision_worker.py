@@ -6,6 +6,8 @@ The spec names the runner, the model's fetched directory, the frames (`frames.np
 uint8 sRGB, the medium's pixels), the parameters and the output folder. Written there:
 
 - `result.npy`: (count, height, width) -- float32 for a depth, int32 labels for a segmentation;
+- `alpha.npy`, for a segmentation: (count, objects, height, width) float32, each object's own probability (its
+  mask logit's sigmoid), a soft matte of it -- below half an 8-bit step 0, above it from 1, 1;
 - `meta.json`: what ran -- Python, torch, transformers, the device, threads, dtype, the determinism asked
   for, the model's own input size, how its output was brought to the medium's size, and what the model
   declared of itself (SAM 2's object scores). Nothing measured: measuring is the adapter's.
@@ -48,6 +50,9 @@ meta = {"python": sys.version.split()[0], "torch": torch.__version__, "device": 
         "dtype": "float32", "determinism": {"seed": int(parameters.get("seed", 0)),
                                             "deterministic_algorithms": True}}
 started = time.monotonic()
+extra = {}  # what a runner gives beside its result, saved as `<name>.npy`
+#: A probability this near 0 or 1 is kept as 0 or 1: half an 8-bit step, so an object's soft matte ends.
+SNAP = 1.0 / 512
 
 
 def depth_anything_v2() -> np.ndarray:
@@ -139,6 +144,14 @@ def sam2_video() -> np.ndarray:
     labels = np.where(logits.max(axis=1) > 0.0, np.asarray(order, np.int32)[best], 0).astype(np.int32)
     meta["overlaps"] = "a pixel claimed by several objects goes to the highest mask logit"
     meta["threshold"] = "mask logit > 0"
+    with np.errstate(over="ignore"):
+        alpha = (1.0 / (1.0 + np.exp(-logits))).astype(np.float32)  # -inf (not followed there) is 0
+    alpha[alpha < SNAP] = 0.0
+    alpha[alpha > 1.0 - SNAP] = 1.0
+    extra["alpha"] = alpha
+    meta["alpha"] = {"what": "each object's own probability: the sigmoid of its mask logit, at the medium's size",
+                     "snapped": f"below {SNAP:.6f} to 0, above {1 - SNAP:.6f} to 1",
+                     "overlaps": "kept: each object's alpha is its own, not resolved against the others"}
     meta["declared"] = {"what": "the model's object score (sigmoid), per object per frame",
                         "by_object": {str(label): presence[:, index].round(4).tolist()
                                       for index, label in enumerate(order)}}
@@ -151,4 +164,6 @@ RUNNERS = {"depth_anything_v2": depth_anything_v2, "video_depth_anything": video
 result = RUNNERS[spec["runner"]]()
 meta["seconds"] = round(time.monotonic() - started, 3)
 np.save(out / "result.npy", result)
+for name, data in extra.items():
+    np.save(out / f"{name}.npy", data)
 (out / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")

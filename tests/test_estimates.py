@@ -42,8 +42,8 @@ def plate(root: Path, frames: int = 4) -> str:
 class Fake:
     """What a worker writes, without a model: a depth of the frame's index, or a box of labels."""
 
-    def __init__(self, noisy: bool = False) -> None:
-        self.calls, self.noisy = 0, noisy
+    def __init__(self, noisy: bool = False, alpha: bool = True) -> None:
+        self.calls, self.noisy, self.alpha = 0, noisy, alpha
 
     def __call__(self, command: list[str]) -> None:
         self.calls += 1
@@ -58,6 +58,11 @@ class Fake:
             result = np.zeros(frames.shape[:3], np.int32)
             result[:, 5:15, 5:20] = 1
             meta["declared"] = {"what": "object score", "by_object": {"1": [0.9] * count}}
+            if self.alpha:  # the box's soft matte: its edge half there
+                alpha = np.zeros((count, 1, *frames.shape[1:3]), np.float32)
+                alpha[:, 0, 4:16, 4:21] = 0.5
+                alpha[:, 0, 5:15, 5:20] = 1.0
+                np.save(out / "alpha.npy", alpha)
         else:
             result = np.stack([np.full(frames.shape[1:3], 1.0 + index, np.float32) for index in range(count)])
             if self.noisy:
@@ -193,6 +198,19 @@ class Contract(unittest.TestCase):
                          [{"label": 1, "name": "mara", "frame": 0, "points": [[10, 10]]}])
         quality = signals.status(self.root, "who")["quality"]
         self.assertEqual((quality["declared"], quality["measured"]), ([0.9] * 4, []))
+        # Beside the labels, the object's soft matte: a signal of its own, from the same run.
+        self.assertEqual(record["provenance"][-1]["maker"]["alphas"], {"1": "who-alpha-1"})  # a YAML key
+        soft = signals.load_record(self.root, "who-alpha-1")
+        self.assertEqual((soft["kind"], soft["origin"]), ("alpha", "estimated"))
+        self.assertEqual(soft["provenance"][-1]["maker"]["object"], {"label": 1, "name": "mara"})
+        edge = signals.SignalReader(self.root, "who-alpha-1").frame(0)
+        self.assertEqual((float(edge[4, 4]), float(edge[10, 10]), float(edge[0, 0])), (0.5, 1.0, 0.0))
+        with self.assertRaisesRegex(ValidationError, "soft matte"):
+            estimates.estimate(self.root, signal_id="who", model="sam2.1-hiera-tiny", media=media, actor=TOOL,
+                               objects=[{"name": "mara", "points": [[10, 10]]}], run=Fake(alpha=False))
+        with self.assertRaisesRegex(ValidationError, "too long"):
+            estimates.estimate(self.root, signal_id="w" * 60, model="sam2.1-hiera-tiny", media=media, actor=TOOL,
+                               objects=[{"name": "mara", "points": [[10, 10]]}], run=Fake())
         # Measured apart, against a person's matte of the same object.
         truth = np.zeros((H, W), np.int32)
         truth[5:15, 5:15] = 1

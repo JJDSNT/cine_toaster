@@ -527,8 +527,8 @@ Neither changes the direction; each is used at the edges (`references.md`).
 - **A constant depth for a layer** (a card at 4 m) needs a signal record.
   How: `depth: {value: metres, camera}` compiled to an object depth of a
   constant over the layer's alpha.
-- **A cut is a hard segmentation.** How: SAM 2's logits kept as a soft
-  alpha signal (step 3's item), `cut` taking it.
+- ~~**A cut is a hard segmentation.**~~ Done (CT-0096): `cut: {..., soft:
+  true}` takes each object's soft matte.
 
 ### Signals on GL: what is not there yet (CT-0081 step 6)
 
@@ -560,9 +560,12 @@ Neither changes the direction; each is used at the edges (`references.md`).
 - **One depth per object is a constant**: an object long in depth (a
   table, a person reaching out) is not one number. How: `statistic: plane`
   -- a plane fitted to the object's interior depth, carried over its matte.
-- **SAM 2's mattes are hard labels** (its soft logits dropped, step 3), so a
-  cut-out from them aliases. How: the logits kept as an `alpha` signal per
-  object.
+- ~~**SAM 2's mattes are hard labels.**~~ Done (CT-0096): each object's
+  probability kept as an `alpha` signal (`<id>-alpha-<label>`); at a
+  rendered pillar's edge the coverage error halves (0.355 to 0.184). Left:
+  the probability is not a coverage -- SAM 2's mask is upsampled from 256
+  px, so a fine edge (hair) is still soft guesswork. How: a matting model
+  (e.g. ViTMatte) refining the alpha in its band, as another estimate.
 - **Coverage reaches 2 pixels**, a fixed choice from one measurement. How:
   the reach from the picture's own filter width (a render records it).
 
@@ -599,9 +602,7 @@ Neither changes the direction; each is used at the edges (`references.md`).
 - **One window's memory on a long shot**: Video Depth Anything holds every
   frame of the stretch. How: its streaming mode (`run_streaming.py` in the
   pinned code) as a parameter, recorded as a different temporal contract.
-- **SAM 2 keeps hard labels**; its soft per-object logits are dropped. How:
-  record each object's probability as an `alpha` signal beside the
-  segmentation, for soft mattes (step 5).
+- ~~**SAM 2 keeps hard labels.**~~ Done (CT-0096): soft mattes beside them.
 - **Prompts are points and boxes on the command line.** How: prompts drawn on
   a frame in the control room, kept with the record; a person's correction
   re-prompting a frame.

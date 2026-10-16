@@ -12,7 +12,8 @@ through `signals.record_signal`, the one way every signal is kept (ADR 0024):
 - **SAM 2** -- objects, prompted on a frame (points or a box), followed through the stretch: a
   `segmentation` whose numbers are **instances** -- the label is the object's identity through time, its
   name only a name -- with what the model declared of each object per frame (its object score) kept as
-  declared, never as measured.
+  declared, never as measured. Beside it, each object's own probability as an `alpha` signal,
+  `<id>-alpha-<label>`: a soft matte of it, its edge as the model saw it, where the labels alias.
 
 What is recorded of each run: the model by name, repository, pinned revision, licence, and every weight (and
 code) file by hash -- the files themselves pinned as inputs, so changed weights make the signal stale; the
@@ -104,7 +105,9 @@ def _run_worker(python: Path, spec: dict[str, Any], work: Path, run: Callable[[l
     except subprocess.CalledProcessError as error:
         tail = "\n".join(((error.stderr or "") + (error.stdout or "")).strip().splitlines()[-8:])
         raise ValidationError(f"The model {spec['model']} failed:\n{tail}") from None
-    return np.load(work / "out" / "result.npy"), json.loads((work / "out" / "meta.json").read_text())
+    alpha = work / "out" / "alpha.npy"
+    return (np.load(work / "out" / "result.npy"), json.loads((work / "out" / "meta.json").read_text()),
+            np.load(alpha) if alpha.is_file() else None)
 
 
 def estimate(root: Path, *, signal_id: str, model: str, media: str | Path, actor: Actor, first: int = 0,
@@ -135,6 +138,9 @@ def estimate(root: Path, *, signal_id: str, model: str, media: str | Path, actor
         objects = [{**item, "label": index + 1, "frame": int(item.get("frame", 0))}
                    for index, item in enumerate(objects)]
         parameters["objects"] = objects
+        if len(f"{signal_id}-alpha-{len(objects)}") > 63:  # each object's soft matte is a signal of its own
+            raise ValidationError(f"{signal_id} is too long to name its objects' soft mattes "
+                                  f"({signal_id}-alpha-{len(objects)}): 63 characters at most")
     elif objects:
         raise ValidationError(f"{model} takes no objects")
     medium = _in_production(root, media)
@@ -151,12 +157,19 @@ def estimate(root: Path, *, signal_id: str, model: str, media: str | Path, actor
         spec = {"model": model, "runner": model_entry["runner"], "model_dir": model_entry["directory"],
                 "frames": str(work / "frames.npy"), "fps": float(rate), "threads": threads,
                 "parameters": parameters}
-        result, meta = _run_worker(python, {**spec, "output": str(work / "a" / "out")}, work / "a", run)
+        result, meta, alpha = _run_worker(python, {**spec, "output": str(work / "a" / "out")}, work / "a", run)
         repeated = None
         if repeat:
-            again, _ = _run_worker(python, {**spec, "output": str(work / "b" / "out")}, work / "b", run)
+            again, _, alpha_again = _run_worker(python, {**spec, "output": str(work / "b" / "out")}, work / "b",
+                                                run)
             difference = float(np.abs(again.astype(np.float64) - result.astype(np.float64)).max())
-            repeated = {"identical": bool(np.array_equal(again, result)), "max_difference": difference,
+            identical = bool(np.array_equal(again, result))
+            if alpha is not None and alpha_again is not None:
+                difference_alpha = float(np.abs(alpha_again.astype(np.float64) - alpha.astype(np.float64)).max())
+                identical = identical and bool(np.array_equal(alpha_again, alpha))
+            repeated = {"identical": identical, "max_difference": difference,
+                        **({"max_difference_alpha": difference_alpha} if alpha is not None and
+                           alpha_again is not None else {}),
                         "how": "the same frames, parameters, threads and weights, run twice"}
     if result.shape[0] != len(frames) or result.shape[1:3] != frames.shape[1:3]:
         raise ValidationError(f"{model} gave {result.shape}, not one value per pixel of {len(frames)} frames")
@@ -181,6 +194,10 @@ def estimate(root: Path, *, signal_id: str, model: str, media: str | Path, actor
                   media=medium, maker=maker, inputs=inputs, actor=actor,
                   rationale=f"{model} on {medium} from frame {first}")
     if model_entry["kind"] == "segmentation":
+        if alpha is None or alpha.shape != (len(frames), len(objects), *frames.shape[1:3]):
+            raise ValidationError(f"{model} gave no soft matte of each object (alpha.npy, one per object a frame)")
+        soft = {item["label"]: f"{signal_id}-alpha-{item['label']}" for item in objects}
+        maker["alphas"] = soft
         maker["objects"] = [{"label": item["label"], "name": item["name"], "frame": item["frame"],
                              **{key: item[key] for key in ("points", "point_labels", "box") if key in item}}
                             for item in objects]
@@ -191,6 +208,14 @@ def estimate(root: Path, *, signal_id: str, model: str, media: str | Path, actor
         made = record_signal(root, frames=list(result.astype(np.int32)), declared=declared,
                              labels={0: "nothing", **{item["label"]: item["name"] for item in objects}},
                              labels_are="instances", **common)
+        for index, item in enumerate(objects):  # each object's soft matte, from the same run
+            record_signal(root, **{**common, "signal_id": soft[item["label"]], "kind": "alpha",
+                                   "maker": {**maker, "object": {"label": item["label"], "name": item["name"]},
+                                             "alpha": meta.get("alpha")},
+                                   "rationale": f"{item['name']}'s soft matte: {common['rationale']}"},
+                          frames=list(alpha[:, index]), declared=[float(value) for value in
+                                                                  meta["declared"]["by_object"][str(item["label"])]])
+        made = {**made, "alphas": soft}
     else:
         made = record_signal(root, frames=list(result.astype(np.float32)), depth=dict(model_entry["depth"]),
                              **common)

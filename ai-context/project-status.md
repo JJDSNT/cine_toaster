@@ -380,7 +380,8 @@ models, voice) in 8.2 minutes with `make test`, its modules in parallel
 
 A fresh clone sets up, tests and builds (`scripts/fresh_clone_check.sh`), and a
 kept version can carry its cut as OpenTimelineIO (`toast assemble --otio`,
-`docs/otio.md`), CT-0096.
+`docs/otio.md`), and SAM 2's segmentation keeps each object's soft matte
+for a layer's `cut` (`soft: true`), CT-0096.
 
 Earlier, on 2026-09-20, the repository test suite passed 141 tests with:
 
