@@ -366,6 +366,33 @@ script goes to the user before it is built.
 Order: D1b (bars) when a piece needs bars; the compositing roadmap C1-C10
 in its own order; then D8 and D9.
 
+**The demo set (the user, 2026-10-16).** No new demos: the ones planned,
+each made by a **different approach**, so that together they show the tool
+end to end. Each is produced through the production flow (an intention, a
+screenplay, a storyboard, then production), and what the flow lacks for its
+approach is recorded and built, not worked around. The reel comes last,
+made from the others.
+
+| Demo | Approach | What of Cine Toaster it exercises |
+|---|---|---|
+| The Last Signal | narrative, generated takes | the classic flow: screenplay, storyboard, cast, generation, verdicts, assembly |
+| The music piece (D8) | an **advertisement** for a fictitious brand, driven by its music | a brief, cuts on the beats, packshot and legal card, several deliveries from one production (30/15/6 s; 16:9, 9:16, 1:1) |
+| The animated short | a **cartoon** (2D drawn) | a character kept the same shot to shot (model sheet, style guide), lip sync to dialogue, limited animation on twos |
+| The hybrid VFX micro-scene | footage and **ray-traced CG** (Cycles) | depth, a person cut out with soft mattes, a CG object behind and in front of her |
+| The reel (D9), last | the four as its sources | the tool presenting itself, on NewTek's 1991 tape; it holds a short **ray-traced scene of its own** -- a homage to Eric Graham's *Juggler* (1986, the Amiga's ray-traced animation) -- whose final shots come from Blender's blockout rendered, not generated |
+
+Ray tracing appears twice, in two roles: CG joining footage (the hybrid
+scene) and a film made by it alone (the Juggler scene in the reel). Open
+for the user: how the cartoon is made -- generated in a fixed style from a
+model sheet (recommended: it tests what is hardest in AI animation and the
+cast references not yet wired to generation), Blender's Grease Pencil, or
+toon-shaded 3D -- and the budget for paid generation. Gaps already seen: an
+intention/treatment record (only `logline`), a production using another's
+version as a source (the reel), the screenplay of a music-driven piece, a
+client brief and duration variants as records (the advertisement), a shot
+whose final picture is a Blender render through the flow (cartoon or
+Juggler), UI capture for the reel.
+
 ### From the review of FilmCraft and EffectCraft (2026-10-14, CT-0075)
 
 Neither changes the direction; each is used at the edges (`references.md`).

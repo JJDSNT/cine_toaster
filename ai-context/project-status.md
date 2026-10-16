@@ -203,7 +203,12 @@ Open records, by what they wait for (2026-10-15; every other record is
 
 - **Next, by the user's word**: the demos, produced through the production
   flow -- an intention, a screenplay, a storyboard -- the reel last, made
-  from the others (`CT-0064`, `ready`; D8 and D9 of the roadmap).
+  from the others (`CT-0064`, `ready`; D8 and D9 of the roadmap). Each demo
+  by a different approach (2026-10-16, the roadmap's "demo set"): The Last
+  Signal narrative, the music piece an advertisement, the animated short a
+  cartoon, the hybrid scene footage with ray-traced CG, the reel last with a
+  ray-traced Juggler homage of its own. Open: how the cartoon is made, the
+  generation budget.
 - **Awaiting the user's review**: SINGULAR's migration (`CT-0054`); the UX
   research made on `main` -- production information priorities, production
   awareness, cognitive ergonomics, creative context, compound locations,
