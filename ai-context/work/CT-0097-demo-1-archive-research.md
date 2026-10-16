@@ -181,16 +181,42 @@ tool waits as asked. Found on the way: Eye's pages say more than titles
 (synopsis, tinting, genre, maker: BP113 is Pathé Frères, tinted brown) and
 carry `PD-old-70` / `PD-anon-70-EU`.
 
+## Round 1 watched (2026-10-16)
+
+- 43 copies fetched whole (SHA-1 = the archive's), 492 shots found, 48
+  contact sheets; every sheet seen except two of the longest films' later
+  sheets. `research/archive/inventory.yaml`: 15 selects (each shot by
+  number and timecode; narrative value and technical complexity apart;
+  rights per select), 6 held back for rights or fitness, the rest
+  described; `derived/selects-review-round-1.mp4` (9 min): the selects in
+  motion, source and timecode burnt in.
+- Strongest, by narrative value: *De Stad in Spiegelbeeld* (BP300, J.P.
+  Smits, Amsterdam) -- a film of reflections ending on a **chrome sphere**
+  reflecting the street: the Juggler's sphere is in the archive; a
+  cameraman on a girder over Manhattan filming what we never see (BP352);
+  Porter's *The Lighthouse by the Sea* (1911) -- a woman at a telescope, the
+  sea in an iris; Griffith's *Edgar Allan Poe* (1909) -- a raven on the bust
+  above the door; a glass mountain stormed by knights (BP125); a
+  glassblower's glowing sphere (BP187); a portrait artist's film eaten by
+  nitrate decay that clears within a minute (BP342: restoration as
+  narrative, in the material).
+- Found about the material: Eye's transfers run at 25 fps (the shooting
+  speed was 16-18: motion sped up); 720x404 files hold a smaller 4:3
+  picture (Poe: ~420 px wide); scene detection over-cuts decayed film and
+  under-cuts dark tinted film, and merges a dissolve into one "shot" (BP300
+  shot 7 holds the street and the sphere); several "anonymous" fragments
+  carry distributors' titles (HAP-Film, Minerva, Pathé) or name people (Daisy
+  Spiess, a 1920s German film): their makers are findable, so their rights
+  are not settled by anonymity.
+
 # To do
 
-- The user's decision on the copies: low-resolution unrestored transfers of
-  the four, or widen the first round to titles with collector print scans.
-- Download the chosen copies untouched (hash, origin, retrieval date), each
-  with its rights record (work / copy / restrictions / evidence / status).
-- Derivatives with their provenance: shots detected, contact sheets.
-- The inventory of sequences: timecodes, action, camera, free space,
-  surfaces and occlusions, copy quality; narrative value and technical
-  complexity apart.
+- The user watches the selects (the review reel, the sheets) -- the story is
+  chosen after.
+- Rights of the chosen selects confirmed: makers named on cards (J.P. Smits;
+  the glass-mountain film; Vitagraph 1915; F. S. Armitage) found and their
+  deaths checked; anonymous fragments confirmed with Eye's records.
+- Méliès: a copy of documented origin. Library of Congress: by a person.
 - Second round: Keaton, Méliès.
 
 # Validation
