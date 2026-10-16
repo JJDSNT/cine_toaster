@@ -69,6 +69,8 @@ the user's validation).
 
 Compositing, the demos line and earlier:
 
+- `CT-0097` — Demo 1 (hybrid VFX): archive research before the screenplay --
+  Chaplin's 1914-16 shorts, rights of the work and of each copy apart (doing)
 - `CT-0096` — Foundations before the demos: the suite in parallel, a fresh
   clone checked end to end, a version's cut as OpenTimelineIO (done)
 - `CT-0081` — C8: signals from models and from 3D, the audit -- the
