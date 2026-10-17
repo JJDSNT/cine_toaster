@@ -159,6 +159,9 @@ For the canvas setup, see [docs/canvas.md](docs/canvas.md). Media, GPU, audio, a
 
 ### Example productions
 
+**Creative direction (2026-10-17):** [Five standalone demos and one integrated cinematic reel](docs/demo-portfolio-direction.md). This supersedes the earlier demo lineup; the runnable examples below remain temporarily as technical fixtures pending migration. The new reel follows a historical cameraman through animation, a 3D/Juggler world, a music video and a Cine Toaster advertisement, then returns to the cameraman. Functional coverage from the old examples is tracked as open opportunities rather than forced into the films.
+
+
 `make demo` creates two independently identified productions, neither of them *Singular*:
 
 - **The Last Signal** -- a small dramatic production kept as a repeatable fixture: scene geometry, shots, takes, review and continuity checks.
