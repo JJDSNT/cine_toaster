@@ -12,10 +12,11 @@ import threading
 from .assistant import build
 from .catalog import role_models
 from .models import model_from_env
+from .operations import Watcher, WaitStore
 from .runtime_client import RuntimeClient
 
 
-def app(runtime_url: str, model=None):
+def app(runtime_url: str, model=None, watch: bool = True):
     from ag_ui_langgraph import LangGraphAgent, add_langgraph_fastapi_endpoint
     from fastapi import FastAPI
     from langgraph.checkpoint.memory import MemorySaver
@@ -25,8 +26,12 @@ def app(runtime_url: str, model=None):
     # turn; name the type, rather than rely on a default LangGraph will close.
     serde = JsonPlusSerializer(allowed_msgpack_modules=[("ag_ui._generated.models", "Context")])
     model = model if model is not None else model_from_env()
+    runtime = RuntimeClient(runtime_url)
+    waits = WaitStore()
     # Every role uses the model the host was given, unless the person bound a role to another (ADR 0034).
-    graph = build(model, RuntimeClient(runtime_url), MemorySaver(serde=serde), models=role_models(model))
+    graph = build(model, runtime, MemorySaver(serde=serde), models=role_models(model), waits=waits)
+    if watch:
+        Watcher(graph, runtime, waits).start()
     application = FastAPI(title="Cine Toaster assistant")
     add_langgraph_fastapi_endpoint(application, LangGraphAgent(name="assistant", graph=graph), "/")
     return application

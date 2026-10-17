@@ -111,9 +111,14 @@ models:                                              # your notes on top of the 
 Cine Toaster never picks a model by itself; the catalogue
 (`src/cine_toaster/agents/model_catalog.yaml`) only describes what adapters
 carry and what known models are good at.
-Long generation jobs remain in the existing jobs runtime; if the bounded agent
-wait ends, ask it to continue when the job finishes. No automatic durable
-agent resume after completion/restart is claimed.
+Long generation jobs remain in the existing jobs runtime. When one outlives
+the agent's turn, **Generation Operations** watches it: when it ends, the agent
+continues by itself -- keeps the result, inspects it, asks for your review --
+but never starts a new generation, which needs your consent. A failed job is
+diagnosed (its error, the endpoint's workers and queue, the failures measured
+for that path) and waits for you. The waits survive a restart of the server
+(`$XDG_STATE_HOME/cine-toaster/agent-waits.json`); the conversation itself
+does not, and the continued work is rebuilt from the film's records.
 
 ## What it sees
 

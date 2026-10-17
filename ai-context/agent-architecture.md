@@ -205,8 +205,8 @@ inputs are bounded, project-scoped registered raster bytes with pinned hashes.
 Generation uses existing jobs, explicit per-plan quota consent and non-overwriting
 adoption. The reviewer cannot approve human gates. Codex CLI currently implements
 the optional image-input transport; other adapters stop honestly without vision.
-Bounded waits can leave a real generation job running; later agent reasoning
-requires another interaction, not a second scheduler or automatic durable resume.
+Bounded waits can leave a real generation job running; since CT-0115 the role
+leaves it to Generation Operations, which continues the work when it ends.
 
 ## Directing and canonical continuity (CT-0111)
 
@@ -274,6 +274,19 @@ uses the model the host was given unless the person binds a role to another
 (`roles:` in the same file). `toast doctor` names the roles the supplied model
 can and cannot serve. RunPod/ComfyUI is not an infrastructure agent: recipes
 (data), a Generation Operations role, and a development skill (ADR 0034).
+
+## Generation Operations (CT-0115)
+
+A deterministic `technical` role (`agents/operations.py`). A role whose job
+outlives its turn records a wait (thread, project, job, role) in disposable
+operational state; a watcher in the assistant server reads the job through the
+runtime and, when it ends, opens one turn on that thread with a Generation
+Operations message (never a person's). Success hands the turn to the waiting
+role, which keeps and reviews the result but may not generate (no one is there
+to consent). Failure is diagnosed from the job error, the recipe's endpoint
+health (data plane only) and the measured failures of `knowledge/providers/`,
+and ends asking the person. It is not a second scheduler: production jobs
+stay on the existing engine; waits survive a restart, conversations do not.
 
 ## Runtime skill packaging
 

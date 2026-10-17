@@ -8,8 +8,7 @@ its state shape and the Coordinator's reset from these declarations, so a new
 role is one declaration plus its nodes, not edits in four places.
 
 Only implemented roles are declared. The roles still to come (Sequence
-Adherence, Generation Operations, ...) are in the roadmap, not here: a role
-listed is a role that runs.
+Adherence, ...) are in the roadmap, not here: a role listed is a role that runs.
 """
 
 from __future__ import annotations
@@ -60,6 +59,9 @@ ROLES: dict[str, Role] = {role.id: role for role in (
                   "planning_resume_verified": False}),
     Role("continuity", "Script Supervisor / Continuity", "author", within="directing"),
     Role("continuity_review", "Independent continuity review", "reviewer", within="directing"),
+    # Deterministic: it reads jobs, recipes and endpoint health, and asks no model (`operations.py`).
+    Role("generation_operations", "Generation Operations", "technical", needs=frozenset(),
+         scratch={"operations_job": "", "operations_wait": {}, "background": False}),
 )}
 
 #: Roles the Coordinator (or another role) may hand a turn to, by the action that does it.

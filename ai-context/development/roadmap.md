@@ -364,13 +364,40 @@ roles the supplied model serves. To do, in order:
   / `generation_health`, and two `toast doctor` rows (there were none).
   Remaining: VRAM/GPU per recipe is not recorded anywhere yet (only "L40S,
   measured" in the LTX note); add it to the notes when next measured.
-- [ ] **Generation Operations role + continuation on job completion.** The
-  Art Direction wait is 25 s; a RunPod cold start is minutes, so work stops
-  until the next human message. Solve: a `technical` role with Cine Toaster
-  tools (capability/endpoint health, estimate, job status, diagnosis, retry
-  under the same quota consent), and a job-completion event that resumes the
-  waiting role from a checkpoint kept beside the job store (KDP Studio ADR
-  0020's restart-surviving wait). No pod/endpoint creation in the product.
+- [ ] **Knowledge that evolves with use -- design open (the author, 2026-10-17:
+  "a camada de knowledge/evolve learning era algo que eu ainda não tenho toda
+  concebida").** Today `knowledge/` notes (claims measured/suspected/refuted;
+  built-in, shared, project layers) are written by hand; takes keep seconds
+  and cost and `toast finops` compares billed with assumed, but nothing turns
+  use into knowledge. Proposed, to decide before building: (1) automatic
+  per-recipe observations from every job (duration, cold start, error, GPU) as
+  disposable operational state; (2) `toast recipes` shows measured beside the
+  adapter's assumption; (3) a repeated pattern becomes a *suspected* claim the
+  agent drafts with its evidence, and only a person promotes it to *measured*
+  in a project or shared note. A model never rewrites knowledge by itself.
+  **Demotion is the harder half** (the author: "não é porque algo aconteceu
+  durante um período que vai acontecer para sempre"): a claim records the
+  conditions it was measured under (recipe, digest of the workflow's model
+  files, GPU, provider version, date); a changed condition makes it
+  "unverified since" automatically; contrary observations (the predicted
+  failure absent over N jobs, the workaround no longer needed) flag it for
+  reassessment with the evidence. Lowering confidence may be automatic -- the
+  safe direction; promoting to measured and declaring refuted stay a person's.
+  Example to start from: `runpod-serverless.md` "silent-gpu-swap", measured
+  2026-09-18, may no longer hold.
+- [x] **Generation Operations role + continuation on job completion** (done
+  2026-10-17). `agents/operations.py`: waits in disposable state, a watcher
+  in the assistant server, a continuation turn opened by the role's own
+  message; success resumes Art Direction (keep, inspect, request review; no
+  new generation), failure is diagnosed and waits for the person. Remaining:
+  (a) other roles' jobs (Coordinator `start_workflow` runs) are not waited on;
+  (b) the conversation checkpoint is in memory, so after a restart the chat
+  history is gone and the continuation is rebuilt from records -- move to the
+  SQLite checkpointer if Demo 01 shows the history matters; (c) a page open on
+  the thread does not see the continuation until it reconnects (AG-UI has no
+  push outside a run): the inbox and records refresh, the chat does not;
+  (d) a watcher pass racing a person's turn on the same thread is avoided by
+  checking `get_state().next`, not by a lock.
 - [ ] **Development skill `.agents/skills/runpod-comfyui/`** for development
   agents: worker images, endpoints and recipes with the RunPod tooling;
   never packaged as a runtime skill.

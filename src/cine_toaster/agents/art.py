@@ -36,6 +36,8 @@ After failed review, correct the brief/plan using specific findings within remai
 attempts; all candidates remain. Do not keep asking a human about an agent-fixable
 problem. If vision is unavailable, stop blocked honestly. For inconclusive or
 exhausted corrections, ask a concrete direction question with evidence.
+A turn opened by Generation Operations (a job you started has ended) has no
+person present: keep and inspect the result and request review, never generate.
 request_review is allowed only for a current ready_for_human pixel review; it creates
 the existing human Inception readiness request, not a human approval. Respond
 needs_review only after that request exists. No external research, deletion,
@@ -100,11 +102,17 @@ LOOP = Loop(role='art_direction', steps='art_steps', pending='art_pending', sche
             limit='Atingi o limite deste turno; preservei os resultados. Não há correção em segundo plano.',
             review_ready=lambda state: bool(state.get('art_review_request')),
             not_ready='Ainda não salvei uma proposta atual para revisão humana.',
-            shown=lambda state, action: 'visual_prevalidation' if action == 'inspect' else 'art_direction')
+            shown=lambda state, action: 'visual_prevalidation' if action == 'inspect' else 'art_direction',
+            # A turn Generation Operations opened has nobody to consent: it keeps and reviews, never generates.
+            allowed=lambda state: tuple(action for action in SCHEMA['properties']['action']['enum']
+                                        if not (state.get('background') and action == 'generate')))
 
 
-def nodes(model, runtime, reviewer=None):
-    """`reviewer` serves Visual Prevalidation: a separate call, and possibly another model the person bound."""
+def nodes(model, runtime, reviewer=None, waits=None):
+    """`reviewer` serves Visual Prevalidation: a separate call, and possibly another model the person bound.
+
+    `waits` hands a job that outlives the turn to Generation Operations (`operations.py`).
+    """
 
     reviewer = reviewer or model
 
@@ -286,13 +294,19 @@ def nodes(model, runtime, reviewer=None):
         except Exception as error:
             return stop(state, f'A geração não pôde ser iniciada: {error}')
 
-    def wait(state):
+    def wait(state, config=None):
         try:
             deadline = time.monotonic() + WAIT_SECONDS
             job = runtime.job(state['art_job'])
             while job['state'] in ('queued', 'running') and time.monotonic() < deadline:
                 time.sleep(1)
                 job = runtime.job(state['art_job'])
+            thread = ((config or {}).get('configurable') or {}).get('thread_id')
+            if job['state'] in ('queued', 'running') and waits is not None and thread:
+                waits.add(thread=thread, project_id=state.get('project_id', ''), job=job['id'], role='art_direction')
+                return stop(state, f"O job {job['id']} continua {job['state']}. Operações de geração o acompanham: "
+                            'quando terminar, eu retomo, retenho o resultado e sigo com a revisão. '
+                            'Nenhuma nova geração começa sem você.', 'waiting_for_job', art_waiting=False)
             if job['state'] in ('queued', 'running'):
                 return stop(state, f"O job {job['id']} continua {job['state']} no runtime. Você pode acompanhar aqui; "
                             'quando terminar, peça a continuação da revisão. Não há retomada autônoma do agente.', 'waiting_for_job', art_waiting=False)

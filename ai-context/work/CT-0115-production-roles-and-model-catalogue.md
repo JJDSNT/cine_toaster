@@ -97,6 +97,11 @@ the message for both Claude adapters.
   1M context and prices (Anthropic model table, 2026-10-06).
 - Generation recipes (`providers/recipes.py`), `toast recipes`, MCP reads,
   doctor rows for LTX 2.5 and Qwen Image Edit on RunPod; `test_recipes.py`.
+- Generation Operations (`agents/operations.py`, role `generation_operations`):
+  waits, watcher, continuation turn, diagnosis; Art Direction leaves running
+  jobs to it and may not generate in a continuation; `test_generation_operations.py`.
+- Knowledge that evolves with use: recorded as an open design with the
+  author's point that demotion is the harder half (roadmap).
 
 # To do
 

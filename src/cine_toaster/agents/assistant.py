@@ -22,6 +22,7 @@ from langgraph.types import interrupt
 
 from .loop import delegated
 from .models import Model, ModelUnavailable
+from .operations import node as operations_node, resumed_job
 from .reads import READS, overview, read
 from .roles import DELEGATIONS, ROLES, scratch_fields, scratch_reset
 from ..production_context import WORK_POLICY
@@ -231,8 +232,12 @@ def run_status(runtime: RuntimeClient, proposal: dict[str, Any]) -> str:
     return f"A execução está {run['state']}."
 
 
-def build(model: Model, runtime: RuntimeClient, checkpointer=None, models=None):
-    """`models(role)` gives the model that serves a role (`catalog.role_models`); by default `model` serves all."""
+def build(model: Model, runtime: RuntimeClient, checkpointer=None, models=None, waits=None):
+    """`models(role)` gives the model that serves a role (`catalog.role_models`); by default `model` serves all.
+
+    `waits` (`operations.WaitStore`) lets a role leave a generation to Generation Operations and be continued
+    when it ends; without it, a job that outlives the turn waits for the person's next message.
+    """
 
     from .inception import nodes as inception_nodes
     from .art import nodes as art_nodes
@@ -242,6 +247,17 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None, models=None):
     model = pick("coordinator")
 
     def coordinator(state: Assistant) -> dict[str, Any]:
+        job = resumed_job(state)
+        if job:
+            # A generation the person consented to has ended: Generation Operations opens this turn, not a person.
+            turn = state["resume"]["message"]
+            if state.get("completed_turn") == turn:
+                return {"active_role": "done"}
+            return {**scratch_reset(), "resume": {}, "turn": turn, "proposal": {}, "notes": [],
+                    "operations_job": job, "operations_wait": state.get("operations_wait") or {},
+                    "background": True, "active_role": "generation_operations",
+                    "routing_reason": "Generation finished",
+                    "agent_status": {"role": "generation_operations", "state": "working", "detail": job}}
         seen = page_context(state)
         human = next((m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)), None)
         turn = str(getattr(human, "id", "") or len(state["messages"]))
@@ -442,7 +458,8 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None, models=None):
     graph.add_node("inception", inception)
     graph.add_node("inception_tool", tool)
     art_context, art_reason, art_tool, art_generate, art_wait = art_nodes(
-        pick("art_direction"), runtime, reviewer=pick("visual_prevalidation"))
+        pick("art_direction"), runtime, reviewer=pick("visual_prevalidation"), waits=waits)
+    graph.add_node("operations", operations_node(runtime, waits))
     planning_context, planning_reason, planning_tool = directing_nodes(
         pick("directing"), runtime, auditor=pick("continuity"), reviewer=pick("continuity_review"))
     for name, node in (("planning_context", planning_context), ("directing", planning_reason),
@@ -455,7 +472,11 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None, models=None):
     graph.add_node("confirm", confirm)
     graph.add_edge(START, "coordinator")
     graph.add_conditional_edges("coordinator", lambda s: s["active_role"],
-                                {"coordinator": "assistant", "inception": "inception_context", "directing": "planning_context", "art_direction": "art_context", "done": END})
+                                {"coordinator": "assistant", "inception": "inception_context", "directing": "planning_context",
+                                 "art_direction": "art_context", "generation_operations": "operations", "done": END})
+    # A finished job goes back to the role that waited, which keeps its result first.
+    graph.add_conditional_edges("operations", lambda s: "art_wait" if s.get("active_role") == "art_direction" else END,
+                                {"art_wait": "art_wait", END: END})
     graph.add_conditional_edges("inception_context", lambda s: "inception" if s.get("inception_context") else END,
                                 {"inception": "inception", END: END})
     graph.add_conditional_edges("assistant", route, {"confirm": "confirm", "assistant": "assistant",
