@@ -34,6 +34,10 @@ proposal promotion, storyboard generation from a proposal and durable
 autonomous continuation remain open. Validate these handoffs on Demo 01 before
 adding a duplicate Coordinator or a nominal wider workforce (SPEC-0017).
 
+## Newly captured production-operations backlog
+
+- **CT-0117 — Project Storage** (`ready`): show production footprint, remaining free space per destination volume, storage breakdown, and low-space render preflight. See `../work/CT-0117-project-storage.md` and [issue #1](https://github.com/JJDSNT/cine_toaster/issues/1). This is not yet implemented. (Captured on `main` as CT-0098; renumbered on the merge of 2026-10-17, because this branch already used CT-0098..CT-0101.)
+
 ## Ordered plan from 2026-09-29
 
 This is the working order agreed after the camera, cut, and canvas
