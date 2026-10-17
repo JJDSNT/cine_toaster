@@ -22,15 +22,15 @@ An archival cameraman films → his subjective view reveals the animated story �
 
 This is a **narrative direction**, not a final edit, timing, script or mandate that each standalone demo contain the bridges. The reel-only connective shots can be produced separately. Its circular ending should retain the emotional payoff after the product reveal.
 
-## Morphing — required capability to develop (2026-10-17)
+## Morphing — required workflow capability, implementation open (2026-10-17)
 
-**Decision: morphing is a feature-development requirement for Cine Toaster**, not merely a possible aesthetic transition or an existing capability claim. Track it in the product backlog and in the reel's production readiness checks.
+**Decision:** Cine Toaster must **support morphing in its production workflow**; this does **not** imply building a native morphing engine. First investigate and evaluate existing external tools, plugins, libraries, ComfyUI workflows and services that can be orchestrated by Cine Toaster. Implement a native component only if integration cannot meet artistic, technical, licensing, reproducibility or operational requirements.
 
-**Initial use case:** an intentional, controllable visual metamorphosis between images/shots, especially the passage from the Cine Toaster commercial/reveal back to the historical cameraman's view. Other applications may include object, character or scene transformations in demos, where narratively justified.
+**Initial cinematic use case:** a controllable visual metamorphosis between images/shots, particularly the transition from the *Commercial Break* / product reveal back to the archival cameraman's point of view. Other uses remain optional and story-led.
 
-**Requirements to investigate and implement:** source/target image or clip inputs; transition timing and easing; spatial/temporal correspondence or control points/masks where needed; coherent intermediate frames without distracting artifacts; integration with timeline/transition tooling and rendering pipeline; reproducible parameters and asset provenance; preview and approval workflow. Evaluate 2D image morphing versus video/AI-assisted morphing and whether compositing or model-based workflows best serve each use case. Do not presume a specific engine, model or algorithm yet.
+**Integration contract to evaluate:** input images or video clips; adjustable duration and pacing; correspondence/masks or other controls when available; temporal coherence and quality; timeline/render-pipeline integration; preview, approval and repeatability; workflow parameters and asset provenance; licensing, cost and local/cloud execution. Compare conventional 2D morphing, video morphing, compositing and AI-assisted approaches without preselecting an engine.
 
-**Acceptance direction:** demonstrate an editable, repeatable morph between two deliberately chosen shots with a smooth temporal result, documented production settings, and reviewable output. Implementation status: **planned / not verified**.
+**Acceptance direction:** demonstrate an editable, repeatable morph between two chosen shots, with reviewable intermediate/result frames and recorded settings. Status: **required capability / solution to investigate / not yet verified**. Create or adapt tooling only if external solutions are inadequate.
 
 ## Functional coverage to preserve and place opportunistically
 
