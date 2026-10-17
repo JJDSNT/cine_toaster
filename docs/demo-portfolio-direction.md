@@ -52,6 +52,14 @@ Do **not** immediately delete `examples/demo-project`, `examples/amiga-demo-reel
 
 The previous production order is no longer authoritative. A new sequence should follow creative dependencies, production readiness, budget and user approval. **No paid generation without explicit approval.**
 
+## New capability candidate: morphing (2026-10-17)
+
+The proposed advertisement-to-archival-cameraman return creates a concrete cinematic motivation for **morphing**: a controlled transformation between two images/shapes/compositions, possibly combined with a reverse film-era look change and sound transition. Morphing is **not synonymous with** a cross-dissolve, grading, film grain or ordinary opacity blend.
+
+**Status: capability to investigate and specify, not implemented or committed to a particular algorithm.** Evaluate image/landmark-guided morphs, optical-flow-assisted morphs, geometry/depth-guided transformations and (where artistically warranted) model-based video transitions. Compare temporal stability, occlusions, controllability, artifact handling, deterministic/reproducible rendering, provenance, CPU/GPU cost, and compatibility with the existing shot compositing graph. Preserve start/end image and duration, easing, anchors/masks and human review as production decisions where relevant. First prototype should use a small, inspectable transition with known endpoints; avoid paid generation without approval.
+
+Potential placements: reel advertisement → archival camera, the animation short’s stylistic evolution, and other justified transformations. Do **not** force a morph if a match cut, lens/viewfinder reveal or look transformation serves the narrative better. A reverse film-stock look change is a separate, potentially already supported compositing concern.
+
 ## Next documentation/production decisions
 
 - Write one-page artistic intentions for each standalone work, keeping reel-only bridges separate.
