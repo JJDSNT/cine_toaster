@@ -52,6 +52,23 @@ Do **not** immediately delete `examples/demo-project`, `examples/amiga-demo-reel
 
 The previous production order is no longer authoritative. A new sequence should follow creative dependencies, production readiness, budget and user approval. **No paid generation without explicit approval.**
 
+## Juggler narrative exploration — *Beyond the Stage* (2026-10-17)
+
+**Status: promising story treatment for further development, not an approved screenplay, shot list, final title or locked technical design.** Preserve the independent short's dramatic coherence; the reel may use alternative connecting shots.
+
+**Premise:** A juggler in an early-computer-graphics world wants to take his performance beyond the limits of his tiny stage. The technical evolution from classic Amiga-era CG to a rich cinematic 3D world becomes the *consequence of his pursuit of freedom*, rather than a parade of rendering features. Unreal Engine is a proposed production engine for the expansive environment, not an in-universe product advertisement or a confirmed Cine Toaster integration.
+
+**Four movements:**
+
+1. **Performance / limitation.** In a recognizably classic Amiga Juggler-inspired aesthetic, he performs a precise routine with three spheres and bows to an empty audience. Beyond the stage lies nothing. He notices a fourth sphere just beyond its edge, but cannot reach it: there is no floor.
+2. **Crossing / invention.** He throws his spheres beyond the boundary. Each impact reveals or establishes another piece of traversable space. He hesitates and steps beyond the old stage; for the first time the camera can follow him into a world with real spatial depth. This is the motivated passage from early CG visual language toward contemporary 3D, with **Unreal Engine** a candidate for the new environment, lighting, scale and cinematic camera.
+3. **Discovery / reinvention.** In a vast environment with architecture, vegetation, water and atmosphere, the original spheres are left behind. He must rediscover his art using elements of the world: a droplet, a luminous fragment and particles become his new juggling objects. His environment becomes his instrument.
+4. **New stage / resolution.** He performs again, now against the vast landscape. The three spheres rise like small planets. A fleeting image of a musical performance in one sphere can support the reel's next transition. He bows again: no longer trapped by the stage, he has found a whole world in which to perform.
+
+**Dramatic spine:** desire = expand his performance; obstacle = the world ends at the stage boundary; action = build a way beyond it using his juggling skill; transformation = encounter and learn from a larger world; resolution = turn the world into his stage.
+
+**To investigate before scripting:** how/why the fourth sphere appears; physical causality of the thrown spheres making new floor; how to stage the loss of the original spheres without confusing the viewer; the juggler's personality and emotional beats; whether the sphere's music-video image belongs in the independent ending or only the reel; the character's arrival from the animation short as **reel-only bridge**; period-faithful opening visuals and rights/credit for Amiga Juggler inspiration; Blender ↔ Unreal asset interchange, camera/scene handoff, rendering and compositing via Cine Toaster; visual continuity during the engine/style transition. None of these decisions implies existing Unreal support or authorizes paid rendering.
+
 ## New capability candidate: morphing (2026-10-17)
 
 The proposed advertisement-to-archival-cameraman return creates a concrete cinematic motivation for **morphing**: a controlled transformation between two images/shapes/compositions, possibly combined with a reverse film-era look change and sound transition. Morphing is **not synonymous with** a cross-dissolve, grading, film grain or ordinary opacity blend.
