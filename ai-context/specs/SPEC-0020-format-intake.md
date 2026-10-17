@@ -53,3 +53,18 @@ creates no gate.
 `tests/test_intake.py`: sheet resolution, agent/human authority, limits,
 re-asking lineage, inbox items, forged answers refused on read, CLI answer,
 Inception interviewing and continuing after an answer.
+
+## Amendment (2026-10-17, Demo 01)
+
+- **A written film is not held up by its format name.** The `format` item is
+  required only while the film has no scenes; afterwards it is a gap to note.
+  Inception asks only what the requested work cannot proceed without, and does
+  a concrete request the records support first (Demo 01: a 24-shot film's
+  storyboard request was replaced by "what kind of film is this?").
+- **An answer given in conversation is recorded by the agent**, the director's
+  call: "eu posso passar o formato em conversa natural e o agente escrever".
+  `answer_intake` accepts an agent actor only with `quote`, the person's exact
+  words; Inception's `record_answer` is refused unless the quote is in the
+  person's messages of that conversation. The record keeps
+  `source: {kind: conversation, quote}`. MCP still has no answering tool: an
+  external agent cannot show the person's words to the runtime.

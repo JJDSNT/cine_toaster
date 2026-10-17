@@ -42,11 +42,19 @@ class IntakeCase(unittest.TestCase):
 
 
 class IntakeTests(IntakeCase):
-    def test_an_unknown_format_is_the_first_question(self):
+    def test_an_unknown_format_is_the_first_question_of_a_new_film(self):
+        from unittest.mock import patch
+        from cine_toaster import intake
+
+        with patch.object(intake, "load_production", lambda root: {"id": "the-last-signal", "scenes": []}):
+            view = intake_view(self.root)
+        self.assertEqual(view["missing_required"], ["format"])
+
+    def test_a_written_film_is_not_held_up_by_its_format_name(self):
         view = intake_view(self.root)
         self.assertIsNone(view["format"])
         self.assertEqual([row["id"] for row in view["items"]], ["format"])
-        self.assertEqual(view["missing_required"], ["format"])
+        self.assertEqual(view["missing_required"], [])  # a gap to note, not a gate
         self.assertEqual(view["production_says"], "Short film · 8 minutes")  # evidence the agent must weigh
 
     def test_a_declared_format_brings_its_sheet(self):
@@ -71,6 +79,16 @@ class IntakeTests(IntakeCase):
             answer_intake(self.root, question=asked["id"], answer="Outro", expected_revision=2, actor=HUMAN)
         row = intake_view(self.root)["items"][0]
         self.assertEqual((row["status"], row["answer"]["answer"]), ("answered", "Um videoclipe"))
+
+    def test_an_answer_given_in_conversation_is_recorded_with_the_persons_words(self):
+        asked = ask_intake(self.root, questions=[question("format")], expected_revision=0, actor=AGENT)["questions"][0]
+        with self.assertRaises(PermissionDeniedError):  # no quote, no record
+            answer_intake(self.root, question=asked["id"], answer="A short", expected_revision=1, actor=AGENT)
+        answer_intake(self.root, question=asked["id"], answer="Curta de animação, uns 100 s",
+                      quote="é uma curta de animação de uns 100 segundos", expected_revision=1, actor=AGENT)
+        saved = load_creation(self.root)["intake_answers"][0]
+        self.assertEqual(saved["source"], {"kind": "conversation", "quote": "é uma curta de animação de uns 100 segundos"})
+        self.assertEqual(saved["actor"]["kind"], "agent")
 
     def test_an_answer_naming_a_format_brings_its_sheet_without_editing_the_production(self):
         asked = ask_intake(self.root, questions=[question("format")], expected_revision=0, actor=AGENT)["questions"][0]
@@ -112,7 +130,7 @@ class IntakeTests(IntakeCase):
         answer_intake(self.root, question=asked["id"], answer="A short", expected_revision=1, actor=HUMAN)
         path = self.root / "creation" / "state.json"
         state = json.loads(path.read_text())
-        state["intake_answers"][0]["actor"] = AGENT.public_dict()
+        state["intake_answers"][0]["actor"] = AGENT.public_dict()  # an agent's answer with no quoted words
         path.write_text(json.dumps(state))
         with self.assertRaises(PersistenceError):
             load_creation(self.root)
@@ -168,6 +186,36 @@ class InterviewTests(IntakeCase):
         view = intake_view(self.root)
         self.assertEqual(view["open_count"], 1)
         self.assertIn("Qual é a música?", model.calls[1][1])  # the receipt is seen before answering
+
+    def test_inception_records_what_the_person_said_and_only_that(self):
+        asked = ask_intake(self.root, questions=[question("format", "Que tipo de filme é?")],
+                           expected_revision=0, actor=AGENT)["questions"][0]
+
+        class Recording(Runtime):
+            def record_intake_answer(self, payload):
+                return answer_intake(self.root, actor=AGENT, **payload)
+
+        said = "É uma curta de animação, uns 100 segundos, 16:9."
+        model = Model({"action": "record_answer", "reply": "", "answer": {
+                           "question": asked["id"], "answer": "Curta de animação, ~100 s, 16:9", "quote": said}},
+                      {"action": "respond", "reply": "Anotado.", "status": "complete"})
+        build(model, Recording(self.root)).invoke(
+            {"messages": [HumanMessage(content=said, id="m-format")],
+             "ag-ui": {"context": [{"description": "Current room", "value": "creation"}]}},
+            {"configurable": {"thread_id": "said"}})
+        self.assertEqual(load_creation(self.root)["intake_answers"][0]["source"]["quote"], said)
+
+        invented = Model({"action": "record_answer", "reply": "", "answer": {
+                              "question": asked["id"], "answer": "Um videoclipe", "quote": "é um videoclipe"}},
+                         {"action": "respond", "reply": "Anotado.", "status": "complete"})
+        state = build(invented, Recording(self.root)).invoke(
+            {"messages": [HumanMessage(content="Ainda não sei.", id="m-unsure")],
+             "ag-ui": {"context": [{"description": "Current room", "value": "creation"}]}},
+            {"configurable": {"thread_id": "unsure"}})
+        receipt = state["inception_receipts"][0]
+        self.assertFalse(receipt["ok"])
+        self.assertIn("not in the person's messages", receipt["error"])
+        self.assertEqual(len(load_creation(self.root)["intake_answers"]), 1)  # nothing invented was written
 
     def test_an_answered_interview_continues_in_inception(self):
         asked = ask_intake(self.root, questions=[question("format")], expected_revision=0, actor=AGENT)["questions"][0]

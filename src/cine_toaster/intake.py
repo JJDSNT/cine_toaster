@@ -85,9 +85,20 @@ def validate_intake(state: dict[str, Any]) -> None:
                 or item.get("question") not in known or item["question"] in answered
                 or not isinstance(item.get("answer"), str) or not item["answer"].strip()
                 or len(item["answer"]) > 4000 or not isinstance(item.get("answered_at"), str)
-                or not isinstance(item.get("actor"), dict) or item["actor"].get("kind") != "human"):
+                or not isinstance(item.get("actor"), dict) or not _answered_by_a_person(item)):
             raise ValueError("Invalid intake answer")
         answered.add(item["question"])
+
+
+def _answered_by_a_person(item: dict[str, Any]) -> bool:
+    """A person typed it here, or said it in conversation and an agent recorded their exact words."""
+
+    if item["actor"].get("kind") == "human":
+        return True
+    source = item.get("source")
+    return (item["actor"].get("kind") == "agent" and isinstance(source, dict)
+            and source.get("kind") == "conversation" and isinstance(source.get("quote"), str)
+            and source["quote"].strip() != "" and len(source["quote"]) <= 2000)
 
 
 def intake_view(root: Path, state: dict[str, Any] | None = None,
@@ -104,7 +115,11 @@ def intake_view(root: Path, state: dict[str, Any] | None = None,
     answers = {item: answers_by_question[question["id"]] for item, question in latest.items()
                if question["id"] in answers_by_question}
     style, source = _format(root, production, answers)
-    items = [FORMAT_ITEM] if source != "declared" else []
+    # Before a film has scenes the format decides everything else; once it is written and broken
+    # down, not knowing the format's name is a gap to note, not a gate (Demo 01: a 24-shot film's
+    # storyboard request was held up by "what kind of film is this?").
+    developed = bool(production.get("scenes"))
+    items = [{**FORMAT_ITEM, "required": not developed}] if source != "declared" else []
     items += sheet_items(style) if style else []
     rows = []
     for item in items:
@@ -124,7 +139,7 @@ def intake_view(root: Path, state: dict[str, Any] | None = None,
             "production_says": str(production.get("format") or ""),
             "items": rows, "open": open_questions, "open_count": len(open_questions),
             "missing_required": [row["id"] for row in rows if row["required"] and row["status"] == "not_asked"],
-            "meaning": "Answers are the person's words, kept as records. An answered sheet is not approval, "
+            "meaning": "Answers are the person's words, kept as records (typed here, or quoted from conversation). An answered sheet is not approval, "
                        "and a missing item may already be established elsewhere in the records.",
             "url": "/app/decisions.html#intake"}
 
@@ -175,10 +190,19 @@ def ask_intake(root: Path, *, questions: list[dict[str, Any]], expected_revision
         return {"revision": committed["revision"], "questions": asked}
 
 
-def answer_intake(root: Path, *, question: str, answer: str, expected_revision: int, actor: Actor) -> dict[str, Any]:
-    """A person's answer, kept in their words. One answer per question; asking again is a new question."""
+def answer_intake(root: Path, *, question: str, answer: str, expected_revision: int, actor: Actor,
+                  quote: str = "") -> dict[str, Any]:
+    """A person's answer, kept in their words. One answer per question; asking again is a new question.
 
-    if actor.kind != "human":
+    A person may also answer in conversation: an agent then records it with `quote`, the person's
+    exact words (the Agent Runtime checks they are in the person's messages before calling). The
+    answer is still theirs; the agent is only who wrote it down.
+    """
+
+    if actor.kind == "agent":
+        if not isinstance(quote, str) or not quote.strip() or len(quote) > 2000:
+            raise PermissionDeniedError("An agent records an answer only with the person's exact words (quote)")
+    elif actor.kind != "human":
         raise PermissionDeniedError("An intake question is answered by a person")
     if not isinstance(answer, str) or not answer.strip() or len(answer) > 4000:
         raise ValidationError("An answer is non-empty text of at most 4000 characters")
@@ -195,6 +219,8 @@ def answer_intake(root: Path, *, question: str, answer: str, expected_revision: 
             raise ValidationError("This question was already answered; the agent asks again if it needs more")
         item = {"id": "intake_a_" + uuid.uuid4().hex[:16], "question": question, "answer": answer.strip(),
                 "actor": actor.public_dict(), "answered_at": now()}
+        if actor.kind == "agent":
+            item["source"] = {"kind": "conversation", "quote": quote.strip()}
         committed = {**state, "revision": state["revision"] + 1,
                      "intake_answers": [*state.get("intake_answers", []), item]}
         validate_intake(committed)

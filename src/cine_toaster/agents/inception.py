@@ -15,7 +15,7 @@ from .roles import ROLES
 from ..production_context import WORK_POLICY
 
 MAX_STEPS, MAX_READS, MAX_WRITES = (ROLES["inception"].budgets[key] for key in ("steps", "reads", "writes"))
-TOOLS = ("read", "save_concept", "save_screenplay", "assess_readiness", "ask_questions")
+TOOLS = ("read", "save_concept", "save_screenplay", "assess_readiness", "ask_questions", "record_answer")
 STOPS = ("complete", "needs_direction", "needs_review", "blocked", "paused")
 
 SYSTEM = """You are the Inception specialist inside Cine Toaster's Agent Runtime.
@@ -51,12 +51,19 @@ must supply. Resolve agent-owned gaps yourself when you have the capability.
 Interview before advancing (SPEC-0020). The creation record carries the format's
 intake sheet: each item, why it matters and the stage it unlocks, with what was
 asked and answered. Compare it with everything the records already establish.
-For what only the person can tell you and the records do not say, use
-`ask_questions`: at most three at a time, the most blocking first, each in the
-director's language with its reason, then respond needs_direction. Never ask
-what the records answer, never answer for the person, never repeat an open
-question. If the format itself is unknown, ask that first. An answered item is
-the person's word: use it, and cite it when it shapes a candidate.
+For what only the person can tell you, the records do not say, and the work
+asked for cannot proceed without, use `ask_questions`: at most three at a
+time, the most blocking first, each in the director's language with its
+reason, then respond needs_direction. A concrete request the records already
+support is done first; an optional or merely useful question never replaces
+it. Never ask what the records answer, never answer for the person, never
+repeat an open question. For a new film with no scenes, the format comes
+first. An answered item is the person's word: use it, and cite it when it
+shapes a candidate. When the person answers in conversation -- an open
+question, or a sheet item they bring up themselves -- write it down with
+`record_answer`: the question id, the answer in their words, and `quote`, the
+exact words from their message. It is refused unless the quote is in what they
+wrote here. Record only what they said, never your inference.
 
 A storyboard proposal is for the director's unit of review, a canonical
 sequence: set proposal.sequence to its id (from the work structure) so the
@@ -92,6 +99,8 @@ SCHEMA = {"type": "object", "properties": {
     "status": {"type": "string", "enum": list(STOPS)},
     "query": {"type": "string", "enum": list(READS)},
     "scene": TEXT, "shot": TEXT, "text": TEXT,
+    "answer": {"type": "object", "properties": {"question": TEXT, "answer": TEXT, "quote": TEXT},
+               "required": ["question", "answer", "quote"]},
     "questions": {"type": "array", "items": {"type": "object", "properties": {
         "item": TEXT, "question": TEXT, "why": TEXT, "based_on": TEXT}, "required": ["item", "question", "why"]}},
     "draft": {"type": "object", "properties": {
@@ -322,6 +331,17 @@ def nodes(model, runtime):
                     if not value.get("source_digest"):
                         raise ValueError("Source material cannot be verified; reread or repair the production context")
                     result = runtime.save_inception_draft(payload)
+                elif action == "record_answer":
+                    supplied = call.get("answer") or {}
+                    quote = str(supplied.get("quote") or "").strip()
+                    spoken = [str(m.content) for m in state["messages"] if getattr(m, "type", "") == "human"]
+                    # The person's words, or nothing: the runtime never takes the agent's paraphrase as theirs.
+                    if not quote or not any(quote in text for text in spoken):
+                        raise ValueError("The quote is not in the person's messages in this conversation; "
+                                         "record only what they wrote")
+                    result = runtime.record_intake_answer({"question": supplied.get("question"),
+                                                           "answer": supplied.get("answer"), "quote": quote,
+                                                           "expected_revision": value["revision"]})
                 elif action == "ask_questions":
                     result = runtime.ask_intake({"questions": call.get("questions") or [],
                                                  "expected_revision": value["revision"]})

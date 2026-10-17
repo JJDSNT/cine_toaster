@@ -838,6 +838,18 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             except CineToasterError as error:
                 self._send_json(error.public_dict(), HTTPStatus(error.http_status))
             return
+        if parsed.path == "/api/creation/intake-recorded-answer":
+            # An answer the person gave in conversation, recorded by an agent with their exact words.
+            from .intake import answer_intake
+            from .state import Actor
+            try:
+                payload = self._read_json_body(limit=64 * 1024)
+                self._send_json(answer_intake(self.project_root, question=payload.get("question"),
+                    answer=payload.get("answer"), quote=payload.get("quote", ""),
+                    expected_revision=payload.get("expected_revision"), actor=Actor(id="creation-agent", kind="agent")))
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
         if parsed.path in ("/api/creation/intake-questions", "/api/creation/intake-answer"):
             from .intake import answer_intake, ask_intake
             from .state import Actor

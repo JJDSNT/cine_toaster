@@ -50,6 +50,9 @@ class RuntimeClient:
         query = urllib.parse.urlencode({"recipe": recipe, "jobs": jobs}) if recipe else ""
         return self._call("/api/generation" + ("?" + query if query else ""))
 
+    def record_intake_answer(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._call("/api/creation/intake-recorded-answer", payload)
+
     def ask_intake(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._call("/api/creation/intake-questions", payload)
 

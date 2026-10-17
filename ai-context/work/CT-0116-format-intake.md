@@ -41,6 +41,10 @@ the answer (CT-0112's informal-question gap). Model: KDP Studio's interviewer.
   Inception (`resumed_intake`).
 - `tests/test_intake.py` (11), MCP tool assertions.
 
+- 2026-10-17, from Demo 01: the format item no longer gates a written film;
+  answers given in conversation are recorded by Inception with the person's
+  exact words, checked against their messages (SPEC-0020 amendment).
+
 # To do
 
 1. Real-model interview on a disposable film (paid model call: ask first).
@@ -51,8 +55,9 @@ the answer (CT-0112's informal-question gap). Model: KDP Studio's interviewer.
 
 - The sheet lives in the format style, beside the format's other rules: one
   owner per format; the production's free-text `format:` is evidence only.
-- An answer is never written by an agent (no MCP answering tool); the CLI
-  user and the inbox are the person.
+- An answer is the person's: typed in the inbox or the CLI, or said in
+  conversation and recorded by the agent with their quoted words (the director,
+  2026-10-17). No MCP answering tool: it cannot show the person's words.
 - An answer naming a format does not edit `style:`; declaring it is separate.
 
 # Validation
