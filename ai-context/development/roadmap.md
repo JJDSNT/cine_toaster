@@ -356,9 +356,14 @@ roles the supplied model serves. To do, in order:
   `read_intake`; answering the last open question continues in Inception.
   Remaining: sheets for non-format films (a short with no format style gets
   only the `format` question), and a real-model interview on a disposable film.
-- [ ] **Generation recipes.** ComfyUI/endpoint graphs described in filmmaking
-  terms (inputs, models, VRAM, rate, endpoint variable); the graph stays in
-  the provider adapter.
+- [x] **Generation recipes** (done 2026-10-17). `providers/recipes.py`:
+  each path in a film's words, its transport, configuration (named, never
+  shown), the model files its ComfyUI graph loads, the adapter's own rate and
+  timing, measured failures from `knowledge/providers/`; endpoint health from
+  the data plane. `toast recipes [--health ID]`, MCP `list_generation_recipes`
+  / `generation_health`, and two `toast doctor` rows (there were none).
+  Remaining: VRAM/GPU per recipe is not recorded anywhere yet (only "L40S,
+  measured" in the LTX note); add it to the notes when next measured.
 - [ ] **Generation Operations role + continuation on job completion.** The
   Art Direction wait is 25 s; a RunPod cold start is minutes, so work stops
   until the next human message. Solve: a `technical` role with Cine Toaster

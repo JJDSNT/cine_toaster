@@ -67,6 +67,7 @@ class McpTests(unittest.TestCase):
         self.assertNotIn('request_sequence_review', reads)
         # An agent asks the format interview; answering it is the person's (SPEC-0020).
         self.assertIn("read_intake", reads)
+        self.assertTrue({"list_generation_recipes", "generation_health"} <= reads)
         self.assertIn("ask_intake_questions", names - reads)
         self.assertFalse({name for name in names if "answer" in name})
         self.assertTrue({"production_status", "continuity_ledger"} <= reads)

@@ -95,6 +95,8 @@ the message for both Claude adapters.
 - Claude API: system prompt cached (`cache_control` ephemeral), cache reads
   recorded in `last`. Catalogue: Claude Fable 5.1, Opus/Sonnet/Haiku 5.5 with
   1M context and prices (Anthropic model table, 2026-10-06).
+- Generation recipes (`providers/recipes.py`), `toast recipes`, MCP reads,
+  doctor rows for LTX 2.5 and Qwen Image Edit on RunPod; `test_recipes.py`.
 
 # To do
 

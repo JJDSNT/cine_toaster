@@ -1205,6 +1205,37 @@ def command_intake(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_recipes(args: argparse.Namespace) -> int:
+    """The generation recipes (ADR 0034): what each path makes, its configuration, models, costs, known failures."""
+
+    from .providers.recipes import health, recipes
+    from .providers.runpod import load_credentials
+
+    if args.env_file:
+        load_credentials(Path(args.env_file).expanduser())  # never printed
+    if args.health:
+        value = health(args.health)
+        print(json.dumps(value, indent=2, ensure_ascii=False) if args.json else
+              (f"{value['recipe']}: {value['warm_workers']} warm worker(s), queue {value['jobs'].get('inQueue', 0)}"
+               + ("; a cold start is likely" if value["cold_start_likely"] else "")
+               + (f"; {value['unhealthy']} unhealthy" if value["unhealthy"] else "")
+               if value["readable"] else f"{value['recipe']}: not readable -- {value['reason']}"))
+        return 0
+    found = recipes()
+    if args.json:
+        print(json.dumps(found, indent=2, ensure_ascii=False))
+        return 0
+    for item in found:
+        print(f"{item['id']} ({item['kind']}, {item['transport']}): {item['does']}")
+        print(f"  {'configured' if item['configured'] else 'missing ' + ', '.join(item['missing'])}; "
+              + (f"US$ {item['rate_usd_per_hour']}/h" if item.get("rate_usd_per_hour") else f"cost: {item['cost']}"))
+        for model in item["models"]:
+            print(f"  needs {model['file']} ({model['loader']})")
+        for failure in item["known_failures"]:
+            print(f"  known: {failure['id']} -- {failure['workaround']}")
+    return 0
+
+
 def command_status(args: argparse.Namespace) -> int:
     """Where the production stands, sequence by sequence: the Producer's report (docs/production-agents.md)."""
 
@@ -2567,6 +2598,13 @@ def build_parser() -> argparse.ArgumentParser:
     continuity_parser.add_argument("--shot", help="... at this shot, after the scene's declared changes")
     continuity_parser.add_argument("--json", action="store_true")
     continuity_parser.set_defaults(function=command_continuity)
+
+    recipes_parser = subparsers.add_parser(
+        "recipes", help="Generation recipes: what each path makes, configuration, model files, costs, known failures")
+    recipes_parser.add_argument("--health", metavar="RECIPE", help="read one endpoint's workers and queue")
+    recipes_parser.add_argument("--env-file", help="credentials and endpoint ids, never printed")
+    recipes_parser.add_argument("--json", action="store_true")
+    recipes_parser.set_defaults(function=command_recipes)
 
     intake_parser = subparsers.add_parser(
         "intake", help="The format interview: what the format needs, the agent's questions, and your answers")

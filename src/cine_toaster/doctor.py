@@ -230,6 +230,34 @@ def _codex_image() -> Capability:
     )
 
 
+def _recipe(recipe_id: str, name: str) -> Capability:
+    """A RunPod generation recipe: configured on this machine or not. Health is a network read: `toast recipes --health`."""
+
+    from .providers.recipes import RECIPES, describe
+
+    recipe = describe(RECIPES[recipe_id])
+    return Capability(
+        name=name,
+        what_it_enables=f"{recipe['does']} (`toast recipes`, ADR 0034)",
+        required=False,
+        status=OK if recipe["configured"] else MISSING,
+        detail=(f"configured; {len(recipe['models'])} model file(s) the endpoint must hold; endpoint health not "
+                f"read here: toast recipes --health {recipe_id}" if recipe["configured"]
+                else "missing " + ", ".join(recipe["missing"])),
+        remedy="" if recipe["configured"] else
+               f"set {' and '.join(recipe['missing'])} (or pass --env-file to the command that generates); the "
+               "endpoint itself is created with runpodctl or the RunPod console, never by Cine Toaster",
+    )
+
+
+def _ltx_recipe() -> Capability:
+    return _recipe("ltx-2-5", "LTX 2.5 on RunPod")
+
+
+def _qwen_recipe() -> Capability:
+    return _recipe("qwen-image-edit", "Qwen Image Edit on RunPod")
+
+
 def _moderngl() -> Capability:
     from .compositing.gl import gl_unavailable_reason
 
@@ -628,6 +656,8 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _colour_fonts,
     _lottie,
     _retimed_sound,
+    _ltx_recipe,
+    _qwen_recipe,
     # Detected, not yet used. See `report`.
     _sox,
     _blender,

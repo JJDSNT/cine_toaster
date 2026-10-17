@@ -256,6 +256,20 @@ def build(root: Path, manager=None):
                        actor=Actor(**ACTOR)))
 
     @server.tool(annotations=reading)
+    def list_generation_recipes() -> list[dict[str, Any]]:
+        """What each generation path makes, from what, where it runs, whether it is configured here, the model
+        files its graph loads, its rate and timing, and measured failure patterns with their workarounds."""
+        from .providers.recipes import recipes
+        return _answer(recipes)
+
+    @server.tool(annotations=reading)
+    def generation_health(recipe: str) -> dict[str, Any]:
+        """A recipe endpoint's workers and queue, read from the data plane: is a cold start likely, is a worker
+        unhealthy. Never creates, scales or changes an endpoint -- that is the person's, in runpodctl or the console."""
+        from .providers.recipes import health
+        return _answer(lambda: health(recipe))
+
+    @server.tool(annotations=reading)
     def read_intake() -> dict[str, Any]:
         """The format interview: the format's intake sheet, what was asked, and the person's answers (SPEC-0020)."""
         from .intake import intake_view
