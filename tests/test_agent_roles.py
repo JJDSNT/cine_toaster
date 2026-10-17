@@ -202,3 +202,24 @@ class LoopTests(unittest.TestCase):
             raise ModelUnavailable("offline")
         state = step(self.loop(), {}, SimpleNamespace(ask=broken), "s", "p")
         self.assertIn("offline", state["messages"][0].content)
+
+
+class BoundedTests(unittest.TestCase):
+    def test_a_cut_is_valid_json_and_says_what_was_left_out(self):
+        from cine_toaster.agents.inception import bounded
+
+        value = {"drafts": [{"id": f"d{i}", "text": "x" * 5000} for i in range(60)], "title": "Light"}
+        text = bounded(value, 9000)
+        self.assertLessEqual(len(text), 9000)
+        cut = json.loads(text)
+        self.assertEqual(cut["title"], "Light")
+        self.assertEqual(cut["drafts"][0]["id"], "d0")
+        self.assertEqual(cut["drafts"][-1]["id"], "d59")  # the newest work survives the cut
+        self.assertTrue(any("items cut" in item for item in cut["drafts"] if isinstance(item, str)))
+        self.assertIn("characters cut", cut["drafts"][0]["text"])
+
+    def test_what_fits_is_untouched_and_what_never_fits_says_so(self):
+        from cine_toaster.agents.inception import bounded
+
+        self.assertEqual(bounded({"a": "b"}), '{"a": "b"}')
+        self.assertIn("focused read", json.loads(bounded({f"k{i}": i for i in range(5000)}, 200))["cut"])

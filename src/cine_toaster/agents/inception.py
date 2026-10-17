@@ -97,9 +97,41 @@ SCHEMA = {"type": "object", "properties": {
 }, "required": ["reply", "action"]}
 
 
+#: How far `bounded` shrinks, in order: the longest text kept, and the most items of a list.
+_SHRINK = ((2000, 40), (800, 20), (300, 10), (120, 6), (40, 3))
+
+
+def _shrink(value: Any, chars: int, items: int) -> Any:
+    if isinstance(value, str):
+        return value if len(value) <= chars else value[:chars] + f" … [{len(value) - chars} characters cut]"
+    if isinstance(value, dict):
+        return {key: _shrink(item, chars, items) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        if len(value) > items:
+            # The first and the latest entries: an index starts a list, the newest work ends it.
+            head, tail = items // 2, items - items // 2
+            value = [*value[:head], f"… [{len(value) - items} items cut; use a focused read]", *value[-tail:]]
+        return [_shrink(item, chars, items) for item in value]
+    return value
+
+
 def bounded(value: Any, limit: int = 9000) -> str:
+    """The value as JSON within `limit` characters, cut by structure and saying where -- always valid JSON.
+
+    Long texts keep their start, long lists their first and latest entries, each
+    with a marker of what was left out, so the model can ask for a focused read
+    instead of reading a string severed in the middle.
+    """
+
     text = json.dumps(value, ensure_ascii=False, default=str)
-    return text if len(text) <= limit else text[:limit] + " … [truncated; use a focused read]"
+    for chars, items in _SHRINK:
+        if len(text) <= limit:
+            return text
+        text = json.dumps(_shrink(value, chars, items), ensure_ascii=False, default=str)
+    if len(text) <= limit:
+        return text
+    return json.dumps({"cut": f"too large to give here ({len(json.dumps(value, default=str))} characters); "
+                              "use a focused read"})
 
 
 def creation_digest(value: dict) -> str:
@@ -110,7 +142,7 @@ def creation_digest(value: dict) -> str:
         "source_digest": value.get("source_digest"), "review": {key: current.get(key) for key in
             ("id", "status", "summary", "readiness", "proposal", "decision", "next_agent_action")},
         "recent_human_directions": value.get("assessment_decisions", [])[-3:],
-        "drafts": [{**item, "text": item["text"][:1800]} for item in value.get("drafts", [])[-6:]],
+        "drafts": [{**item, "text": _shrink(item["text"], 1800, 0)} for item in value.get("drafts", [])[-6:]],
         "rounds": value.get("active_rounds", [])[-4:],
         "references": [{"id": item["id"], "title": item.get("title"), "notes": item.get("notes"),
                         "findings": item.get("findings")} for item in value.get("references", [])[:30]],

@@ -327,10 +327,11 @@ roles the supplied model serves. To do, in order:
   strings. Now the page sets agent state `resume` = {decision, message};
   `assistant.resumed()` honours it only for that message and the Coordinator
   consumes it every turn; roles still re-read the decision from the records.
-- [ ] **Role-specific context digests.** `bounded()` truncates JSON mid-string
-  and drafts are cut at 1800 characters. Solve: each role builds a digest of
-  the records it needs (KDP Studio's fixed *readers*), and asks for a focused
-  read beyond it; never feed truncated JSON.
+- [x] **No severed JSON** (done 2026-10-17). `bounded()` cut JSON in the
+  middle of a string; it now shrinks by structure (long texts keep their
+  start, long lists their first and latest entries), always valid JSON, each
+  cut marked with what was left out. Fixed per-role *readers* (KDP Studio)
+  come with read-and-answer roles as data, below.
 - [ ] **Fewer, cheaper model steps.** Each step is a fresh CLI process (up to
   8 x 180 s a turn). Solve: native tool calling on adapters that support it
   (Claude API), prompt caching of the stable system/context prefix; measure

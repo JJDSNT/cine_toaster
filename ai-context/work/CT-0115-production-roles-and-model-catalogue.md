@@ -90,6 +90,8 @@ the message for both Claude adapters.
   budget/ask/validate/delegate/respond replaced by a declared `Loop` each;
   failure messages unified ("Não consegui avançar este trabalho: ...");
   `LoopTests` added.
+- `bounded()` shrinks by structure, never severs JSON; draft texts are cut
+  with a marker; `BoundedTests` added.
 
 # To do
 
