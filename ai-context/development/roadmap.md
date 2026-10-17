@@ -404,6 +404,22 @@ roles the supplied model serves. To do, in order:
   adding a path (workflow by node type, adapter constants, recipe, doctor,
   knowledge, tests), preparing and diagnosing an endpoint. A test keeps the
   product from referencing it.
+- [ ] **Reconcile LTX cold-start knowledge (found 2026-10-17).** The recipe
+  uses `generation.COLD_START_SECONDS = 150` (1-02A block 2: 245 s cold,
+  2026-09-29) while `knowledge/providers/ltx-2.5.md` says "a cold start of
+  about 20 minutes (US$ 0.60)", migrated from SINGULAR's `ltx` skill, which
+  itself records idle 1800 s and then 60 s found on 2026-09-21. An error to
+  resolve, not a choice: measure one cold start on the current endpoint
+  configuration and record it with its conditions (first case for the
+  demotion rule above).
+- [ ] **SINGULAR's skills as seeds of runtime filmmaking skills.**
+  `~/confyui/.claude/skills/{diretor,camera,ltx,previs3d}` hold measured
+  directing grammar, camera language, LTX prompting and previs procedure --
+  what Directing, Continuity, Art Direction and a future blockout role need.
+  They are SINGULAR-specific (its tools, its film) and must not be imported
+  as they are; runtime skill packaging is still undecided
+  (`agent-architecture.md`). Decide the packaging, then generalise one skill
+  (diretor -> Directing) as the first runtime skill.
 - [ ] **Sequence Adherence reviewer** (SPEC-0019), then further authors
   (Cinematography/masters, Editing, Sound) as Demo 01 needs them.
 - [x] **Catalogue facts** (Claude models, 2026-10-17): context and prices

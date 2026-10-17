@@ -2,7 +2,7 @@
 id: CT-0115
 title: Production roles as declarations, a model catalogue, and generation operations
 type: work
-status: doing
+status: review
 owner: claude
 created_at: 2026-10-17
 updated_at: 2026-10-17
@@ -105,16 +105,14 @@ the message for both Claude adapters.
 
 # To do
 
-0. Format intake / interviewer (the author's question, 2026-10-17): agents can
-   stop with `needs_direction` but no format sheet says what a music video
-   needs, and questions live only in chat. Roadmap entry written.
-1. ~~Typed resume~~ done.
-2. Role-specific digests instead of truncated JSON; native tool calling where
-   an adapter supports it (finding 3).
-3. Generation recipes; Generation Operations role; continuation on job
-   completion with a checkpointed wait (findings 6, ADR 0034 point 5).
-4. Development skill `.agents/skills/runpod-comfyui/`.
-5. Sequence Adherence reviewer (SPEC-0019); further authors as Demo 01 needs.
+1. Real-model checks on a disposable film (paid model calls: the author's go):
+   image input on Claude CLI/API, one interview, one Generation Operations
+   continuation; measure turn time and tokens per step, then decide on native
+   tool calling (roadmap).
+2. Read-and-answer roles as data, with the first such role.
+3. SPEC-0019 sequence package and independent sequence review (CT-0113).
+4. Knowledge that evolves with use: the author to settle the design
+   (promotion by a person; demotion on changed conditions or contrary evidence).
 
 # Decisions
 

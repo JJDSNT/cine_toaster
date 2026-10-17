@@ -10,6 +10,24 @@ and is never packaged for production agents (AGENTS.md, ADR 0034). Production
 agents see generation through recipes (`toast recipes`, MCP
 `list_generation_recipes`) and the Generation Operations role.
 
+## Use what already exists first
+
+This skill adds only Cine Toaster's boundaries and code paths. For RunPod
+itself -- onboarding, account and API configuration, templates, endpoints,
+volumes, GPU choice, the CLI -- load the **official RunPod plugin** skills,
+installed for Claude Code and Codex: `runpod` (the router, with live-verified
+golden paths such as `02-comfyui-pod`, `05-model-to-endpoint-pipeline`,
+`09-custom-serverless-dev-loop`), `runpod-templates` (the official ComfyUI
+template: what it ships, its ports and paths, what is missing on first boot,
+repairing imported workflows), `runpodctl`, `runpod-usage`, `runpod-mcp`.
+
+Measured, production-specific knowledge from SINGULAR lives in
+`~/confyui/.claude/skills/` (`ltx`, `camera`, `diretor`, `previs3d`). It is
+the source `knowledge/providers/ltx-2.5.md` was migrated from. **Read it,
+never run its tools**, and treat it as evidence measured under its own
+conditions, not as an oracle: it already contradicts itself (idle 1800 s
+noted, 60 s found on 2026-09-21).
+
 ## Boundaries that do not move
 
 - The product touches only the **data plane**: submit a job, poll it, read
@@ -54,9 +72,10 @@ agents see generation through recipes (`toast recipes`, MCP
 
 ## Preparing an endpoint (outside the product)
 
-- Start from RunPod's official ComfyUI worker template (the RunPod plugin's
-  `runpod-templates` skill knows what it ships and what is missing on first
-  boot); add the custom nodes the graph's `class_type`s need.
+- Follow the RunPod plugin's golden path for the case (a ComfyUI pod to
+  build and try the graph; model-to-endpoint for serverless) and its
+  `runpod-templates` skill for the official ComfyUI image; add the custom
+  nodes the graph's `class_type`s need.
 - Put the model files `toast recipes` lists on a network volume. A volume
   pins the endpoint to its data centre, where the GPU may be scarce.
 - **Pin the allowed GPU types** (measured: the platform otherwise swaps to a

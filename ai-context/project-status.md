@@ -203,15 +203,19 @@ Cine Toaster cannot yet:
 
 ## Active work
 
-CT-0115 (ADR 0034, 2026-10-17): agent review and structure. Roles are
-declared (`agents/roles.py`) and the CoAgent state/reset derive from them;
-every adapter declares capabilities and carries images (Claude CLI/API join
-Codex); a model catalogue describes adapters and models and never picks one;
-a person may bind a role to another model they supplied. No "RunPod agent":
-generation recipes (data), a Generation Operations role with continuation on
-job completion, and a development skill are the planned three layers. Format
-intake (an interviewer that asks before advancing) is recorded as a gap.
-Ordered follow-ups in `development/roadmap.md` § Agent Runtime structure.
+CT-0115 / CT-0116 (ADR 0034, SPEC-0020, 2026-10-17): agent structure. Roles
+are declared (`agents/roles.py`) and share one reasoning step (`agents/loop.py`);
+the model the person supplies serves every role unless they bind one to
+another (catalogue `agents/model_catalog.yaml`, which describes and never
+picks); all three adapters carry images; context is cut by structure, never
+severed; decisions resume through a typed `resume`. Inception interviews by
+format (intake sheets in the format styles; answers are the person's, in the
+inbox or `toast intake`). RunPod/ComfyUI is three layers: generation recipes
+(`toast recipes`, doctor rows), the deterministic Generation Operations role
+that continues work when a consented job ends, and the `runpod-comfyui`
+development skill. Open: knowledge that evolves with use (design, with
+demotion as the hard half), SPEC-0019's sequence package and independent
+review, and real-model checks on a disposable film (paid: the author's go).
 
 CT-0112 addresses the hidden-pending-decision / approval-without-stage-output
 gap (ADR 0032, SPEC-0018). A cross-workspace inbox derives current direction
