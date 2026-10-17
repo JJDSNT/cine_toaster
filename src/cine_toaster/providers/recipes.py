@@ -6,8 +6,11 @@ it needs configured, which model files its ComfyUI graph loads, and what it
 costs and takes. The graph and the provider's vocabulary stay in the adapter;
 the numbers are the adapter's own constants, read here, never copied.
 
-Health is read from the data plane only (`/health` of a serverless endpoint):
-workers and queue. Creating or changing endpoints, pods or volumes is not done
+Health is read from the data plane (`/health`: workers and queue) and the
+endpoint's scaling from REST v2 (`GET /serverless/{id}`), both read-only. A
+batch is planned against them: sent together it pays one cold start, sent one
+by one past the idle timeout it pays one per job; and lowering workers while
+jobs are in flight strands them (both losses the author reported, 2026-10-17). Creating or changing endpoints, pods or volumes is not done
 here -- that is runpodctl, the RunPod console or MCP, and a person.
 """
 from __future__ import annotations
@@ -137,6 +140,90 @@ def recipes() -> list[dict[str, Any]]:
     return [describe(recipe) for recipe in RECIPES.values()]
 
 
+def endpoint_config(recipe_id: str, fetch: Callable[[str, dict], dict] | None = None) -> dict[str, Any]:
+    """How the endpoint scales -- min/max workers, idle timeout, scaler, FlashBoot -- read, never written.
+
+    REST v2 `GET /serverless/{id}`. Knowing the idle timeout is what lets a batch
+    land on warm workers instead of paying one cold start per job.
+    """
+
+    recipe = RECIPES.get(recipe_id)
+    if recipe is None or recipe.transport != "runpod-serverless":
+        return {"readable": False, "reason": "no serverless endpoint for this recipe"}
+    endpoint = os.environ.get(recipe.endpoint_env, "")
+    if not endpoint:
+        return {"readable": False, "reason": f"{recipe.endpoint_env} is not set"}
+    from .runpod_billing import _get
+
+    try:
+        value = (fetch or _get)(f"/serverless/{endpoint}", {})
+    except ProviderNotConfigured as error:
+        return {"readable": False, "reason": error.message}
+    except Exception as error:
+        return {"readable": False, "reason": f"configuration not readable: {error}"}
+    workers, scaling = value.get("workers") or {}, value.get("scaling") or {}
+    return {"readable": True, "workers_min": workers.get("min"), "workers_max": workers.get("max"),
+            "idle_timeout_seconds": workers.get("idleTimeout"), "scaling": scaling,
+            "flashboot": value.get("flashboot"), "gpu_pools": (value.get("gpu") or {}).get("pools") or [],
+            "data_centers": value.get("dataCenterIds") or []}
+
+
+def scale_down_guard(state: dict[str, Any]) -> dict[str, Any]:
+    """Whether lowering workers or the idle timeout now would strand work. Measured loss: it was done mid-batch."""
+
+    if not state.get("readable"):
+        return {"safe": False, "reason": "health not readable: assume work is in flight"}
+    jobs = state.get("jobs") or {}
+    in_flight = int(jobs.get("inQueue") or 0) + int(jobs.get("inProgress") or 0)
+    return {"safe": in_flight == 0, "in_flight": in_flight,
+            "reason": "no job queued or running" if not in_flight else
+                      f"{in_flight} job(s) queued or running: lowering workers or idle timeout now strands them"}
+
+
+def batch_plan(recipe_id: str, jobs: int, *, seconds_each: float | None = None,
+               state: dict[str, Any] | None = None, config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """What a batch of `jobs` costs in cold starts sent together versus one by one, and how to send it."""
+
+    if recipe_id not in RECIPES:
+        raise ProviderNotConfigured(f"No generation recipe {recipe_id!r}", allowed=sorted(RECIPES))
+    if type(jobs) is not int or jobs < 1:
+        raise ProviderError("A batch has at least one job")
+    numbers = describe(RECIPES[recipe_id])
+    cold = float(numbers.get("cold_start_seconds") or 0)
+    execution = seconds_each if seconds_each is not None else float(
+        numbers.get("execution_seconds") or (numbers.get("execution_seconds_per_clip_second") or 0) * 10)
+    rate = float(numbers.get("rate_usd_per_hour") or 0)
+    state = state if state is not None else health(recipe_id)
+    config = config if config is not None else endpoint_config(recipe_id)
+    warm = int(state.get("warm_workers") or 0) if state.get("readable") else 0
+    most = int(config.get("workers_max") or 1) if config.get("readable") else 1
+    idle = config.get("idle_timeout_seconds") if config.get("readable") else None
+    rounds = -(-jobs // max(most, 1))
+    starts_together = 0 if warm >= min(jobs, most) else min(jobs, most) - warm
+    advice = [f"Send the {jobs} job(s) together: up to {most} worker(s) start once and the rest queue on warm "
+              "workers." if jobs > 1 else "One job."]
+    if idle is not None:
+        advice.append(f"Workers stay warm {idle} s after their last job: anything sent later pays a cold start "
+                      f"(about {cold:.0f} s) again.")
+        if jobs > 1 and idle < execution:
+            advice.append("The idle timeout is shorter than one job: raise it for the batch (and restore it after), "
+                          "in the RunPod console or runpodctl, before sending -- never while jobs are in flight.")
+    else:
+        advice.append("The idle timeout is not known here: read it before sending one job at a time.")
+    guard = scale_down_guard(state)
+    if not guard["safe"]:
+        advice.append(f"Do not lower workers or the idle timeout until the batch ends: {guard['reason']}.")
+    seconds_together = (cold if starts_together else 0) + rounds * execution
+    return {"recipe": recipe_id, "jobs": jobs, "seconds_each": execution, "warm_workers": warm,
+            "workers_max": most if config.get("readable") else None, "idle_timeout_seconds": idle,
+            "together": {"cold_starts": starts_together, "seconds": round(seconds_together),
+                         "cold_usd": round(starts_together * cold * rate / 3600, 3)},
+            "one_by_one_worst": {"cold_starts": jobs, "seconds": round(jobs * (cold + execution)),
+                                 "cold_usd": round(jobs * cold * rate / 3600, 3)},
+            "scale_down": guard, "advice": advice,
+            "assumes": "cold start and execution are the adapter's estimates, not this endpoint's measurement"}
+
+
 def health(recipe_id: str, transport: Callable[[str, dict | None], dict] | None = None) -> dict[str, Any]:
     """Workers and queue of a recipe's endpoint, read from the data plane; says plainly what it could not read."""
 
@@ -158,6 +245,7 @@ def health(recipe_id: str, transport: Callable[[str, dict | None], dict] | None 
         return {"recipe": recipe_id, "readable": False, "reason": f"health not readable: {error}"}
     workers, jobs = answer.get("workers") or {}, answer.get("jobs") or {}
     warm = int(workers.get("idle") or 0) + int(workers.get("running") or 0) + int(workers.get("ready") or 0)
-    return {"recipe": recipe_id, "readable": True, "workers": workers, "jobs": jobs,
-            "warm_workers": warm, "cold_start_likely": warm == 0,
-            "unhealthy": int(workers.get("unhealthy") or 0), "throttled": int(workers.get("throttled") or 0)}
+    value = {"recipe": recipe_id, "readable": True, "workers": workers, "jobs": jobs,
+             "warm_workers": warm, "cold_start_likely": warm == 0,
+             "unhealthy": int(workers.get("unhealthy") or 0), "throttled": int(workers.get("throttled") or 0)}
+    return {**value, "scale_down": scale_down_guard(value)}

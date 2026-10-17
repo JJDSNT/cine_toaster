@@ -46,6 +46,31 @@ noted, 60 s found on 2026-09-21).
 - Tests never send a real job: every adapter takes a `transport`, and tests
   script it.
 
+## Batches, cold starts and scaling (losses the author reported)
+
+Two mistakes have cost real money: an agent **lowered the workers while a
+batch was queued**, and generations were **sent one at a time**, each after the
+workers had gone idle, paying a cold start per job. Before you touch an
+endpoint's workers, idle timeout or scaler -- or send more than one job:
+
+1. `toast recipes --health <recipe> --env-file <file>` (or MCP
+   `generation_health`): warm workers, queue, running jobs, min/max workers,
+   idle timeout, and **"scaling down now: safe / NOT safe"**. The RunPod
+   queue counts every client's jobs, not only Cine Toaster's.
+2. **Never lower `workers.max`, `workers.min` or `idleTimeout` while anything
+   is queued or running**, nor while the author says a batch is coming. Ask.
+3. `toast recipes --batch <recipe> <jobs>` (MCP `plan_generation_batch`):
+   send a batch **together**; if the idle timeout is shorter than one job, raise
+   it for the batch and restore it after the queue is empty -- with the
+   author's go, in the console or runpodctl.
+4. After a batch, report what it cost in cold starts (job records,
+   `toast finops`) so the estimate can be corrected.
+
+`toast generate` sends one block per run and the local executor runs two
+jobs at once: today a batch does not reach the RunPod queue in one go (see
+the roadmap). Until that changes, send the runs back to back, inside the idle
+window.
+
 ## Adding or changing a generation path
 
 1. **Workflow.** Export the ComfyUI graph in **API format** into

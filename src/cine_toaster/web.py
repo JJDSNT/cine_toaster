@@ -260,6 +260,24 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             except CineToasterError as error:
                 self._send_json(error.public_dict(), HTTPStatus(error.http_status))
             return
+        if parsed.path == "/api/generation":
+            # Recipes, endpoint health and scaling, and a batch plan (ADR 0034). Reads only.
+            from .providers.recipes import batch_plan, endpoint_config, health, recipes
+            try:
+                recipe = (query.get("recipe") or [""])[0]
+                jobs = int((query.get("jobs") or ["0"])[0] or 0)
+                if not recipe:
+                    self._send_json({"recipes": recipes()})
+                else:
+                    state, config = health(recipe), endpoint_config(recipe)
+                    self._send_json({"health": state, "config": config,
+                                     "batch": batch_plan(recipe, jobs, state=state, config=config) if jobs else None})
+            except ValueError:
+                self._send_json({"error": {"code": "validation_error", "message": "jobs must be a whole number"}},
+                                HTTPStatus.BAD_REQUEST)
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
         if parsed.path == "/api/sequence-work":
             from .sequence_work import sequence_work_view
             try:

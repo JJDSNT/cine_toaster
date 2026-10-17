@@ -404,6 +404,23 @@ roles the supplied model serves. To do, in order:
   adding a path (workflow by node type, adapter constants, recipe, doctor,
   knowledge, tests), preparing and diagnosing an endpoint. A test keeps the
   product from referencing it.
+- [x] **Batches, cold starts and scaling** (done 2026-10-17; the author: an
+  agent lowered workers while a batch was sent, and one-at-a-time generation
+  paid a cold start each). `recipes.endpoint_config` reads min/max workers,
+  idle timeout, scaler and FlashBoot (REST v2, read only); `batch_plan` sets
+  cold starts sent together against one by one; `scale_down_guard` says
+  whether lowering workers now strands jobs (unknown is never safe). In
+  `toast recipes --health/--batch`, MCP `generation_health` /
+  `plan_generation_batch`, the Coordinator's `generation` read and prompt, and
+  the development skill's rules for agents holding infrastructure tools.
+- [ ] **Send a batch to the RunPod queue in one go.** `toast generate` takes
+  one block per run and `JobManager` runs two jobs at once, each submitting
+  and then polling inside `run_job`: a batch never reaches the queue together.
+  Solve: split `runpod.run_job` into submit (id recorded in the state file,
+  as now) and wait; let `toast generate PROJECT SCENE BLOCK...` (and the
+  Coordinator's proposal) submit every block first, then wait on all; the
+  local executor bounds downloads, not submissions. Keep the state-file rule:
+  a different pending request is refused, never resent.
 - [ ] **Reconcile LTX cold-start knowledge (found 2026-10-17).** The recipe
   uses `generation.COLD_START_SECONDS = 150` (1-02A block 2: 245 s cold,
   2026-09-29) while `knowledge/providers/ltx-2.5.md` says "a cold start of

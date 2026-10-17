@@ -195,6 +195,16 @@ def _budget(runtime: RuntimeClient, args: dict[str, Any]) -> str:
 
 
 #: name -> (what it answers, what it needs, how)
+def _generation(runtime: RuntimeClient, args: dict[str, Any]) -> str:
+    """Recipes, or one recipe's workers, queue, scaling and a batch plan: `text` = recipe[:jobs]."""
+    recipe, _, jobs = str(args.get("text") or "").partition(":")
+    value = runtime.generation(recipe.strip(), int(jobs) if jobs.strip().isdigit() else 0)
+    if not recipe:
+        value = {"recipes": [{key: item.get(key) for key in ("id", "does", "kind", "transport", "configured",
+                 "missing", "cost", "rate_usd_per_hour", "cold_start_seconds")} for item in value["recipes"]]}
+    return json.dumps(value, ensure_ascii=False)
+
+
 READS: dict[str, tuple[str, str, Callable[[RuntimeClient, dict[str, Any]], str]]] = {
     "production_work": ("explicit canonical pending agent work, Coordinator ownership, sequence scope and blockers; not running jobs or human approvals",
                         "optional text = exact work or sequence id", _work),
@@ -207,6 +217,9 @@ READS: dict[str, tuple[str, str, Callable[[RuntimeClient, dict[str, Any]], str]]
     "cast": ("every cast member: what the sheet decides, voice, variants, how many scenes", "", _cast),
     "screenplay": ("screenplay lines containing a text", "text", _screenplay),
     "budget": ("the generation budget and the latest spending", "", _budget),
+    "generation": ("generation recipes; or one recipe's warm workers, queue, idle timeout, whether scaling down is "
+                   "safe, and a batch plan (cold starts sent together vs one by one)",
+                   "optional text = recipe id, or recipe:number of jobs", _generation),
 }
 
 

@@ -72,5 +72,54 @@ class DevelopmentSkillTests(unittest.TestCase):
             self.assertNotIn(".agents/skills", path.read_text(encoding="utf-8"), path)
 
 
+
+class BatchTests(unittest.TestCase):
+    COLD = {"readable": True, "warm_workers": 0, "jobs": {"inQueue": 0, "inProgress": 0}}
+    CONFIG = {"readable": True, "workers_max": 2, "idle_timeout_seconds": 60}
+
+    def test_together_pays_cold_starts_once_one_by_one_pays_each(self):
+        from cine_toaster.providers.recipes import batch_plan
+
+        plan = batch_plan("ltx-2-5", 6, seconds_each=64, state=self.COLD, config=self.CONFIG)
+        self.assertEqual(plan["together"]["cold_starts"], 2)        # two workers start, once
+        self.assertEqual(plan["one_by_one_worst"]["cold_starts"], 6)
+        self.assertLess(plan["together"]["seconds"], plan["one_by_one_worst"]["seconds"])
+        self.assertTrue(any("together" in line for line in plan["advice"]))
+        self.assertTrue(any("idle timeout is shorter" in line for line in plan["advice"]))  # 60 s < 64 s a job
+
+    def test_warm_workers_mean_no_cold_start(self):
+        from cine_toaster.providers.recipes import batch_plan
+
+        warm = {**self.COLD, "warm_workers": 2}
+        self.assertEqual(batch_plan("ltx-2-5", 4, seconds_each=64, state=warm, config=self.CONFIG)
+                         ["together"]["cold_starts"], 0)
+
+    def test_scaling_down_mid_batch_is_flagged(self):
+        from cine_toaster.providers.recipes import batch_plan, scale_down_guard
+
+        busy = {**self.COLD, "jobs": {"inQueue": 3, "inProgress": 1}}
+        self.assertEqual(scale_down_guard(busy), {"safe": False, "in_flight": 4, "reason":
+                         "4 job(s) queued or running: lowering workers or idle timeout now strands them"})
+        self.assertFalse(scale_down_guard({"readable": False})["safe"])  # unknown is never safe
+        plan = batch_plan("ltx-2-5", 2, state=busy, config=self.CONFIG)
+        self.assertTrue(any("Do not lower workers" in line for line in plan["advice"]))
+
+    def test_the_endpoint_configuration_is_read_from_rest_v2(self):
+        from cine_toaster.providers.recipes import endpoint_config
+
+        asked = []
+
+        def fetch(path, query):
+            asked.append(path)
+            return {"workers": {"min": 0, "max": 2, "idleTimeout": 60}, "flashboot": "FLASHBOOT",
+                    "scaling": {"type": "QUEUE_DELAY", "queueDelay": 4}}
+
+        with patch.dict(os.environ, ENV, clear=True):
+            config = endpoint_config("ltx-2-5", fetch)
+        self.assertEqual(asked, ["/serverless/endpoint-1"])
+        self.assertEqual((config["workers_max"], config["idle_timeout_seconds"]), (2, 60))
+        self.assertFalse(endpoint_config("codex-image")["readable"])
+
+
 if __name__ == "__main__":
     unittest.main()

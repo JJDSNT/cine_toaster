@@ -1208,18 +1208,41 @@ def command_intake(args: argparse.Namespace) -> int:
 def command_recipes(args: argparse.Namespace) -> int:
     """The generation recipes (ADR 0034): what each path makes, its configuration, models, costs, known failures."""
 
-    from .providers.recipes import health, recipes
+    from .providers.recipes import batch_plan, endpoint_config, health, recipes
     from .providers.runpod import load_credentials
 
     if args.env_file:
         load_credentials(Path(args.env_file).expanduser())  # never printed
+    if args.batch:
+        recipe, jobs = args.batch[0], int(args.batch[1])
+        plan = batch_plan(recipe, jobs, seconds_each=args.seconds)
+        if args.json:
+            print(json.dumps(plan, indent=2, ensure_ascii=False))
+            return 0
+        print(f"{recipe}, {jobs} job(s) of about {plan['seconds_each']:.0f} s; {plan['warm_workers']} warm worker(s)"
+              + (f", at most {plan['workers_max']}" if plan["workers_max"] else "")
+              + (f", idle timeout {plan['idle_timeout_seconds']} s" if plan["idle_timeout_seconds"] is not None else ""))
+        for label, key in (("together", "together"), ("one by one, worst case", "one_by_one_worst")):
+            part = plan[key]
+            print(f"  {label}: {part['cold_starts']} cold start(s), about {part['seconds']} s, cold US$ {part['cold_usd']}")
+        for line in plan["advice"]:
+            print(f"  - {line}")
+        print(f"  ({plan['assumes']})")
+        return 0
     if args.health:
-        value = health(args.health)
-        print(json.dumps(value, indent=2, ensure_ascii=False) if args.json else
-              (f"{value['recipe']}: {value['warm_workers']} warm worker(s), queue {value['jobs'].get('inQueue', 0)}"
-               + ("; a cold start is likely" if value["cold_start_likely"] else "")
-               + (f"; {value['unhealthy']} unhealthy" if value["unhealthy"] else "")
-               if value["readable"] else f"{value['recipe']}: not readable -- {value['reason']}"))
+        value, config = health(args.health), endpoint_config(args.health)
+        if args.json:
+            print(json.dumps({"health": value, "config": config}, indent=2, ensure_ascii=False))
+            return 0
+        print(f"{value['recipe']}: {value['warm_workers']} warm worker(s), queue {value['jobs'].get('inQueue', 0)}, "
+              f"running {value['jobs'].get('inProgress', 0)}"
+              + ("; a cold start is likely" if value["cold_start_likely"] else "")
+              + (f"; {value['unhealthy']} unhealthy" if value["unhealthy"] else "")
+              if value["readable"] else f"{value['recipe']}: not readable -- {value['reason']}")
+        print(f"  workers {config['workers_min']}..{config['workers_max']}, idle timeout {config['idle_timeout_seconds']} s, "
+              f"scaling {config['scaling']}, FlashBoot {config['flashboot']}" if config["readable"]
+              else f"  configuration not readable -- {config['reason']}")
+        print(f"  scaling down now: {'safe' if value['scale_down']['safe'] else 'NOT safe'} ({value['scale_down']['reason']})")
         return 0
     found = recipes()
     if args.json:
@@ -2601,7 +2624,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     recipes_parser = subparsers.add_parser(
         "recipes", help="Generation recipes: what each path makes, configuration, model files, costs, known failures")
-    recipes_parser.add_argument("--health", metavar="RECIPE", help="read one endpoint's workers and queue")
+    recipes_parser.add_argument("--health", metavar="RECIPE",
+                                help="one endpoint's workers, queue, scaling, and whether scaling down is safe now")
+    recipes_parser.add_argument("--batch", nargs=2, metavar=("RECIPE", "JOBS"),
+                                help="cold starts and time for JOBS sent together versus one by one")
+    recipes_parser.add_argument("--seconds", type=float, help="with --batch: seconds of GPU per job")
     recipes_parser.add_argument("--env-file", help="credentials and endpoint ids, never printed")
     recipes_parser.add_argument("--json", action="store_true")
     recipes_parser.set_defaults(function=command_recipes)

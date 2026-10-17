@@ -264,10 +264,19 @@ def build(root: Path, manager=None):
 
     @server.tool(annotations=reading)
     def generation_health(recipe: str) -> dict[str, Any]:
-        """A recipe endpoint's workers and queue, read from the data plane: is a cold start likely, is a worker
-        unhealthy. Never creates, scales or changes an endpoint -- that is the person's, in runpodctl or the console."""
-        from .providers.recipes import health
-        return _answer(lambda: health(recipe))
+        """A recipe endpoint's workers and queue (data plane) and its scaling -- min/max workers, idle timeout,
+        FlashBoot -- (REST v2, read only): is a cold start likely, is scaling down safe now. Never creates, scales
+        or changes an endpoint -- that is the person's, in runpodctl or the console."""
+        from .providers.recipes import endpoint_config, health
+        return _answer(lambda: {"health": health(recipe), "config": endpoint_config(recipe)})
+
+    @server.tool(annotations=reading)
+    def plan_generation_batch(recipe: str, jobs: int, seconds_each: float | None = None) -> dict[str, Any]:
+        """Before sending several jobs: cold starts and time sent together versus one by one, the idle timeout
+        that keeps workers warm, and whether lowering workers now would strand jobs in flight. Send a batch
+        together; never lower workers or the idle timeout while `scale_down.safe` is false."""
+        from .providers.recipes import batch_plan
+        return _answer(lambda: batch_plan(recipe, jobs, seconds_each=seconds_each))
 
     @server.tool(annotations=reading)
     def read_intake() -> dict[str, Any]:

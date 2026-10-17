@@ -46,6 +46,10 @@ class RuntimeClient:
     def assess_inception(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._call("/api/creation/assessment", payload)
 
+    def generation(self, recipe: str = "", jobs: int = 0) -> dict[str, Any]:
+        query = urllib.parse.urlencode({"recipe": recipe, "jobs": jobs}) if recipe else ""
+        return self._call("/api/generation" + ("?" + query if query else ""))
+
     def ask_intake(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._call("/api/creation/intake-questions", payload)
 
