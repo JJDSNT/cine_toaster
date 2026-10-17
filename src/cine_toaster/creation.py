@@ -131,6 +131,13 @@ def reference_catalog(root: Path, records: list[dict] | None = None) -> list[dic
 
 
 def creation_view(root: Path) -> dict[str, Any]:
+    from .read_scope import read_scope
+
+    with read_scope():  # a dozen sub-views read the same production once (read-only)
+        return _creation_view(root)
+
+
+def _creation_view(root: Path) -> dict[str, Any]:
     state = load_creation(root)
     drafts = {draft["id"]: draft for draft in state["drafts"]}
     reference_records = load_references(root)

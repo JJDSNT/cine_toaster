@@ -21,8 +21,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import yaml
 
+from .yamlio import safe_load
 from .geometry import Finding
 
 AUTHORITY = ("face", "hair", "wardrobe", "build", "age", "voice")
@@ -133,7 +133,7 @@ def load_cast(root: Path, manifest: dict[str, Any]) -> dict[str, Member]:
     if not directory.is_dir():
         return members
     for sheet in sorted(directory.glob(f"*/{CHARACTER_FILE}")):
-        raw = yaml.safe_load(sheet.read_text(encoding="utf-8")) or {}
+        raw = safe_load(sheet.read_text(encoding="utf-8")) or {}
         base = sheet.parent
         problems: list[str] = []
         member_id = cast_key(raw.get("id") or base.name)

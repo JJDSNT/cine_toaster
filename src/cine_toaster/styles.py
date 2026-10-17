@@ -38,7 +38,9 @@ advice (`style_departure`, never a refusal) names the axis it comes from.
 
 from __future__ import annotations
 
+import copy
 import os
+import threading
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -114,12 +116,30 @@ def _load(path: Path, origin: str) -> dict[str, Any]:
     }
 
 
+#: Parsed manifests by (path, origin, size, mtime_ns): a production loads the
+#: catalogue once per scene, and parsing ~40 TOML files each time dominated it.
+_PARSED: dict[tuple[str, str, int, int], dict[str, Any]] = {}
+_PARSED_LOCK = threading.Lock()
+
+
+def _cached_load(manifest: Path, origin: str) -> dict[str, Any]:
+    stat = manifest.stat()
+    key = (str(manifest), origin, stat.st_size, stat.st_mtime_ns)
+    with _PARSED_LOCK:
+        item = _PARSED.get(key)
+    if item is None:
+        item = _load(manifest, origin)
+        with _PARSED_LOCK:
+            _PARSED[key] = item
+    return copy.deepcopy(item)  # callers may adjust an entry; the cache stays as read
+
+
 def list_styles(project_root: Path | None = None) -> list[dict[str, Any]]:
     by_id: dict[str, dict[str, Any]] = {}
     for origin, root in _roots(project_root):
         if root.is_dir():
             for manifest in sorted(root.glob("*/style.toml")):
-                item = _load(manifest, origin)
+                item = _cached_load(manifest, origin)
                 by_id[item["id"]] = item
     order = {name: index for index, name in enumerate(KINDS)}
     axes = {name: index for index, name in enumerate(AXES)}

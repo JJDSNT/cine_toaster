@@ -281,7 +281,10 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/sequence-work":
             from .sequence_work import sequence_work_view
             try:
-                self._send_json(sequence_work_view(self.project_root))
+                from .read_scope import read_scope
+                with read_scope():
+                    view = sequence_work_view(self.project_root)
+                self._send_json(view)
             except CineToasterError as error:
                 self._send_json(error.public_dict(), HTTPStatus(error.http_status))
             return

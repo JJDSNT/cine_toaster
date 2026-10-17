@@ -6,6 +6,13 @@ from .project import load_production
 
 
 def decision_inbox(root):
+    from .read_scope import read_scope
+
+    with read_scope():  # one read of the production for the whole inbox
+        return _decision_inbox(root)
+
+
+def _decision_inbox(root):
     creation = creation_view(root); production = load_production(root)
     current = (creation.get('inception_review') or {}).get('current') or {}
     items = []; agent_work = []

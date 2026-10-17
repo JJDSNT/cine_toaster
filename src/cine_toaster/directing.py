@@ -35,6 +35,13 @@ def planning_digest(root, state=None, production=None):
 
 
 def planning_context(root: Path):
+    from .read_scope import read_scope
+
+    with read_scope():  # one read of the production for the whole context (read-only)
+        return _planning_context(root)
+
+
+def _planning_context(root: Path):
     root = Path(root).resolve(); production = load_production(root); state = load_creation(root)
     evidence = {}
     public = json.loads(json.dumps(_projection(production), default=str))

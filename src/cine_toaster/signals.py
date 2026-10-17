@@ -43,6 +43,7 @@ from typing import Any, Iterable
 import numpy as np
 import yaml
 
+from .yamlio import safe_load
 from . import timebase
 from .errors import ValidationError
 from .events import Event, append_event
@@ -246,7 +247,7 @@ def record_signal(root: Path, *, signal_id: str, kind: str, frames: Iterable[np.
     origin_instant = Fraction(start) if isinstance(start, Fraction) else Fraction(str(start))
     folder.mkdir(parents=True, exist_ok=True)
     with scene_lock(folder):
-        record = yaml.safe_load((folder / "signal.yaml").read_text()) if (folder / "signal.yaml").is_file() else {}
+        record = safe_load((folder / "signal.yaml").read_text()) if (folder / "signal.yaml").is_file() else {}
         number = int(record.get("data", 0)) + 1
         target = folder / "data" / f"{number:04d}"
         target.mkdir(parents=True, exist_ok=True)
@@ -417,7 +418,7 @@ def load_record(root: Path, signal_id: str) -> dict[str, Any]:
     folder = directory(Path(root), signal_id)
     if not (folder / "signal.yaml").is_file():
         raise ValidationError(f"There is no signal {signal_id} (record it first)")
-    record = yaml.safe_load((folder / "signal.yaml").read_text())
+    record = safe_load((folder / "signal.yaml").read_text())
     record["provenance"] = json.loads((folder / "provenance.json").read_text())
     record["quality"] = json.loads((folder / "quality.json").read_text())
     return record

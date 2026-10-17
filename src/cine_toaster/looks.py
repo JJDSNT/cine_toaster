@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from .yamlio import safe_load
 
 
 LOOKS_DIRECTORY = "looks"
@@ -70,7 +71,7 @@ def load_looks(root: Path) -> dict[str, Look]:
     looks: dict[str, Look] = {}
     for path in sorted(directory.glob(f"*/{LOOK_FILE}")):
         try:
-            document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            document = safe_load(path.read_text(encoding="utf-8")) or {}
         except yaml.YAMLError:
             continue
         if not isinstance(document, dict):

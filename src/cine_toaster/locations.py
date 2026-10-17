@@ -17,8 +17,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import yaml
 
+from .yamlio import safe_load
 from .errors import ValidationError
 
 DIRECTORY = "locations"
@@ -31,7 +31,7 @@ def _key(value: Any) -> str:
 
 
 def _read(path: Path) -> dict[str, Any]:
-    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    raw = safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(raw, dict):
         raise ValidationError(f"{path} is not a mapping")
     return raw
@@ -41,11 +41,13 @@ def _location(path: Path, root: Path | None) -> dict[str, Any]:
     raw = _read(path)
     base = path.parent
     references = []
+    resolved_root = root.resolve() if root else None  # once, not twice per reference
     for item in raw.get("references") or []:
         if not isinstance(item, dict) or not item.get("path"):
             continue
         target = (base / str(item["path"])).resolve()
-        shown = target.relative_to(root.resolve()).as_posix() if root and target.is_relative_to(root.resolve()) else str(item["path"])
+        shown = (target.relative_to(resolved_root).as_posix() if resolved_root and target.is_relative_to(resolved_root)
+                 else str(item["path"]))
         references.append({"path": shown, "kind": str(item.get("kind") or "plate"), "camera": str(item.get("camera") or ""),
                            "exists": target.is_file()})
     pin = base / PIN

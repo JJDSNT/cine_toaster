@@ -12,6 +12,7 @@ from typing import Any
 
 import yaml
 
+from .yamlio import safe_load
 from .creation import content_digest, load_creation, reference_snapshot
 from .errors import ValidationError
 from .references import generate_reference, image_providers, load_references, reference_images
@@ -129,7 +130,7 @@ def run_reference(context) -> dict[str, Any]:
                               name="exploration-" + context.job_id, requested_by="Creation / Inception", runner=runner)
     context.check()
     record_path = made / "reference.yaml"
-    record = yaml.safe_load(record_path.read_text(encoding="utf-8"))
+    record = safe_load(record_path.read_text(encoding="utf-8"))
     record["generation"]["creation_inputs"] = params["inputs"]
     record_path.write_text(yaml.safe_dump(record, allow_unicode=True, sort_keys=False), encoding="utf-8")
     context.progress(0.98, "Reference ready to inspect and adopt; earlier images are preserved")

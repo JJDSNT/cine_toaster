@@ -7,6 +7,7 @@ from pathlib import Path, PurePosixPath
 
 import yaml
 
+from .yamlio import safe_load
 from .classify import TEXT_EXTENSIONS, classify
 from .model import ProjectItem
 
@@ -21,7 +22,7 @@ def project_id_for(root: Path) -> str:
     if manifest.is_file():
         try:
             with manifest.open(encoding="utf-8") as handle:
-                document = yaml.safe_load(handle) or {}
+                document = safe_load(handle) or {}
             project_id = document.get("id") if isinstance(document, dict) else None
         except (OSError, yaml.YAMLError):
             project_id = None

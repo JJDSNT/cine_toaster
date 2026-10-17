@@ -316,29 +316,34 @@ Track scope and acceptance criteria in [CT-0084](../work/CT-0084-three-workspace
 - [ ] Compare existing feature menu + inspector with hybrid workspace/context navigation in a focused prototype.
 - [ ] Validate decisions, provenance and local exceptions with users before an implementation ADR.
 
-### The GUI is slow to load: measured causes (2026-10-17)
+### The GUI is slow to load: measured and fixed (2026-10-17)
 
-Measured on a copy of Demo 01 (7 scenes): `/api/production` 3 ms (cached),
-`/api/creation` 2.0 s, `/api/decisions` 2.2 s, `/api/planning-context` 0.9 s,
-`/api/sequence-work` 0.8 s, `/api/storyboard` 0.5 s. One `creation_view`
-(profiled, 3.9 s under the profiler):
+Measured on a copy of Demo 01 (7 scenes), over HTTP. Before: `/api/creation`
+2.0 s, `/api/decisions` 2.2 s, `/api/planning-context` 0.9 s,
+`/api/sequence-work` 0.8 s. After: 0.10 s, 0.10 s, 0.10 s, 0.09 s (first call
+of a fresh server 0.23 s). Causes and fixes:
 
-- [ ] **The production is loaded 8 times per request.** The Creation sub-views
-  (`creation_review`, `storyboard`, `stage_handoff`, `directing`, ...) call
-  `load_production` themselves instead of the one already loaded; the web
-  layer's `cached_production` is not used by them. Solve: load once in
-  `creation_view` / `decision_inbox` and pass it down (most views already
-  accept `production=`).
-- [ ] **The style catalogue is re-parsed for every scene.** `_scene_style`
-  calls `list_styles` per scene: 57 calls, 2,109 TOML parses, 1.7 s. Solve:
-  one catalogue per `load_production` (or cache keyed by the style roots'
-  mtimes).
-- [ ] **Reference files are re-hashed on every read.** 99 SHA-256 digests,
-  0.8 s, repeated by `reference_snapshot` and `load_references`. Solve: a
-  digest cache keyed by (path, size, mtime_ns), disposable.
-- These costs grow with the film: CT-0113 saw Singular's preproduction take
-  over 120 s. The inbox link polls `/api/decisions` every 15 s per open tab.
-  Validate the fix on Demo 01 and read-only on Singular.
+- [x] **The production was loaded 8 times per request** by the Creation
+  sub-views. Fixed with a request-scoped memo (`read_scope.py`): inside one
+  read-only view (`creation_view`, `decision_inbox`, `planning_context`,
+  `/api/sequence-work`), `load_production` and `load_references` read a root
+  once; outside it, and in every command that writes, nothing is shared.
+- [x] **The style catalogue was re-parsed for every scene** (57 catalogue
+  reads, 2,109 TOML parses). Now once per production load, and each manifest
+  is parsed once per (path, size, mtime) (`styles._cached_load`, returning
+  copies: one entry's lists end up in the production's records).
+- [x] **Reference files were re-hashed on every read** (99 SHA-256 digests).
+  `references.digest` keeps a disposable cache by (path, size, mtime_ns).
+- [x] **Singular, read-only** (files unchanged before/after): `creation_view`,
+  `decision_inbox`, `planning_context` about 12 s each -> about 1 s. Two more
+  causes found there and fixed: the locations (40 YAML files) were read again
+  for every scene (now once per production load, copied per scene), and
+  location/reference/cast/look/signal/track records used PyYAML's pure-Python
+  loader (now one `yamlio.safe_load`, libyaml's C safe loader when installed,
+  as `project.py` already did).
+- [ ] `takes.discover` (Singular: 197 calls, ~29k `stat`) is now the largest
+  remaining cost of a production load; `/api/storyboard` (0.15 s on Demo 01)
+  the slowest Demo 01 call. Measure again before optimising further.
 
 ### Agent Runtime structure (CT-0115, ADR 0034, 2026-10-17)
 

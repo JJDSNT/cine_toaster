@@ -36,6 +36,7 @@ from typing import Any
 
 import yaml
 
+from .yamlio import safe_load
 from . import timebase
 from .errors import ValidationError
 from .events import Event, append_event
@@ -57,7 +58,7 @@ def directory(root: Path, track_id: str) -> Path:
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return safe_load(path.read_text(encoding="utf-8")) or {}
 
 
 def _write(path: Path, text: str) -> None:

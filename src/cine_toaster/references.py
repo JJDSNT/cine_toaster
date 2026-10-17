@@ -12,12 +12,14 @@ from __future__ import annotations
 
 import hashlib
 import shutil
+import threading
 from datetime import date
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+from .yamlio import safe_load
 from .errors import ValidationError
 from .new_production import slug
 
@@ -26,12 +28,31 @@ RECORD = "reference.yaml"
 KINDS = ("generated", "found", "made")
 
 
+#: Digests already computed, by (path, size, mtime_ns): operational and disposable.
+#: A file rewritten keeps neither its size and modification time together, so
+#: an entry never outlives the bytes it describes.
+_DIGESTS: dict[tuple[str, int, int], str] = {}
+_DIGESTS_LOCK = threading.Lock()
+_DIGESTS_MAX = 8192
+
+
 def digest(path: Path) -> str:
+    stat = path.stat()
+    key = (str(path.resolve()), stat.st_size, stat.st_mtime_ns)
+    with _DIGESTS_LOCK:
+        known = _DIGESTS.get(key)
+    if known:
+        return known
     hasher = hashlib.sha256()
     with path.open("rb") as handle:
         for block in iter(lambda: handle.read(1 << 20), b""):
             hasher.update(block)
-    return hasher.hexdigest()
+    value = hasher.hexdigest()
+    with _DIGESTS_LOCK:
+        if len(_DIGESTS) >= _DIGESTS_MAX:
+            _DIGESTS.clear()
+        _DIGESTS[key] = value
+    return value
 
 
 def _problems(folder: Path, record: dict[str, Any], known: set[str]) -> list[dict[str, str]]:
@@ -66,9 +87,19 @@ def _problems(folder: Path, record: dict[str, Any], known: set[str]) -> list[dic
 
 
 def load_references(root: Path) -> list[dict[str, Any]]:
-    """Every reference of the production, with what its record says and what is wrong with it."""
+    """Every reference of the production, with what its record says and what is wrong with it.
 
-    directory = Path(root).expanduser().resolve() / DIRECTORY
+    Inside a `read_scope()` the same production's references are read once.
+    """
+
+    from .read_scope import scoped
+
+    resolved = Path(root).expanduser().resolve()
+    return scoped("references", resolved, lambda: _load_references(resolved))
+
+
+def _load_references(root: Path) -> list[dict[str, Any]]:
+    directory = root / DIRECTORY
     if not directory.is_dir():
         return []
     folders = sorted(path for path in directory.iterdir() if path.is_dir())
@@ -81,7 +112,7 @@ def load_references(root: Path) -> list[dict[str, Any]]:
                 {"code": "reference_record", "severity": "error", "message": f"no {RECORD} in {folder.name}"}]})
             continue
         try:
-            record = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            record = safe_load(path.read_text(encoding="utf-8")) or {}
         except yaml.YAMLError as error:
             references.append({"id": folder.name, "title": "", "findings": [
                 {"code": "reference_record", "severity": "error", "message": f"{RECORD} does not parse: {error}"}]})

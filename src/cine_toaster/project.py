@@ -420,10 +420,26 @@ def _phase(root: Path, path: Path, state: SceneState) -> dict[str, Any]:
     return phase(root, {"file": path.relative_to(root).as_posix()}, state.gates)
 
 
-def _production_locations(root: Path, scenes: list[dict[str, Any]]) -> dict[str, Any]:
+def _location_catalog(root: Path, memo: list | None) -> dict[str, dict[str, Any]]:
+    """The production's locations, read once per production load (`memo`), not once per scene.
+
+    Callers get their own copy: a scene merges its location's plan, the
+    production adds appearances.
+    """
+
+    import copy
+
     from .locations import load_locations
 
-    found = load_locations(root)
+    if memo is None:
+        return load_locations(root)
+    if not memo:
+        memo.append(load_locations(root))
+    return copy.deepcopy(memo[0])
+
+
+def _production_locations(root: Path, scenes: list[dict[str, Any]], memo: list | None = None) -> dict[str, Any]:
+    found = _location_catalog(root, memo)
     for location_id, location in found.items():
         location["appearances"] = [scene["id"] for scene in scenes if scene.get("location") == location_id]
     return found
@@ -516,18 +532,30 @@ def _surround(value: Any) -> str:
     return "" if text in ("", "false", "no", "none", "off", "stereo", "0") else text
 
 
+def _style_catalog(root: Path, memo: list | None) -> dict[str, dict[str, Any]]:
+    """The style catalogue, read once per production load (`memo`), not once per scene."""
+
+    if memo:
+        return memo[0]
+    from .styles import list_styles
+
+    catalog = {entry["id"]: entry for entry in list_styles(root)}
+    if memo is not None:
+        memo.append(catalog)
+    return catalog
+
+
 def _scene_style(document: dict[str, Any], scene_id: str, root: Path,
-                 project_style: Any) -> tuple[dict[str, Any] | None, list[Finding]]:
+                 project_style: Any, styles: list | None = None) -> tuple[dict[str, Any] | None, list[Finding]]:
     """The styles in force, one per axis -- technique, direction, format -- each the scene's or else the
     production's (CT-0049), combined."""
 
     scene_style = document.get("style")
     if not scene_style and not project_style:
         return None, []
-    from .styles import list_styles, resolve, summary
+    from .styles import resolve, summary
 
-    parts, problems = resolve({entry["id"]: entry for entry in list_styles(root)},
-                              scene=scene_style, project=project_style)
+    parts, problems = resolve(_style_catalog(root, styles), scene=scene_style, project=project_style)
     findings = [Finding(code="style_unknown", severity="error", scene_id=scene_id, shots=(), message=f"{problem}.")
                 for problem in problems]
     return summary(parts), findings
@@ -692,6 +720,8 @@ def _load_scene(
     project_deliver: Any = None,
     project_surround: Any = None,
     project_subtitles: Any = None,
+    styles: list | None = None,
+    locations: list | None = None,
 ) -> dict[str, Any]:
     document = _read_yaml(path)
     scene_id = vtext(document, "scene") or _text(document.get("id"))
@@ -703,9 +733,9 @@ def _load_scene(
     location_id = _text(_scene_field(document, "location", scene_aliases)).strip().upper()
     location_findings: list[Finding] = []
     if location_id:
-        from .locations import load_locations, resolve
+        from .locations import resolve
 
-        location = load_locations(root).get(location_id)
+        location = _location_catalog(root, locations).get(location_id)
         if location is None:
             location_findings.append(Finding(code="location_unknown", severity="error", scene_id=scene_id,
                 message=f"The scene is set in {location_id}, which is not among the production's locations "
@@ -749,7 +779,7 @@ def _load_scene(
     move_findings.extend(sound_findings)
     enter, enter_findings = _scene_enter(document, scene_id, root)
     move_findings.extend(enter_findings)
-    style, style_findings = _scene_style(document, scene_id, root, project_style)
+    style, style_findings = _scene_style(document, scene_id, root, project_style, styles)
     people = {str(subject_id).upper() for subject_id in geometry.subjects}
     people |= {str(name).upper() for name in (_scene_field(document, "cast", scene_aliases) or {})}
     move_findings.extend(_expand_emotions(shots, document, scene_id, root, people,
@@ -766,9 +796,8 @@ def _load_scene(
     renditions: list[dict[str, Any]] = []
     if deliver:
         from .formats import renditions as parse_renditions
-        from .styles import list_styles
 
-        renditions, problems = parse_renditions(deliver, {entry["id"]: entry for entry in list_styles(root)})
+        renditions, problems = parse_renditions(deliver, _style_catalog(root, styles))
         move_findings.extend(Finding(code="deliver_problem", severity="error", scene_id=scene_id, shots=(),
                                      message=f"{scene_id} {problem}.") for problem in problems)
     motions = shot_motions(geometry, shots, scene_id=scene_id)
@@ -1723,9 +1752,18 @@ def _link_screenplay(
 
 
 def load_production(root: Path) -> dict[str, Any]:
-    """Load the operational model of one production, straight from its files."""
+    """Load the operational model of one production, straight from its files.
+
+    Inside a `read_scope()` (one read-only view) the same root is read once.
+    """
+
+    from .read_scope import scoped
 
     root = root.expanduser().resolve()
+    return scoped("production", root, lambda: _load_production(root))
+
+
+def _load_production(root: Path) -> dict[str, Any]:
     manifest_path = root / PROJECT_FILE
     if not manifest_path.is_file():
         raise FileNotFoundError(f"No Cine Toaster project file: {manifest_path}")
@@ -1740,11 +1778,13 @@ def load_production(root: Path) -> dict[str, Any]:
     project_look = vtext(manifest, "look")
     script_files, script_problem = screenplay_files(manifest, root)
     screenplay = _read_screenplay(root, script_files)
+    styles: list = []  # the style catalogue, read at most once for the whole production
+    locations: list = []  # and the locations: Singular's 40 were read again for every scene
     scenes = [
         _load_scene(path, root, declared_fields, project_look, screenplay, _shot_field_aliases(manifest),
                     _scene_field_aliases(manifest), project_style=manifest.get("style"),
                     project_deliver=manifest.get("deliver"), project_surround=manifest.get("surround"),
-                    project_subtitles=manifest.get("subtitles"))
+                    project_subtitles=manifest.get("subtitles"), styles=styles, locations=locations)
         for path in scene_files(root, manifest)
     ]
     scenes.sort(key=lambda scene: (scene["order"], scene["id"]))
@@ -1827,7 +1867,7 @@ def load_production(root: Path) -> dict[str, Any]:
         "cast": {key: {**member.public_dict(), "appearances": seen.get(key, [])}
                  for seen in [cast_appearances(scenes, cast)] for key, member in cast.items()},
         # SPEC-0010: each set declared once, with the scenes shot in it.
-        "locations": _production_locations(root, scenes),
+        "locations": _production_locations(root, scenes, locations),
         # ADR 0016: a generated screenplay is read only in the editor.
         "script_generated_by": _text(manifest.get("screenplay_generated_by")),
         # Where a take's word timings are, beside it: `{stem}` is the take's
