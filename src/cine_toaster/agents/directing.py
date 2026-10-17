@@ -4,9 +4,9 @@ from __future__ import annotations
 import json
 import uuid
 
-from langchain_core.messages import AIMessage
 
 from .inception import bounded
+from .loop import Loop, step
 from .reads import production_work
 from .roles import ROLES
 from ..production_context import WORK_POLICY, work_structure
@@ -104,15 +104,29 @@ CONTINUITY_SYSTEM += '\n' + WORK_POLICY
 REVIEW_SYSTEM += '\n' + WORK_POLICY
 
 
+def _review_ready(state):
+    current = (state['planning_creation'].get('inception_review') or {}).get('current') or {}
+    return bool(state.get('planning_review_request')) and current.get('id') == state['planning_review_request'] \
+        and current.get('status') == 'awaiting_decision'
+
+
+LOOP = Loop(role='directing', steps='planning_steps', pending='planning_pending', schema=SCHEMA,
+            limit='Atingi o limite deste turno; preservei propostas e pareceres. Não há correção em segundo plano.',
+            review_ready=_review_ready, not_ready='Ainda não existe uma proposta atual salva para sua revisão.',
+            # The Continuity role audits; it does not plan, publish requests or hand work on.
+            allowed=lambda state: (('review_continuity', 'read_context', 'read_scene', 'respond')
+                                   if state.get('planning_role') == 'continuity'
+                                   else tuple(SCHEMA['properties']['action']['enum'])),
+            shown=lambda state, action: 'continuity' if action == 'review_continuity'
+                                        else state.get('planning_role') or 'directing')
+
+
 def nodes(model, runtime, auditor=None, reviewer=None):
     """`model` directs; `auditor` serves the Continuity role; `reviewer` the fresh independent review."""
 
     auditor, reviewer = auditor or model, reviewer or model
 
-    def stop(state, message, status='blocked', **extra):
-        return {'messages': [AIMessage(content=message)], 'planning_pending': {}, 'pending_tool': {}, 'proposal': {},
-                'completed_turn': state.get('turn'), 'agent_status': {
-                    'role': state.get('active_role', 'directing'), 'state': status}, **extra}
+    stop = LOOP.stop
 
     def pack(bundle, scene_id):
         scenes = bundle['production']['scenes']
@@ -169,8 +183,6 @@ def nodes(model, runtime, auditor=None, reviewer=None):
         return update
 
     def reason(state):
-        if state.get('planning_steps', 0) >= MAX_STEPS:
-            return stop(state, 'Atingi o limite deste turno; preservei propostas e pareceres. Não há correção em segundo plano.', 'resource_limit')
         role = state.get('planning_role') or 'directing'
         bundle = state['planning_context']
         prompt = (f"Canonical pending agent work:\n{production_work(state['planning_creation'])}"
@@ -180,31 +192,9 @@ def nodes(model, runtime, auditor=None, reviewer=None):
                   f"\nRemaining reasoning steps: {MAX_STEPS-state.get('planning_steps', 0)}; "
                   f"continuity attempts: {MAX_REVIEWS-state.get('planning_reviews', 0)}."
                   '\nConversation:\n' + '\n'.join(f'{m.type}: {m.content}' for m in state['messages'][-10:]))
-        try:
-            answer = (auditor.ask(CONTINUITY_SYSTEM, prompt, SCHEMA) if role == 'continuity'
-                      else model.ask(DIRECTING_SYSTEM, prompt, SCHEMA))
-            action = answer.get('action')
-            allowed = ('review_continuity', 'read_context', 'read_scene', 'respond') if role == 'continuity' else SCHEMA['properties']['action']['enum']
-            if action not in allowed:
-                raise ValueError('Action is not authorised for this production role')
-        except Exception as error:
-            return stop(state, f'Não consegui avançar este trabalho: {error}')
-        update = {'planning_steps': state.get('planning_steps', 0) + 1}
-        if action == 'delegate_art_direction':
-            return {**update, 'planning_pending': {}, 'active_role': 'art_direction',
-                    'agent_status': {'role': 'art_direction', 'state': 'working'}}
-        if action == 'respond':
-            status = answer.get('status')
-            if status not in ('complete', 'needs_direction', 'needs_review', 'blocked') or not answer.get('reply'):
-                return stop(state, 'Não recebi uma entrega, pergunta ou impedimento válido.')
-            if status == 'needs_review':
-                current = (state['planning_creation'].get('inception_review') or {}).get('current') or {}
-                if not state.get('planning_review_request') or current.get('id') != state['planning_review_request'] or current.get('status') != 'awaiting_decision':
-                    return stop(state, 'Ainda não existe uma proposta atual salva para sua revisão.')
-            return {**update, **stop(state, answer['reply'], status)}
-        return {**update, 'planning_pending': answer,
-                'active_role': 'continuity' if action == 'review_continuity' else role,
-                'agent_status': {'role': 'continuity' if action == 'review_continuity' else role, 'state': 'working', 'detail': action}}
+        if role == 'continuity':
+            return step(LOOP, state, auditor, CONTINUITY_SYSTEM, prompt)
+        return step(LOOP, state, model, DIRECTING_SYSTEM, prompt)
 
     def tool(state):
         call = state['planning_pending']; action = call['action']; bundle = state['planning_context']

@@ -152,3 +152,53 @@ class CatalogueTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+try:
+    from cine_toaster.agents.loop import Loop, step
+    HAS_LOOP = True
+except ImportError:  # the agents extra
+    HAS_LOOP = False
+
+
+@unittest.skipUnless(HAS_LOOP, "the agents extra is not installed")
+class LoopTests(unittest.TestCase):
+    SCHEMA = {"properties": {"action": {"enum": ["save", "respond", "delegate_continuity"]}}}
+
+    def loop(self, ready=False):
+        return Loop(role="directing", steps="planning_steps", pending="planning_pending", schema=self.SCHEMA,
+                    limit="limit", review_ready=lambda state: ready, not_ready="nothing saved")
+
+    def ask(self, answer):
+        return SimpleNamespace(ask=lambda system, prompt, schema: answer)
+
+    def test_the_budget_is_checked_before_the_model_is_asked(self):
+        model = SimpleNamespace(ask=lambda *a: self.fail("asked past the budget"))
+        state = step(self.loop(), {"planning_steps": 8, "turn": "t"}, model, "s", "p")
+        self.assertEqual(state["agent_status"]["state"], "resource_limit")
+        self.assertEqual(state["completed_turn"], "t")
+
+    def test_an_action_outside_the_role_runs_nothing(self):
+        for answer in ({"action": "shell"}, ["save"], None):
+            state = step(self.loop(), {}, self.ask(answer), "s", "p")
+            self.assertEqual(state["agent_status"]["state"], "blocked")
+            self.assertEqual(state["planning_pending"], {})
+
+    def test_needs_review_needs_something_saved(self):
+        answer = {"action": "respond", "status": "needs_review", "reply": "Look."}
+        self.assertEqual(step(self.loop(), {}, self.ask(answer), "s", "p")["messages"][0].content, "nothing saved")
+        self.assertEqual(step(self.loop(ready=True), {}, self.ask(answer), "s", "p")["agent_status"]["state"],
+                         "needs_review")
+
+    def test_a_tool_action_waits_and_a_delegation_hands_the_turn_on(self):
+        state = step(self.loop(), {"planning_steps": 1}, self.ask({"action": "save", "reply": ""}), "s", "p")
+        self.assertEqual((state["planning_pending"]["action"], state["planning_steps"]), ("save", 2))
+        state = step(self.loop(), {"planning_scene": "SC-1"}, self.ask({"action": "delegate_continuity"}), "s", "p")
+        self.assertEqual((state["active_role"], state["planning_role"], state["planning_scene"]),
+                         ("continuity", "continuity", "SC-1"))
+
+    def test_a_failed_model_is_said_not_raised(self):
+        def broken(*args):
+            raise ModelUnavailable("offline")
+        state = step(self.loop(), {}, SimpleNamespace(ask=broken), "s", "p")
+        self.assertIn("offline", state["messages"][0].content)

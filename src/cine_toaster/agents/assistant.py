@@ -20,6 +20,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.types import interrupt
 
+from .loop import delegated
 from .models import Model, ModelUnavailable
 from .reads import READS, overview, read
 from .roles import DELEGATIONS, ROLES, scratch_fields, scratch_reset
@@ -308,13 +309,9 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None, models=None):
                     "proposal": {}, "notes": [], "turn": turn, "completed_turn": turn,
                     "agent_status": {"role": "coordinator", "state": "blocked"}}
         action = answer.get("action", "none")
-        if action in ("delegate_directing", "delegate_continuity"):
-            role = action.removeprefix("delegate_")
-            return {"active_role": role, "planning_role": role, "planning_scene": answer.get("scene") or scene_id,
-                    "proposal": {}, "turn": turn, "agent_status": {"role": role, "state": "working"}}
-        if action == "delegate_art_direction":
-            return {"active_role": "art_direction", "proposal": {}, "turn": turn,
-                    "agent_status": {"role": "art_direction", "state": "working"}}
+        if action in ("delegate_directing", "delegate_continuity", "delegate_art_direction"):
+            return {**delegated(action, answer, {**state, "planning_scene": state.get("planning_scene") or scene_id}),
+                    "turn": turn}
         if action == "delegate_inception":
             if state.get("returned_to_coordinator"):
                 return {"messages": [AIMessage(content="O encaminhamento não avançou: a capacidade solicitada ainda não está integrada.")],

@@ -9,8 +9,7 @@ import json
 import uuid
 from typing import Any
 
-from langchain_core.messages import AIMessage
-
+from .loop import Loop, step
 from .reads import READS, overview, read, production_work
 from .roles import ROLES
 from ..production_context import WORK_POLICY
@@ -119,10 +118,27 @@ def creation_digest(value: dict) -> str:
     }, 14000)
 
 
+def _review_ready(state: dict) -> bool:
+    current = ((state.get("inception_context") or {}).get("creation", {}).get("inception_review") or {}).get("current")
+    return bool(current) and current["status"] == "awaiting_decision"
+
+
+def _return_to_coordinator(state: dict, answer: dict, update: dict) -> dict:
+    if state.get("returned_to_coordinator"):
+        return LOOP.stop(state, "O encaminhamento não pôde avançar; esta capacidade ainda não está integrada.")
+    return {"pending_tool": {}, "active_role": "coordinator", "returned_to_coordinator": True}
+
+
+LOOP = Loop(role="inception", steps="inception_steps", pending="pending_tool", schema=SCHEMA,
+            limit="Atingi o limite de trabalho deste turno. Os resultados salvos foram preservados; "
+                  "não há execução em segundo plano. Peça a continuação para uma nova rodada.",
+            review_ready=_review_ready,
+            not_ready="Ainda não existe uma avaliação atual salva para aprovar; não inventei um pedido de revisão.",
+            statuses=STOPS, special={"return_to_coordinator": _return_to_coordinator})
+
+
 def stop(state: dict, message: str, status: str = "blocked") -> dict:
-    return {"messages": [AIMessage(content=message)], "pending_tool": {}, "proposal": {},
-            "completed_turn": state.get("turn", ""),
-            "agent_status": {"role": "inception", "state": status, "detail": message}}
+    return LOOP.stop({**state, "active_role": "inception"}, message, status)
 
 
 def nodes(model, runtime):
@@ -154,9 +170,6 @@ def nodes(model, runtime):
     def reason(state):
         if not state.get("inception_context"):
             return stop(state, "O contexto criativo não está disponível; não publiquei uma avaliação.")
-        if state.get("inception_steps", 0) >= MAX_STEPS:
-            return stop(state, "Atingi o limite de trabalho deste turno. Os resultados salvos foram preservados; "
-                        "não há execução em segundo plano. Peça a continuação para uma nova rodada.", "resource_limit")
         context = state["inception_context"]
         conversation = "\n".join(f"{m.type}: {m.content}" for m in state["messages"][-10:])
         prompt = (f"Whole film:\n{context['film']}\nCreation:\n{creation_digest(context['creation'])}"
@@ -166,38 +179,7 @@ def nodes(model, runtime):
                   f"{MAX_READS - state.get('inception_reads', 0)} additional reads, "
                   f"{MAX_WRITES - state.get('inception_writes', 0)} writes."
                   f"\nConversation:\n{conversation}")
-        try:
-            answer = model.ask(SYSTEM, prompt, SCHEMA)
-        except Exception as error:
-            return stop(state, f"Não consegui falar com o modelo: {getattr(error, 'message', error)}")
-        if not isinstance(answer, dict):
-            return stop(state, "O modelo retornou uma resposta inválida; não executei ferramentas.")
-        action = answer.get("action")
-        update = {"inception_steps": state.get("inception_steps", 0) + 1}
-        if action in ("delegate_directing", "delegate_continuity"):
-            role = action.removeprefix("delegate_")
-            return {**update, "pending_tool": {}, "active_role": role, "planning_role": role,
-                    "planning_scene": answer.get("scene") or state.get("planning_scene", ""),
-                    "agent_status": {"role": role, "state": "working"}}
-        if action == "delegate_art_direction":
-            return {**update, "pending_tool": {}, "active_role": "art_direction",
-                    "agent_status": {"role": "art_direction", "state": "working"}}
-        if action in TOOLS:
-            return {**update, "pending_tool": answer,
-                    "agent_status": {"role": "inception", "state": "working", "detail": action}}
-        if action == "return_to_coordinator":
-            if state.get("returned_to_coordinator"):
-                return stop(state, "O encaminhamento não pôde avançar; esta capacidade ainda não está integrada.")
-            return {**update, "pending_tool": {}, "active_role": "coordinator", "returned_to_coordinator": True}
-        if action != "respond" or answer.get("status") not in STOPS or not str(answer.get("reply") or "").strip():
-            return stop(state, "O modelo não apresentou uma entrega, pergunta ou impedimento válido. Não executei a ação.")
-        status = answer["status"]
-        reply = answer["reply"]
-        if status == "needs_review":
-            current = (context["creation"].get("inception_review") or {}).get("current")
-            if not current or current["status"] != "awaiting_decision":
-                return stop(state, "Ainda não existe uma avaliação atual salva para aprovar; não inventei um pedido de revisão.")
-        return {**update, **stop(state, reply, status)}
+        return step(LOOP, {**state, "active_role": "inception"}, model, SYSTEM, prompt)
 
     def tool(state):
         call = state["pending_tool"]

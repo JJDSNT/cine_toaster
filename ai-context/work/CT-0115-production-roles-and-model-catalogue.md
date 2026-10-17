@@ -86,6 +86,10 @@ the message for both Claude adapters.
   The page-context entries "Inception decision id" / "Direction continuation
   attempt" are gone. Tests moved to the typed input; one AG-UI-level test
   proves the state reaches the graph through `ag_ui_langgraph`. `make ui` rebuilt.
+- One reasoning step (`agents/loop.py`): the three roles' copies of
+  budget/ask/validate/delegate/respond replaced by a declared `Loop` each;
+  failure messages unified ("Não consegui avançar este trabalho: ...");
+  `LoopTests` added.
 
 # To do
 

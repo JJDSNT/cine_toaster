@@ -5,10 +5,10 @@ import json
 import time
 import uuid
 
-from langchain_core.messages import AIMessage
 from langgraph.types import interrupt
 
 from .inception import bounded, creation_digest
+from .loop import Loop, step
 from .models import supports
 from .reads import overview, production_work
 from .roles import ROLES
@@ -96,16 +96,19 @@ REVIEW_SCHEMA = {'type': 'object', 'properties': {
 SYSTEM += '\n' + WORK_POLICY
 REVIEW_SYSTEM += '\n' + WORK_POLICY
 
+LOOP = Loop(role='art_direction', steps='art_steps', pending='art_pending', schema=SCHEMA,
+            limit='Atingi o limite deste turno; preservei os resultados. Não há correção em segundo plano.',
+            review_ready=lambda state: bool(state.get('art_review_request')),
+            not_ready='Ainda não salvei uma proposta atual para revisão humana.',
+            shown=lambda state, action: 'visual_prevalidation' if action == 'inspect' else 'art_direction')
+
 
 def nodes(model, runtime, reviewer=None):
     """`reviewer` serves Visual Prevalidation: a separate call, and possibly another model the person bound."""
 
     reviewer = reviewer or model
 
-    def stop(state, message, status='blocked', **extra):
-        return {'messages': [AIMessage(content=message)], 'art_pending': {}, 'pending_tool': {}, 'proposal': {},
-                'completed_turn': state.get('turn'), 'agent_status': {
-                    'role': state.get('active_role', 'art_direction'), 'state': status}, **extra}
+    stop = LOOP.stop
 
     def context(state):
         try:
@@ -144,8 +147,6 @@ def nodes(model, runtime, reviewer=None):
         return update
 
     def reason(state):
-        if state.get('art_steps', 0) >= MAX_STEPS:
-            return stop(state, 'Atingi o limite deste turno; preservei os resultados. Não há correção em segundo plano.', 'resource_limit')
         value = state['art_context']['creation']
         prompt = (f"Whole film: {state['art_context']['film']}\nScreenplay: {state['art_context']['screenplay']}"
                   f"\nApproved stage input and actual target scene/drawings: {bounded({key:state['art_context'].get(key) for key in ('handoff','scene','storyboard')}, 24000)}"
@@ -160,23 +161,7 @@ def nodes(model, runtime, reviewer=None):
                 prompt += '\nExisting reference jobs (not new work): ' + bounded(runtime.reference_jobs(), 5000)
             except Exception as error:
                 prompt += f'\nReference jobs unavailable: {error}'
-        try:
-            answer = model.ask(SYSTEM, prompt, SCHEMA)
-            if not isinstance(answer, dict) or answer.get('action') not in SCHEMA['properties']['action']['enum']:
-                raise ValueError('Invalid art action')
-        except Exception as error:
-            return stop(state, f'Não consegui avançar a direção de arte: {error}')
-        steps = state.get('art_steps', 0) + 1
-        if answer['action'] == 'respond':
-            status = answer.get('status')
-            if status not in ('complete', 'needs_direction', 'needs_review', 'blocked') or not answer.get('reply'):
-                return stop(state, 'O modelo não apresentou entrega, pergunta ou impedimento válido.')
-            if status == 'needs_review' and not state.get('art_review_request'):
-                return stop(state, 'Ainda não salvei uma proposta atual para revisão humana.')
-            return stop(state, answer['reply'], status, art_steps=steps)
-        role = 'visual_prevalidation' if answer['action'] == 'inspect' else 'art_direction'
-        return {'art_steps': steps, 'art_pending': answer, 'active_role': role,
-                'agent_status': {'role': role, 'state': 'working', 'detail': answer['action']}}
+        return step(LOOP, state, model, SYSTEM, prompt)
 
     def tool(state):
         call = state['art_pending']; action = call['action']

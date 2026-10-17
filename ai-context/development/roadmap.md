@@ -335,11 +335,15 @@ roles the supplied model serves. To do, in order:
   8 x 180 s a turn). Solve: native tool calling on adapters that support it
   (Claude API), prompt caching of the stable system/context prefix; measure
   turn time before and after on Demo 01.
-- [ ] **One role loop.** Inception, Art Direction and Directing each carry
-  their own reason/tool/stop/refresh copy. Solve: KDP Studio's shape --
-  draft -> named deterministic checks -> land (a command) -> hold -- with
-  each role giving its prompt, checks, landing and reviewer; read-and-answer
-  roles become data, generate/wait/publish roles stay in code.
+- [x] **One role loop** (done 2026-10-17). `agents/loop.py`: one reasoning
+  step for every role (budget before the model, allowed actions, delegation,
+  honest `respond`, `needs_review` only when something is saved); Inception,
+  Art Direction and Directing/Continuity declare a `Loop` and keep their
+  tools; the Coordinator delegates through the same `delegated()`.
+- [ ] **Read-and-answer roles as data.** KDP Studio's manifests: a role that
+  only reads and answers (a report) becomes a declaration with fixed readers.
+  Do it with the first such role (the format interviewer is a candidate),
+  not as a placeholder.
 - [ ] **Format intake (the interviewer).** Agents can stop with
   `needs_direction`, but nothing knows what a format needs (a music video:
   the track, duration, BPM, performance or narrative, lyrics), and the
