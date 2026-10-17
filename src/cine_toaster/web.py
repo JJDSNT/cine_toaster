@@ -99,7 +99,7 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", mimetypes.guess_type(candidate.name)[0] or "application/octet-stream")
         self.send_header("Content-Length", str(len(payload)))
-        self.send_header("Cache-Control", "no-cache" if candidate.name == "index.html" else "public, max-age=31536000, immutable")
+        self.send_header("Cache-Control", "no-cache" if candidate.suffix == ".html" else "public, max-age=31536000, immutable")
         self.end_headers()
         self.wfile.write(payload)
 
@@ -253,6 +253,57 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
 
     def _handle_api(self, parsed) -> None:
         query = parse_qs(parsed.query)
+        if parsed.path == '/api/decisions':
+            from .decision_inbox import decision_inbox
+            try:
+                self._send_json(decision_inbox(self.project_root))
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
+        if parsed.path == "/api/sequence-work":
+            from .sequence_work import sequence_work_view
+            try:
+                self._send_json(sequence_work_view(self.project_root))
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
+        if parsed.path == "/api/planning-context":
+            from .directing import planning_context
+            try:
+                self._send_json(planning_context(self.project_root))
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
+        if parsed.path == "/api/storyboard":
+            from .storyboard import storyboard_view
+            try:
+                self._send_json(storyboard_view(self.project_root, query.get("scene", [""])[0]))
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
+        if parsed.path == "/api/creation/reference-preview":
+            from .references import IMAGE_SUFFIXES
+            try:
+                manager = self.job_manager
+                job = manager.get(query.get("job", [""])[0])
+                if (job["project_id"] != self._project_id() or job["kind"] != "generate_reference"
+                        or job["state"] != "succeeded"):
+                    raise ResourceNotFoundError("No reviewable reference job in this production")
+                staging = manager.staging_dir(job["id"]).resolve()
+                images = [item for item in (job.get("result") or {}).get("files", [])
+                          if Path(item["staged"]).suffix.lower() in IMAGE_SUFFIXES]
+                image = (staging / images[0]["staged"]).resolve() if images else None
+                self._send_file(image if image and image.is_relative_to(staging) else None)
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
+        if parsed.path == "/api/creation":
+            from .creation import creation_view
+            try:
+                self._send_json(creation_view(self.project_root))
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
         if parsed.path == "/api/locations":
             # The production's sets (SPEC-0010): each with its plan drawn in the Core's terms,
             # the scenes shot there, and where it stands against the backlot.
@@ -697,6 +748,135 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if self._proxy_assistant(parsed):
             return
+        if parsed.path == '/api/creation/publish-storyboard':
+            from .stage_handoff import publish_storyboard_reference
+            from .state import Actor
+            try:
+                payload = self._read_json_body(limit=128 * 1024)
+                fields = {key: payload.get(key) for key in ('handoff', 'scene', 'shot', 'reference', 'file', 'title',
+                          'expected_revision', 'expected_storyboard_revision')}
+                fields.update({key: payload.get(key) or '' for key in ('based_on', 'note')})
+                self._send_json(publish_storyboard_reference(self.project_root, **fields, actor=Actor(id='art-direction', kind='agent')))
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
+        if parsed.path in ("/api/creation/direction-plan", "/api/creation/continuity-review"):
+            from .directing import save_direction_plan, save_continuity_review
+            from .state import Actor
+            try:
+                payload = self._read_json_body(limit=128 * 1024)
+                common = {"expected_revision": payload.get("expected_revision"),
+                          "expected_planning_digest": payload.get("expected_planning_digest")}
+                if parsed.path.endswith("direction-plan"):
+                    fields = {key: payload.get(key) for key in ("scene", "title", "intention", "shots")}
+                    fields.update({key: payload.get(key) or "" for key in ("based_on", "art_brief")})
+                    result = save_direction_plan(self.project_root, **common, **fields, actor=Actor(id="directing", kind="agent"))
+                else:
+                    fields = {key: payload.get(key) for key in ("plan", "verdict", "summary", "findings", "limitations")}
+                    fields["scene"] = payload.get("scene") or ""
+                    result = save_continuity_review(self.project_root, **common, **fields, actor=Actor(id="continuity", kind="agent"))
+                self._send_json(result)
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
+        if parsed.path in ("/api/creation/art-brief", "/api/creation/art-images", "/api/creation/visual-review"):
+            from .art_direction import image_package, save_art_brief, save_visual_review
+            from .state import Actor
+            try:
+                payload = self._read_json_body(limit=128 * 1024)
+                if parsed.path.endswith("art-images"):
+                    result = image_package(self.project_root, payload.get("references"))
+                else:
+                    common = {"expected_revision": payload.get("expected_revision"),
+                              "expected_source_digest": payload.get("expected_source_digest")}
+                    if parsed.path.endswith("art-brief"):
+                        result = save_art_brief(self.project_root, **common, actor=Actor(id="art-direction", kind="agent"),
+                            **{key: payload.get(key, "" if key in ("concept", "based_on") else None)
+                               for key in ("title", "text", "criteria", "references", "concept", "based_on")})
+                    else:
+                        result = save_visual_review(self.project_root, **common, actor=Actor(id="visual-prevalidation", kind="agent"),
+                            **{key: payload.get(key) for key in ("brief", "references", "targets", "images_digest", "verdict", "findings", "summary")})
+                self._send_json(result)
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
+        if parsed.path == "/api/storyboard":
+            from .storyboard import register_storyboard_candidate
+            from .state import Actor
+            try:
+                payload = self._read_json_body(limit=128 * 1024)
+                image = _safe_project_path(self.project_root, str(payload.get("image", "")))
+                if image is None:
+                    raise ValidationError("Storyboard import image must be inside this production")
+                self._send_json(register_storyboard_candidate(self.project_root,
+                    scene=payload.get("scene"), shot=payload.get("shot"), image=image,
+                    title=payload.get("title"), expected_revision=payload.get("expected_revision"),
+                    actor=Actor(id="storyboard-gui"), references=payload.get("references"),
+                    based_on=payload.get("based_on", ""), note=payload.get("note", ""),
+                    provenance=payload.get("provenance")))
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
+        if parsed.path == "/api/creation/sequence-review-request":
+            from .sequence_work import request_sequence_review
+            from .state import Actor
+            try:
+                payload = self._read_json_body(limit=16 * 1024)
+                result = request_sequence_review(self.project_root, sequence=payload.get('sequence'),
+                    title=payload.get('title'), rationale=payload.get('rationale'),
+                    expected_revision=payload.get('expected_revision'),
+                    expected_source_digest=payload.get('expected_source_digest'),
+                    actor=Actor(id='production-coordinator', kind='agent'))
+                self._send_json(result)
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
+        if parsed.path in ("/api/creation/assessment", "/api/creation/direction"):
+            from .creation_review import record_inception_assessment, decide_inception_assessment
+            from .state import Actor
+            try:
+                payload = self._read_json_body(limit=128 * 1024)
+                if parsed.path.endswith("assessment"):
+                    result = record_inception_assessment(self.project_root, title=payload.get("title"),
+                        summary=payload.get("summary"), readiness=payload.get("readiness"), proposal=payload.get("proposal"),
+                        references=payload.get("references", []), expected_revision=payload.get("expected_revision"),
+                        expected_source_digest=payload.get("expected_source_digest"),
+                        actor=Actor(id="creation-agent", kind="agent"))
+                else:
+                    result = decide_inception_assessment(self.project_root, assessment=payload.get("assessment"),
+                        outcome=payload.get("outcome"), guidance=payload.get("guidance", ""),
+                        advance=payload.get('advance', False), expected_handoff_digest=payload.get('expected_handoff_digest', ''),
+                        expected_revision=payload.get("expected_revision"), actor=Actor(id="director", kind="human"))
+                self._send_json(result)
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
+        if parsed.path in ("/api/creation", "/api/creation/agent-draft", "/api/creation/reference-plan", "/api/creation/rounds"):
+            from .creation import MAX_TEXT_BYTES, save_creation_draft, save_exploration_round
+            from .creation_jobs import plan_reference
+            from .state import Actor
+
+            try:
+                payload = self._read_json_body(limit=MAX_TEXT_BYTES * 2)
+                if parsed.path.endswith("reference-plan"):
+                    result = plan_reference(self.project_root, payload)
+                elif parsed.path.endswith("rounds"):
+                    result = save_exploration_round(self.project_root, title=payload.get("title"),
+                        references=payload.get("references", []), expected_revision=payload.get("expected_revision"),
+                        actor=Actor(id="creation-gui"), rationale=payload.get("rationale", ""), source=payload.get("source", ""),
+                        follows=payload.get("follows", ""), corrections=payload.get("corrections", []), based_on=payload.get("based_on", ""))
+                else:
+                    result = save_creation_draft(
+                        self.project_root, kind=payload.get("kind"), title=payload.get("title"), text=payload.get("text"),
+                        expected_revision=payload.get("expected_revision"),
+                        actor=Actor(id="inception", kind="agent") if parsed.path.endswith("agent-draft") else Actor(id="creation-gui"),
+                        expected_source_digest=payload.get("expected_source_digest"),
+                        references=payload.get("references", []), based_on=payload.get("based_on", ""),
+                        concept=payload.get("concept", ""), rationale=payload.get("rationale", ""))
+                self._send_json(result)
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
         if parsed.path == "/api/commands":
             self._handle_command()
             return
@@ -895,6 +1075,7 @@ def serve_project(
     host: str = "127.0.0.1",
     port: int = 8787,
     assistant: bool = False,
+    agent_provider: str | None = None,
 ) -> None:
     project_index = ProjectIndex(root)
     server = ThreadingHTTPServer((host, port), ProjectBrowserHandler)
@@ -916,15 +1097,20 @@ def serve_project(
         # ADR 0018: the assistant and its Copilot Runtime, beside the control room.
         from .assistant_host import AssistantHost, unavailable_reason
 
-        reason = unavailable_reason()
+        reason = unavailable_reason(agent_provider)
         if reason:
             print(f"Assistant not started: {reason}")
         else:
-            server.assistant = AssistantHost(f"http://127.0.0.1:{port}", port + 1, port + 2)  # type: ignore[attr-defined]
+            server.assistant = AssistantHost(f"http://127.0.0.1:{port}", port + 1, port + 2,
+                                             provider=agent_provider)  # type: ignore[attr-defined]
             server.assistant.start()  # type: ignore[attr-defined]
-            print(f"Assistant on (agent :{port + 1}, Copilot Runtime :{port + 2}); open /app/ to talk to it.")
+            print(f"Assistant on (provider {server.assistant.provider}, agent :{port + 1}, "
+                  f"Copilot Runtime :{port + 2}); open /app/ to talk to it.")
     print(f"Cine Toaster browsing {server.project_root}")
-    print(f"Open http://{host}:{port}")
+    from .server_network import startup_urls
+
+    for line in startup_urls(host, server.server_address[1]):
+        print(line)
     print("Press Ctrl+C to stop.")
     try:
         server.serve_forever()

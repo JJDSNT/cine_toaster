@@ -73,7 +73,7 @@ install-gpu: install
 	@$(RUN) -m pip install --quiet -e '.[gpu]'
 
 # The directing assistant (ADR 0017, 0018): LangGraph over AG-UI. The model is
-# the Claude Code CLI with your own login, so no key is needed.
+# host-configured, with fallback to the current Codex/Claude CLI (docs/assistant.md).
 install-agents: install
 	@echo "==> Installing the agents extra (the assistant)"
 	@$(RUN) -m pip install --quiet -e '.[agents]'

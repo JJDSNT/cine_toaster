@@ -2108,24 +2108,34 @@ async function renderStoryboard() {
   const data = await writing();
   if (!data) return renderUnstructured();
 
+  let drawings = null;
+  try { drawings = await api("/api/storyboard"); }
+  catch (error) { root.append(el("p", "error", `Could not read storyboard drawings: ${error.message}`)); }
+  const latest = new Map();
+  for (const candidate of drawings?.candidates || []) latest.set(`${candidate.scene}/${candidate.shot}`, candidate);
+  if (drawings) {
+    byId("storyboard-nav-count").textContent = String(latest.size);
+    byId("storyboard-nav-count").title = "Shots with retained storyboard drafts; not approvals";
+  }
+
   const header = el("section", "scene-header");
   const copy = el("div");
   copy.append(el("span", "eyebrow", "STORYBOARD"), el("h1", "", "Every frame, in order"));
   const facts = el("div", "scene-facts");
   facts.append(
     metric(String(data.counts.frames), "Frames"),
-    metric(String(data.counts.stills), "Drawn"),
+    metric(String(latest.size), "Draft drawings"),
+    metric(String(data.counts.stills), "Separate stills"),
     metric(String(data.counts.scenes), "Scenes"),
   );
   header.append(copy, facts);
   root.append(header);
 
-  if (!data.counts.stills) {
+  if (drawings && !latest.size && !data.counts.stills) {
     emptyRoom(
       root,
-      "No frames have been drawn yet",
-      "A card or a composite gets its still when its scene is assembled (or `toast still`); generated shots get " +
-        "theirs from a take. Until then a scene is text on a screen.",
+      "No storyboard drawings or shot stills recorded",
+      "Story drawings explore the proposed action before a finished shot master exists. Composition studies and discovered stills remain separate.",
     );
   }
 
@@ -2136,7 +2146,14 @@ async function renderStoryboard() {
     for (const frame of scene.frames) {
       const card = el("article", "filmstrip-card");
       const frameBox = el("div", "filmstrip-frame");
-      if (frame.still) {
+      const drawing = latest.get(`${scene.id}/${frame.shot_id}`);
+      if (drawing?.image_available) {
+        const image = el("img");
+        image.src = `/media/${drawing.image.path.split("/").map(encodeURIComponent).join("/")}`;
+        image.alt = `${scene.id} ${frame.shot_id} storyboard draft`;
+        image.loading = "lazy";
+        frameBox.append(image);
+      } else if (frame.still) {
         const image = el("img");
         image.src = `/media/${frame.still}`;
         image.alt = frame.label;
@@ -2149,6 +2166,16 @@ async function renderStoryboard() {
       const meta = el("div", "filmstrip-meta");
       meta.append(el("strong", "", frame.shot_id), el("span", "muted", `${frame.duration_seconds}s`));
       card.append(meta, el("p", "", frame.label));
+      if (drawing) {
+        card.append(el("small", "muted", `Storyboard draft v${drawing.version} · Approval not recorded`));
+        for (const finding of drawing.findings) card.append(el("p", "error", finding.message));
+        const review = el("a", "", "Review beside screenplay →");
+        review.href = `/app/preproduction.html?scene=${encodeURIComponent(scene.id)}&shot=${encodeURIComponent(frame.shot_id)}&candidate=${encodeURIComponent(drawing.id)}`;
+        review.addEventListener("click", (event) => event.stopPropagation());
+        const reviewRow = el("p");
+        reviewRow.append(review);
+        card.append(reviewRow);
+      }
       card.append(frameScript(frame));
       if (frame.transition) {
         card.append(el("small", "filmstrip-transition", `↳ ${frame.transition.id}`));
@@ -3091,3 +3118,22 @@ document.addEventListener("keydown", (event) => {
 start().catch((error) => {
   byId("workspace").textContent = `Could not open production: ${error.message}`;
 });
+
+async function refreshDecisionCount() {
+  const link = byId("decision-inbox-link");
+  if (!link) return;
+  try {
+    const response = await fetch("/api/decisions");
+    if (!response.ok) throw new Error("Decisions unavailable");
+    const value = await response.json();
+    link.textContent = `Awaiting you · ${value.pending_count}`;
+    const work = byId("agent-work-link");
+    if (work) work.textContent = `AI work · ${value.agent_work_count ?? 0}`;
+  } catch {
+    link.textContent = "Awaiting you · unavailable";
+    const work = byId("agent-work-link");
+    if (work) work.textContent = "AI work · unavailable";
+  }
+}
+void refreshDecisionCount();
+window.setInterval(() => { if (!document.hidden) void refreshDecisionCount(); }, 15000);

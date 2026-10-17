@@ -10,6 +10,7 @@ from __future__ import annotations
 import threading
 
 from .assistant import build
+from .catalog import role_models
 from .models import model_from_env
 from .runtime_client import RuntimeClient
 
@@ -23,7 +24,9 @@ def app(runtime_url: str, model=None):
     # The page's context arrives as AG-UI objects and is checkpointed with the
     # turn; name the type, rather than rely on a default LangGraph will close.
     serde = JsonPlusSerializer(allowed_msgpack_modules=[("ag_ui._generated.models", "Context")])
-    graph = build(model or model_from_env(), RuntimeClient(runtime_url), MemorySaver(serde=serde))
+    model = model if model is not None else model_from_env()
+    # Every role uses the model the host was given, unless the person bound a role to another (ADR 0034).
+    graph = build(model, RuntimeClient(runtime_url), MemorySaver(serde=serde), models=role_models(model))
     application = FastAPI(title="Cine Toaster assistant")
     add_langgraph_fastapi_endpoint(application, LangGraphAgent(name="assistant", graph=graph), "/")
     return application

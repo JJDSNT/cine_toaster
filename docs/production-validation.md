@@ -53,12 +53,15 @@ work as cinema.
 
 ## Demo production portfolio
 
-Cine Toaster maintains four complementary demo productions. They are not four
-versions of the same sample film; each has a distinct validation responsibility.
+Cine Toaster has checked-in regression fixtures and a portfolio of demos being
+produced. They occupy the same product hierarchy, but they are not at the same
+stage: a fixture containing representative production state is not thereby a
+finished demo. The first complete demo must travel end to end and work as a
+watchable film.
 
-### Demo 1 — The Last Signal
+### Fixture — The Last Signal
 
-**Role: technical/control demo and regression fixture.**
+**Role: technical/control production and regression fixture.**
 
 The existing `examples/demo-project` remains intentionally small and
 controlled. It exercises the native project structure, screenplay, scenes and
@@ -67,9 +70,21 @@ action, checks, comparison and selection.
 
 Its value is repeatability. It should remain cheap enough to use while
 developing the runtime and schemas rather than growing into a showcase
-production.
+production. It is incomplete by design and is not a creative or completion
+standard for another demo.
 
-### Demo 2 — Amiga Demo Reel / Cine Toaster Self-Demo
+### First complete demo — Something New Is Coming
+
+**Role: end-to-end product demonstration through a finished animated short.**
+
+Demo 01 follows Lia from childhood to adulthood while the language of
+animation changes around her. It must exercise the actual production flow --
+intention, screenplay, breakdown, storyboard, human approval, generation,
+versioned review, assembly, sound and delivery -- and end as a film that can be
+watched. Existing fixtures may regress its mechanisms but cannot substitute
+for that outcome.
+
+### Planned — Amiga Demo Reel / Cine Toaster Self-Demo
 
 **Role: product showcase, commercial communication and continuous dogfooding.**
 
@@ -90,7 +105,7 @@ Act II: show Cine Toaster doing it while producing the demo itself
 As capabilities mature, they may be incorporated when they strengthen the
 piece. The reel must not become an exhaustive feature checklist.
 
-### Demo 3 — Animated Short
+### Planned animation coverage after Demo 01
 
 **Role: animation and stylised-character production.**
 
@@ -104,7 +119,7 @@ The purpose is not to mandate a particular animation technique or engine. It is
 to ensure Cine Toaster can represent and manage animation as a genuine
 production modality.
 
-### Demo 4 — Music / Visual Piece
+### Planned — Music / Visual Piece
 
 **Role: music-driven and non-dialogue-led audiovisual production.**
 
@@ -131,16 +146,19 @@ REAL PRODUCTION
 
 DEMO PRODUCTIONS
   The Last Signal
-    -> engineering / regression / controlled production state
+    -> incomplete fixture / engineering / controlled production state
+
+  Something New Is Coming
+    -> first complete end-to-end demo / finished animated short
 
   Amiga Demo Reel
-    -> product / commercial / UI / dogfooding
+    -> planned product / commercial / UI / dogfooding
 
-  Animated Short
-    -> animation / stylisation / recurring animated characters
+  Later animation coverage
+    -> additional animation / stylisation needs not covered by Demo 01
 
   Music / Visual Piece
-    -> rhythm / music / VFX / non-narrative audiovisual structure
+    -> planned rhythm / music / VFX / non-narrative audiovisual structure
 ```
 
 Capabilities such as vertical delivery, localisation, subtitles,
@@ -177,6 +195,6 @@ profile, reconciled cost, compute efficiency and capability
 adoption/effectiveness in Studio Analytics.
 
 Interpret that evidence according to the production's purpose. A technical
-fixture optimises for repeatability; a showcase must communicate; an animation
-demo must prove its modality; a music piece must work audiovisually; and a real
-film must first work as a film.
+fixture optimises for repeatability but does not count as an end-to-end demo; a
+showcase must communicate; an animation demo must prove its modality; a music
+piece must work audiovisually; and a real film must first work as a film.

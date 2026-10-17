@@ -160,8 +160,11 @@ def command_stats(args: argparse.Namespace) -> int:
 
 
 def command_serve(args: argparse.Namespace) -> int:
+    if args.agent_provider is not None and not args.assistant:
+        raise ValidationError("--agent-provider requires --assistant")
     _ensure_index(args.project, refresh=not args.no_refresh)
-    serve_project(args.project, host=args.host, port=args.port, assistant=args.assistant)
+    serve_project(args.project, host=args.host, port=args.port, assistant=args.assistant,
+                  agent_provider=args.agent_provider)
     return 0
 
 
@@ -244,8 +247,10 @@ def command_references(args: argparse.Namespace) -> int:
         try:
             if args.dry_run:
                 from .providers.codex_image import instruction
+                from .references import compose
 
                 pictures = reference_images(args.project, args.parent or [])
+                args.prompt, _ = compose(args.project, args.prompt, cast=args.cast or "", style=args.style or "")
                 print(f"provider: {args.provider} (subscription quota, no dollars)")
                 for picture in pictures:
                     print(f"reference: {picture}")
@@ -254,7 +259,7 @@ def command_references(args: argparse.Namespace) -> int:
             folder = generate_reference(args.project, prompt=args.prompt, title=args.title,
                                         parents=args.parent or [], provider=args.provider,
                                         requested_by=args.requested_by or "", notes=args.note or [],
-                                        name=args.name or "")
+                                        name=args.name or "", cast=args.cast or "", style=args.style or "")
         except CineToasterError as error:
             print(str(error), file=sys.stderr)
             return 2
@@ -285,6 +290,47 @@ def command_references(args: argparse.Namespace) -> int:
             errors += finding["severity"] == "error"
             print(f"  {finding['severity'].upper()}  {finding['code']}: {finding['message']}")
     return 1 if errors else 0
+
+
+def command_creation(args: argparse.Namespace) -> int:
+    from .creation import creation_view, save_creation_draft, save_exploration_round
+
+    try:
+        if args.creation_command == "list":
+            result = creation_view(args.project)
+        elif args.creation_command == "assess":
+            from .creation_review import record_inception_assessment
+            payload = json.loads(args.assessment_file.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict):
+                raise ValidationError("Assessment file must contain a JSON object")
+            result = record_inception_assessment(args.project, title=payload.get("title"), summary=payload.get("summary"),
+                readiness=payload.get("readiness"), proposal=payload.get("proposal"), references=payload.get("references", []),
+                expected_revision=args.expected_revision, actor=_resolve_actor(args))
+        elif args.creation_command == "decide":
+            from .creation_review import decide_inception_assessment
+            result = decide_inception_assessment(args.project, assessment=args.assessment, outcome=args.outcome,
+                guidance=args.guidance, expected_revision=args.expected_revision, actor=_resolve_actor(args))
+        elif args.creation_command == "round":
+            pairs = []
+            for value in args.correction or []:
+                previous, separator, current = value.partition("=")
+                if not separator:
+                    raise ValidationError("--correction must be previous-reference=current-reference")
+                pairs.append({"previous": previous, "current": current})
+            result = save_exploration_round(args.project, title=args.title, references=args.reference or [],
+                expected_revision=args.expected_revision, actor=_resolve_actor(args), rationale=args.why,
+                source=args.source, follows=args.follows or "", corrections=pairs, based_on=args.based_on or "")
+        else:
+            result = save_creation_draft(
+                args.project, kind=args.kind, title=args.title, text=args.text_file.read_text(encoding="utf-8"),
+                expected_revision=args.expected_revision, actor=_resolve_actor(args),
+                references=args.reference or [], concept=args.concept or "", based_on=args.based_on or "",
+                rationale=args.why or "")
+    except (CineToasterError, OSError, ValueError) as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
 
 
 def _resolve_actor(args: argparse.Namespace) -> Actor:
@@ -774,6 +820,19 @@ def command_storyboard(args: argparse.Namespace) -> int:
     from .commands import dispatch
 
     root = Path(args.project).expanduser().resolve()
+    if args.storyboard_command in ("candidates", "add"):
+        from .storyboard import register_storyboard_candidate, storyboard_view
+        from .state import Actor
+        if args.storyboard_command == "candidates":
+            result = storyboard_view(root, args.scene)
+        else:
+            provenance = json.loads(args.provenance.read_text(encoding="utf-8")) if args.provenance else {}
+            result = register_storyboard_candidate(root, scene=args.scene, shot=args.shot, image=args.image,
+                title=args.title, expected_revision=args.expected_revision,
+                actor=Actor(id=args.actor, kind=args.actor_kind), references=args.reference,
+                based_on=args.based_on, note=args.note, provenance=provenance)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
     command = "approve_storyboard" if args.storyboard_command == "approve" else "reopen_storyboard"
     result = dispatch(root, command, {"scene_id": args.scene, "rationale": args.why,
                                       "actor": {"id": args.actor, "kind": "human"}})
@@ -2048,7 +2107,9 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument("--port", type=int, default=8787)
     serve_parser.add_argument("--no-refresh", action="store_true")
     serve_parser.add_argument("--assistant", action="store_true",
-                              help="also run the directing assistant (the agents extra, Node, the Claude CLI; ADR 0018)")
+                              help="also run the directing assistant (agents extra, Node, configured provider or current CLI; ADR 0018)")
+    serve_parser.add_argument("--agent-provider", metavar="ADAPTER",
+                              help="provider adapter for this host (codex-cli, claude-cli, claude-api); overrides CINE_TOASTER_MODEL and current-CLI fallback")
     serve_parser.set_defaults(function=command_serve)
 
     demo_parser = subparsers.add_parser(
@@ -2083,6 +2144,54 @@ def build_parser() -> argparse.ArgumentParser:
     new_parser.add_argument("--logline")
     new_parser.set_defaults(function=command_new)
 
+    creation_parser = subparsers.add_parser("creation", help="Explore concepts and save versioned screenplay candidates")
+    creation_actions = creation_parser.add_subparsers(dest="creation_command", required=True)
+    creation_list = creation_actions.add_parser("list", help="Draft history, pinned inputs and references (JSON)")
+    creation_list.add_argument("project", type=Path)
+    creation_list.set_defaults(function=command_creation)
+    creation_assess = creation_actions.add_parser("assess", help="Record the agent's destination-specific readiness judgment and proposal")
+    creation_assess.add_argument("project", type=Path)
+    creation_assess.add_argument("--assessment-file", type=Path, required=True)
+    creation_assess.add_argument("--expected-revision", type=int, required=True)
+    creation_assess.add_argument("--actor")
+    creation_assess.add_argument("--actor-kind", choices=("agent", "system"), default="agent")
+    creation_assess.set_defaults(function=command_creation)
+    creation_decide = creation_actions.add_parser("decide", help="Human approval of an assessed direction, or request changes with guidance")
+    creation_decide.add_argument("project", type=Path)
+    creation_decide.add_argument("assessment")
+    creation_decide.add_argument("--outcome", choices=("approved", "changes_requested"), required=True)
+    creation_decide.add_argument("--guidance", default="")
+    creation_decide.add_argument("--expected-revision", type=int, required=True)
+    creation_decide.add_argument("--actor")
+    creation_decide.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
+    creation_decide.set_defaults(function=command_creation)
+    creation_save = creation_actions.add_parser("save", help="Save a new candidate; never replace the canonical screenplay")
+    creation_save.add_argument("project", type=Path)
+    creation_save.add_argument("--kind", choices=("concept", "screenplay"), required=True)
+    creation_save.add_argument("--title", required=True)
+    creation_save.add_argument("--text-file", type=Path, required=True)
+    creation_save.add_argument("--expected-revision", type=int, required=True)
+    creation_save.add_argument("--reference", action="append")
+    creation_save.add_argument("--concept")
+    creation_save.add_argument("--based-on")
+    creation_save.add_argument("--why")
+    creation_save.add_argument("--actor")
+    creation_save.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
+    creation_save.set_defaults(function=command_creation)
+    creation_round = creation_actions.add_parser("round", help="Record an exploration pass and explicit intended corrections; never approve it")
+    creation_round.add_argument("project", type=Path)
+    creation_round.add_argument("--title", required=True)
+    creation_round.add_argument("--reference", action="append", required=True)
+    creation_round.add_argument("--expected-revision", type=int, required=True)
+    creation_round.add_argument("--why", required=True)
+    creation_round.add_argument("--source", required=True)
+    creation_round.add_argument("--follows")
+    creation_round.add_argument("--based-on", help="revise this saved round version; retain the earlier version")
+    creation_round.add_argument("--correction", action="append", help="previous-reference=current-reference")
+    creation_round.add_argument("--actor")
+    creation_round.add_argument("--actor-kind", choices=("human", "agent", "system"), default="human")
+    creation_round.set_defaults(function=command_creation)
+
     references_parser = subparsers.add_parser(
         "references", help="What the film looks at -- drafts, probes, paintings -- with where each came from")
     references_actions = references_parser.add_subparsers(dest="references_command", required=True)
@@ -2112,6 +2221,8 @@ def build_parser() -> argparse.ArgumentParser:
     references_generate.add_argument("--title", required=True, help="what it is")
     references_generate.add_argument("--from", dest="parent", action="append",
                                      help="a reference whose pictures it is shown, in order; repeatable")
+    references_generate.add_argument("--cast", help="who: a cast member, MEMBER or MEMBER@variant (from the sheet)")
+    references_generate.add_argument("--style", help="how it is drawn: a style id (the catalog or the film's styles/)")
     references_generate.add_argument("--provider", default="codex-image", choices=("codex-image",))
     references_generate.add_argument("--requested-by", help="who asked for it, when not the person at the terminal")
     references_generate.add_argument("--note", action="append")
@@ -2309,6 +2420,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     board_parser = subparsers.add_parser("storyboard", help="Approve a scene's storyboard (the phase gate), or reopen it")
     board_sub = board_parser.add_subparsers(dest="storyboard_command", required=True)
+    listing = board_sub.add_parser("candidates", help="Read storyboard drawings, pinned inputs and missing/changed evidence")
+    listing.add_argument("project", type=Path)
+    listing.add_argument("--scene", default="")
+    adding = board_sub.add_parser("add", help="Retain a new storyboard drawing; never approve or publish a master")
+    adding.add_argument("project", type=Path)
+    adding.add_argument("scene")
+    adding.add_argument("shot")
+    adding.add_argument("--image", type=Path, required=True)
+    adding.add_argument("--title", required=True)
+    adding.add_argument("--expected-revision", type=int, required=True)
+    adding.add_argument("--reference", action="append", default=[])
+    adding.add_argument("--based-on", default="")
+    adding.add_argument("--note", default="")
+    adding.add_argument("--provenance", type=Path, help="JSON object with prompt and actual generation inputs when known")
+    adding.add_argument("--actor", default=os.environ.get("USER", "director"))
+    adding.add_argument("--actor-kind", choices=("human", "agent"), default="human")
     for name, text in (("approve", "What the storyboard defines will be produced"), ("reopen", "Back to fitting it")):
         item = board_sub.add_parser(name, help=text)
         item.add_argument("project", type=Path)

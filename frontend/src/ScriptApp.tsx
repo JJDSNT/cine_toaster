@@ -3,6 +3,7 @@ import { EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { basicSetup } from "codemirror";
 import { fountainSupport } from "./fountainLanguage.ts";
+import { DecisionLink } from "./DecisionInbox.tsx";
 import { normalizeHeading, outline, type OutlineEntry } from "./fountain.ts";
 
 // The screenplay editor (ADR 0016). It sends back exactly the text written
@@ -157,6 +158,7 @@ export function ScriptApp() {
   return (
     <div className="shell script-shell">
       <header>
+        <DecisionLink />
         <a className="back" href="/">← Control room</a>
         <div>
           <span className="eyebrow">Screenplay{opened.editable ? "" : " · read only"}</span>

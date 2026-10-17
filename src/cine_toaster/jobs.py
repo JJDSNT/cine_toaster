@@ -180,6 +180,7 @@ class JobKind:
     #: Called after the staged files are placed: a kind that produces a
     #: production record (an assembly version) registers it here.
     adopted: Callable[[dict[str, Any], list[str]], None] | None = None
+    allow_overwrite: bool = True
 
 
 KINDS: dict[str, JobKind] = {}
@@ -480,6 +481,8 @@ class JobManager:
         job = self.get(job_id)
         if job["state"] != "succeeded":
             raise JobError(f"Only a succeeded job can be adopted; {job_id} is {job['state']}", state=job["state"])
+        if overwrite and job["kind"] in KINDS and not KINDS[job["kind"]].allow_overwrite:
+            raise ValidationError("This job creates versioned artifacts; overwriting an earlier result is not allowed")
         files = (job["result"] or {}).get("files", [])
         if destination is not None and len(files) != 1:
             raise ValidationError("A destination can only be given for a single-file result")
@@ -1524,3 +1527,8 @@ def _run_picture(context: JobContext) -> dict[str, Any]:
 
 
 register(JobKind("derive_picture", _validate_picture, _run_picture))
+
+# Exploration uses the same lifecycle as other production jobs (CT-0105).
+from .creation_jobs import validate_reference as _validate_reference, run_reference as _run_reference
+
+register(JobKind("generate_reference", _validate_reference, _run_reference, allow_overwrite=False))

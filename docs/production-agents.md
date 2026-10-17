@@ -1,6 +1,13 @@
 # Production agent roles
 
-Status: **architectural direction / pending implementation**
+Status: **partially implemented / broader workforce remains architectural direction**
+
+Implementation update (CT-0108, ADR 0029): a thin Production Coordinator and
+the Inception specialist now run inside the existing public `assistant`
+LangGraph CoAgent. CT-0110 / ADR 0030 add Art Direction and Visual Prevalidation
+inside that same CoAgent. CT-0111 / ADR 0031 add Directing/Shot Planning and
+Script Supervisor/Continuity. Other roles below remain architectural direction. The new
+loop is bounded and human-interaction-driven, not durable background dispatch.
 
 Cine Toaster's agents should model **film-production responsibilities**, not
 vendor tools. Blender, ComfyUI, LTX, FFmpeg, Ardour, compositors and future
@@ -13,6 +20,16 @@ system resemble the production it is intended to coordinate: a feature film
 with many shots, alternatives, decisions, dependencies and human approvals.
 
 ## Principles
+
+Runtime context (CT-0113): the shared work contract and canonical sequence
+membership/order are supplied to the implemented roles, including fresh visual
+and continuity reviewers. Coordinator/Inception can query `work_structure` by
+sequence/scene ID; external MCP agents use `read_work_structure` and the shared
+filmmaking guide. Scene focus never changes the human review unit; partial
+studies must be labelled. Groupings come from each film, not scene-number ranges
+or developer conversation. Original Inception -> screenplay -> ordered storyboard
+adherence review is required by the flow; the full sequence package/validator
+remains in progress, not implied by supplying this context.
 
 - **Roles before tools.** Do not create a Blender Agent or LTX Agent merely
   because an integration exists. Expose capabilities and let production roles
@@ -35,6 +52,59 @@ with many shots, alternatives, decisions, dependencies and human approvals.
 
 ## Proposed production roles
 
+### Inception
+
+First implementation delivered in CT-0108 / SPEC-0015, with shared candidate /
+readiness tools and human-direction handoff. External reference/mood specialists
+and image generation are not part of this first specialist's tools.
+The role leads a conversation about intention, audience, format, constraints,
+concept alternatives and visual identity. It should develop material itself
+within the authorised scope, identify gaps and assess sufficiency separately
+for screenplay, storyboard and masters, not require the human to fill authoring
+forms. Questions to the director should resolve real creative choices or
+missing authority, not outsource work the agent can do.
+
+Its context is the relevant whole film, including later-stage material and
+retained human guidance when revisiting an idea. That does not mean supplying
+every asset/transcript on every turn. References and mood/visual-identity
+specialists may be consulted selectively for a concrete question; their
+findings remain distinguishable from facts and human decisions. External
+research and image generation require actual available adapters and authority;
+analysing existing metadata is not evidence of browsing or visually inspecting
+an image.
+
+Outputs are retained concept/screenplay candidates and destination-specific
+readiness assessments with exact inputs, owned gaps, a scoped recommendation
+and a concrete next step. Use the existing Creation application operations
+(SPEC-0013, ADR 0028). Agent authorship is not a human approval; Inception cannot
+approve its own proposal, publish masters or infer paid-generation permission
+from a creative direction decision. Earlier versions and images remain kept.
+
+Implement inside the existing LangGraph / CoAgents Agent Runtime, not a new
+executor. The role receives its model adapter from the host; neither its mission
+nor tool permissions depend on Claude, Codex or a particular model.
+
+### Art Direction and Visual Prevalidation
+
+Implemented first slice (CT-0110, SPEC-0016): Art Direction develops retained
+visual briefs from Inception/whole-film context, with intention, visual language,
+specific criteria and pinned inputs. It can plan and start exploratory reference
+jobs after explicit quota confirmation; every attempt preserves alternatives.
+
+Visual Prevalidation receives actual raster attachments in a fresh request,
+compares each criterion and records evidence, uncertainty and corrections.
+Its advisory dispositions are ready for human review, needs changes or
+inconclusive. It is not a master choice, human approval or objective quality
+score. A current successful review can support the existing human direction
+request. Changed briefs/material invalidate the review/request.
+
+Both use the injected model; the reviewer does not see the creator's quality
+claims. This is role/context separation, not independent-model verification.
+Currently Codex CLI supports the optional visual transport; text-only adapters
+stop explicitly and doctor reports the gap. Generation jobs can outlast the
+bounded agent wait; request continuation afterward. No durable auto-resume or
+external reference research is implemented by this slice.
+
 ### Director
 
 Owns dramatic and cinematic intent: what the scene means, what an audience
@@ -45,6 +115,12 @@ can execute rather than micromanaging provider prompts.
 Typical interactions: screenplay/breakdown -> directing intent -> DoP,
 Production Design, Sound and Editor -> review generated takes -> approve or
 request changes.
+
+Implemented first slice (CT-0111, SPEC-0017): Directing/Shot Planning writes
+retained scene proposals from linked screenplay units, optional saved art
+briefs and current production context. It can revise them after an independent
+continuity report and present a scoped human direction request. These are not
+canonical shot edits, numeric camera layouts, storyboard images or approvals.
 
 ### Cinematographer / Director of Photography (DoP)
 
@@ -66,7 +142,13 @@ Maintains production-wide continuity rather than only per-shot validation.
 Cine Toaster already has useful inputs for this role: measured geometry, line
 of action, named cameras, shots, takes, sequences and durable decisions.
 
-Its eventual continuity ledger may track, where a production declares them:
+The existing canonical continuity ledger tracks declared facts, changes and
+human exceptions; this agent reuses it, never introduces a competing ledger.
+Implemented first slice (CT-0111): fresh independent textual review of exact
+proposals, or standalone scene/film audits, with computed checks, source IDs,
+authored/computed/inferred/unknown basis and retained limitations. No pixel
+inspection, automatic canonical corrections or human approval is implied.
+Relevant declarations include:
 
 - character position, screen direction and eyeline;
 - wardrobe, hair, injuries and carried objects;
@@ -178,7 +260,18 @@ The Production Coordinator should **not**:
 
 ### Orchestration policy
 
-Use the smallest useful team. A metadata query may need only the Producer. A
+For a film starting from scratch, the thin Coordinator should route creative
+development to Inception. For an imported screenplay or an existing production,
+inspect current material, gaps, human decisions and the request before routing:
+do not force the film through a new Inception gate. An existing film may revisit
+Inception without discarding later-stage context or outputs. A missing role or
+tool is a disclosed capability gap, not a claimed dispatch. This routing is
+implemented for Coordinator/Inception/Art Direction/Visual Prevalidation and
+the first Directing/Continuity slice, not
+for the wider workforce.
+
+Use the smallest useful team. A metadata query currently needs only the existing
+Coordinator; it does not justify implementing another Producer. A
 camera plan may need Director + DoP + Continuity. Finalising a difficult shot
 may involve Editor + VFX + Finishing. The coordinator should select roles by
 required capability and risk rather than always broadcasting to every agent.
@@ -378,14 +471,25 @@ Production Design and VFX; FFmpeg can serve Editor, Sound and Finishing.
 
 This is not a commitment to implement all roles immediately.
 
+Director priority update (2026-10-16, CT-0108): implement **Inception with thin
+Production Coordinator routing first**, reusing the existing runtime. The
+broader ordering below remains a proposal for subsequent workforce expansion.
+
+Delivered update (CT-0111): the Coordinator is already implemented; Directing
+and Continuity now have a first bounded proposal/review slice. The historical
+list below is not a request to implement another Coordinator or duplicate it
+under the Producer name. Canonical promotion and substantive demo review are
+more valuable next steps than adding role names without executable capabilities.
+
 1. **Script Supervisor / Continuity** -- extends data Cine Toaster already owns
    and can prevent expensive mistakes before generation.
 2. **Director** -- establishes explicit creative intent and acceptance criteria
    that downstream roles can consume.
 3. **Producer / Production Manager** -- makes a feature-length production
    operationally observable.
-4. **Production Coordinator** -- initially thin: route work,
-   collect findings, expose conflicts and human gates.
+4. **Production Coordinator** -- thin routing already delivered (CT-0108),
+   reused by CT-0110/0111. Wider coordination can grow when needed; do not
+   implement another role to duplicate current routing and human gates.
 5. **DoP and Editor** -- deepen planning and feedback/retake loops.
 6. **Production Design, Sound, VFX and Finishing** -- grow as their underlying
    artifact/capability adapters mature.

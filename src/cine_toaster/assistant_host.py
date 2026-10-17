@@ -28,7 +28,7 @@ HOP_BY_HOP = {"connection", "keep-alive", "transfer-encoding", "te", "trailer", 
               "proxy-authenticate", "host", "content-length"}
 
 
-def unavailable_reason() -> str:
+def unavailable_reason(provider: str | None = None) -> str:
     """Why the assistant cannot run here, or an empty string."""
 
     try:
@@ -43,26 +43,40 @@ def unavailable_reason() -> str:
     from .agents.models import model_from_env
 
     try:
-        model = model_from_env()
+        model = model_from_env(provider)
     except Exception as error:
         return getattr(error, "message", str(error))
     reason = model.available() if hasattr(model, "available") else ""
+    if not reason:
+        try:
+            from .agents.catalog import load
+
+            load()  # a broken role-binding file fails here, not at the first turn
+        except Exception as error:
+            reason = getattr(error, "message", str(error))
     return reason
 
 
 class AssistantHost:
-    def __init__(self, runtime_url: str, agent_port: int, copilot_port: int) -> None:
+    def __init__(self, runtime_url: str, agent_port: int, copilot_port: int,
+                 *, provider: str | None = None) -> None:
         self.runtime_url = runtime_url
         self.agent_port = agent_port
         self.copilot_port = copilot_port
+        self.provider = provider
         self._stop = threading.Event()
         self._process: subprocess.Popen | None = None
         self.restarts = 0
 
     def start(self) -> None:
+        from .agents.models import model_from_env
         from .agents.server import serve_in_thread
 
-        serve_in_thread(self.runtime_url, self.agent_port)
+        # Resolve once for this host, then inject the adapter into the role graph.
+        # Never relabel an installed CLI as the user's already-open session.
+        model = model_from_env(self.provider)
+        self.provider = model.name
+        serve_in_thread(self.runtime_url, self.agent_port, model=model)
         threading.Thread(target=self._supervise, name="copilot-runtime", daemon=True).start()
 
     def _supervise(self) -> None:

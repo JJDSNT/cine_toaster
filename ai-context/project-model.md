@@ -47,7 +47,24 @@ portable without the Cine Toaster application database or caches.
 project/
   project.yaml                    authored: identity, paths, sequences
   story/screenplay.fountain
+  creation/state.json            runtime-owned (CT-0105; ADR 0026): immutable concept/screenplay
+                                  candidates, journal revision, actor/rationale and pinned upstream inputs;
+                                  exploration rounds and explicit creative correction links;
+                                  CT-0107 assessments pin material and destination-specific readiness;
+                                  human assessment_decisions retain guidance and the next agent instruction;
+                                  CT-0110 adds art_briefs and visual_reviews: retained criteria and exact raster
+                                  evidence, advisory findings, never human approval (ADR 0030);
+                                  CT-0111 adds direction_plans and continuity_reviews: screenplay-pinned
+                                  shot proposals and source-labelled advisory reports, never implicit
+                                  canonical shot promotion or a second continuity ledger (ADR 0031);
+                                  CT-0112 adds stage_handoffs: exact human-approved development inputs,
+                                  pinned source snapshots and output provenance, not a task queue (ADR 0032);
+                                  never implicit edits or approval of the canonical screenplay
   scenes/<scene>/scene.yaml       authored: direction, geography, shots
+  storyboard/state.json          runtime-owned (CT-0106; ADR 0027): retained drawing candidates,
+                                  journal revision, scene/shot context and pinned reference inputs;
+                                  distinct from human approval and discovered stills
+  storyboard/images/<id>.<ext>    immutable imported drawing bytes; older versions retained
   scenes/<scene>/state.json       runtime-owned: selections, decisions, versions
   scenes/<scene>/work/            the takes, as files
   signals/<id>/                   runtime-owned (C8, CT-0081; ADR 0024): a signal of a medium -- signal.yaml

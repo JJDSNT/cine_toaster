@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import unittest
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 
 from cine_toaster import doctor
 
@@ -67,3 +70,25 @@ class StudioToolchainTests(unittest.TestCase):
         studio = text.split("Studio toolchain")[1]
         self.assertIn("SoX", studio)
         self.assertNotIn("PyYAML", studio)
+
+
+class PreproductionBuildTests(unittest.TestCase):
+    def test_an_older_ui_build_is_not_reported_as_the_new_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            built = root / "web_assets" / "app"
+            built.mkdir(parents=True)
+            for name in ("index.html", "script.html"):
+                (built / name).touch()
+            with patch.object(doctor, "__file__", str(root / "doctor.py")), patch.object(doctor, "_binary", return_value="npm"):
+                report = doctor._canvas()
+                self.assertEqual(report.status, doctor.MISSING)
+                self.assertIn("preproduction.html", report.detail)
+                self.assertEqual(report.remedy, "make ui")
+                (built / "preproduction.html").touch()
+                self.assertEqual(doctor._canvas().status, doctor.MISSING)
+                (built / "creation.html").touch()
+                self.assertEqual(doctor._canvas().status, doctor.MISSING)
+                self.assertIn('decisions.html', doctor._canvas().detail)
+                (built / 'decisions.html').touch()
+                self.assertEqual(doctor._canvas().status, doctor.OK)

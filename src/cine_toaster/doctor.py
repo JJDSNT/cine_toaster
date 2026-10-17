@@ -285,14 +285,16 @@ def _compositing() -> Capability:
 
 
 def _canvas() -> Capability:
-    built = (Path(__file__).with_name("web_assets") / "app" / "index.html").is_file()
+    folder = Path(__file__).with_name("web_assets") / "app"
+    missing = [name for name in ("index.html", "script.html", "preproduction.html", "creation.html", "decisions.html") if not (folder / name).is_file()]
+    built = not missing
     node = _binary("npm")
     return Capability(
         name="Canvas and editor",
-        what_it_enables="the production canvas at /app/ and the screenplay editor at /app/script.html (ADR 0015, 0016)",
+        what_it_enables="the canvas at /app/, screenplay editor at /app/script.html, pre-production at /app/preproduction.html, Creation at /app/creation.html and the decision inbox at /app/decisions.html (ADR 0015, 0016, 0026, 0032)",
         required=False,
         status=OK if built else MISSING,
-        detail="built" if built else ("Node is installed" if node else ""),
+        detail="built" if built else "missing build entries: " + ", ".join(missing),
         remedy="" if built else ("make ui" if node else "install Node 20+ (https://nodejs.org), then: make ui"),
     )
 
@@ -370,8 +372,53 @@ def _assistant() -> Capability:
         required=False,
         status=OK if not reason else MISSING,
         detail=reason,
-        remedy="" if not reason else "make install-agents; Node 20+; make ui; Claude Code logged in (claude)",
+        remedy="" if not reason else "make install-agents; Node 20+; make ui; use the current Codex/Claude CLI "
+               "or select CINE_TOASTER_MODEL=ADAPTER (codex-cli, claude-cli, claude-api) and configure its credentials; "
+               "toast serve PROJECT --assistant --agent-provider ADAPTER",
     )
+
+
+def _agent_roles() -> Capability:
+    """Which production roles the model the person supplied can serve (ADR 0034).
+
+    The catalogue describes; it never picks. A role whose needs the configured
+    model (or the model the person bound it to) lacks is named with what it misses.
+    """
+
+    from .agents.catalog import describe, load, role_models
+    from .agents.models import model_from_env
+    from .agents.roles import ROLES, missing
+    from .assistant_host import unavailable_reason
+
+    reason = unavailable_reason()
+    try:
+        model = model_from_env()
+        catalogue = load()
+        pick = role_models(model, catalogue)
+    except Exception as error:
+        reason = reason or getattr(error, "message", str(error))
+        return Capability(name="Agent roles", required=False, status=MISSING, detail=reason,
+                          what_it_enables="the production roles of the assistant, on the model you supply",
+                          remedy="Select a model adapter (--agent-provider / CINE_TOASTER_MODEL) and fix "
+                                 "$XDG_CONFIG_HOME/cine-toaster/models.yaml if it is named above.")
+    served, unserved = [], []
+    for role in ROLES.values():
+        lacks = missing(role.id, pick(role.id))
+        (unserved if lacks else served).append(f"{role.id} (needs {', '.join(lacks)})" if lacks else role.id)
+    entry = describe(model, catalogue)
+    known = entry["model_entry"] or {}
+    detail = (f"{entry['adapter']}" + (f" / {entry['model']}" if entry["model"] else "")
+              + (f": strengths {', '.join(known.get('strengths') or []) or 'not described'}" if entry["model"] else "")
+              + f"; serves {', '.join(served) or 'none'}"
+              + (f"; cannot serve {'; '.join(unserved)}" if unserved else "")
+              + ("; inference and login not verified" if not reason else f"; {reason}"))
+    return Capability(name="Agent roles", required=False, status=MISSING if reason or unserved else OK,
+        what_it_enables="the production roles of the assistant, on the model you supply",
+        detail=detail,
+        remedy="" if not (reason or unserved) else
+               "Supply a model whose adapter carries what the role needs (all current adapters carry images), "
+               "or bind that role to one in $XDG_CONFIG_HOME/cine-toaster/models.yaml (`roles:`); "
+               "make install-agents; make ui.")
 
 
 def _color() -> Capability:
@@ -570,6 +617,7 @@ CHECKS: tuple[Callable[[], Capability], ...] = (
     _ffprobe,
     _voice,
     _assistant,
+    _agent_roles,
     _mcp,
     _color,
     _usd,

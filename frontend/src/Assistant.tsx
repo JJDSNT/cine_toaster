@@ -3,9 +3,10 @@
 //
 // The page tells the agent what the person is looking at (useAgentContext).
 // The agent can point at a shot and take the screen somewhere (shared state:
-// that only moves the view), and asks here before it changes the film.
-import { useEffect, useRef } from "react";
-import { CopilotChat, CopilotKitProvider, useAgent, useAgentContext, useInterrupt } from "@copilotkit/react-core/v2";
+// that only moves the view). Inception appends scoped candidates/assessments;
+// consequential production actions and human gates remain explicit decisions.
+import { useEffect, useRef, useState } from "react";
+import { CopilotChat, CopilotKitProvider, useAgent, useAgentContext, useCopilotKit, useInterrupt } from "@copilotkit/react-core/v2";
 import "@copilotkit/react-core/v2/styles.css";
 
 export interface Seen {
@@ -23,7 +24,22 @@ export type { Navigation };
 interface Shared {
   highlight?: string;
   navigate?: Navigation;
+  agent_status?: { role: string; state: string; detail?: string };
+  production_update?: { id: string; revision: number; kind: string };
 }
+
+const activityLabels: Record<string, string> = {
+  working: "Working", needs_direction: "Awaiting your direction", needs_review: "Awaiting your review",
+  blocked: "Unable to continue", resource_limit: "Turn limit reached", complete: "Complete",
+  paused: "Paused", awaiting_confirmation: "Awaiting confirmation",
+  waiting_for_job: "Generation running · continuation needed after completion",
+};
+
+const roleLabels: Record<string, string> = {
+  coordinator: "Production Coordinator", inception: "Inception",
+  art_direction: "Art Direction", visual_prevalidation: "Visual Prevalidation",
+  directing: "Directing / Shot Planning", continuity: "Script Supervisor / Continuity",
+};
 
 /** One conversation per browser tab, kept across rooms and pages. */
 function threadId(): string {
@@ -64,16 +80,47 @@ interface Props {
   seen: Seen;
   onHighlight: (shot: string) => void;
   onNavigate?: (where: Navigation) => void;
+  continuation?: { decisionId: string; attempt?: string } | null;
+  onProductionUpdate?: () => void;
 }
 
-function Conversation({ seen, onHighlight, onNavigate, thread }: Props & { thread: string }) {
+function Conversation({ seen, onHighlight, onNavigate, onProductionUpdate, continuation, thread }: Props & { thread: string }) {
   useAgentContext({ description: "Current room", value: seen.room });
   useAgentContext({ description: "Current scene id", value: seen.scene });
   useAgentContext({ description: "What the room shows", value: seen.focus });
   useAgentContext({ description: "Selected", value: seen.selected || "nothing" });
   useAgentContext({ description: "Also on screen", value: seen.details || "nothing else" });
-  const { agent } = useAgent({ agentId: "assistant" });
+  useAgentContext({ description: "Inception decision id", value: continuation?.decisionId || "" });
+  useAgentContext({ description: "Direction continuation attempt", value: continuation?.attempt || "" });
+  const { agent, isReady } = useAgent({ agentId: "assistant" });
+  const { copilotkit } = useCopilotKit();
+  const [continuationError, setContinuationError] = useState("");
+  const continued = useRef(new Set<string>());
+  const refreshed = useRef("");
   const shared = (agent?.state ?? {}) as Shared;
+  const update = shared.production_update;
+  useEffect(() => {
+    if (update?.id && refreshed.current !== update.id) {
+      refreshed.current = update.id;
+      onProductionUpdate?.(); // refresh authoritative application records; this is not a telemetry bus
+    }
+  }, [update, onProductionUpdate]);
+  const running = agent?.isRunning;
+  useEffect(() => {
+    const id = continuation?.decisionId;
+    const intent = id + (continuation?.attempt ? "-" + continuation.attempt : "");
+    if (!id || !agent || !isReady || running || continued.current.has(intent)) return;
+    continued.current.add(intent);
+    setContinuationError("");
+    agent.threadId = thread;
+    // This is a human-originated CoAgent interaction, not a second dispatcher.
+    // The graph must resolve the ID from production records before using it.
+    agent.addMessage({ id: `decision-${intent}`, role: "user",
+      content: "Continue from the direction I just recorded. Read the saved decision and its scope before acting." });
+    void copilotkit.runAgent({ agent }).catch((error: unknown) => {
+      setContinuationError(`The decision was saved, but continuation failed: ${String(error)}. Ask the assistant to continue when available.`);
+    });
+  }, [continuation, agent, isReady, running, copilotkit, thread]);
   const highlight = shared.highlight ?? "";
   useEffect(() => onHighlight(highlight), [highlight, onHighlight]);
   // Move the screen once per request. Requests already followed are remembered
@@ -100,7 +147,11 @@ function Conversation({ seen, onHighlight, onNavigate, thread }: Props & { threa
       );
     },
   });
-  return <CopilotChat agentId="assistant" threadId={thread} />;
+  return <><p className="assistant-role" role="status" data-testid="assistant-role">
+    {shared.agent_status ? `${roleLabels[shared.agent_status.role] || shared.agent_status.role} · ${activityLabels[shared.agent_status.state] || "Status unavailable"}`
+      : "Production Coordinator"}
+  </p>{continuationError && <p role="alert">{continuationError}</p>}
+    <CopilotChat agentId="assistant" threadId={thread} /></>;
 }
 
 export default function Assistant(props: Props) {

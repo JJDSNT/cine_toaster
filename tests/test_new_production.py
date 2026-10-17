@@ -97,6 +97,16 @@ class NewProductionTests(unittest.TestCase):
 
 
 class GuideTests(unittest.TestCase):
+    def test_onboarding_explains_lan_launch_phone_url_and_network_boundaries(self) -> None:
+        from cine_toaster.mcp_server import INSTRUCTIONS
+        guide = guide_text()
+        for text in (guide, INSTRUCTIONS):
+            self.assertIn("--host 0.0.0.0", text)
+            self.assertIn("<LAN_IP>:8787/app/creation.html", text)
+            self.assertIn("WSL", text)
+            self.assertIn("firewall", text)
+            self.assertIn("internet", text)
+
     def test_every_command_the_guide_names_exists(self) -> None:
         def actions(parser: argparse.ArgumentParser) -> dict[str, argparse.ArgumentParser]:
             found = next((action for action in parser._actions if isinstance(action, argparse._SubParsersAction)), None)

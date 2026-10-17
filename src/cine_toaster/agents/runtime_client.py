@@ -37,6 +37,56 @@ class RuntimeClient:
     def screenplay(self) -> dict[str, Any]:
         return self._call("/api/screenplay")
 
+    def creation(self) -> dict[str, Any]:
+        return self._call("/api/creation")
+
+    def save_inception_draft(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._call("/api/creation/agent-draft", payload)
+
+    def assess_inception(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._call("/api/creation/assessment", payload)
+
+    def save_art_brief(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._call("/api/creation/art-brief", payload)
+
+    def visual_images(self, references: list[str]) -> dict[str, Any]:
+        return self._call("/api/creation/art-images", {"references": references})
+
+    def save_visual_review(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._call("/api/creation/visual-review", payload)
+
+    def planning(self) -> dict[str, Any]:
+        return self._call("/api/planning-context")
+
+    def save_direction_plan(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._call("/api/creation/direction-plan", payload)
+
+    def save_continuity_review(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._call("/api/creation/continuity-review", payload)
+
+    def plan_reference(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._call("/api/creation/reference-plan", payload)
+
+    def start_reference(self, plan: dict[str, Any]) -> dict[str, Any]:
+        return self._call("/api/jobs", {"kind": "generate_reference", "params": {**plan, "accept_quota": True}})
+
+    def job(self, job_id: str) -> dict[str, Any]:
+        return self._call("/api/jobs/" + urllib.parse.quote(job_id, safe=""))
+
+    def reference_jobs(self) -> list[dict]:
+        return [{key: job.get(key) for key in ('id', 'state', 'adopted_at', 'result', 'error')}
+                | {'art_brief': job.get('params', {}).get('art_brief')}
+                for job in self._call('/api/jobs') if job.get('kind') == 'generate_reference'][:8]
+
+    def keep_reference(self, job_id: str) -> dict[str, Any]:
+        return self._call("/api/jobs/" + urllib.parse.quote(job_id, safe="") + "/adopt", {"overwrite": False})
+
+    def storyboard(self, scene: str = "") -> dict[str, Any]:
+        return self._call("/api/storyboard?scene=" + urllib.parse.quote(scene))
+
+    def publish_storyboard(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._call('/api/creation/publish-storyboard', payload)
+
     def budget(self) -> dict[str, Any]:
         return self._call("/api/budget")
 

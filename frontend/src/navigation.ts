@@ -13,6 +13,7 @@ export function addressOf(where: Navigation): string {
   const query = (pairs: Record<string, string>) => `/?${new URLSearchParams(pairs)}`;
   if (where.room === "canvas") return "/app/";
   if (where.room === "editor") return "/app/script.html";
+  if (where.room === "creation") return "/app/creation.html";
   if (where.room === "overview") return "/";
   if (where.room === "scene" && where.scene) return query({ scene: where.scene });
   if (where.room === "compare" && where.scene && where.shot) {

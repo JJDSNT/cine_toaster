@@ -5,7 +5,7 @@ type: architecture
 status: accepted
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-09-20
+updated_at: 2026-10-17
 tags:
   - agents
   - development-agents
@@ -173,11 +173,109 @@ That spike ran (CT-0043), and ADR 0017 records the outcome:
   turn.
 - An agent acts only through commands, asks the person before
   consequential actions, and never decides a human gate.
-- The model sits behind a model adapter. The first adapter is the Claude
-  Code CLI with the person's own login, and an API-key adapter serves any
-  other use.
+- The model sits behind an injected model adapter, independent of role. The
+  existing adapters are Codex CLI, Claude Code CLI and Claude API. Precedence
+  is explicit host flag (`--agent-provider`), host environment
+  (`CINE_TOASTER_MODEL`), then the current CLI's unambiguous inherited signal.
+  No installed-executable or credential scan selects a provider. This selection
+  does not implement SPEC-0001 session binding: the CLIs make ephemeral requests,
+  not attachments to an open conversation. Repository development instructions,
+  context and tool authority do not become runtime production-agent context.
 
-## Runtime skill location
+## Implemented production-role loop (CT-0108)
+
+ADR 0029 / SPEC-0015 extend the existing public `assistant` CoAgent with a
+Production Coordinator and Inception specialist nodes. New/title-only films
+enter Inception; other requests can be delegated based on production context.
+The specialist has bounded read/candidate/assessment tools through the shared
+Application API, not merely a role prompt. It cannot decide human gates or
+generate images. Revision and material preconditions protect publication.
+
+The GUI refreshes canonical records after writes and can initiate the next
+CoAgent turn after saving a human direction. This is human-interaction-driven
+coordination, not durable background dispatch. Model/session bindings remain
+separate; in-memory thread replay/project guards do not establish full
+SPEC-0001 conformance. Specialist extensions below reuse this topology.
+
+## Art Direction and Visual Prevalidation (CT-0110)
+
+ADR 0030 / SPEC-0016 add internal Art Direction tools and a fresh visual reviewer
+call to the same CoAgent. Briefs/reviews are canonical Creation records; visual
+inputs are bounded, project-scoped registered raster bytes with pinned hashes.
+Generation uses existing jobs, explicit per-plan quota consent and non-overwriting
+adoption. The reviewer cannot approve human gates. Codex CLI currently implements
+the optional image-input transport; other adapters stop honestly without vision.
+Bounded waits can leave a real generation job running; later agent reasoning
+requires another interaction, not a second scheduler or automatic durable resume.
+
+## Directing and canonical continuity (CT-0111)
+
+ADR 0031 / SPEC-0017 add Directing/Shot Planning and Script Supervisor/Continuity
+to the existing public graph. The Coordinator already exists; it is reused.
+Plans/reports use shared application commands and the Creation journal, with
+revision/full planning-source checks. A fresh independent reviewer reuses the
+existing continuity ledger and computed checks, distinguishing declarations,
+computation, inference and unknowns. Standalone canonical audits need no plan.
+Textual camera intent is not measured geometry or pixel inspection.
+
+Preproduction displays versions, evidence and scoped human direction requests.
+Exact saved human decisions can initiate a new same-CoAgent turn. Eight-step /
+two-review limits do not create autonomous background work. Approval is not
+canonical promotion, storyboard approval or generation permission. Existing
+canonical findings remain separate from proposed coverage/state checks.
+
+## Approved stage handoffs (CT-0112)
+
+ADR 0032 / SPEC-0018 extend the existing human command and CoAgent, not the
+orchestration topology. A GUI approval can atomically adopt source-pinned inputs
+for explicitly displayed canonical scene/shot targets. The existing Art Direction
+role consumes the exact decision and publishes registered reference images as
+retained storyboard candidates through shared Core/HTTP commands. New generation
+still requires the existing quota interrupt/jobs. Final storyboard approval,
+canonical shot rewrites and automatic 3D/master handoff are separate.
+
+Additive briefs/references/drawings do not invalidate their own handoff; changed
+pinned sources do. Outputs are traceable without chat. The inbox derives real
+waiting gates and incomplete work, not live-run state. Conversational continuation
+waits for a connected agent and uses distinct human intent IDs for explicit retries;
+no background scheduler or durable autonomous recovery is added.
+
+## Production work structure (CT-0113)
+
+The Coordinator, Inception, Art Direction and its fresh reviewer receive the
+shared product work contract: canonical sequences are the work/human-review
+unit; scenes/shots remain internal or explicitly partial work. The film overview
+keeps the complete sequence roster outside its truncated scene-detail summary.
+Coordinator/Inception can explicitly read `work_structure` by canonical
+sequence/scene ID. Directing/Continuity and its fresh reviewer receive the same
+projection, preserved before narrowing detailed scene records. Every read uses
+the addressed production; no cached chat grouping or Singular-specific range.
+External MCP production agents get the same startup contract and a read-only
+`read_work_structure` tool, alongside the existing product filmmaking guide.
+
+The policy includes iterative stage flow, source/evidence comparison, independent
+review, human-only creative gates, version retention and agent-owned gaps.
+This is product code/context, never a runtime import of `ai-context/`. Context
+availability does not implement SPEC-0019's remaining comparison/validator or
+constitute proof of readiness, review execution or approval.
+
+## Declared roles and the model catalogue (CT-0115)
+
+ADR 0034. A production role is a declaration in `agents/roles.py`: kind
+(coordinator, author, reviewer, technical), the model capabilities it needs,
+budgets, and its per-turn scratch; the graph's state and the Coordinator's
+reset are derived from these. Only implemented roles are declared.
+
+Adapters declare `capabilities` (structured output, vision, web); all three
+carry images inside the request. `agents/model_catalog.yaml`, extended by
+`$XDG_CONFIG_HOME/cine-toaster/models.yaml`, describes adapters and known
+models (strengths, cost class, source); it never selects a model. Every role
+uses the model the host was given unless the person binds a role to another
+(`roles:` in the same file). `toast doctor` names the roles the supplied model
+can and cannot serve. RunPod/ComfyUI is not an infrastructure agent: recipes
+(data), a Generation Operations role, and a development skill (ADR 0034).
+
+## Runtime skill packaging
 
 A future location such as `packages/runtime-skills/` may contain filmmaking
 skills. The exact packaging language and directory remain undecided. Do not

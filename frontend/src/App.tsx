@@ -13,6 +13,7 @@ import type { GraphEdge, GraphNode, ProductionGraph } from "./types.ts";
 // The assistant is its own chunk, fetched only when the runtime has it on (ADR 0018).
 const Assistant = lazy(() => import("./Assistant.tsx"));
 import { addressOf, type Navigation } from "./navigation.ts";
+import { DecisionLink } from "./DecisionInbox.tsx";
 
 type Selection = { kind: "node"; node: GraphNode } | { kind: "edge"; edge: GraphEdge } | null;
 
@@ -298,6 +299,7 @@ export function App() {
   return (
     <div className="shell">
       <header>
+        <DecisionLink />
         <a className="back" href="/">← Control room</a>
         <div>
           <span className="eyebrow">Production canvas · cuts, references and workflows editable</span>

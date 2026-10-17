@@ -29,23 +29,38 @@ from pathlib import Path
 from typing import Any
 
 from .errors import CineToasterError, ValidationError
+from .production_context import WORK_POLICY, work_structure
 
 ACTOR = {"id": "claude-code", "kind": "agent"}
 
 INSTRUCTIONS = (
     "Cine Toaster holds a film as files: breakdowns, a screenplay, cast sheets, takes. Work on it through these "
-    "tools, not by editing its files: every change here is a recorded decision with a revision. Start with "
+    "tools, not by editing its files: every change here is a recorded decision with a revision. Creation / Inception "
+    "precedes writing: read_creation shows concept and screenplay candidates and reference inputs; "
+    "save_creation_candidate appends a version without replacing or approving the film screenplay. "
+    "Early reference exploration may consume quota; distinguish it from approved shot production. Start with "
     "film_overview, then read_scene or read_shot; how_to_make_a_film is the whole guide. A scene goes through two "
-    "phases. Phase 1 fits the screenplay and the storyboard together; it is cheap and iterative, and nothing in it "
-    "is paid. A person then approves the scene's storyboard (each scene shows its phase), and phase 2 produces it: "
+    "phases. Phase 1 fits the screenplay and the storyboard together; planning itself needs no generation. "
+    "Optional exploratory image generation may consume quota or money and must be disclosed. "
+    "A person then approves the scene's storyboard (each scene shows its phase), and phase 2 produces it: "
     "master pictures, clips as takes, scene versions, sequences, every result kept as a version. Do not spend on "
     "a scene whose storyboard is not approved without saying so. list_practices and read_practice give the "
     "filmmaking practices the checks enforce. Cuts, references and voices are decisions over the breakdown; "
     "workflows and jobs make pictures, video, takes and versions. Paid generation needs max_usd at or above the "
     "estimate plan_generation gives, and the budget ceiling holds whatever you pass. Approving or refusing a "
     "picture, choosing a take and approving the storyboard are the director's: explain the candidates, never "
-    "decide. A long job returns an id: follow it with wait_for_job."
+    "decide. A long job returns an id: follow it with wait_for_job. "
+    "When launching the GUI for this director on a trusted LAN, prefer toast serve PROJECT --host 0.0.0.0 "
+    "--assistant, and report http://<LAN_IP>:8787/app/creation.html using the computer's actual LAN IP, "
+    "checking the startup LAN URL and read-only forwarding diagnostics. "
+    "not localhost or 0.0.0.0 as the phone destination. The runtime is unauthenticated: never expose it "
+    "to the internet. Check WSL NAT/mirrored networking and authorised firewall/forwarding separately; "
+    "do not claim phone reachability from a loopback check or change system networking silently."
 )
+
+
+INSTRUCTIONS += ('\nUse read_work_structure for exact sequence/scene scope and read_production_work '
+                 'for explicit pending agent-owned requests and blockers. A pending request is not a running job.\n') + WORK_POLICY
 
 
 class LocalRuntime:
@@ -59,11 +74,20 @@ class LocalRuntime:
 
         return load_production(self.root)
 
+    def creation(self) -> dict[str, Any]:
+        from .creation import creation_view
+
+        return creation_view(self.root)
+
     def scene(self, scene_id: str) -> dict[str, Any]:
         scene = next((item for item in self.production()["scenes"] if item["id"] == scene_id), None)
         if scene is None:
             raise ValidationError(f"No scene {scene_id!r}")
         return scene
+
+    def storyboard(self, scene: str = "") -> dict[str, Any]:
+        from .storyboard import storyboard_view
+        return storyboard_view(self.root, scene)
 
     def screenplay(self) -> dict[str, Any]:
         from .screenplay_edit import screenplay_files
@@ -115,9 +139,121 @@ def build(root: Path, manager=None):
     # --- reads -------------------------------------------------------------------
 
     @server.tool(annotations=reading)
+    def plan_reference_exploration(title: str, request: str, parents: list[str] | None = None,
+                                    concept: str = "") -> dict[str, Any]:
+        """Preview exact prompt, saved input hashes, provider availability and quota use. Sends nothing."""
+        from .creation_jobs import plan_reference
+        return _answer(lambda: plan_reference(runtime.root, {"title": title, "request": request,
+                              "parents": parents or [], "concept": concept}))
+
+    @server.tool(annotations=paying)
+    def start_reference_exploration(plan: dict[str, Any], accept_quota: bool = False) -> dict[str, Any]:
+        """Generate one exploratory image from an inspected plan only after explicit quota consent.
+        Returns a job id; wait_for_job with adopt=False retains a staged result for review.
+        A kept result creates a new reference and never replaces any existing image."""
+        return _answer(lambda: public_job(jobs.submit("generate_reference", runtime.root,
+                              {**plan, "accept_quota": accept_quota})))
+
+    @server.tool(annotations=reading)
+    def read_creation() -> dict[str, Any]:
+        """Concept and screenplay candidate history, pinned inputs and the film's exploratory references."""
+        from .creation import creation_view
+        return creation_view(runtime.root)
+
+    @server.tool(annotations=working)
+    def assess_inception(title: str, summary: str, readiness: list[dict], proposal: dict,
+                          references: list[str], expected_revision: int) -> dict[str, Any]:
+        """Record the agent's assessment, not a human approval. Readiness items name destination
+        (screenplay/storyboard/masters), status (ready/needs_work/not_assessed), summary and gaps
+        (description, owner=agent/human, next_action). Proposal names destination, question, scope,
+        why and next_step. Explain sufficiency; do not infer it from image counts. Pins current
+        material and presents Approve / Request changes to the human; never starts paid generation."""
+        from .creation_review import record_inception_assessment
+        from .state import Actor
+        return _answer(lambda: record_inception_assessment(runtime.root, title=title, summary=summary,
+            readiness=readiness, proposal=proposal, references=references, expected_revision=expected_revision,
+            actor=Actor(**ACTOR)))
+
+    @server.tool(annotations=reading)
+    def read_storyboard_candidates(scene: str = "") -> dict[str, Any]:
+        """Retained story drawings, exact input versions and changes; not masters or approvals."""
+        return _answer(lambda: runtime.storyboard(scene))
+
+    @server.tool(annotations=working)
+    def save_storyboard_candidate(scene: str, shot: str, image: str, title: str, expected_revision: int,
+                                  references: list[str] | None = None, based_on: str = "", note: str = "",
+                                  provenance: dict | None = None) -> dict[str, Any]:
+        """Import an explicitly requested drawing already inside this film. Keep older versions;
+        never approve a storyboard, choose a cast master or publish a finished shot image."""
+        from .storyboard import register_storyboard_candidate
+        from .state import Actor
+        def save():
+            root = runtime.root.resolve()
+            path = (root / image).resolve()
+            if not path.is_relative_to(root):
+                raise ValidationError("Storyboard import image must be inside this production")
+            return register_storyboard_candidate(root, scene=scene, shot=shot, image=path, title=title,
+                expected_revision=expected_revision, actor=Actor(**ACTOR), references=references,
+                based_on=based_on, note=note, provenance=provenance)
+        return _answer(save)
+
+    @server.tool(annotations=working)
+    def record_exploration_round(title: str, references: list[str], expected_revision: int,
+                                 rationale: str, source: str, follows: str = "",
+                                 corrections: list[dict[str, str]] | None = None, based_on: str = "") -> dict[str, Any]:
+        """Record an explicitly described creative pass and its intended corrections.
+        Corrections name previous/current reference ids. Never infer these from image similarity,
+        treat them as provider image inputs or approve the new pass automatically."""
+        from .creation import save_exploration_round
+        from .state import Actor
+        return _answer(lambda: save_exploration_round(runtime.root, title=title, references=references,
+            expected_revision=expected_revision, actor=Actor(**ACTOR), rationale=rationale, source=source,
+            follows=follows, corrections=corrections, based_on=based_on))
+
+    @server.tool(annotations=working)
+    def save_creation_candidate(kind: str, title: str, text: str, expected_revision: int,
+                                references: list[str] | None = None, concept: str = "",
+                                based_on: str = "", rationale: str = "") -> dict[str, Any]:
+        """Save an explicitly requested candidate version with pinned inputs; never edit the film's current
+        screenplay or approve anything. A screenplay candidate must name a saved concept version."""
+        from .creation import save_creation_draft
+        from .state import Actor
+        return _answer(lambda: save_creation_draft(runtime.root, kind=kind, title=title, text=text,
+                       expected_revision=expected_revision, actor=Actor(**ACTOR), references=references,
+                       concept=concept, based_on=based_on, rationale=rationale))
+
+    @server.tool(annotations=reading)
     def film_overview() -> str:
         """The whole film: scenes with shots, chosen takes, findings, waiting gates, runs; sequences, cast, budget."""
         return overview(runtime.production(), runtime.budget())
+
+    @server.tool(annotations=reading)
+    def read_work_structure(sequence: str = "", scene: str = "") -> dict[str, Any]:
+        """Canonical ordered sequences and the production work/review contract.
+
+        Focusing a scene does not narrow sequence review. No readiness/approval
+        is inferred, and missing groupings are not invented from scene numbers.
+        """
+        return _answer(lambda: work_structure(runtime.production(), sequence=sequence, scene=scene))
+
+    @server.tool(annotations=reading)
+    def read_production_work() -> dict[str, Any]:
+        """Explicit pending sequence reviews: owner, exact scope, source changes and agent-owned gaps, not live jobs."""
+        from .sequence_work import sequence_work_view
+        return _answer(lambda: sequence_work_view(runtime.root))
+
+    @server.tool(annotations=working)
+    def request_sequence_review(sequence: str, title: str, rationale: str,
+                                expected_revision: int, expected_source_digest: str) -> dict[str, Any]:
+        """Record an explicitly authorised sequence review task; never approve, generate or claim dispatch/completion.
+
+        Use revision/source_digest from read_production_work. Missing review capabilities remain visible blockers.
+        """
+        from .sequence_work import request_sequence_review as request_review
+        from .state import Actor
+        return _answer(lambda: request_review(runtime.root, sequence=sequence, title=title, rationale=rationale,
+                       expected_revision=expected_revision, expected_source_digest=expected_source_digest,
+                       actor=Actor(**ACTOR)))
 
     @server.tool(annotations=reading)
     def read_scene(scene: str) -> str:
@@ -169,7 +305,7 @@ def build(root: Path, manager=None):
 
     @server.tool(annotations=paying)
     def generate_reference(title: str, prompt: str, from_references: list[str] | None = None, name: str = "",
-                           notes: list[str] | None = None) -> dict[str, Any]:
+                           notes: list[str] | None = None, cast: str = "", style: str = "") -> dict[str, Any]:
         """Make one picture through Codex's image generation (the director's ChatGPT subscription quota, no
         dollars) from a description and the pictures of earlier references, and keep it as a new reference
         recorded as asked by claude-code. A reference is something to look at -- a probe, a trial of an era or
@@ -179,7 +315,7 @@ def build(root: Path, manager=None):
 
         try:
             folder = make(runtime.root, prompt=prompt, title=title, parents=list(from_references or []),
-                          requested_by=ACTOR["id"], notes=list(notes or []), name=name)
+                          requested_by=ACTOR["id"], notes=list(notes or []), name=name, cast=cast, style=style)
         except CineToasterError as error:
             return {"refused": str(error)}
         return {"reference": folder.name, "image": str(folder / "image.png")}

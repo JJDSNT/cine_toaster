@@ -219,6 +219,19 @@ Require spikes before adoption:
   interfaces.
 - `src/cine_toaster/geometry.py` parses scene geometry and runs static
   continuity checks over it.
+- `src/cine_toaster/production_context.py` projects canonical ordered sequence
+  membership and the shared product work/review contract for internal and MCP
+  production agents. It does not persist grouping, infer approval or read
+  development memory; the sequence adherence package remains CT-0113 work.
+- `src/cine_toaster/directing.py` retains shot proposals and advisory reviews
+  through the shared Creation journal/lock; it reuses `continuity.py` rather
+  than owning another ledger. `agents/directing.py` adds bounded Directing and
+  independent Continuity calls to the existing Coordinator/CoAgent (ADR 0031).
+  Proposal approval is not canonical shot promotion or storyboard approval.
+- `src/cine_toaster/stage_handoff.py` pins human-approved existing-shot
+  development inputs in the Creation journal and wraps the existing storyboard
+  import with scope/freshness/replay checks. `decision_inbox.py` derives saved
+  human requests and output links; it is not another gate store (ADR 0032).
 - `src/cine_toaster/application.py` registers external local projects through
   locators and materialized workspaces in an initial in-memory Project Manager.
 - `src/cine_toaster/index.py` builds a disposable external SQLite index.

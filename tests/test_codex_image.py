@@ -9,6 +9,7 @@ from pathlib import Path
 
 import yaml
 
+from cine_toaster.errors import ValidationError
 from cine_toaster.new_production import create_production
 from cine_toaster.providers import ProviderError, ProviderNotConfigured
 from cine_toaster.providers.codex_image import CodexImageProvider
@@ -94,6 +95,33 @@ class CodexImageTests(unittest.TestCase):
         self.assertEqual(record["generation"]["references"][0]["file"], f"references/{board.name}/board.png")
         self.assertEqual(record["generation"]["thread"], THREAD)
         self.assertTrue(all(item["findings"] == [] for item in load_references(root)))
+
+
+    def test_who_how_and_what_are_composed_from_their_records(self) -> None:
+        root = create_production(self.base / "film", "A Film").root
+        (root / "cast" / "lia").mkdir(parents=True)
+        (root / "cast" / "lia" / "character.yaml").write_text(
+            "id: LIA\nlabel: Lia\ndescription: Long dark hair, a linen dress.\nauthoritative_for: [face]\n"
+            "variants:\n  age-8:\n    description: about eight\n", encoding="utf-8")
+        (root / "styles" / "ink").mkdir(parents=True)
+        (root / "styles" / "ink" / "style.toml").write_text(
+            'schema_version = 1\nid = "ink"\nname = "Ink"\nkind = "animation"\nprompt = "black ink on paper"\n',
+            encoding="utf-8")
+        board = add_reference(root, [self.reference], title="Board", kind="generated", made_on="2026-10-16")
+        fake = FakeCodex(self.home)
+
+        folder = generate_reference(root, prompt="She runs.", title="Trial", parents=[board.name], cast="LIA@age-8",
+                                    style="ink", runner=fake, codex_home=self.home)
+
+        sent = fake.calls[0][6]
+        self.assertIn("never their drawing style", sent)
+        self.assertIn("Who: Lia. Long dark hair, a linen dress. Here: about eight.", sent)
+        self.assertIn("How it is drawn: black ink on paper.", sent)
+        self.assertTrue(sent.endswith("What happens: She runs."))
+        record = yaml.safe_load((folder / "reference.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(record["generation"]["composed_from"], {"cast": "LIA@age-8", "style": "ink", "shot": "She runs."})
+        with self.assertRaisesRegex(ValidationError, "no variant 'age-90'"):
+            generate_reference(root, prompt="x", title="T2", cast="LIA@age-90", runner=fake, codex_home=self.home)
 
 
 if __name__ == "__main__":

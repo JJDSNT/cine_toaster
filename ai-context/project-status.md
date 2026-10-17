@@ -5,7 +5,7 @@ type: status
 status: current
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-10-16
+updated_at: 2026-10-17
 tags:
   - status
   - tracker
@@ -14,7 +14,7 @@ tags:
 
 # Project status
 
-Last updated: 2026-10-16
+Last updated: 2026-10-17
 
 ## Current phase
 
@@ -178,8 +178,9 @@ Cine Toaster can currently:
   enforces (`toast knowledge`, `toast why`);
 - carry measured provider capability claims that a future generation adapter
   will read;
-- list and instantiate two independently identified demo productions: The Last
-  Signal and Amiga Demo Reel;
+- list and instantiate two independently identified source fixtures: The Last
+  Signal and Amiga Demo Reel; they are incomplete productions, not completed
+  end-to-end demos;
 - register multiple arbitrary external local projects simultaneously through an
   in-memory Project Manager;
 - preserve manifest project identity across path changes and reject duplicate
@@ -190,21 +191,277 @@ Cine Toaster can currently:
   values and one-off tools, demonstrated by a working project-local transition
   in Amiga Demo Reel and the no-extension case in The Last Signal;
 - preserve project files as the production authority.
+- run a provider-independent Production Coordinator and Inception specialist
+  inside the existing CoAgent, with retained creative drafts, readiness review
+  and human-interaction-driven revision through shared application operations.
 
 Cine Toaster cannot yet:
 
 - persist the multi-project registry or expose project switching in the UI;
-- run project-scoped agents;
+- persist fully scoped agent threads/provider session bindings or recover
+  autonomous agent continuation after a runtime restart;
 
 ## Active work
+
+CT-0115 (ADR 0034, 2026-10-17): agent review and structure. Roles are
+declared (`agents/roles.py`) and the CoAgent state/reset derive from them;
+every adapter declares capabilities and carries images (Claude CLI/API join
+Codex); a model catalogue describes adapters and models and never picks one;
+a person may bind a role to another model they supplied. No "RunPod agent":
+generation recipes (data), a Generation Operations role with continuation on
+job completion, and a development skill are the planned three layers. Format
+intake (an interviewer that asks before advancing) is recorded as a gap.
+Ordered follow-ups in `development/roadmap.md` § Agent Runtime structure.
+
+CT-0112 addresses the hidden-pending-decision / approval-without-stage-output
+gap (ADR 0032, SPEC-0018). A cross-workspace inbox derives current direction
+requests and waiting scene/workflow gates. Explicit approval can atomically
+adopt source-pinned development inputs for displayed existing scene/shot IDs.
+The same CoAgent routes to Art Direction, which can publish registered image
+references as retained storyboard candidates through the existing import command.
+Generation still uses existing quota-confirmed jobs; no test approves Demo 01.
+The first integrated 85-test regression passed; browser acceptance found and
+fixed provisional-agent startup, then passed the complete approval-to-output
+and new-gate path, reload/mobile and read-error feedback on a disposable film.
+One announced graceful restart activated the same LAN server / `codex-cli`
+after confirming no jobs. Demo 01's approval remains human-owned and pending.
+Full regression passed: **1186 tests in 685.8 seconds**; the later explicit
+continuation case also passed in the final focused run.
+Director correction: the unit of work/human review is a **sequence**, not a
+scene. The implementation above is a partial mechanism, not a validated
+Inception -> storyboard transition. No production agent has reviewed Demo 01's
+sequence-level adherence yet (zero real visual/continuity reviews). Next is an
+independently reviewed sequence comparison package linking exact Inception
+inputs, screenplay beats, ordered drawings and explicit gaps. Current pending
+SC-010 P1-P3 development direction is not that sequence approval.
+Canonical shot-manifest promotion, final storyboard approval, informal-question
+capture and durable autonomous continuation remain open.
+
+CT-0113 is active (SPEC-0019). Production-agent context now includes the shared
+work/review contract and complete canonical sequence membership/order, with an
+explicit `work_structure` read for Coordinator/Inception and the same context
+in Directing/Continuity/Art and independent reviewer calls. This is runtime
+product context, not repository memory, and does not infer readiness/approval.
+External MCP agents receive the same startup contract and read-only
+`read_work_structure` tool, as well as the updated filmmaking guide.
+Singular's Genebra is 1-01..1-04 including 1-02A/B/C; Demo 01's The Ascent spans
+seven scenes. The sequence comparison/package and independent adherence
+validator/sequence-first GUI remain in progress, not delivered by this context
+slice. No real-film gates or images were changed.
+The context slice passed the complete **1199-test regression (653.9 seconds)**
+and a separate ten-test MCP run; one announced graceful restart activated it
+on the existing Demo LAN server / `codex-cli`, with LAN GUI HTTP 200. Actual
+Singular sequence-room inspection confirmed Genebra's seven scenes / 202 shots.
+Its preproduction startup exceeded 120 s during concurrent heavy tests; do not
+claim the full Singular GUI walkthrough passed. Investigate this read/startup
+cost separately from the remaining sequence review package.
+
+CT-0111 reuses the existing Production Coordinator for Directing/Shot Planning
+and Script Supervisor/Continuity (ADR 0031, SPEC-0017), not another Producer or
+orchestration mechanism. Shared Core/HTTP operations retain versioned proposals
+and independent source-labelled reports in Creation. The existing canonical
+continuity ledger and geometry/coverage findings are reused. Proposal checks
+remain distinct from canonical findings; text does not establish pixel or
+numeric-camera validation. Preproduction displays versions/evidence and the
+scoped human direction gate. Human changes resume the same CoAgent, preserving
+prior proposals/reports. Canonical shot promotion and image generation from
+these proposals remain unimplemented; approval does not claim either.
+
+The first 60-test agent regression and expanded 23 directing tests passed;
+real public CoAgents/HTTP/browser acceptance demonstrated a human changes
+handoff, retained second version, reload/mobile and no manual authoring forms.
+All five frontend test files and builds passed. The complete regression passed
+**1172 tests in 583.3 seconds**, including heavy adapters. The Art browser
+regression and read-only live LAN preproduction walkthrough also passed.
+One announced graceful server restart activated the graph with the same
+`codex-cli` adapter and LAN address, after confirming no jobs. LAN GUI HTTP
+returned 200. Demo 01 remains revision 6 with its original source digest and
+no test proposals/reports, generations or decisions. Real-film creative review
+remains open, rather than filling the user's production with test material.
+
+CT-0110 adds Art Direction and independent visual prevalidation to the existing
+CoAgent (ADR 0030, SPEC-0016): versioned briefs, actual bounded raster attachments,
+criterion evidence, stale-review/human-request checks and generation through
+existing jobs after per-plan quota consent. The Creation GUI shows the records
+without authoring forms. The reviewer uses a fresh role/context with the same
+model; it cannot approve a gate. Codex CLI implements image input; unsupported
+adapters report the gap through doctor/runtime. Bounded job waits do not add
+durable auto-resume. Nineteen art tests, a 109-test focused regression and real
+CoAgents browser/mobile acceptance passed. A live Codex model identified a red
+circle from a synthetic raster input, not a production image. The server now
+hosts the new graph on the same LAN URL; the old listener was absent when checked,
+so no running instance was killed. Demo 01 revision/source digest are unchanged.
+The early full run (1144 tests) had one synthetic-fixture provenance failure;
+that fixture is corrected. The final full regression passed **1149 tests in
+598.4 seconds**, including all 19 art cases and heavy adapters. Frontend tests,
+build and existing Inception GUI continuation passed. Director review of actual
+artistic quality remains open; no Demo 01 creative decision/generation was made.
+
+The director requested an Inception role plus whole-film Production Coordinator
+in the existing Agent Runtime ([CT-0108](work/CT-0108-provider-independent-inception-runtime.md)).
+First correction: provider selection uses `--agent-provider`, then
+`CINE_TOASTER_MODEL`, then the current CLI (Codex / Claude) when unambiguous,
+with no implicit Claude CLI default. A Codex CLI model adapter is included;
+finding a CLI does not verify authentication/inference. The current adapters
+do not attach to an open provider conversation; SPEC-0001
+thread/session binding remains planned.
+
+The Coordinator and first Inception specialist are now implemented inside the
+same public LangGraph `assistant` CoAgent (ADR 0029, SPEC-0015). Routing uses
+whole-film context; blank/title-only films enter Inception without forcing
+imported screenplays through another gate. Inception can append real concepts,
+concept-linked screenplay drafts and readiness assessments via shared commands,
+with revision/material preconditions and no human approval/image-generation
+tools. GUI writes refresh canonical records, and a human direction can initiate
+another turn through the same CoAgent, rechecking the saved decision. This is
+interactive coordination, not a new queue or durable background dispatcher.
+CT-0110 adds Art Direction / visual prevalidation, and CT-0111 adds the first
+Directing / Continuity proposal-review slice. External reference research,
+other stage executors and durable autonomous resume remain unimplemented.
+
+Twenty-three specialist tests and the final 97-test focused regression passed;
+real CoAgents browser acceptance proved saved work -> human changes -> retained
+revision -> new review on a disposable film. A live Codex CLI smoke test returned
+an Inception question grounded in that disposable film, without writing it.
+The full regression passed (1117 tests, 617.6 s), including the earlier
+storyboard-reopening test; its previous intermittent failure is not considered
+independently explained. Four final agent edge cases and LAN-onboarding coverage
+were added later and passed the final focused run. Demo 01 is reloaded with the
+new graph and `codex-cli`; real-film inspection confirmed its material unchanged.
+
+LAN onboarding ([CT-0109](work/CT-0109-lan-gui-onboarding.md)) now guides agents
+to use an intentional trusted-LAN bind and report a real LAN URL. The CLI default
+stays loopback. LAN launches now discover real URLs and inspect Windows/WSL
+forwarding/listeners without changing OS rules. The director authorised TCP 8787
+forwarding and a Windows Private/Wi-Fi/LocalSubnet firewall rule for Demo 01.
+The Windows LAN URL `http://192.168.100.179:8787/app/creation.html` and assistant
+info respond HTTP 200, and the director confirmed actual phone access. The
+persistent host-specific rules may need an update after DHCP/WSL address changes.
+LAN follow-up validation: 43 focused tests passed. The full 1129-test run reported
+one jobs retry-test temporary-directory cleanup error; all 20 jobs tests passed
+in isolation. That cleanup race remains unexplained, not fixed by LAN work.
+
+Priority clarification from the director:
+[CT-0107](work/CT-0107-agent-led-work-and-human-review-loop.md). The GUI is
+human situational awareness; authorised active work must progress through the
+agent or present a concrete human request over a complete scoped delivery.
+The director narrowed the first implementation to readiness and a simple
+direction decision. This is now implemented in the existing Creation journal:
+agent assessment per destination, pinned material, scoped recommendation,
+Approve / Request changes with guidance, and retained human decisions through
+shared Core/CLI/HTTP operations. MCP can author assessments, not approve them
+(ADR 0028). Demo 01 now has a real pending assessment at Creation revision 6:
+enough material for screenplay/storyboard development; masters need identity
+and composition work. No human decision or generation was performed. Focused
+tests/browser acceptance and the full 1079-test regression passed. Automatic
+dispatch/continuation remains unimplemented: the next instruction is recorded
+as not dispatched. Do not claim the full autonomous workflow is delivered.
+Continuation must reuse the existing LangGraph Agent Runtime/CoAgents, extending
+missing specialists there instead of creating a parallel execution mechanism.
+The repo registers one public `assistant` CoAgent; CT-0108 adds its internal
+Coordinator/Inception loop. The wider specialist workforce and persistent
+background continuation remain planned in the production-agent documentation.
+
+The director authorised the next slice (2026-10-16):
+[CT-0106](work/CT-0106-storyboard-candidates-and-inception-inputs.md), actual
+storyboard image candidates beside the screenplay, with versioned Inception
+inputs. Wake's three drafts are now retained with exact input hashes/prompts
+and displayed beside the screenplay, with ordered thumbnails, prior-version
+navigation and two-way Inception links. Core/CLI/HTTP/MCP use shared operations
+(ADR 0027, SPEC-0014); bounded reads inform the assistant. The other 21 shots
+stay explicitly incomplete. No face choice, blockout or approval was imposed
+or inferred. Following the director's clarification, manual Inception forms and
+input-editing controls are removed: the GUI is situational for the human,
+while agents use shared operations. The normal Control Room Storyboard now
+shows the same draft images, with links to their screenplay view. No additional
+21-shot generation was started; the director only needs a clearly located
+populated example. Targeted tests, disposable/real-film browser checks and the full
+1068-test regression passed; director usability review remains open.
+The server is available at `127.0.0.1:8787` with the assistant enabled.
+
+Director refinement for the GUI follow-up: theme-oriented concepts, evolve /
+reject without deletion, and evidence-based readiness separately for starting
+screenplay and storyboard work. Explain story drawings -> 3D composition ->
+shot masters and the role of stills without conflating cast references, image
+formats and creative approvals. Requirements are recorded in CT-0105; these
+concept actions and the full downstream handoff are not delivered; readiness
+and direction decisions now have the CT-0107 first slice described above.
+
+Latest director feedback, recorded for a later GUI iteration (2026-10-16;
+[CT-0105](work/CT-0105-creation-inception-and-stage-inputs.md), "Latest director
+feedback"): prioritize copilot-led interaction, with manual authoring forms
+secondary, and a film-wide "Awaiting your decision" inbox accessible from every
+module. Lia's identity-reference choice is the first concrete example; the
+current Review room covers take review, not this unified queue. Show the
+question, evidence/candidates and affected work; distinguish actionable human
+requests from warnings or unfinished preparation. Mark-for-deletion is distinct
+from actual deletion and must preserve history. These are recorded next steps,
+not implemented capabilities; resume when the director requests advancement.
+
+New GUI direction (2026-10-16):
+[CT-0105](work/CT-0105-creation-inception-and-stage-inputs.md) adds Creation /
+Inception before Screenplay & Storyboard. It supports idea exploration and
+draft references whose selected versions can guide later work, with traceable
+inputs and preserved alternatives. The design and Demo 01 acceptance journey
+are recorded. The first slice is implemented at `/app/creation.html`: immutable
+concept/screenplay candidates, selected input hashes, reference comparison,
+contextual assistant and quota-consented exploratory reference jobs staged for
+explicit non-overwriting adoption. Core/HTTP/CLI/MCP share the operations
+(ADR 0026, SPEC-0013). Director feedback exposed the flat gallery's loss of
+creative history. The director then requested a simpler primary gallery:
+images grouped by freely named rounds, not a fixed stage taxonomy. History,
+actual inputs, cast designations, use and corrections are collapsed details.
+Demo 01 has Storyboard reference / Eras / Age control groups, retaining all 13
+images and prior round-record versions without inferred approvals. The
+first-slice full suite passed (1056 tests); the expanded full run caught a test
+scoping error, fixed and followed by a green 1018-test fast run. The final
+round-grouping slice passed its 14 Core/interface tests, frontend build/tests
+and disposable browser acceptance; see CT-0105 for exact validation evidence.
+Canonical screenplay promotion, candidate-specific storyboard authoring and
+director usability validation remain open. This extends the earlier
+three-workspace hypothesis; the embedded assistant's proposed text is inserted
+manually, not silently saved.
+
+Current process finding (2026-10-16): [CT-0103](work/CT-0103-demo-01-process-and-gui-incident.md)
+documents Demo 01's premature advance from textual shot breakdown to blockout,
+the GUI storyboard discovery gap and the assistant omitted at server launch.
+The next demo action is to validate the screenplay/storyboard path in the GUI
+and complete the missing visual review before expanding the blockout. The
+record contains an acceptance scenario; the incident remains unresolved.
+
+GUI follow-up: [CT-0104](work/CT-0104-demo-driven-gui-flow.md) now has a read-only
+React pilot at `/app/preproduction.html`, linked from the Control Room. Actual
+screenplay and proposed shots appear together, with distinct composition
+studies, visible assistant availability and scene approval state. Browser
+navigation, mobile layout and the enabled chat's context delivery were exercised
+against Demo 01, without a model message. Visual-candidate
+authoring/versioning and human usability validation remain open; existing UI
+routes and production records are preserved. Build, frontend tests and the
+full 1,044-test Python suite passed; the final doctor build-detection change
+also passed its nine-test module separately.
 
 Open records, by what they wait for (2026-10-15; every other record is
 `done`, `ai-context/work/README.md`):
 
-- **Doing, first demo**: the evolution of animation (`CT-0099`,
+- **Doing, first complete demo**: the evolution of animation (`CT-0099`,
   `~/films/demo-01`), replacing the hybrid scene (`CT-0097`, paused). The
-  `codex-image` adapter is done (CT-0101); next: the cast sheet and the
-  eras, then the identity and transformation trials.
+  `codex-image` adapter, cast sheet and seven era records are done. The first
+  identity pass is generated: costume, hair and movement hold, but one
+  eight-year-old parent picture prevented a valid test of ageing through eras
+  1--6. A controlled 14/16/18 pass without that child picture now gives a clear
+  age progression and preserves every first-pass image as history; facial
+  identity across techniques still awaits the director's master-face choice.
+  The film now has its canonical seven-scene screenplay and a 103-second,
+  24-shot linked breakdown in one sequence. The opening scene has measured
+  cameras and paths, six clay boards and a 12-second animatic. Its review
+  exposed absent pose and flight-elevation support, insufficient landscape
+  landmarks and a project-look inheritance mismatch in the brief. Next:
+  validate the GUI/process findings in CT-0103, complete the visual storyboard
+  and preserve the initial render pass before further spatial refinement;
+  the transformation trial remains open. No storyboard is approved yet.
+  The checked-in The Last Signal and Amiga productions are regression/source
+  fixtures at the same portfolio level, not completed predecessors or the bar
+  by which this film is called done.
 - **Next, by the user's word**: the demos, produced through the production
   flow -- an intention, a screenplay, a storyboard -- the reel last, made
   from the others (`CT-0064`, `ready`; D8 and D9 of the roadmap). Each demo

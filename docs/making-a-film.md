@@ -10,7 +10,7 @@ commands for each step, and which decisions belong to the director.
 ```bash
 toast new ~/films/my-film --title "My Film"                                # empty
 toast new ~/films/my-film --title "My Film" --screenplay draft.fountain    # or a .fdx
-toast serve ~/films/my-film                                                # the control room
+toast serve ~/films/my-film --host 0.0.0.0 --assistant                      # trusted-LAN GUI + copilot
 ```
 
 Given a screenplay, `toast new` makes one breakdown per screenplay scene,
@@ -19,11 +19,85 @@ to Fountain, and what the conversion loses is reported. The production lives
 outside the Cine Toaster checkout, and `toast new` never writes into a
 directory that already has files in it.
 
-`toast demo <dir>` copies a small finished example (The Last Signal), which
-is useful for seeing what a production looks like once it has shots and
-takes.
+### Open the GUI on the local network
+
+For this onboarding, prefer an intentional LAN-accessible launch so the director
+can review on a phone on the same trusted network. Use `--host 0.0.0.0` to listen
+on IPv4 interfaces, keeping the assistant behind the same GUI origin. The CLI
+still defaults to loopback for callers that do not request LAN access.
+
+At startup, a LAN bind now prints detected LAN URLs and read-only network
+diagnostics. On WSL it reports the Windows LAN URL separately from VM addresses
+and checks for a matching forwarding destination/listener. Missing Windows tools
+produce a warning, not a startup failure. This does not verify firewall policy
+or actual phone reachability and never changes OS rules automatically.
+
+After starting, verify the computer's LAN IPv4 address and give the director
+`http://<LAN_IP>:8787/app/creation.html` (or the relevant workspace). Neither
+`localhost` nor `0.0.0.0` is the phone's destination: localhost refers to the
+phone itself. Verify the GUI/API and assistant availability; do not claim phone
+reachability from a localhost check alone. Use `--host 127.0.0.1` when access
+must stay on this machine, or omit `--assistant` if it is not configured.
+
+**Trusted network only:** the runtime has no authentication and exposes film
+commands, not only previews. Do not expose it to the internet, open router WAN
+ports, disable the firewall or publish the assistant's internal ports. Only the
+GUI/runtime port is needed; any firewall rule should be limited to the trusted
+local network and explicitly authorised.
+
+On WSL 2, the Linux VM's address may not be reachable from the phone. Report the
+Windows LAN address separately and check the WSL networking mode. NAT may need
+explicit Windows port forwarding and firewall rules; mirrored networking has
+its own firewall policy. Do not apply system network changes silently or report
+success until verified. See [Microsoft's WSL networking guide](https://learn.microsoft.com/en-us/windows/wsl/networking).
+
+Authorised Windows forwarding is host-specific: DHCP or a WSL restart can change
+its destination. Recheck the startup diagnostic after either change. Rules are
+persistent until explicitly removed; stopping the server does not remove them.
+
+`toast demo <dir>` copies a small regression fixture (The Last Signal), which
+is useful for seeing scenes at several workflow stages and exercising shots
+and takes. It is not a completed end-to-end demo or a creative template.
+
+## The sequence is the work and review unit
+
+Use the film's canonical sequences and their exact ordered scene membership.
+For example, Singular's Genebra includes 1-01, 1-02, 1-02A, 1-02B, 1-02C,
+1-03 and 1-04; another film may group its scenes differently. Never reconstruct
+the grouping from numeric endpoints or copy this example into another film.
+Scenes and shots are useful internal subtasks or explicitly partial studies,
+not substitutes for a sequence delivery. Focusing a scene in the GUI does not
+change the director's review unit. Unassigned scenes remain an explicit gap.
+
+The iterative flow is Inception -> screenplay <-> storyboard -> blockouts/3D
+storyboard -> master images -> clips -> assembled sequences. An imported film
+can start from its existing material; do not invent earlier Inception records.
+For a sequence transition, compare exact original intention/reference versions
+with screenplay beats and ordered drawings, identifying deviations, continuity
+and gaps. An independent check of an artist's brief alone is insufficient.
+Do agent-fixable work before asking the director for a concrete creative choice
+or a complete review. Preserve every version; only humans decide creative gates,
+and those decisions do not authorise paid generation.
+
+Implemented CoAgent roles receive this work contract and canonical roster;
+Coordinator/Inception can explicitly read `work_structure` by sequence/scene ID;
+external MCP agents use the read-only `read_work_structure` tool.
+The full sequence comparison package and independent adherence validator remain
+in progress. Do not claim that context availability has executed that review,
+or that an isolated scene-direction gate approves the sequence transition.
 
 ## The production is its folder
+
+The built-in assistant's existing Production Coordinator can delegate discovery
+to Inception, visual development to Art Direction/Visual Prevalidation and
+linked-screenplay shot proposals to Directing/Continuity. In **Screenplay &
+Storyboard**, ask it to develop a named scene's decoupage and review continuity.
+Its retained proposals/reports appear in **Directing & continuity**. Humans
+approve or request changes at the scoped direction gate, not through manual
+authoring forms. These proposal decisions do not promote canonical shots,
+approve storyboard images or authorise generation; the full downstream handoff
+is still incomplete. See [the assistant](assistant.md) and
+[preproduction](preproduction.md) for implemented limits.
 
 ```text
 project.yaml                      identity, paths, sequences, the frame, the look
@@ -68,15 +142,57 @@ toast references generate <film> --title "1930s trial" --from <reference> \
     --prompt "keep her face; redraw her in early-1930s technique ..." [--dry-run]
 ```
 
+`--cast MEMBER@variant` and `--style <id>` compose who she is (the cast
+sheet) and how it is drawn (the style) from their records, so `--prompt`
+says only what happens.
+
 It runs through Codex's image generation on the ChatGPT subscription, so
 it costs quota, not dollars (`toast doctor` says whether it is set up).
 
 The folder is the whole film. Caches and job records can be deleted without
 losing anything that was decided.
 
+## Creation / Inception: before the screenplay
+
+A film can begin with an idea, a discussion, alternative directions and rough
+visual references. Keep the useful explorations and their origins in the film;
+the references commands above already support pictures and their lineage.
+
+A [Creation / Inception workspace](creation.md) is available at
+`/app/creation.html`. Save concept versions, compare reference alternatives
+and develop a screenplay candidate from an explicit saved concept/reference
+set. Earlier versions remain; the film's current screenplay is not replaced. A
+reference may inspire later work without becoming a shot's approved image.
+Record actual provider inputs separately from images that were only consulted.
+
+Exploratory generation may consume quota or money; show and authorise its cost.
+Writing and shot planning need not wait for any generated reference. A film
+that already has a screenplay can start directly with it. Revising an earlier
+exploration must not silently replace the inputs of work already produced.
+
+The assistant can delegate visual development to Art Direction, which saves a
+brief with specific criteria and pinned inputs. Visual Prevalidation inspects
+actual images separately and retains evidence and corrections in this workspace.
+Ask for the desired visual outcome in the copilot; no authoring forms are needed.
+A precheck never approves the art for you. Exploratory generation uses the
+existing jobs and asks for explicit quota consent on each plan; failed candidates
+remain available. If a job outlasts the bounded assistant wait, ask it to continue
+when the job finishes. `toast doctor` reports whether the selected agent adapter
+supports visual input (currently Codex CLI); metadata is not pixel inspection.
+
 ## Phase 1: the screenplay and the storyboard, fitted together
 
-This phase is iterative and cheap: nothing costs money or waits on a model.
+The [Screenplay & Storyboard pilot](preproduction.md), at
+`/app/preproduction.html`, shows linked screenplay passages beside proposed
+shots, retained story drawings and separate composition studies. Import drawings
+with `toast storyboard add` (or the shared HTTP/MCP operation), keep earlier
+versions and trace exact reference inputs back to Inception. The latest preview
+is not an approval or a selected master. Missing visuals are shown explicitly;
+the pilot does not yet implement the full handoff to shot masters.
+
+This phase is iterative and cheap: writing, planning and computed previews need
+no model call. Optional AI-generated sketches can consume quota or money and
+need their own disclosure and authorisation, just like exploratory references.
 The screenplay and the shots are adjusted against each other until what will
 be shot is defined.
 

@@ -5,7 +5,7 @@ type: roadmap
 status: active
 owner: project
 created_at: 2026-09-20
-updated_at: 2026-10-15
+updated_at: 2026-10-16
 tags:
   - development
   - roadmap
@@ -16,6 +16,23 @@ tags:
 
 This roadmap orders architectural risk. It is not a promise that every listed
 technology will be adopted.
+
+CT-0112 closes the first pending-decision discovery / approved-input handoff:
+the cross-workspace inbox derives canonical requests, and a human can explicitly
+advance scoped existing-shot storyboard inputs through the same CoAgent/Art
+Direction and existing reference-generation/storyboard commands (SPEC-0018).
+Outputs retain source/decision links. This is not canonical proposed-shot
+promotion or automatic final-storyboard/3D/master approval.
+
+Agent Runtime update (CT-0111, 2026-10-16): the existing Production Coordinator
+now delegates to the first Directing/Shot Planning and Script Supervisor /
+Continuity slice, alongside Inception and Art Direction/Visual Prevalidation.
+Retained proposals and independent reports use the Creation journal and existing
+continuity ledger; preproduction exposes scoped human direction and revision.
+This is bounded agent reasoning, not a new production scheduler. Canonical
+proposal promotion, storyboard generation from a proposal and durable
+autonomous continuation remain open. Validate these handoffs on Demo 01 before
+adding a duplicate Coordinator or a nominal wider workforce (SPEC-0017).
 
 ## Ordered plan from 2026-09-29
 
@@ -295,6 +312,63 @@ Track scope and acceptance criteria in [CT-0084](../work/CT-0084-three-workspace
 - [ ] Compare existing feature menu + inspector with hybrid workspace/context navigation in a focused prototype.
 - [ ] Validate decisions, provenance and local exceptions with users before an implementation ADR.
 
+### Agent Runtime structure (CT-0115, ADR 0034, 2026-10-17)
+
+Review of CT-0108..CT-0114 with KDP Studio's agents-as-manifests and one-flow
+decisions as reference. Done: roles declared (`agents/roles.py`), the state
+and per-turn reset derived from them; adapters declare capabilities and all
+three carry images; model catalogue (`agents/model_catalog.yaml`, extended by
+`$XDG_CONFIG_HOME/cine-toaster/models.yaml`) that describes and never picks;
+optional role -> model binding by the person; `toast doctor` reports which
+roles the supplied model serves. To do, in order:
+
+- [ ] **Typed resume of an approved decision.** Today encoded as a human
+  message id `decision-<id>-<attempt>` cross-checked with page-context
+  strings (`assistant.py` coordinator). Solve: a typed AG-UI forwarded
+  property (or a `resume` state input) carrying the decision id, validated
+  against the Creation journal; drop the id convention.
+- [ ] **Role-specific context digests.** `bounded()` truncates JSON mid-string
+  and drafts are cut at 1800 characters. Solve: each role builds a digest of
+  the records it needs (KDP Studio's fixed *readers*), and asks for a focused
+  read beyond it; never feed truncated JSON.
+- [ ] **Fewer, cheaper model steps.** Each step is a fresh CLI process (up to
+  8 x 180 s a turn). Solve: native tool calling on adapters that support it
+  (Claude API), prompt caching of the stable system/context prefix; measure
+  turn time before and after on Demo 01.
+- [ ] **One role loop.** Inception, Art Direction and Directing each carry
+  their own reason/tool/stop/refresh copy. Solve: KDP Studio's shape --
+  draft -> named deterministic checks -> land (a command) -> hold -- with
+  each role giving its prompt, checks, landing and reviewer; read-and-answer
+  roles become data, generate/wait/publish roles stay in code.
+- [ ] **Format intake (the interviewer).** Agents can stop with
+  `needs_direction`, but nothing knows what a format needs (a music video:
+  the track, duration, BPM, performance or narrative, lyrics), and the
+  question and answer live only in chat (CT-0112's informal-question gap).
+  Solve: format sheets as data (what must be known, and what each item
+  unlocks); Inception compares the sheet with the records and asks only what
+  cannot be inferred, a few questions at a time with the reason; questions
+  and answers are production records shown in the decision inbox. Model on
+  KDP Studio's interviewer manifest.
+- [ ] **Generation recipes.** ComfyUI/endpoint graphs described in filmmaking
+  terms (inputs, models, VRAM, rate, endpoint variable); the graph stays in
+  the provider adapter.
+- [ ] **Generation Operations role + continuation on job completion.** The
+  Art Direction wait is 25 s; a RunPod cold start is minutes, so work stops
+  until the next human message. Solve: a `technical` role with Cine Toaster
+  tools (capability/endpoint health, estimate, job status, diagnosis, retry
+  under the same quota consent), and a job-completion event that resumes the
+  waiting role from a checkpoint kept beside the job store (KDP Studio ADR
+  0020's restart-surviving wait). No pod/endpoint creation in the product.
+- [ ] **Development skill `.agents/skills/runpod-comfyui/`** for development
+  agents: worker images, endpoints and recipes with the RunPod tooling;
+  never packaged as a runtime skill.
+- [ ] **Sequence Adherence reviewer** (SPEC-0019), then further authors
+  (Cinematography/masters, Editing, Sound) as Demo 01 needs them.
+- [ ] **Catalogue facts.** Context sizes are `null` (not known here); fill
+  them from the providers' documentation with the source, never a guess.
+- [ ] **Real-model check of image input on Claude CLI and API.** Covered by
+  scripted tests only; run one Visual Prevalidation on a disposable film.
+
 ### The demos line: the music piece, then the reel (opened 2026-10-13)
 
 Its own line of work (the user, 2026-10-13): capabilities the demos need,
@@ -366,6 +440,33 @@ script goes to the user before it is built.
 Order: D1b (bars) when a piece needs bars; the compositing roadmap C1-C10
 in its own order; then D8 and D9.
 
+**Creation / Inception (the user, 2026-10-16; CT-0105).** Add a creative module
+before Screenplay & Storyboard: brainstorm ideas and generate rough reference
+candidates, then explicitly choose their versions as inputs to later work.
+First validate the concept/reference -> screenplay handoff on Demo 01. Reuse
+references and existing provenance; define missing draft/decision commands
+before implementing writes. Preserve all alternatives and actual consumed
+versions. The first GUI, candidate journal, Core/HTTP/CLI/MCP saves and staged
+reference-generation jobs are implemented (ADR 0026, SPEC-0013); validation is
+in progress. Next are director usability review and the explicit screenplay
+promotion, not automatic approval or overwrite. CT-0106 now supplies retained
+storyboard drawings for existing canonical shots (ADR 0027, SPEC-0014), exact
+reference inputs and two-way Inception links; Demo 01 has three opening drafts,
+not 24 approved frames. The next GUI iteration should develop theme-oriented
+concepts, copilot-led evolve/reject, destination-specific readiness and the
+cross-module human-decision inbox. Full storyboard -> 3D -> master handoff
+remains separate follow-up work. Final director clarification: the GUI is
+situational for the human, not an AI-operated form surface. Manual Inception
+authoring/input-editing controls are removed; agents retain shared operations.
+
+**Priority correction — close the agent-led loop (CT-0107).** The retained
+artifact/view slice is not enough. Authorised work needs an agent-owned next
+task or a concrete human request over a complete scoped delivery, followed by
+real continuation after approval or directed revision. Audit of Demo 01 found
+three drawings but no waiting gate/open question and no active jobs. Wire and
+validate one closed loop before adding gallery polish or more generated shots;
+do not imply that the embedded copilot already runs the MCP authoring cycle.
+
 **The demo set (the user, 2026-10-16).** No new demos: the ones planned,
 each made by a **different approach**, so that together they show the tool
 end to end. Each is produced through the production flow (an intention, a
@@ -384,7 +485,10 @@ made from the others.
 **Changed later the same day:** the first demo is the evolution of
 animation (CT-0099) -- a girl maturing while the animation does, the
 cartoon approach taken first and widened; the hybrid scene is paused
-(CT-0097). The order below stands for the rest.
+(CT-0097). This is the first demo to be completed end to end. The Last Signal
+and the checked-in Amiga production remain incomplete fixtures at the same
+portfolio level, not earlier finished demos. The older order below is
+superseded for the first slot and will be reconsidered after Demo 01.
 
 Order (the user, 2026-10-16): **1** the hybrid micro-scene, **2** The Last
 Signal, **3** the advertisement, **4** the cartoon, **5** the reel -- from the

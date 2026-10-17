@@ -166,15 +166,55 @@ def reference_images(root: Path, ids: list[str]) -> list[Path]:
     return pictures
 
 
+def compose(root: Path, shot: str, *, cast: str = "", style: str = "") -> tuple[str, dict[str, str]]:
+    """The three descriptions kept apart and sent together: who (the cast sheet), how it is drawn (a
+    style's craft words), and what happens (the shot). Returns the prompt and what it was composed from."""
+
+    parts, used = [], {}
+    if cast:
+        from .cast import cast_key
+        from .project import load_production
+
+        member_id, _, variant = cast.partition("@")
+        members = load_production(root)["cast"]
+        member = members.get(cast_key(member_id))
+        if member is None:
+            raise ValidationError(f"No cast member {member_id!r}; there is {', '.join(members) or 'none'}")
+        if variant and variant not in member["variants"]:
+            raise ValidationError(f"{member['label']} has no variant {variant!r}; there is "
+                                  f"{', '.join(member['variants']) or 'none'}")
+        who = f"Who: {member['label']}. {member['description']}"
+        if variant:
+            who += f" Here: {member['variants'][variant]['description']}."
+        parts.append(who)
+        used["cast"] = member["id"] + (f"@{variant}" if variant else "")
+    if style:
+        from .styles import list_styles
+
+        found = next((item for item in list_styles(root) if item["id"] == style), None)
+        if found is None:
+            raise ValidationError(f"No style {style!r} in the catalog or this film's styles/")
+        parts.append(f"How it is drawn: {found['prompt']}.")
+        used["style"] = found["id"]
+    parts.append(("What happens: " if parts else "") + " ".join(shot.split()))
+    return " ".join(parts), used
+
+
 def generate_reference(root: Path, *, prompt: str, title: str, parents: list[str] | None = None,
                        provider: str = "codex-image", requested_by: str = "", notes: list[str] | None = None,
-                       name: str = "", runner: Any = None, codex_home: Path | None = None) -> Path:
+                       name: str = "", cast: str = "", style: str = "", runner: Any = None,
+                       codex_home: Path | None = None) -> Path:
     """Make one picture from a description and the parents' pictures, and keep it as a reference."""
 
     import tempfile
 
     if not prompt.strip():
         raise ValidationError("A generation needs a description")
+    shot = prompt
+    prompt, composed = compose(root, shot, cast=cast, style=style)
+    if style and parents:  # an earlier picture lends who, never how it was drawn
+        prompt = ("Take only identity from the attached picture(s) -- features, hair, costume -- never their "
+                  "drawing style, which the description sets. " + prompt)
     makers = image_providers()
     if provider not in makers:
         raise ValidationError(f"No image provider {provider!r}; there is {', '.join(makers)}")
@@ -184,6 +224,8 @@ def generate_reference(root: Path, *, prompt: str, title: str, parents: list[str
     with tempfile.TemporaryDirectory(prefix="cine-toaster-reference-") as directory:
         output = Path(directory) / "image.png"
         generation = maker.generate(prompt=prompt, references=pictures, output=output, label=title)
+        if composed:
+            generation["composed_from"] = {**composed, "shot": " ".join(shot.split())}
         film = Path(root).expanduser().resolve()
         for item in generation["references"]:  # the film's own pictures, by their place in it
             if Path(item["file"]).is_relative_to(film):

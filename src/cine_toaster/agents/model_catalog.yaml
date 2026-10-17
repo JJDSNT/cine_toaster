@@ -1,0 +1,58 @@
+# What models can do, as far as Cine Toaster knows (ADR 0034).
+#
+# This table describes; it never chooses. The model a production uses is the
+# one the person supplies (`--agent-provider`, CINE_TOASTER_MODEL, or the CLI
+# they are running). A person extends or corrects this table in
+# $XDG_CONFIG_HOME/cine-toaster/models.yaml, which is read on top of it, and
+# may bind a role to another model they supplied there (`roles:`).
+#
+# `transport` is what the adapter's code carries, verified in models.py.
+# A model's `strengths` are tags from the vocabulary below, with the `source`
+# of the claim; `null` means not known here -- never a guess.
+
+vocabulary:
+  creative_writing: concept, screenplay and brief writing in the film's language
+  planning: ordered shot proposals and multi-step production reasoning
+  visual_critique: judging attached pictures against written criteria
+  continuity_audit: comparing declared facts across scenes with evidence
+  fast_extraction: short classification and extraction at low cost
+
+adapters:
+  claude-cli:
+    transport: [structured_output, vision]
+    model: chosen by the person's Claude Code configuration, unless a role binding names one
+    cost: the person's Claude subscription
+    notes: one headless `claude -p` process per reasoning step; no tools, settings or session
+  claude-api:
+    transport: [structured_output, vision]
+    model: CINE_TOASTER_MODEL_ID (default claude-opus-5-5), or a role binding
+    cost: API usage billed to the key or `ant auth login` profile
+    notes: structured output with server-side fallback on refusal
+  codex-cli:
+    transport: [structured_output, vision]
+    model: chosen by the person's Codex configuration, unless a role binding names one; not reported back
+    cost: the person's ChatGPT subscription quota
+    notes: one ephemeral, read-only `codex exec` per step; all host tools disabled
+
+models:
+  claude-opus-5-5:
+    family: claude
+    tier: most capable of its family
+    context_tokens: null
+    strengths: [creative_writing, planning, visual_critique, continuity_audit]
+    cost_class: high
+    source: Anthropic's model family listing, 2026
+  claude-sonnet-5-5:
+    family: claude
+    tier: balanced capability and cost
+    context_tokens: null
+    strengths: [creative_writing, planning, continuity_audit]
+    cost_class: medium
+    source: Anthropic's model family listing, 2026
+  claude-haiku-5-5:
+    family: claude
+    tier: fastest and least costly of its family
+    context_tokens: null
+    strengths: [fast_extraction]
+    cost_class: low
+    source: Anthropic's model family listing, 2026

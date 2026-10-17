@@ -10,10 +10,13 @@ const EMPTY: Seen = { room: "control room", scene: "", focus: "", selected: "" }
 
 function Drawer() {
   const [seen, setSeen] = useState<Seen>(EMPTY);
+  const [continuation, setContinuation] = useState<{ decisionId: string; attempt?: string } | null>(null);
   useEffect(() => {
     const listen = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin || event.data?.type !== "cine-toaster:context") return;
-      setSeen({ ...EMPTY, ...event.data.seen });
+      if (event.origin !== window.location.origin || event.source !== window.parent) return;
+      if (event.data?.type === "cine-toaster:context") setSeen({ ...EMPTY, ...event.data.seen });
+      if (event.data?.type === "cine-toaster:continue-inception" && typeof event.data.decisionId === "string")
+        setContinuation({ decisionId: event.data.decisionId, attempt: typeof event.data.attempt === "string" ? event.data.attempt : undefined });
     };
     window.addEventListener("message", listen);
     window.parent.postMessage({ type: "cine-toaster:assistant-ready" }, window.location.origin);
@@ -25,9 +28,13 @@ function Drawer() {
   const onNavigate = useCallback((where: Navigation) => {
     window.parent.postMessage({ type: "cine-toaster:navigate", where }, window.location.origin);
   }, []);
+  const onProductionUpdate = useCallback(() => {
+    window.parent.postMessage({ type: "cine-toaster:production-update" }, window.location.origin);
+  }, []);
   return (
     <div className="assistant-drawer dark">
-      <Assistant seen={seen} onHighlight={onHighlight} onNavigate={onNavigate} />
+      <Assistant seen={seen} onHighlight={onHighlight} onNavigate={onNavigate}
+        continuation={continuation} onProductionUpdate={onProductionUpdate} />
     </div>
   );
 }

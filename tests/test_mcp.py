@@ -62,18 +62,90 @@ class McpTests(unittest.TestCase):
             self.assertNotIn(forbidden, names)
         reads = {tool.name for tool in anyio.run(self.server.list_tools) if tool.annotations.read_only_hint}
         self.assertIn("plan_generation", reads)
+        self.assertIn("read_work_structure", reads)
+        self.assertIn('read_production_work', reads)
+        self.assertNotIn('request_sequence_review', reads)
         self.assertTrue({"production_status", "continuity_ledger"} <= reads)
         self.assertNotIn("generate", reads)
 
     def test_it_reads_the_film(self) -> None:
         self.assertIn("SC-030", self.call("film_overview"))
         self.assertIn("P3", self.call("read_shot", {"scene": "SC-030", "shot": "P3"}))
+        self.assertEqual(self.call("read_storyboard_candidates")["revision"], 0)
         locations = self.call("list_locations")
         self.assertEqual(locations[0]["id"], "LISTENING-STATION")
         self.assertTrue(any(move["id"] == "rise-and-reveal" for move in self.call("list_camera_moves")))
         self.assertTrue(any(sound["id"] == "room-tone" for sound in self.call("list_sounds")))
         self.assertTrue(any(item["id"] == "dread" for item in self.call("list_emotions")))
+
+    def test_work_structure_and_guide_preserve_the_sequence_as_review_unit(self) -> None:
+        value = self.call('read_work_structure', {'sequence': 'the-reply', 'scene': 'SC-010'})
+        self.assertEqual(value['review_unit'], 'sequence')
+        self.assertEqual(value['scene_sequences'], ['the-reply'])
+        self.assertEqual(value['sequences'][0]['scene_ids'], ['SC-010', 'SC-030'])
+        self.assertNotIn('approved', value)
+        guide = self.call('how_to_make_a_film')
+        self.assertIn('The sequence is the work and review unit', guide)
+        self.assertIn('1-02A', guide)
+        self.assertIn('work_structure', guide)
+
+    def test_explicit_review_work_uses_shared_command_without_approval_or_dispatch(self) -> None:
+        context = self.call('read_production_work')
+        result = self.call('request_sequence_review', {'sequence': 'the-reply', 'title': 'Review the sequence',
+            'rationale': 'The director requested the comparison.', 'expected_revision': context['revision'],
+            'expected_source_digest': context['source_digest']})
+        task = self.call('read_production_work')['items'][0]
+        self.assertEqual(task['id'], result['request']['id'])
+        self.assertEqual(task['owner'], 'coordinator')
+        self.assertEqual(task['dispatch_status'], 'not_dispatched')
+        self.assertFalse(task['human_action_required'])
+        self.assertEqual(self.call('read_creation').get('assessment_decisions', []), [])
+
+    def test_storyboard_import_is_project_scoped_and_not_an_approval(self) -> None:
+        import base64
+        image = self.root / "drawing.png"
+        image.write_bytes(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a81sAAAAASUVORK5CYII="))
+        arguments = {"scene": "SC-010", "shot": "P1", "image": "drawing.png", "title": "A draft", "expected_revision": 0}
+        self.assertEqual(self.call("save_storyboard_candidate", arguments)["revision"], 1)
+        self.assertIn("refused", self.call("save_storyboard_candidate", arguments))
+        self.assertIn("refused", self.call("save_storyboard_candidate", {**arguments, "image": "../outside.png", "expected_revision": 1}))
+        result = self.call("read_storyboard_candidates", {"scene": "SC-010"})
+        self.assertEqual(result["candidates"][0]["review"], "not_recorded")
+        self.assertEqual(result["revision"], 1)
         self.assertTrue(any(item["id"] == "viral-vertical" for item in self.call("list_styles")))
+
+    def test_creation_candidates_are_shared_records_not_screenplay_replacements(self) -> None:
+        from cine_toaster.creation import load_creation
+        original = (self.root / "story/screenplay.fountain").read_bytes()
+        self.assertEqual(self.call("read_creation")["revision"], 0)
+        first = self.call("save_creation_candidate", {"kind": "concept", "title": "Premise", "text": "A new possibility.", "expected_revision": 0})
+        second = self.call("save_creation_candidate", {"kind": "screenplay", "title": "Trial", "text": "Title: Trial\n\nA start.",
+                           "concept": first["draft"]["id"], "expected_revision": 1})
+        self.assertEqual(second["draft"]["inputs"][0]["id"], first["draft"]["id"])
+        self.assertEqual(load_creation(self.root)["revision"], 2)
+        self.assertEqual((self.root / "story/screenplay.fountain").read_bytes(), original)
+        self.assertIn("refused", self.call("save_creation_candidate", {"kind": "concept", "title": "Conflict", "text": "No silent overwrite.", "expected_revision": 0}))
+        from cine_toaster.references import add_reference
+        picture = self.root / "exploration-fixture.png"
+        picture.write_bytes(b"test reference")
+        reference = add_reference(self.root, [picture], title="MCP exploration", kind="made")
+        recorded = self.call("record_exploration_round", {"title": "First pass", "references": [reference.name],
+                            "expected_revision": 2, "rationale": "Explore the age", "source": "Director's statement"})
+        self.assertEqual(load_creation(self.root)["rounds"][0], recorded["round"])
+        self.assertEqual(recorded["round"]["actor"]["kind"], "agent")
+
+    def test_agent_assesses_inception_but_does_not_approve_its_own_direction(self) -> None:
+        import anyio
+        result = self.call("assess_inception", {"title": "Ready to write", "summary": "The intention is defined.",
+            "readiness": [{"destination": "screenplay", "status": "ready", "summary": "We can explore the story.", "gaps": []}],
+            "proposal": {"destination": "screenplay", "question": "Develop this direction?", "scope": "Draft writing.",
+                         "why": "Enough context to begin.", "next_step": "Develop a retained screenplay candidate."},
+            "references": [], "expected_revision": 0})
+        self.assertEqual(result["assessment"]["actor"]["kind"], "agent")
+        current = self.call("read_creation")["inception_review"]["current"]
+        self.assertEqual(current["status"], "awaiting_decision")
+        names = {tool.name for tool in anyio.run(self.server.list_tools)}
+        self.assertNotIn("decide_inception_assessment", names)
 
     def test_an_agent_learns_the_flow_and_the_practices_from_the_product(self) -> None:
         import anyio

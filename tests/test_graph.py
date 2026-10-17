@@ -110,6 +110,9 @@ class ServingTests(unittest.TestCase):
         self.assertEqual(self.get("/app/some/route")[1], body)  # client routes fall back to the app
         self.assertIn(b"script-", self.get("/app/script.html")[1])
         self.assertNotIn(b"[project]", self.get("/app/../../pyproject.toml")[1])
+        for name in ("script", "preproduction", "creation", "assistant"):
+            with urllib.request.urlopen(self.base + f"/app/{name}.html", timeout=10) as response:
+                self.assertEqual(response.headers["Cache-Control"], "no-cache")
 
     def test_the_old_canvas_address_redirects(self) -> None:
         request = urllib.request.Request(self.base + "/canvas/")

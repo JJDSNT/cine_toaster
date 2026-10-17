@@ -22,9 +22,13 @@ from langgraph.types import interrupt
 
 from .models import Model, ModelUnavailable
 from .reads import READS, overview, read
+from .roles import DELEGATIONS, ROLES, scratch_fields, scratch_reset
+from ..production_context import WORK_POLICY
 from .runtime_client import RuntimeClient
 
-Assistant = TypedDict("Assistant", {
+#: The state shared with the page and across roles; each role's own scratch is
+#: declared with the role (`roles.py`) and joined here.
+SHARED = {
     "messages": Annotated[list, add_messages],
     "ag-ui": dict,        # what the page sends: its context, its tools
     "highlight": str,     # shared with the page: the shot the assistant points at
@@ -32,11 +36,20 @@ Assistant = TypedDict("Assistant", {
     "navigate": dict,     # shared with the page: where to take the director's screen
     "notes": list,        # what it looked up during the current turn
     "turn": str,          # the director's message the notes belong to
-})
+    "project_id": str,    # fixed canonical production identity for this conversation
+    "active_role": str,
+    "routing_reason": str,
+    "agent_status": dict,
+    "production_update": dict,
+    "completed_turn": str,
+    "resume_decision_id": str,
+}
+Assistant = TypedDict("Assistant", {**SHARED, **scratch_fields()})
 
 #: Where it may take the screen. Moving the screen changes nothing in the film,
 #: so it needs no confirmation; the director can always go back.
 ROOMS = {
+    "creation": "Creation / Inception: concept candidates, exploratory references and explicit screenplay inputs",
     "overview": "the production's front page", "script": "the screenplay room", "storyboard": "the storyboard",
     "dialogue": "the dialogue room", "sequences": "sequences and their versions", "scenes": "the list of scenes",
     "review": "what waits for review", "cut": "the cut room (joins between shots)", "cast": "the cast room",
@@ -49,7 +62,7 @@ ROOMS = {
 }
 
 #: Reads per turn before it must answer: enough to follow a question, not to wander.
-MAX_READS = 4
+MAX_READS = ROLES["coordinator"].budgets["reads"]
 
 #: What the assistant may propose. Each is a runtime command; none decides a gate.
 ACTIONS = {
@@ -64,7 +77,7 @@ ACTIONS = {
 }
 
 SYSTEM = (
-    "You are the directing assistant inside Cine Toaster, a film production tool. Answer in the "
+    "You are the Production Coordinator inside Cine Toaster, a film production tool. Answer in the "
     "director's language, briefly and concretely. You know only what is listed under 'The page', 'The film', "
     "'The scene in view' and 'What you looked up'; never invent shots, takes or results. When a question needs "
     "more, set `action` to `read` with `query` one of: "
@@ -78,15 +91,30 @@ SYSTEM = (
     "somewhere with `navigate` when they ask to see something or when showing it answers better than "
     "words: `room` one of " + "; ".join(f"`{name}` ({text})" for name, text in ROOMS.items()) + ". "
     "It only moves the screen, so do it without asking; say where you took them."
+    " For creative discovery, concept development, reference/mood briefs or readiness assessment, "
+    "use action `delegate_inception` to invoke the implemented Inception specialist in this same runtime. "
+    "It can append concept/screenplay candidates and readiness assessments, never approve human gates. "
+    "For developed art direction, image candidates or pixel review use `delegate_art_direction`. "
+    "The Art Direction role uses a separate Visual Prevalidation call and explicit generation quota consent. "
+    "For screenplay shot proposals use `delegate_directing`; for an evidence-based canonical continuity "
+    "audit use `delegate_continuity`. Directing saves versioned proposals and uses a separate Continuity "
+    "reviewer; neither promotes shots or approves storyboards. They reuse the existing continuity ledger. "
+    "Do not merely describe its job when the director asks for that work. Other specialised stage "
+    "executors are not implemented: say what is missing, never claim dispatch. Do not force existing "
+    "screenplays/productions back to Inception or confuse a scene title with the film title.\n" + WORK_POLICY
+    + "\nCurrent canonical production work is supplied every turn. Explain or progress relevant authorised work, "
+    "but pending/not_dispatched is not a live run. Honour capability blockers; do not claim that a local art "
+    "or continuity report completes sequence adherence review or ask the director to approve an unfinished task."
 )
 SCHEMA = {
     "type": "object",
     "properties": {
         "reply": {"type": "string"},
         "highlight": {"type": "string"},
-        "action": {"type": "string", "enum": ["none", "read", *ACTIONS]},
+        "action": {"type": "string", "enum": ["none", "read", *DELEGATIONS, *ACTIONS]},
         "query": {"type": "string", "enum": list(READS)},
         "scene": {"type": "string"},
+        "sequence": {"type": "string"},
         "shot": {"type": "string"},
         "text": {"type": "string"},
         "block": {"type": "string"},
@@ -173,7 +201,65 @@ def run_status(runtime: RuntimeClient, proposal: dict[str, Any]) -> str:
     return f"A execução está {run['state']}."
 
 
-def build(model: Model, runtime: RuntimeClient, checkpointer=None):
+def build(model: Model, runtime: RuntimeClient, checkpointer=None, models=None):
+    """`models(role)` gives the model that serves a role (`catalog.role_models`); by default `model` serves all."""
+
+    from .inception import nodes as inception_nodes
+    from .art import nodes as art_nodes
+    from .directing import nodes as directing_nodes
+
+    pick = models or (lambda role: model)
+    model = pick("coordinator")
+
+    def coordinator(state: Assistant) -> dict[str, Any]:
+        seen = page_context(state)
+        human = next((m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)), None)
+        turn = str(getattr(human, "id", "") or len(state["messages"]))
+        if state.get("completed_turn") == turn:
+            return {"active_role": "done"}  # replay of a completed turn must not append versions twice
+        try:
+            production = runtime.production()
+        except Exception:
+            production = {}  # the existing coordinator reports its read failure
+        project_id = production.get("id") or ""
+        if state.get("project_id") and project_id and state["project_id"] != project_id:
+            return {"active_role": "done", "proposal": {}, "pending_tool": {},
+                    "messages": [AIMessage(content="Esta conversa pertence a outro filme. Abra uma nova conversa para este projeto.")],
+                    "agent_status": {"role": "coordinator", "state": "blocked", "detail": "Project identity mismatch"}}
+        blank = bool(production) and not production.get("scenes") and not production.get("script_files")
+        if production and not production.get("scenes") and production.get("script_files"):
+            try:
+                files = runtime.screenplay().get("files") or []
+                # `toast new` creates a title-only Fountain file, not a developed script.
+                blank = bool(files) and all((item.get("text") or "").strip() in
+                    ("", "Title: " + production.get("title", "")) for item in files)
+            except Exception:
+                blank = False  # an unreadable imported screenplay is not proof of a blank film
+        decision_id = seen.get("Inception decision id", "")
+        attempt = seen.get('Direction continuation attempt', '')
+        suffix = '-' + attempt if attempt and len(attempt) <= 80 and all(c.isalnum() or c == '-' for c in attempt) else ''
+        decision_id = decision_id if decision_id and getattr(human, "id", "") == "decision-" + decision_id + suffix else ""
+        role = "inception" if seen.get("Current room") == "creation" or blank or decision_id else "coordinator"
+        if decision_id:
+            try:
+                creative = runtime.creation()
+                current = (creative.get("inception_review") or {}).get("current") or {}
+                handoff = next((item for item in creative.get('handoffs', []) if item['decision'] == decision_id), None)
+                if ((current.get("decision") or {}).get("id") == decision_id
+                        and (current.get("proposal") or {}).get("direction_plan")):
+                    role = "directing"
+                if ((current.get('decision') or {}).get('id') == decision_id and handoff
+                        and not handoff['stale'] and handoff['destination'] == 'storyboard'):
+                    role = 'art_direction'
+            except Exception:
+                pass  # the specialist validates the exact canonical decision before acting
+        why = "Creation workspace" if seen.get("Current room") == "creation" else "New film without screenplay" if blank else "Production request and whole-film context"
+        return {**scratch_reset(), "project_id": project_id or state.get("project_id", ""), "turn": turn,
+                "active_role": role, "routing_reason": why, "proposal": {}, "notes": [],
+                "planning_scene": seen.get("Current scene id", ""),
+                "resume_decision_id": decision_id,
+                "agent_status": {"role": role, "state": "working", "detail": why}}
+
     def assistant(state: Assistant) -> dict[str, Any]:
         seen = page_context(state)
         scene_id = seen.get("Current scene id", "")
@@ -195,6 +281,7 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None):
         looked = "\n\n".join(f"[{note['query']} {note['args']}]\n{note['result']}" for note in notes) or "(nothing yet)"
         left = MAX_READS - len(notes)
         prompt = ("The page:\n" + ("\n".join(f"- {key}: {value}" for key, value in seen.items()) or "- (nothing)")
+                  + "\n\nCanonical pending agent work:\n" + read(runtime, 'production_work', {})
                   + f"\n\nThe film:\n{film}\n\nThe scene in view:\n{records}"
                   + f"\n\nWhat you looked up this turn ({left} read(s) left):\n{looked}"
                   + "\n\nConversation:\n" + "\n".join(turns))
@@ -202,10 +289,25 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None):
             answer = model.ask(SYSTEM, prompt, SCHEMA)
         except ModelUnavailable as error:
             return {"messages": [AIMessage(content=f"Não consegui falar com o modelo: {error.message}")],
-                    "proposal": {}, "notes": [], "turn": turn}
+                    "proposal": {}, "notes": [], "turn": turn, "completed_turn": turn,
+                    "agent_status": {"role": "coordinator", "state": "blocked"}}
         action = answer.get("action", "none")
+        if action in ("delegate_directing", "delegate_continuity"):
+            role = action.removeprefix("delegate_")
+            return {"active_role": role, "planning_role": role, "planning_scene": answer.get("scene") or scene_id,
+                    "proposal": {}, "turn": turn, "agent_status": {"role": role, "state": "working"}}
+        if action == "delegate_art_direction":
+            return {"active_role": "art_direction", "proposal": {}, "turn": turn,
+                    "agent_status": {"role": "art_direction", "state": "working"}}
+        if action == "delegate_inception":
+            if state.get("returned_to_coordinator"):
+                return {"messages": [AIMessage(content="O encaminhamento não avançou: a capacidade solicitada ainda não está integrada.")],
+                        "completed_turn": turn, "agent_status": {"role": "coordinator", "state": "blocked"}}
+            return {"active_role": "inception", "proposal": {}, "turn": turn,
+                    "routing_reason": "Coordinator delegated creative development",
+                    "agent_status": {"role": "inception", "state": "working", "detail": "Creative development"}}
         if action == "read" and left > 0:
-            args = {key: answer[key] for key in ("scene", "shot", "text") if answer.get(key)}
+            args = {key: answer[key] for key in ("sequence", "scene", "shot", "text") if answer.get(key)}
             name = str(answer.get("query", ""))
             return {"notes": notes + [{"query": name, "args": args, "result": read(runtime, name, args)}],
                     "turn": turn, "proposal": {}}
@@ -225,7 +327,8 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None):
                     proposal = {}
         update: dict[str, Any] = {"messages": [AIMessage(content=answer.get("reply", ""))],
                                   "highlight": answer.get("highlight", ""), "proposal": proposal, "notes": notes,
-                                  "turn": turn}
+                                  "turn": turn, "completed_turn": "" if proposal else turn,
+                                  "agent_status": {"role": "coordinator", "state": "awaiting_confirmation" if proposal else "complete"}}
         where = answer.get("navigate") or {}
         if where.get("room") in ROOMS:
             # A fresh id, so asking for the same place twice moves the screen twice.
@@ -234,6 +337,12 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None):
         return update
 
     def route(state: Assistant) -> str:
+        if state.get("active_role") in ("directing", "continuity"):
+            return "planning_context"
+        if state.get("active_role") == "art_direction":
+            return "art_context"
+        if state.get("active_role") == "inception":
+            return "inception_context"
         if state.get("proposal"):
             return "confirm"
         last = state["messages"][-1] if state["messages"] else None
@@ -270,7 +379,8 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None):
             question = f"{verb} {target} na cena {proposal['scene']}?"
         answer = interrupt({"message": question, "proposal": proposal})
         if not (isinstance(answer, dict) and answer.get("approved")):
-            return {"messages": [AIMessage(content="Certo, não fiz nada.")], "proposal": {}}
+            return {"messages": [AIMessage(content="Certo, não fiz nada.")], "proposal": {},
+                    "completed_turn": state.get("turn"), "agent_status": {"role": "coordinator", "state": "complete"}}
         payload = {"scene_id": proposal["scene"]}
         if proposal["action"] == "set_cuts":
             payload.update(rationale=proposal.get("reason", ""), cuts=[
@@ -289,17 +399,61 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None):
             result = runtime.command(proposal["action"], payload)
         except Exception as error:
             return {"messages": [AIMessage(content=f"O runtime recusou: {getattr(error, 'message', error)}")],
-                    "proposal": {}}
+                    "proposal": {}, "completed_turn": state.get("turn"),
+                    "agent_status": {"role": "coordinator", "state": "blocked"}}
         # Say what actually happened, read back from the records, not what was hoped for.
         status = run_status(runtime, proposal) if proposal["action"] not in ("set_cut", "set_cuts") else ""
         return {"messages": [AIMessage(content=f"Feito: {verb.lower()} {target} (revisão {result.get('revision')}). "
                                                + status)],
-                "proposal": {}}
+                "proposal": {}, "completed_turn": state.get("turn"),
+                "agent_status": {"role": "coordinator", "state": "complete"}}
 
     graph = StateGraph(Assistant)
+    context, inception, tool = inception_nodes(pick("inception"), runtime)
+    graph.add_node("coordinator", coordinator)
     graph.add_node("assistant", assistant)
+    graph.add_node("inception_context", context)
+    graph.add_node("inception", inception)
+    graph.add_node("inception_tool", tool)
+    art_context, art_reason, art_tool, art_generate, art_wait = art_nodes(
+        pick("art_direction"), runtime, reviewer=pick("visual_prevalidation"))
+    planning_context, planning_reason, planning_tool = directing_nodes(
+        pick("directing"), runtime, auditor=pick("continuity"), reviewer=pick("continuity_review"))
+    for name, node in (("planning_context", planning_context), ("directing", planning_reason),
+                       ("directing_tool", planning_tool), ("continuity", planning_tool)):
+        graph.add_node(name, node)
+    for name, node in (("art_context", art_context), ("art_reason", art_reason), ("art_tool", art_tool),
+                       ("visual_prevalidation", art_tool),
+                       ("art_generate", art_generate), ("art_wait", art_wait)):
+        graph.add_node(name, node)
     graph.add_node("confirm", confirm)
-    graph.add_edge(START, "assistant")
-    graph.add_conditional_edges("assistant", route, {"confirm": "confirm", "assistant": "assistant", END: END})
+    graph.add_edge(START, "coordinator")
+    graph.add_conditional_edges("coordinator", lambda s: s["active_role"],
+                                {"coordinator": "assistant", "inception": "inception_context", "directing": "planning_context", "art_direction": "art_context", "done": END})
+    graph.add_conditional_edges("inception_context", lambda s: "inception" if s.get("inception_context") else END,
+                                {"inception": "inception", END: END})
+    graph.add_conditional_edges("assistant", route, {"confirm": "confirm", "assistant": "assistant",
+                                "inception_context": "inception_context", "art_context": "art_context", "planning_context": "planning_context", END: END})
+    graph.add_conditional_edges("inception", lambda s: "inception_tool" if s.get("pending_tool") else
+                                "art_context" if s.get("active_role") == "art_direction" else
+                                "planning_context" if s.get("active_role") in ("directing", "continuity") else
+                                "assistant" if s.get("active_role") == "coordinator" else END,
+                                {"inception_tool": "inception_tool", "art_context": "art_context", "planning_context": "planning_context", "assistant": "assistant", END: END})
+    graph.add_conditional_edges("inception_tool", lambda s: END if s.get("completed_turn") == s.get("turn") else "inception",
+                                {"inception": "inception", END: END})
     graph.add_edge("confirm", END)
-    return graph.compile(checkpointer=checkpointer)
+    graph.add_conditional_edges("planning_context", lambda s: END if s.get("completed_turn") == s.get("turn") else "directing")
+    graph.add_conditional_edges("directing", lambda s: END if s.get("completed_turn") == s.get("turn") else
+                                "art_context" if s.get("active_role") == "art_direction" else
+                                "continuity" if s.get("planning_pending", {}).get("action") == "review_continuity" else "directing_tool")
+    for name in ("directing_tool", "continuity"):
+        graph.add_conditional_edges(name, lambda s: END if s.get("completed_turn") == s.get("turn") else "directing")
+    graph.add_conditional_edges("art_context", lambda s: "art_reason" if s.get("art_context") else END)
+    graph.add_conditional_edges("art_reason", lambda s: END if s.get("completed_turn") == s.get("turn") else
+                                "art_generate" if s.get("art_pending", {}).get("action") == "generate" else
+                                "visual_prevalidation" if s.get("art_pending", {}).get("action") == "inspect" else "art_tool")
+    for name in ("art_tool", "art_generate", "art_wait", "visual_prevalidation"):
+        graph.add_conditional_edges(name, lambda s: END if s.get("completed_turn") == s.get("turn") else
+                                    "art_wait" if s.get("art_waiting") else "art_reason")
+    # Each role has tighter model/tool budgets; this accommodates cross-role handoffs.
+    return graph.compile(checkpointer=checkpointer).with_config({"recursion_limit": 80})

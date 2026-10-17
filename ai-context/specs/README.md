@@ -48,6 +48,13 @@ work is tracked separately under `ai-context/work/`.
 | `SPEC-0010` | locations and the backlot: a set declared once, pinned from a shared library | accepted | partial |
 | `SPEC-0011` | transition mattes and overlays: a join shaped by a picture, and a picture riding it | accepted | partial |
 | `SPEC-0012` | the compositing graph: primitives, typed values, colour, identity, renderers (ADR 0022) | accepted | partial |
+| `SPEC-0013` | creation candidates: immutable concept/screenplay versions and explicit upstream inputs (ADR 0026) | accepted | partial |
+| `SPEC-0014` | storyboard drawings: retained candidates, pinned shot/reference context and review navigation (ADR 0027) | accepted | partial |
+| `SPEC-0015` | Production Coordinator and bounded Inception agent loop inside the existing CoAgent | accepted | partial |
+| `SPEC-0016` | Art Direction, retained visual briefs and independent pixel prevalidation | accepted | partial |
+| `SPEC-0017` | Directing shot proposals and independent continuity review | accepted | partial |
+| `SPEC-0018` | Decision inbox and approved stage inputs | accepted | partial |
+| `SPEC-0019` | Sequence-level Inception adherence, screenplay/storyboard evidence and independent review | accepted | partial |
 
 ## Rule
 

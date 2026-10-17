@@ -69,6 +69,63 @@ the user's validation).
 
 Compositing, the demos line and earlier:
 
+- [CT-0115](CT-0115-production-roles-and-model-catalogue.md) — agent review:
+  declared roles, model capabilities and catalogue, role bindings; the RunPod/
+  ComfyUI three layers and the format interviewer planned (doing)
+- [CT-0114](CT-0114-explicit-sequence-review-work.md) — explicit agent-owned
+  sequence review request in Creation, shared query/command, automatic agent
+  visibility and separate GUI AI-work counts; validation in progress (doing)
+- [CT-0113](CT-0113-sequence-inception-storyboard-review.md) — restore canonical
+  sequence review scope, runtime work-structure context and original-source
+  screenplay/storyboard comparison; context slice passed 1199 tests and is
+  active on the existing LAN server; package /
+  independent adherence review / sequence-first GUI still in progress (doing)
+- [CT-0112](CT-0112-decision-inbox-and-stage-handoff.md) — cross-workspace
+  canonical decision inbox, atomic approved stage inputs and existing-CoAgent
+  storyboard publication; 1186-test regression passed; sequence acceptance
+  correction tracked in CT-0113 (doing)
+- [CT-0111](CT-0111-directing-and-continuity-agents.md) — reuse the existing
+  Coordinator for retained shot planning and independent continuity reviews,
+  existing ledger, scoped human gates and preproduction display; 1172-test full
+  regression, public CoAgents/browser and read-only live LAN checks passed (review)
+- [CT-0110](CT-0110-art-direction-and-visual-prevalidation.md) — Art Direction
+  and actual-image prevalidation in the existing CoAgent, versioned briefs /
+  findings, quota-confirmed jobs and situational GUI; 1149-test full regression,
+  real CoAgents browser and visual-input smoke passed; active on LAN (review)
+- [CT-0109](CT-0109-lan-gui-onboarding.md) — runtime-facing onboarding for a
+  trusted-LAN/mobile GUI launch, real LAN URLs and honest WSL/security boundaries
+  delivered; follow-up authorises LAN-scoped WSL NAT forwarding and automatic
+  read-only startup diagnostics; Windows LAN HTTP checked and phone access
+  confirmed by the director (review)
+- [CT-0108](CT-0108-provider-independent-inception-runtime.md) — Inception /
+  Coordinator implemented inside the existing public CoAgent, with bounded
+  shared authoring tools, canonical human-direction handoff and tested GUI
+  retained revisions. Provider selection remains host > environment > current
+  CLI; full regression and final GUI/live checks passed (review)
+- [CT-0107](CT-0107-agent-led-work-and-human-review-loop.md) — first slice:
+  Inception readiness and human direction decisions delivered, with a real
+  pending Demo 01 request and green regression/browser checks. Continuation
+  must reuse existing CoAgents/built-in workflows, not a parallel executor;
+  autonomous dispatch and specialist integration remain open (review)
+- [CT-0106](CT-0106-storyboard-candidates-and-inception-inputs.md) — storyboard
+  image candidates linked to shots and Inception inputs; opening-scene vertical
+  slice delivered for review, three retained opening drawings, input/use links,
+  form-free situational Inception and a green full regression; creative approvals and
+  downstream master handoff remain separate (review)
+- [CT-0105](CT-0105-creation-inception-and-stage-inputs.md) — Creation / Inception
+  before the screenplay: brainstorming, rough references and explicit use of
+  earlier artifact versions as later inputs; first GUI, shared candidate journal
+  and staged reference jobs implemented; explicit creative correction rounds
+  distinguish revision from image ancestry and approval. Latest director
+  feedback recorded for follow-up: copilot-first interaction, secondary manual
+  forms and a cross-module human-decision inbox; not implemented yet (review)
+- [CT-0104](CT-0104-demo-driven-gui-flow.md) — rethink the GUI through Demo 01:
+  first React pilot with screenplay beside proposed shots, contextual clay
+  studies, assistant availability and real-data browser checks; visual-candidate
+  authoring and human usability validation remain open (review)
+- [CT-0103](CT-0103-demo-01-process-and-gui-incident.md) — Demo 01 incident:
+  storyboard skipped, assistant omitted at launch, GUI/process and onboarding
+  findings; repeatable acceptance scenario for the actual workflow (review)
 - `CT-0102` — master pictures not bound to a model: the adapter by
   production, scene or shot; ADR 0025 (done)
 - `CT-0101` — the `codex-image` adapter: `toast references generate`, MCP
