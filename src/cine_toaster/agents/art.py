@@ -12,6 +12,7 @@ from .loop import Loop, step
 from .models import supports
 from .reads import overview, production_work
 from .roles import ROLES
+from ..art_direction import MAX_REVIEW_RECORDS
 from ..production_context import WORK_POLICY
 from ..stage_handoff import target_members, target_scenes
 
@@ -19,6 +20,8 @@ MAX_STEPS, MAX_REVIEWS, MAX_GENERATIONS = (ROLES["art_direction"].budgets[key]
                                            for key in ("steps", "reviews", "generations"))
 #: Drawings one consented batch may hold: a sequence's missing shots, not an open-ended run.
 MAX_BATCH = 30
+#: New pictures per inspection; the rest of the request carries the brief's comparison inputs.
+MAX_TARGETS = 6
 WAIT_SECONDS = 25
 
 SYSTEM = """You are the Art Direction specialist in Cine Toaster's Agent Runtime.
@@ -33,6 +36,8 @@ arguments. The runtime supplies revisions, source tokens and fixed actor identit
 Only generate after a real plan; a human interrupt confirms quota on that exact plan.
 No need to ask the same permission in chat. Every generation attempt needs consent.
 Jobs use the existing engine; retaining a new reference is not approving a master.
+Inspect at most six new pictures at a time (the brief's comparison inputs fill
+the rest); a sequence is reviewed in several inspections.
 After generation or when evaluating existing material, inspect sends actual images
 to a separate Visual Prevalidation call. Do not grade your own images from metadata.
 After failed review, correct the brief/plan using specific findings within remaining
@@ -192,6 +197,13 @@ def nodes(model, runtime, reviewer=None, waits=None):
             film = overview(runtime.production())
             screenplay = bounded(runtime.screenplay(), 7000)
             decision = state.get('resume_decision_id') or state.get('art_handoff_decision') or ''
+            if not decision and state.get('background'):
+                # A continuation after a restart lost the thread's memory: the work it serves is the
+                # current approved handoff in the records, never a guess.
+                current_decision = (((value.get('inception_review') or {}).get('current') or {}).get('decision') or {}).get('id')
+                live = [item for item in value.get('handoffs', []) if not item.get('superseded') and not item['stale']
+                        and item['decision'] == current_decision]
+                decision = live[0]['decision'] if len(live) == 1 else ''
             handoff = next((item for item in value.get('handoffs', []) if item['decision'] == decision), None) if decision else None
             if handoff and handoff['stale']:
                 raise ValueError('The approved handoff inputs changed; a new assessment is needed')
@@ -317,9 +329,15 @@ def nodes(model, runtime, reviewer=None, waits=None):
                 brief = _brief(value, call)
                 references = call.get('references') or []
                 parents = [item['id'] for item in brief['inputs'] if item['kind'] == 'reference']
-                selected = list(dict.fromkeys([*references, *parents]))
                 if not references:
                     raise ValueError('Select target reference images to inspect')
+                if len(references) > MAX_TARGETS:
+                    raise ValueError(f'Inspect at most {MAX_TARGETS} new pictures at a time; '
+                                     'review a sequence in several inspections')
+                # Comparison inputs fill what the targets leave of one request, never crowd them out.
+                room = MAX_REVIEW_RECORDS - len(dict.fromkeys(references))
+                parents = [ref for ref in parents if ref not in references][:room]
+                selected = list(dict.fromkeys([*references, *parents]))
                 package = runtime.visual_images(selected)
                 labels = [{key: val for key, val in item.items() if key != 'data'} for item in package['images']]
                 # A fresh reviewer call: no creator conversation or creator quality claims.
@@ -464,7 +482,8 @@ def nodes(model, runtime, reviewer=None, waits=None):
                 return stop(state, f"O job {job['id']} terminou em {job['state']}: {job.get('error')}", art_waiting=False)
             if not job.get('adopted_at'):
                 runtime.keep_reference(job['id'])  # overwrite is always false
-            kept = {'job': job['id'], 'reference': job['result']['summary']['reference']}
+            kept = {'job': job['id'], 'reference': job['result']['summary']['reference'],
+                    'planned_as': (job.get('params') or {}).get('title', '')}  # the plan's title names its shot
             if job['id'] in state.get('art_batch', {}):
                 kept['for'] = state['art_batch'][job['id']]  # the shot this drawing was planned for
             return {**refreshed(state, 'keep_reference', kept), 'art_waiting': False}

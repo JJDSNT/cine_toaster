@@ -6,6 +6,7 @@ const statusNames = { ready: "Enough to proceed", needs_work: "Gaps to resolve",
 export function InceptionReview({ data, reload, onDecision, title = "Is there enough to proceed?" }: {
   data: CreationState; reload: () => Promise<void>; onDecision?: (decisionId: string, attempt?: string) => void; title?: string;
 }) {
+  const [sent, setSent] = useState("");
   const [editing, setEditing] = useState(false);
   const [guidance, setGuidance] = useState("");
   const [error, setError] = useState("");
@@ -65,8 +66,11 @@ export function InceptionReview({ data, reload, onDecision, title = "Is there en
         <p>{handoff.stale ? "Source material changed; reassessment needed." :
           `${handoff.outputs.length} retained output(s) · ${targetShotCount(handoff.target)} target shot(s). This is not a running-job claim.`}</p>
         {handoff.outputs.map((item) => <p key={item.id}><a href={item.url}>See storyboard {item.scene} / {item.shot}</a></p>)}
-        {!handoff.stale && onDecision && <button onClick={() => onDecision(handoff.decision,
-          `retry-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`)}>Continue approved work</button>}
+        {!handoff.stale && onDecision && <button disabled={sent === handoff.id} onClick={() => {
+          // One request per click: repeated clicks started several runs on one conversation (Demo 01).
+          setSent(handoff.id);
+          onDecision(handoff.decision, `retry-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
+        }}>{sent === handoff.id ? "Sent to the assistant · follow the progress above" : "Continue approved work"}</button>}
       </div>}
       {error && <p role="alert">{error} · Your direction text was retained. Refresh records before retrying.</p>}
     </div>

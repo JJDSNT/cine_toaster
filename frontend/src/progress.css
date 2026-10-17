@@ -1,0 +1,28 @@
+.progress { padding: .9rem 1.6rem 1rem; border-bottom: 1px solid #344138; background: #18201a; }
+.progress-phases { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .4rem; }
+.progress-phase { display: grid; grid-template-columns: auto 1fr; column-gap: .45rem; padding: .5rem .6rem; border-radius: .4rem;
+  border: 1px solid #2c362f; color: #8f9c8e; font-size: .78rem; min-width: 0; }
+.progress-mark { grid-row: span 3; font-weight: 700; width: 1.3rem; height: 1.3rem; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid currentColor; font-size: .72rem; }
+.progress-label { font-weight: 600; color: #dfe7dd; overflow-wrap: anywhere; }
+.progress-label a { color: inherit; }
+.progress-state { text-transform: uppercase; letter-spacing: .04em; font-size: .66rem; }
+.progress-summary { overflow-wrap: anywhere; }
+.progress-phase.is-done { color: #9fc79f; }
+.progress-phase.is-active { color: #f3dba4; border-color: #f3dba4; background: #262a1d; }
+.progress-phase.is-waiting_you { color: #ffb38a; border-color: #ffb38a; background: #2d2019; }
+.progress-phase.is-blocked { color: #ff8f8f; border-color: #ff8f8f; }
+.progress-lines { margin: .8rem 0 0; display: grid; gap: .3rem; font-size: .88rem; }
+.progress-lines div { display: grid; grid-template-columns: 3.4rem 1fr; gap: .6rem; }
+.progress-lines dt { color: #8f9c8e; text-transform: uppercase; font-size: .7rem; letter-spacing: .05em; padding-top: .15rem; }
+.progress-lines dd { margin: 0; color: #dfe7dd; }
+.progress-lines .is-yours dd { color: #ffb38a; font-weight: 600; }
+.progress-lines .is-yours a { color: inherit; }
+.progress-failed { padding: .6rem 1.6rem; color: #bbc7ba; }
+@media (max-width: 900px) {
+  .progress { padding: .8rem 1rem; }
+  .progress-phases { grid-template-columns: 1fr; }
+  .progress-phase { grid-template-columns: auto auto 1fr; align-items: center; }
+  .progress-mark { grid-row: auto; }
+  .progress-summary { grid-column: 2 / -1; }
+}

@@ -106,12 +106,17 @@ def save_art_brief(root: Path, *, title, text, criteria, references, expected_re
         return _append(root, state, 'art_briefs', record, actor)
 
 
+MAX_REVIEW_RECORDS = 8
+
+
 def image_package(root: Path, references: list[str]):
     """Only registered, digest-checked raster files; no model-supplied paths/URLs."""
     from PIL import Image
 
-    if not isinstance(references, list) or not 1 <= len(references) <= 4:
-        raise ValidationError('Inspect 1 to 4 reference records per review')
+    # Eight: what every model adapter carries in one request (models._image_bytes). Four left no room
+    # for new drawings beside a brief's comparison inputs (Demo 01: every inspection refused).
+    if not isinstance(references, list) or not 1 <= len(references) <= MAX_REVIEW_RECORDS:
+        raise ValidationError(f'Inspect 1 to {MAX_REVIEW_RECORDS} reference records per review')
     root = Path(root).resolve()
     snapshots = reference_snapshot(root, references)
     images, total = [], 0

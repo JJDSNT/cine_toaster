@@ -260,6 +260,16 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             except CineToasterError as error:
                 self._send_json(error.public_dict(), HTTPStatus(error.http_status))
             return
+        if parsed.path == "/api/progress":
+            # The film phase by phase: done, happening, waiting for the director, next (read only).
+            from .jobs import public_job
+            from .progress import production_progress
+            try:
+                jobs = [public_job(job) for job in self.job_manager.list(project_id=self._project_id(), limit=200)]
+                self._send_json(production_progress(self.project_root, jobs))
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
         if parsed.path == "/api/generation":
             # Recipes, endpoint health and scaling, and a batch plan (ADR 0034). Reads only.
             from .providers.recipes import batch_plan, endpoint_config, health, recipes

@@ -4,6 +4,7 @@ import { InceptionReview } from "./InceptionReview.tsx";
 import { ContextAssistant } from "./ContextAssistant.tsx";
 import type { Continuation } from "./Assistant.tsx";
 import "./decisions.css";
+import { ProductionProgress } from "./ProductionProgress.tsx";
 import { workScope, workState, type AgentWork } from "./productionWork.ts";
 
 interface Inbox {
@@ -70,6 +71,7 @@ export function DecisionInbox() {
     <p>{creation?.title ?? "Production decisions"} · Human decisions and AI work</p></div><button onClick={() => void reload()}>Refresh decisions</button></header>
     <nav className="prep-workspaces"><a href="/app/creation.html">Creation / Inception</a>
       <a href="/app/preproduction.html">Screenplay & Storyboard</a><a href="/">Control Room</a><a href="/app/">Canvas</a></nav>
+    <ProductionProgress />
     <div className="prep-body"><main className="prep-work">
       {error && <p role="alert">Could not refresh decisions: {error}. A failed read does not mean there are no requests.</p>}
       {!data && !error && <p role="status">Reading production requests…</p>}

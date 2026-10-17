@@ -5,7 +5,16 @@ import { ReferenceGallery } from "./ReferenceGallery.tsx";
 import { InceptionReview } from "./InceptionReview.tsx";
 import { DecisionLink } from "./DecisionInbox.tsx";
 import { ArtDirection } from "./ArtDirection.tsx";
+import { ProductionProgress } from "./ProductionProgress.tsx";
 import { candidateAddress, request, type CreationState, type Draft } from "./creation.ts";
+
+/** One line for a batch of pictures: the progress strip above says where it leads. */
+function jobSummary(jobs: { state: string }[]): string {
+  const count = (state: string) => jobs.filter((job) => job.state === state).length;
+  const parts = [["kept", count("adopted")], ["ready", count("succeeded")], ["drawing", count("running")],
+                 ["queued", count("queued")], ["refused", count("failed")]].filter(([, n]) => n) as [string, number][];
+  return `${jobs.length} picture job(s): ${parts.map(([label, n]) => `${n} ${label}`).join(", ")} · details`;
+}
 
 interface Job { id: string; kind: string; state: string; message?: string; error?: unknown; adopted_at?: string; result?: { summary?: { title?: string } } }
 
@@ -77,6 +86,7 @@ export function Creation() {
     <nav className="prep-workspaces" aria-label="Workspaces"><DecisionLink /><span aria-current="page">Creation / Inception</span>
       <a href={storyboardAddress}>Screenplay & Storyboard →</a><a href="/?view=scenes">Production →</a>
       <a href="/?view=sequences">Assembly & versions</a><a href="/">Control Room</a></nav>
+    <ProductionProgress />
     {error && <p className="prep-notice" role="alert">{error}</p>}
     {notice && <p className="creation-notice" role="status">{notice}</p>}
     <div className="prep-body creation-body">
@@ -114,6 +124,7 @@ export function Creation() {
           {data && <details className="creation-history-detail"><summary>History, revisions & downstream use</summary><ReferenceEvolution data={data} /></details>}
         </section>
         {jobsError && <p role="alert">Reference jobs could not be refreshed: {jobsError}</p>}
+        {jobs.length > 0 && <details className="creation-jobs"><summary>{jobSummary(jobs)}</summary>
         {jobs.map((job) => <article className="creation-job" key={job.id}><h3>{job.result?.summary?.title ?? "Reference exploration"} · {job.state}</h3>
           {job.message && <p>{job.message}</p>}{Boolean(job.error) && <pre role="alert">{JSON.stringify(job.error)}</pre>}
           {job.state === "succeeded" && <><img src={`/api/creation/reference-preview?job=${encodeURIComponent(job.id)}`} alt="Generated reference awaiting review" />
@@ -127,7 +138,7 @@ export function Creation() {
             setJobs((items) => items.map((item) => item.id === next.id ? next : item));
           })}>Cancel generation</button>}
           {job.state === "adopted" && <p>Retained as a new reference; earlier images were preserved.</p>}
-        </article>)}
+        </article>)}</details>}
       </main>
       <ContextAssistant seen={seen} continuation={continuation} onRecordsChanged={() => { void reload().catch((reason) => setError(String(reason))); }} />
     </div>
