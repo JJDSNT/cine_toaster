@@ -90,8 +90,6 @@ function Conversation({ seen, onHighlight, onNavigate, onProductionUpdate, conti
   useAgentContext({ description: "What the room shows", value: seen.focus });
   useAgentContext({ description: "Selected", value: seen.selected || "nothing" });
   useAgentContext({ description: "Also on screen", value: seen.details || "nothing else" });
-  useAgentContext({ description: "Inception decision id", value: continuation?.decisionId || "" });
-  useAgentContext({ description: "Direction continuation attempt", value: continuation?.attempt || "" });
   const { agent, isReady } = useAgent({ agentId: "assistant" });
   const { copilotkit } = useCopilotKit();
   const [continuationError, setContinuationError] = useState("");
@@ -114,8 +112,11 @@ function Conversation({ seen, onHighlight, onNavigate, onProductionUpdate, conti
     setContinuationError("");
     agent.threadId = thread;
     // This is a human-originated CoAgent interaction, not a second dispatcher.
-    // The graph must resolve the ID from production records before using it.
-    agent.addMessage({ id: `decision-${intent}`, role: "user",
+    // `resume` is typed state bound to this one message (ADR 0034); the graph
+    // resolves the decision from production records before using it.
+    const message = `decision-${intent}`;
+    agent.setState({ ...(agent.state ?? {}), resume: { decision: id, message } });
+    agent.addMessage({ id: message, role: "user",
       content: "Continue from the direction I just recorded. Read the saved decision and its scope before acting." });
     void copilotkit.runAgent({ agent }).catch((error: unknown) => {
       setContinuationError(`The decision was saved, but continuation failed: ${String(error)}. Ask the assistant to continue when available.`);

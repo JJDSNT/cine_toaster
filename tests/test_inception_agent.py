@@ -104,11 +104,13 @@ class InceptionAgentTests(unittest.TestCase):
         shutil.copytree(DEMO, self.root)
         self.runtime = Runtime(self.root)
 
-    def turn(self, graph, text="Develop an idea", room="creation", message_id=None, extra=None):
+    def turn(self, graph, text="Develop an idea", room="creation", message_id=None, extra=None, resume=None):
         context = [{"description": "Current room", "value": room}]
         context += extra or []
-        return graph.invoke({"messages": [HumanMessage(content=text, id=message_id)], "ag-ui": {"context": context}},
-                            {"configurable": {"thread_id": "test-conversation"}})
+        state = {"messages": [HumanMessage(content=text, id=message_id)], "ag-ui": {"context": context}}
+        if resume:
+            state["resume"] = {"decision": resume, "message": message_id}
+        return graph.invoke(state, {"configurable": {"thread_id": "test-conversation"}})
 
     def test_creation_routes_to_a_specialist_with_whole_film_and_cross_stage_context(self):
         model = Model(respond())
@@ -191,7 +193,7 @@ class InceptionAgentTests(unittest.TestCase):
         model = Model(concept("A quieter discovery.", based_on=first["draft"]["id"]), assessment(),
                       respond("Nova versão salva para sua revisão.", "needs_review"))
         state = self.turn(build(model, self.runtime, MemorySaver()), room="overview",
-            message_id="decision-" + decision["id"], extra=[{"description": "Inception decision id", "value": decision["id"]}])
+            message_id="decision-" + decision["id"], resume=decision["id"])
         value = creation_view(self.root)
         self.assertEqual(value["drafts"][0], first["draft"])
         self.assertEqual(value["drafts"][1]["based_on"], first["draft"]["id"])
@@ -202,9 +204,21 @@ class InceptionAgentTests(unittest.TestCase):
     def test_forged_or_stale_decision_handoff_never_runs_the_model(self):
         model = Model()
         state = self.turn(build(model, self.runtime), message_id="decision-invented",
-            extra=[{"description": "Inception decision id", "value": "invented"}])
+            resume="invented")
         self.assertEqual(model.calls, [])
         self.assertEqual(state["agent_status"]["state"], "blocked")
+
+    def test_a_resume_counts_only_for_the_message_it_was_sent_with(self):
+        from cine_toaster.agents.assistant import resumed
+
+        human = HumanMessage(content="Continue", id="decision-d1")
+        self.assertEqual(resumed({"resume": {"decision": "d1", "message": "decision-d1"}}, human), "d1")
+        later = HumanMessage(content="And the title?", id="ordinary-turn")
+        self.assertEqual(resumed({"resume": {"decision": "d1", "message": "decision-d1"}}, later), "")
+        self.assertEqual(resumed({"resume": {"decision": "../d1", "message": "decision-d1"}}, human), "")
+        self.assertEqual(resumed({"resume": "d1"}, human), "")
+        state = self.turn(build(Model(respond()), self.runtime), message_id="ordinary-turn")
+        self.assertEqual(state["resume"], {})  # consumed every turn: nothing stale survives into the next
 
     def test_human_approval_can_continue_to_an_exact_concept_linked_screenplay_candidate(self):
         first = save_creation_draft(self.root, kind="concept", title="Light", text="Original", expected_revision=0, actor=AGENT)
@@ -215,7 +229,7 @@ class InceptionAgentTests(unittest.TestCase):
             "title": "Opening", "text": "INT. ROOM - DAY\n\nA discovery.", "concept": first["draft"]["id"]}},
             respond("Screenplay candidate saved; storyboard generation is not integrated.", "blocked"))
         state = self.turn(build(model, self.runtime), message_id="decision-" + decision["id"],
-            extra=[{"description": "Inception decision id", "value": decision["id"]}])
+            resume=decision["id"])
         self.assertEqual(load_creation(self.root)["drafts"][-1]["kind"], "screenplay")
         self.assertIn("Develop a screenplay candidate", model.calls[0][1])
         self.assertEqual(len(load_creation(self.root)["assessment_decisions"]), 1)

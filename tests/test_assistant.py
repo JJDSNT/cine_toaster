@@ -236,6 +236,24 @@ class AgUiTests(unittest.TestCase):
         self.assertEqual(snapshots[-1].get("highlight"), "P3")
         self.assertIn("Selected shot: P3", model.prompts[0])
 
+    def test_a_typed_resume_arrives_over_ag_ui_and_is_consumed(self) -> None:
+        from fastapi.testclient import TestClient
+
+        from cine_toaster.agents import server
+
+        # The runtime is unreachable here: the role the turn was routed to is the proof the resume arrived.
+        application = server.app("http://127.0.0.1:1", model=FakeModel())
+        body = {"threadId": "t2", "runId": "r2", "tools": [], "context": [], "forwardedProps": {},
+                "state": {"resume": {"decision": "d1", "message": "decision-d1"}},
+                "messages": [{"id": "decision-d1", "role": "user", "content": "Continue from the direction I recorded."}]}
+        with TestClient(application) as client:
+            response = client.post("/", json=body, headers={"accept": "text/event-stream"})
+        events = [json.loads(line[5:]) for line in response.text.splitlines() if line.startswith("data:")]
+        snapshot = [event["snapshot"] for event in events if event["type"] == "STATE_SNAPSHOT"][-1]
+        self.assertEqual(snapshot["agent_status"]["role"], "inception")
+        self.assertEqual(snapshot["resume_decision_id"], "d1")
+        self.assertEqual(snapshot["resume"], {})
+
 
 if __name__ == "__main__":
     unittest.main()

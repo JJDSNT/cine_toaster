@@ -322,11 +322,11 @@ three carry images; model catalogue (`agents/model_catalog.yaml`, extended by
 optional role -> model binding by the person; `toast doctor` reports which
 roles the supplied model serves. To do, in order:
 
-- [ ] **Typed resume of an approved decision.** Today encoded as a human
-  message id `decision-<id>-<attempt>` cross-checked with page-context
-  strings (`assistant.py` coordinator). Solve: a typed AG-UI forwarded
-  property (or a `resume` state input) carrying the decision id, validated
-  against the Creation journal; drop the id convention.
+- [x] **Typed resume of an approved decision** (done 2026-10-17). Was a
+  human message id `decision-<id>-<attempt>` parsed against page-context
+  strings. Now the page sets agent state `resume` = {decision, message};
+  `assistant.resumed()` honours it only for that message and the Coordinator
+  consumes it every turn; roles still re-read the decision from the records.
 - [ ] **Role-specific context digests.** `bounded()` truncates JSON mid-string
   and drafts are cut at 1800 characters. Solve: each role builds a digest of
   the records it needs (KDP Studio's fixed *readers*), and asks for a focused

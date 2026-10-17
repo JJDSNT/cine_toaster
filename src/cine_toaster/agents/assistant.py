@@ -43,6 +43,7 @@ SHARED = {
     "production_update": dict,
     "completed_turn": str,
     "resume_decision_id": str,
+    "resume": dict,       # from the page: {decision, message}, a human-originated continuation (see `resumed`)
 }
 Assistant = TypedDict("Assistant", {**SHARED, **scratch_fields()})
 
@@ -177,6 +178,24 @@ def scene_digest(scene: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def resumed(state: dict[str, Any], human: Any) -> str:
+    """The decision a continuation names, or an empty string.
+
+    The page sends `resume` = {decision, message} in the agent state with the
+    message it adds for the continuation. It counts only for that message: a
+    later ordinary turn carrying a stale `resume` resumes nothing. The id is
+    only a pointer; every role re-reads the decision from the production's
+    records before acting on it.
+    """
+
+    resume = state.get("resume") or {}
+    decision = str(resume.get("decision") or "") if isinstance(resume, dict) else ""
+    if not decision or len(decision) > 80 or not all(c.isalnum() or c in "-_" for c in decision):
+        return ""
+    message = getattr(human, "id", "") or ""
+    return decision if message and resume.get("message") == message else ""
+
+
 STEP_WORDS = {"done": "feito", "skipped": "pulado", "running": "rodando", "waiting": "esperando você",
               "failed": "falhou", "pending": "a fazer"}
 
@@ -235,10 +254,7 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None, models=None):
                     ("", "Title: " + production.get("title", "")) for item in files)
             except Exception:
                 blank = False  # an unreadable imported screenplay is not proof of a blank film
-        decision_id = seen.get("Inception decision id", "")
-        attempt = seen.get('Direction continuation attempt', '')
-        suffix = '-' + attempt if attempt and len(attempt) <= 80 and all(c.isalnum() or c == '-' for c in attempt) else ''
-        decision_id = decision_id if decision_id and getattr(human, "id", "") == "decision-" + decision_id + suffix else ""
+        decision_id = resumed(state, human)
         role = "inception" if seen.get("Current room") == "creation" or blank or decision_id else "coordinator"
         if decision_id:
             try:
@@ -254,7 +270,7 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None, models=None):
             except Exception:
                 pass  # the specialist validates the exact canonical decision before acting
         why = "Creation workspace" if seen.get("Current room") == "creation" else "New film without screenplay" if blank else "Production request and whole-film context"
-        return {**scratch_reset(), "project_id": project_id or state.get("project_id", ""), "turn": turn,
+        return {**scratch_reset(), "resume": {}, "project_id": project_id or state.get("project_id", ""), "turn": turn,
                 "active_role": role, "routing_reason": why, "proposal": {}, "notes": [],
                 "planning_scene": seen.get("Current scene id", ""),
                 "resume_decision_id": decision_id,

@@ -226,10 +226,11 @@ class DirectingRecordsTests(FilmCase):
 
 @unittest.skipUnless(HAS_AGENTS, 'the agents extra is not installed')
 class DirectingGraphTests(FilmCase):
-    def turn(self, graph, room='screenplay and storyboard', message_id='one', extra=None):
+    def turn(self, graph, room='screenplay and storyboard', message_id='one', extra=None, resume=None):
         return graph.invoke({'messages': [HumanMessage(content='Develop the shot proposal', id=message_id)],
             'ag-ui': {'context': [{'description': 'Current room', 'value': room},
-                                 {'description': 'Current scene id', 'value': 'SC-010'}, *(extra or [])]}},
+                                 {'description': 'Current scene id', 'value': 'SC-010'}, *(extra or [])]},
+            **({'resume': {'decision': resume, 'message': message_id}} if resume else {})},
             {'configurable': {'thread_id': 'directing-test'}})
 
     def last_plan(self):
@@ -286,7 +287,7 @@ class DirectingGraphTests(FilmCase):
         model = Model({'action': 'save_plan', 'reply': '', 'draft': draft(based_on=first['id'])},
                       self.review_action, observation(), self.request_action, respond('Nova versão salva.', 'needs_review'))
         state = self.turn(build(model, self.runtime), message_id='decision-' + decision['id'],
-                          extra=[{'description': 'Inception decision id', 'value': decision['id']}])
+                          resume=decision['id'])
         self.assertIn('Hold the discovery longer', model.calls[0][1])
         self.assertEqual(len(load_creation(self.root)['direction_plans']), 2)
         self.assertEqual(state['agent_status']['state'], 'needs_review')
@@ -350,7 +351,7 @@ class DirectingGraphTests(FilmCase):
             actor=Actor(id='director', kind='human'), expected_revision=load_creation(self.root)['revision'])['decision']
         model = Model(respond('A promoção canônica ainda não está implementada.', 'blocked'))
         state = self.turn(build(model, self.runtime), message_id='decision-' + decision['id'],
-            extra=[{'description': 'Inception decision id', 'value': decision['id']}])
+            resume=decision['id'])
         self.assertEqual(state['active_role'], 'directing')
         self.assertEqual(len(load_creation(self.root)['direction_plans']), 1)
         self.assertEqual(len(self.runtime.production()['scenes'][0]['shots']), 2)

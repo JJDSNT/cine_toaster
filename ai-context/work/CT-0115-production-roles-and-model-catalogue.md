@@ -80,13 +80,19 @@ the message for both Claude adapters.
   roles the supplied model serves or cannot serve.
 - Tests: `tests/test_agent_roles.py` (15), and a role-bound reviewer case in
   `test_art_direction.py`.
+- Typed resume (step 1): agent state `resume` = {decision, message} set by
+  `Assistant.tsx` with the continuation message; `assistant.resumed()`
+  accepts it only for that message; consumed by the Coordinator each turn.
+  The page-context entries "Inception decision id" / "Direction continuation
+  attempt" are gone. Tests moved to the typed input; one AG-UI-level test
+  proves the state reaches the graph through `ag_ui_langgraph`. `make ui` rebuilt.
 
 # To do
 
 0. Format intake / interviewer (the author's question, 2026-10-17): agents can
    stop with `needs_direction` but no format sheet says what a music video
    needs, and questions live only in chat. Roadmap entry written.
-1. Typed resume input instead of the message-id convention (finding 2).
+1. ~~Typed resume~~ done.
 2. Role-specific digests instead of truncated JSON; native tool calling where
    an adapter supports it (finding 3).
 3. Generation recipes; Generation Operations role; continuation on job

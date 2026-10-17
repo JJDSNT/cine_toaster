@@ -190,9 +190,9 @@ class HandoffAgentTests(HandoffCase):
         model = Model(respond('Need another bounded pass.', 'blocked'), respond('A new explicitly requested turn.', 'blocked'))
         graph = build(model, self.runtime, MemorySaver())
         def turn(attempt):
-            return graph.invoke({'messages': [HumanMessage(content='Continue approved work', id='decision-' + decision + '-' + attempt)],
-                'ag-ui': {'context': [{'description': 'Inception decision id', 'value': decision},
-                    {'description': 'Direction continuation attempt', 'value': attempt}]}},
+            message = 'decision-' + decision + '-' + attempt
+            return graph.invoke({'messages': [HumanMessage(content='Continue approved work', id=message)],
+                'resume': {'decision': decision, 'message': message}},
                 {'configurable': {'thread_id': 'manual-continuation'}})
         turn('retry-one'); turn('retry-one')
         self.assertEqual(len(model.calls), 1)
@@ -207,8 +207,8 @@ class HandoffAgentTests(HandoffCase):
             respond('Desenho retido; revisão visual ainda pendente.', 'complete'))
         graph = build(model, self.runtime)
         state = graph.invoke({'messages': [HumanMessage(content='Continue approved direction', id='decision-' + decision)],
-            'ag-ui': {'context': [{'description': 'Current room', 'value': 'decisions'},
-                                 {'description': 'Inception decision id', 'value': decision}]}})
+            'ag-ui': {'context': [{'description': 'Current room', 'value': 'decisions'}]},
+            'resume': {'decision': decision, 'message': 'decision-' + decision}})
         self.assertEqual(state['active_role'], 'art_direction')
         self.assertIn('Art Direction specialist', model.calls[0][0])
         self.assertIn(result['handoff']['id'], model.calls[0][1])
