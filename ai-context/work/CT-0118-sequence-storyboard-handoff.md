@@ -42,6 +42,19 @@ Validation criterion from the director: in Singular the sequence is Genebra
 - Inbox and GUI: sequence labels and coverage (`targetLabel`, `targetShotCount`).
 - `tests/test_sequence_handoff.py` (10).
 
+- Demo 01, first real sequence run: the director approved The Ascent (24
+  shots); Art Direction saved a brief, then plan_batch failed four times with
+  an empty error -- the model left out `brief`, the lookup raised a bare
+  StopIteration. Fixed: the latest brief is used when none is named, an
+  unknown one is named in the error, and no receipt is ever empty
+  (`_brief`, `_error`; the same in Inception and Directing). A dry run with
+  the real model then corrected its own parents from the error and reached
+  the single consent: "Gerar 24 desenhos de storyboard de uma vez?".
+- Intake questions can be withdrawn (agent or person, with a reason, kept as
+  history; `withdraw_intake`, Inception `withdraw_question`, `toast intake
+  --withdraw`). Demo 01's format question, asked under the removed rule, was
+  withdrawn with that reason.
+
 # To do
 
 1. The director's real test on Demo 01: ask Inception (Creation room) for the

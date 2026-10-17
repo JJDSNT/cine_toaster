@@ -12,7 +12,7 @@ import yaml
 from cine_toaster.creation import load_creation
 from cine_toaster.decision_inbox import decision_inbox
 from cine_toaster.errors import PermissionDeniedError, PersistenceError, ValidationError
-from cine_toaster.intake import MAX_OPEN, answer_intake, ask_intake, intake_view
+from cine_toaster.intake import MAX_OPEN, answer_intake, ask_intake, intake_view, withdraw_intake
 from cine_toaster.state import Actor
 
 DEMO = Path(__file__).parents[1] / "examples" / "demo-project"
@@ -118,6 +118,18 @@ class IntakeTests(IntakeCase):
                            expected_revision=2, actor=AGENT)
         self.assertEqual(again["questions"][0]["based_on"], answer["id"])
         self.assertEqual(intake_view(self.root)["items"][0]["status"], "open")
+
+    def test_a_question_that_needs_no_answer_is_withdrawn_and_leaves_the_inbox(self):
+        asked = ask_intake(self.root, questions=[question("format")], expected_revision=0, actor=AGENT)["questions"][0]
+        with self.assertRaises(ValidationError):
+            withdraw_intake(self.root, question=asked["id"], reason="", expected_revision=1, actor=AGENT)
+        withdraw_intake(self.root, question=asked["id"], reason="The screenplay already says it is a short.",
+                        expected_revision=1, actor=AGENT)
+        self.assertEqual(intake_view(self.root)["open_count"], 0)
+        self.assertFalse([item for item in decision_inbox(self.root)["items"] if item["kind"] == "question"])
+        self.assertEqual(len(load_creation(self.root)["intake_questions"]), 1)  # kept as history
+        with self.assertRaises(ValidationError):  # once is enough
+            withdraw_intake(self.root, question=asked["id"], reason="again", expected_revision=2, actor=AGENT)
 
     def test_open_questions_wait_in_the_inbox(self):
         ask_intake(self.root, questions=[question("format", "Que tipo de filme é?", "Decide a ficha.")],

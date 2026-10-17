@@ -1180,6 +1180,11 @@ def command_intake(args: argparse.Namespace) -> int:
     from .state import Actor
 
     root = Path(args.project).expanduser().resolve()
+    if args.withdraw:
+        from .intake import withdraw_intake
+        question, reason = args.withdraw
+        withdraw_intake(root, question=question, reason=reason, expected_revision=load_creation(root)["revision"],
+                        actor=Actor(id="director", kind="human"))
     if args.answer:
         question, text = args.answer
         # Whoever types at this terminal is the person the question was put to.
@@ -2637,6 +2642,8 @@ def build_parser() -> argparse.ArgumentParser:
         "intake", help="The format interview: what the format needs, the agent's questions, and your answers")
     intake_parser.add_argument("project", type=Path)
     intake_parser.add_argument("--answer", nargs=2, metavar=("QUESTION", "TEXT"), help="answer one open question")
+    intake_parser.add_argument("--withdraw", nargs=2, metavar=("QUESTION", "REASON"),
+                               help="take back an open question that needs no answer")
     intake_parser.add_argument("--json", action="store_true")
     intake_parser.set_defaults(function=command_intake)
 

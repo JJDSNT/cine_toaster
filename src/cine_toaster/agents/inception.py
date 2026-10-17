@@ -15,7 +15,7 @@ from .roles import ROLES
 from ..production_context import WORK_POLICY
 
 MAX_STEPS, MAX_READS, MAX_WRITES = (ROLES["inception"].budgets[key] for key in ("steps", "reads", "writes"))
-TOOLS = ("read", "save_concept", "save_screenplay", "assess_readiness", "ask_questions", "record_answer")
+TOOLS = ("read", "save_concept", "save_screenplay", "assess_readiness", "ask_questions", "record_answer", "withdraw_question")
 STOPS = ("complete", "needs_direction", "needs_review", "blocked", "paused")
 
 SYSTEM = """You are the Inception specialist inside Cine Toaster's Agent Runtime.
@@ -63,7 +63,9 @@ shapes a candidate. When the person answers in conversation -- an open
 question, or a sheet item they bring up themselves -- write it down with
 `record_answer`: the question id, the answer in their words, and `quote`, the
 exact words from their message. It is refused unless the quote is in what they
-wrote here. Record only what they said, never your inference.
+wrote here. Record only what they said, never your inference. An open question of yours
+that the work no longer needs (the records answered it, or it should not have
+been asked) is withdrawn with `withdraw_question` and the reason.
 
 A storyboard proposal is for the director's unit of review, a canonical
 sequence: set proposal.sequence to its id (from the work structure) so the
@@ -101,6 +103,8 @@ SCHEMA = {"type": "object", "properties": {
     "scene": TEXT, "shot": TEXT, "text": TEXT,
     "answer": {"type": "object", "properties": {"question": TEXT, "answer": TEXT, "quote": TEXT},
                "required": ["question", "answer", "quote"]},
+    "withdrawal": {"type": "object", "properties": {"question": TEXT, "reason": TEXT},
+                   "required": ["question", "reason"]},
     "questions": {"type": "array", "items": {"type": "object", "properties": {
         "item": TEXT, "question": TEXT, "why": TEXT, "based_on": TEXT}, "required": ["item", "question", "why"]}},
     "draft": {"type": "object", "properties": {
@@ -342,6 +346,11 @@ def nodes(model, runtime):
                     result = runtime.record_intake_answer({"question": supplied.get("question"),
                                                            "answer": supplied.get("answer"), "quote": quote,
                                                            "expected_revision": value["revision"]})
+                elif action == "withdraw_question":
+                    supplied = call.get("withdrawal") or {}
+                    result = runtime.withdraw_intake({"question": supplied.get("question"),
+                                                      "reason": supplied.get("reason"),
+                                                      "expected_revision": value["revision"]})
                 elif action == "ask_questions":
                     result = runtime.ask_intake({"questions": call.get("questions") or [],
                                                  "expected_revision": value["revision"]})
@@ -362,7 +371,7 @@ def nodes(model, runtime):
                 refreshed_context = {**context, "film": overview(runtime.production()), "sources": sources()}
             receipt = {"action": action, "ok": True, "result": result}
         except Exception as error:
-            receipt = {"action": action, "ok": committed is not None, "error": str(getattr(error, "message", error)),
+            receipt = {"action": action, "ok": committed is not None, "error": str(getattr(error, "message", "") or error) or type(error).__name__,
                        "next": "Reread creation explicitly and reconsider; do not claim success or blindly retry."}
             if committed is not None:
                 receipt["result"] = committed

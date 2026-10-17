@@ -146,6 +146,29 @@ def board_brief(board):
                            for item in board.get('candidates') or []]}
 
 
+def _brief(value, call):
+    """The brief a plan or an inspection names, or the latest one when the model leaves it out.
+
+    Found on Demo 01: plan_batch came without `brief`, the lookup raised StopIteration -- an
+    exception with no message -- and four empty receipts left the model nothing to correct.
+    """
+    briefs = value.get('art_briefs', [])
+    wanted = call.get('brief')
+    if not wanted:
+        if not briefs:
+            raise ValueError('No visual brief is saved yet: save_brief first')
+        return briefs[-1]
+    found = next((item for item in briefs if item['id'] == wanted), None)
+    if found is None:
+        raise ValueError(f"No visual brief {wanted!r}; the saved ones are {', '.join(item['id'] for item in briefs) or 'none'}")
+    return found
+
+
+def _error(error):
+    """What a refusal says to the model: never an empty string."""
+    return str(getattr(error, 'message', '') or error) or type(error).__name__
+
+
 def _scope(target):
     if 'sequence' in target:
         return (f"{target.get('label') or target['sequence']} ({len(target['scenes'])} scenes, "
@@ -261,14 +284,14 @@ def nodes(model, runtime, reviewer=None, waits=None):
                 result = runtime.save_art_brief({key: fields[key] for key in
                     ('title', 'text', 'criteria', 'references', 'concept', 'based_on') if fields.get(key) is not None} | preconditions)
             elif action == 'plan_generation':
-                brief = next(item for item in value.get('art_briefs', []) if item['id'] == call.get('brief'))
+                brief = _brief(value, call)
                 fields = call.get('generation') or {}
                 plan = runtime.plan_reference({key: fields[key] for key in ('title', 'request', 'parents') if key in fields}
                                                | {'art_brief': brief['id'], 'concept': brief.get('concept', '')})
                 return {'art_pending': {}, 'art_plan': plan, 'art_plan_source': preconditions,
                         'art_receipts': [*state.get('art_receipts', []), {'action': action, 'ok': True, 'result': plan}]}
             elif action == 'plan_batch':
-                brief = next(item for item in value.get('art_briefs', []) if item['id'] == call.get('brief'))
+                brief = _brief(value, call)
                 items = call.get('batch') or []
                 handoff = state['art_context'].get('handoff')
                 allowed = set(target_members(handoff['target'])) if handoff else set()
@@ -291,7 +314,7 @@ def nodes(model, runtime, reviewer=None, waits=None):
                     return stop(state, 'A pré-validação atingiu o limite de tentativas; preciso de direção para outra rodada.', 'needs_direction')
                 if not supports(reviewer, 'vision'):
                     return stop(state, 'O adaptador atual não recebe imagens. Não fiz inspeção visual; configure um adaptador com visão.')
-                brief = next(item for item in value.get('art_briefs', []) if item['id'] == call.get('brief'))
+                brief = _brief(value, call)
                 references = call.get('references') or []
                 parents = [item['id'] for item in brief['inputs'] if item['kind'] == 'reference']
                 selected = list(dict.fromkeys([*references, *parents]))
@@ -370,7 +393,7 @@ def nodes(model, runtime, reviewer=None, waits=None):
         except Exception as error:
             # Do not reread after a refused write: explicit read_context is required.
             return {'art_pending': {}, 'art_receipts': [*state.get('art_receipts', []),
-                    {'action': action, 'ok': False, 'error': str(getattr(error, 'message', error))}],
+                    {'action': action, 'ok': False, 'error': _error(error)}],
                     'art_reviews': state.get('art_reviews', 0) + visual_attempt,
                     'active_role': 'art_direction', 'agent_status': {'role': 'art_direction', 'state': 'working'}}
 

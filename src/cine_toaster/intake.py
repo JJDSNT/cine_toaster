@@ -88,6 +88,20 @@ def validate_intake(state: dict[str, Any]) -> None:
                 or not isinstance(item.get("actor"), dict) or not _answered_by_a_person(item)):
             raise ValueError("Invalid intake answer")
         answered.add(item["question"])
+    if not isinstance(state.get("intake_withdrawals", []), list):
+        raise ValueError("Invalid intake withdrawal list")
+    _validate_withdrawals(state, known, answered)
+
+
+def _validate_withdrawals(state: dict[str, Any], known: dict[str, dict], answered: set[str]) -> None:
+    withdrawn: set[str] = set()
+    for item in state.get("intake_withdrawals", []):
+        if (not isinstance(item, dict) or item.get("question") not in known or item["question"] in withdrawn
+                or item["question"] in answered or not isinstance(item.get("reason"), str) or not item["reason"].strip()
+                or not isinstance(item.get("actor"), dict) or item["actor"].get("kind") not in ("agent", "human")
+                or not isinstance(item.get("withdrawn_at"), str)):
+            raise ValueError("Invalid intake withdrawal")
+        withdrawn.add(item["question"])
 
 
 def _answered_by_a_person(item: dict[str, Any]) -> bool:
@@ -109,9 +123,11 @@ def intake_view(root: Path, state: dict[str, Any] | None = None,
     production = load_production(root) if production is None else production
     state = load_creation(root, production=production) if state is None else state
     answers_by_question = {item["question"]: item for item in state.get("intake_answers", [])}
+    withdrawn = {item["question"] for item in state.get("intake_withdrawals", [])}
     latest: dict[str, dict] = {}
     for question in state.get("intake_questions", []):
-        latest[question["item"]] = question
+        if question["id"] not in withdrawn:  # a withdrawn question is history, not a request
+            latest[question["item"]] = question
     answers = {item: answers_by_question[question["id"]] for item, question in latest.items()
                if question["id"] in answers_by_question}
     style, source = _format(root, production, answers)
@@ -228,6 +244,36 @@ def answer_intake(root: Path, *, question: str, answer: str, expected_revision: 
         append_event(root, Event.create("creation.intake_answered", state["project_id"], revision=committed["revision"],
                                         question=question, actor=actor.public_dict()))
         return {"revision": committed["revision"], "answer": item}
+
+
+def withdraw_intake(root: Path, *, question: str, reason: str, expected_revision: int, actor: Actor) -> dict[str, Any]:
+    """Take back an open question that no longer needs an answer, saying why; it stays in the journal."""
+
+    if actor.kind not in ("agent", "human"):
+        raise PermissionDeniedError("A question is withdrawn by the agent that asked it or by the person asked")
+    if not isinstance(reason, str) or not reason.strip() or len(reason) > 1000:
+        raise ValidationError("Say why the question no longer needs an answer")
+    if type(expected_revision) is not int or expected_revision < 0:
+        raise ValidationError("expected_revision must be a non-negative integer")
+    root = Path(root).expanduser().resolve()
+    with scene_lock(root):
+        state = load_creation(root)
+        if state["revision"] != expected_revision:
+            raise RevisionConflictError(expected_revision, state["revision"])
+        if not any(item["id"] == question for item in state.get("intake_questions", [])):
+            raise ResourceNotFoundError(f"No intake question {question!r}")
+        if any(item["question"] == question for item in state.get("intake_answers", [])):
+            raise ValidationError("This question was answered; an answer is not withdrawn")
+        if any(item["question"] == question for item in state.get("intake_withdrawals", [])):
+            raise ValidationError("This question was already withdrawn")
+        item = {"question": question, "reason": reason.strip(), "actor": actor.public_dict(), "withdrawn_at": now()}
+        committed = {**state, "revision": state["revision"] + 1,
+                     "intake_withdrawals": [*state.get("intake_withdrawals", []), item]}
+        validate_intake(committed)
+        _commit(root, committed)
+        append_event(root, Event.create("creation.intake_withdrawn", state["project_id"], revision=committed["revision"],
+                                        question=question, actor=actor.public_dict()))
+        return {"revision": committed["revision"], "withdrawal": item}
 
 
 def inbox_items(view: dict[str, Any]) -> list[dict[str, Any]]:

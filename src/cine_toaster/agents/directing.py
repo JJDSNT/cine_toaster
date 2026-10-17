@@ -254,7 +254,7 @@ def nodes(model, runtime, auditor=None, reviewer=None):
         except Exception as error:
             return {'planning_pending': {}, 'planning_reviews': state.get('planning_reviews', 0) + attempt,
                     'planning_receipts': [*state.get('planning_receipts', []),
-                        {'action': action, 'ok': False, 'error': str(getattr(error, 'message', error))}],
+                        {'action': action, 'ok': False, 'error': str(getattr(error, 'message', '') or error) or type(error).__name__}],
                     'active_role': state.get('planning_role', 'directing')}
 
     return context, reason, tool

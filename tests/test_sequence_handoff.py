@@ -157,6 +157,22 @@ class SequenceArtTests(SequenceHandoffCase):
         self.assertEqual({item['job'] for item in waits.all()}, {f'job_{n}' for n in range(1, 6)})
         self.assertEqual(state['art_batch']['job_3']['scene'], items[2]['scene'])
 
+    def test_a_batch_without_its_brief_uses_the_latest_and_a_refusal_is_never_silent(self):
+        """Regression (Demo 01): plan_batch came without `brief`; four empty receipts, nothing drawn."""
+        self.sequence_request()
+        decision = self.advance()['decision']['id']
+        brief = self.brief()
+        items = [{'scene': 'SC-030', 'shot': 'P1', 'title': 'SC-030 P1', 'request': 'Draw it.', 'parents': []}]
+        graph = self.graph({'action': 'plan_batch', 'reply': '', 'batch': items},
+                           {'action': 'plan_batch', 'reply': '', 'brief': 'art_invented', 'batch': items},
+                           respond('Parado.', 'blocked'))
+        planned = []
+        self.runtime.plan_reference = lambda payload: planned.append(payload) or {**payload, 'available': True}
+        state = self.continue_approved(graph, decision)
+        self.assertEqual(planned[0]['art_brief'], brief['id'])
+        self.assertTrue(state['art_receipts'][0]['ok'])
+        self.assertIn('art_invented', state['art_receipts'][1]['error'])  # says what is wrong
+
     def test_a_batch_item_outside_the_approved_sequence_is_refused(self):
         self.sequence_request()
         decision = self.advance()['decision']['id']
