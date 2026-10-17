@@ -198,6 +198,9 @@ Cine Toaster cannot yet:
 
 ## Active work
 
+**Demo portfolio direction updated (2026-10-17):** see [the new creative brief](../docs/demo-portfolio-direction.md). The previous five-item demo set and production order described below are superseded *as creative planning*. The current executable examples and their technical validation remain until dependencies and test coverage are migrated. Up to five standalone works (historical cinema; evolving animation; 3D/Juggler; music video; Cine Toaster advertisement) feed a sixth, circular narrative reel. The Last Signal is discontinued as a demo; its functional coverage is to be preserved through new productions or fixtures. Requirements remain open for opportunistic assignment, not silently dropped.
+
+
 Open records, by what they wait for (2026-10-15; every other record is
 `done`, `ai-context/work/README.md`):
 
