@@ -295,5 +295,7 @@ skills. The exact packaging language and directory remain undecided. Do not
 create placeholder skill trees before a real runtime skill and loader contract
 exist.
 
-Development procedures, if added under `.agents/skills/`, follow the coding
-agent's skill format and are not distributed to production agents.
+Development procedures live under `.agents/skills/` (the first:
+`runpod-comfyui`, CT-0115), in the coding agent's skill format, linked from
+`.claude/skills/` for Claude Code. They are not distributed to production
+agents; a test keeps the product package from referencing them.

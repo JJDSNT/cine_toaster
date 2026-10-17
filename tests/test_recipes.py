@@ -60,5 +60,17 @@ class RecipeTests(unittest.TestCase):
             health("no-such-recipe")
 
 
+
+class DevelopmentSkillTests(unittest.TestCase):
+    def test_the_development_skill_never_reaches_production_agents(self):
+        from pathlib import Path
+
+        root = Path(__file__).parents[1]
+        self.assertTrue((root / ".agents/skills/runpod-comfyui/SKILL.md").is_file())
+        product = root / "src" / "cine_toaster"
+        for path in product.rglob("*.py"):
+            self.assertNotIn(".agents/skills", path.read_text(encoding="utf-8"), path)
+
+
 if __name__ == "__main__":
     unittest.main()

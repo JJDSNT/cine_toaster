@@ -398,9 +398,12 @@ roles the supplied model serves. To do, in order:
   push outside a run): the inbox and records refresh, the chat does not;
   (d) a watcher pass racing a person's turn on the same thread is avoided by
   checking `get_state().next`, not by a lock.
-- [ ] **Development skill `.agents/skills/runpod-comfyui/`** for development
-  agents: worker images, endpoints and recipes with the RunPod tooling;
-  never packaged as a runtime skill.
+- [x] **Development skill `.agents/skills/runpod-comfyui/`** (done
+  2026-10-17; linked from `.claude/skills/` for Claude Code): boundaries
+  (data plane only, money, never SINGULAR's tools, secrets, scripted tests),
+  adding a path (workflow by node type, adapter constants, recipe, doctor,
+  knowledge, tests), preparing and diagnosing an endpoint. A test keeps the
+  product from referencing it.
 - [ ] **Sequence Adherence reviewer** (SPEC-0019), then further authors
   (Cinematography/masters, Editing, Sound) as Demo 01 needs them.
 - [x] **Catalogue facts** (Claude models, 2026-10-17): context and prices
