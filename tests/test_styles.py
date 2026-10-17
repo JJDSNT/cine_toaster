@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from cine_toaster.styles import KINDS, list_styles
+from cine_toaster.styles import KINDS, list_styles, lookup, resolve
 
 DEMO = Path(__file__).parents[1] / "examples" / "demo-project"
 
@@ -36,7 +36,7 @@ class CatalogTests(unittest.TestCase):
                 self.assertLessEqual(set(item["editing"]["prefer_cuts"] + item["editing"]["avoid_cuts"]), set(CUT_TYPES))
                 self.assertLessEqual(set(item["titles"]), titles)
                 # A name is for people: the words a model gets never carry one.
-                for name in ("Ghibli", "Kubrick", "Anderson", "Wong Kar-wai", "Tarkovsky", "Villeneuve", "Dogme"):
+                for name in ("Ghibli", "Kubrick", "Anderson", "Wong Kar-wai", "Tarkovsky", "Villeneuve", "Dogme", "Vox"):
                     self.assertNotIn(name, item["prompt"])
 
     def test_formats_carry_their_rules(self) -> None:
@@ -103,6 +103,14 @@ class FilmTests(unittest.TestCase):
         messages = " ".join(finding["message"] for finding in departures)
         self.assertIn("Viral vertical hooks within 2 s", messages)  # P1 holds 6 s before anything changes
         self.assertIn("Viral vertical holds a shot 0.5 to 4 s", messages)
+
+    def test_vox_is_a_way_of_directing_an_explainer(self) -> None:
+        catalog = {item["id"]: item for item in list_styles()}
+        vox = lookup(catalog, "Vox")
+        self.assertEqual((vox["id"], vox["axis"]), ("collage-explainer", "direction"))
+        parts, problems = resolve(catalog, project={"format": "explainer", "direction": "Vox"})
+        self.assertEqual(problems, [])
+        self.assertEqual({part["id"] for part, _ in parts}, {"explainer", "collage-explainer"})
 
     def test_a_style_is_found_by_the_name_people_know(self) -> None:
         scene = self.style(scene="ghibli")

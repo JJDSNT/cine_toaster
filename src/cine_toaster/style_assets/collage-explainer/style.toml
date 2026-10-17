@@ -1,0 +1,36 @@
+schema_version = 1
+id = "collage-explainer"
+name = "Collage explainer (Vox-like)"
+kind = "manner"
+says = "An argument made of evidence: archive, documents and data, cut out, layered and pointed at."
+# Names people know it by: shown, and accepted by `style:`.
+aka = ["Vox", "Vox-like", "Vox explainer"]
+# For people reading the entry; never sent to a model, never a claim of endorsement.
+inspired_by = ["Vox explainer videos", "documentary collage", "motion-graphic journalism"]
+framing = ["documents and photographs as evidence, the camera travelling across them",
+           "on-screen text as an image: a scanned page, a phrase highlighted as it is said",
+           "maps and charts that build step by step, one point per beat"]
+colour = "a limited palette: off-white paper, black, one saturated accent marking the point"
+sound = "a voice-over carrying the argument, a pulsing music bed, archival audio"
+titles = ["lower-third", "word-by-word", "caption", "typewriter", "type-pop"]
+# What a video model is told about the image, in words of craft.
+prompt = "layered paper collage of archival photographs and documents, cut-out figures with soft drop shadows, highlighted text on scanned pages, animated maps and charts, halftone print texture, limited palette with one saturated accent colour"
+use_when = ["Explaining an argument with evidence: history, data, policy, how something came to be"]
+avoid_when = ["Character drama, dialogue scenes"]
+
+[camera]
+lens = "normal"
+prefer = ["push-in", "locked-off", "truck-left", "truck-right", "zoom-in", "pan-left", "pan-right"]
+avoid = ["handheld", "orbit-left", "orbit-right", "dolly-zoom"]
+
+[editing]
+shot_seconds = [1.5, 6]
+prefer_cuts = ["hard", "match"]
+avoid_cuts = []
+prefer_transitions = ["matte-wipe", "page-turn"]
+avoid_transitions = ["film-burn", "blur-dissolve"]
+
+[performance]
+intensity = "subtle"
+max = "clear"
+notes = "the narrator carries the argument; people appear as archival figures, not performers"
