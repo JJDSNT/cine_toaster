@@ -102,9 +102,18 @@ the message for both Claude adapters.
   jobs to it and may not generate in a continuation; `test_generation_operations.py`.
 - Knowledge that evolves with use: recorded as an open design with the
   author's point that demotion is the harder half (roadmap).
+- Batch-aware generation: endpoint scaling read (REST v2), batch plan,
+  scale-down guard, Coordinator read and prompt, development-skill rules
+  (the author's losses: workers lowered mid-batch, one cold start per job).
+- The development skill defers to the official RunPod plugin and names
+  SINGULAR's skills as read-only measured sources; the LTX cold-start figures
+  contradict each other (roadmap).
 
 # To do
 
+0. Send a batch to the RunPod queue in one go (roadmap: split submit from
+   wait in `run_job`; `toast generate` with several blocks). It touches the
+   paid path: do it with the author.
 1. Real-model checks on a disposable film (paid model calls: the author's go):
    image input on Claude CLI/API, one interview, one Generation Operations
    continuation; measure turn time and tokens per step, then decide on native
@@ -131,5 +140,8 @@ the message for both Claude adapters.
 - After: agent modules (145 tests) OK; `tests/run.py fast`, 1184 tests OK
   in 204 s. `toast doctor` under Claude Code: "Agent roles ok (claude-cli;
   serves all seven roles; inference and login not verified)".
-- Not done: heavy suite; a real-model image call on Claude CLI/API (scripted
-  only; roadmap entry).
+- Full suite (`tests/run.py`, heavy included) at the development-skill
+  commit: 1247 tests OK in 574 s. After the batch and style commits:
+  `tests/run.py fast`, 1211 tests OK.
+- Not done: real-model calls (image input on Claude CLI/API, an interview, a
+  continuation) -- scripted only; they spend the author's quota.
