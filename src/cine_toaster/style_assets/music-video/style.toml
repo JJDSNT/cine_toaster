@@ -39,8 +39,8 @@ total_seconds = [120, 300]
 
 [[intake]]
 id = "track"
-ask = "Which song is it, and is the final mix available (file, length, BPM if known)?"
-why = "The song is the timeline: cuts, sections and length all come from it."
+ask = "Which song is it, is the final mix available (file, length, BPM if known), and under what licence may it be synchronised to picture and distributed (composition and master separately)?"
+why = "The song is the timeline: cuts, sections and length all come from it. Free to listen or royalty-free is not a sync licence."
 unlocks = "assembly"
 
 [[intake]]

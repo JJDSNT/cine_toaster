@@ -43,8 +43,8 @@ end_card = true
 
 [[intake]]
 id = "product"
-ask = "What is advertised, and what must be shown of it (packshot, logo, claims)?"
-why = "An advertisement is judged by what it shows of the product."
+ask = "What is advertised, and what must be shown of it (packshot, logo, claims)? Is the product real, fictional, or the film's own maker?"
+why = "An advertisement is judged by what it shows of the product; a fictional product needs its identity designed, and a claim about a real one must be true."
 unlocks = "screenplay"
 
 [[intake]]

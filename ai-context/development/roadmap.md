@@ -553,6 +553,18 @@ three drawings but no waiting gate/open question and no active jobs. Wire and
 validate one closed loop before adding gallery polish or more generated shots;
 do not imply that the embedded copilot already runs the MCP authoring cycle.
 
+**Superseded as creative planning (2026-10-17):** the demo set and order
+below are replaced by [the demo portfolio direction](../../docs/demo-portfolio-direction.md):
+up to five standalone works -- historical cinema (CT-0097's archive), the
+evolving animation *Something New Is Coming* (CT-0099, Demo 01, unchanged),
+the 3D/Juggler *Beyond the Stage*, a music video, and the *Commercial Break*
+advertisement -- feeding one circular reel. The Last Signal is discontinued as
+a demo and stays a technical fixture; the old examples are not removed before
+their coverage is migrated. Kept below as history and as the list of gaps the
+old set exposed. New requirement from it: **morphing** as a production
+capability, external tools first (a ComfyUI workflow would enter as a
+generation recipe, ADR 0034); see the direction document.
+
 **The demo set (the user, 2026-10-16).** No new demos: the ones planned,
 each made by a **different approach**, so that together they show the tool
 end to end. Each is produced through the production flow (an intention, a

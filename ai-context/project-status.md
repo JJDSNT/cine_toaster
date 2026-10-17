@@ -203,6 +203,8 @@ Cine Toaster cannot yet:
 
 ## Active work
 
+**Demo portfolio direction updated (2026-10-17):** see [the new creative brief](../docs/demo-portfolio-direction.md). The previous five-item demo set and production order described below are superseded *as creative planning*. The current executable examples and their technical validation remain until dependencies and test coverage are migrated. Up to five standalone works (historical cinema; evolving animation; 3D/Juggler; music video; Cine Toaster advertisement) feed a sixth, circular narrative reel. The Last Signal is discontinued as a demo; its functional coverage is to be preserved through new productions or fixtures. Requirements remain open for opportunistic assignment, not silently dropped.
+
 CT-0115 / CT-0116 (ADR 0034, SPEC-0020, 2026-10-17): agent structure. Roles
 are declared (`agents/roles.py`) and share one reasoning step (`agents/loop.py`);
 the model the person supplies serves every role unless they bind one to

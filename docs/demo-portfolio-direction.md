@@ -1,0 +1,127 @@
+# Demo portfolio and integrated reel — creative direction
+
+Status: **proposed direction, agreed in discussion 2026-10-17**. This is a living creative brief, **not** a production-ready screenplay, feature-completion claim, or authorization to spend on generation.
+
+## Principle
+
+Produce **up to five standalone cinematic demos**, each a complete work in its own right, followed by **one integrated cinematic demo reel** built from their approved footage and assets. Fewer demos are acceptable if the creative and validation goals are met. **Singular is a real film and validation case, not a demo.**
+
+The demos are not feature-checklist videos. They should be artistically compelling, use Cine Toaster's real production pipeline (intention → screenplay → breakdown/storyboard → production/review → finishing), and supply reusable shots, characters, environments or effects to the reel. The reel itself tells a continuous story and reveals the product through cinematic results, not a tutorial.
+
+## Proposed five productions
+
+1. **Historical cinema** — work with surviving archival footage, including a cameraman filming high on a building under construction. Preservation/provenance, restoration *within* the film, and historical-to-modern compositing are opportunities. The cameraman opens and closes the reel.
+2. **Something New Is Coming** — standalone animated narrative in which a character and the visual language evolve *together* across animation eras. The character reaches a mountaintop; a possible 3D Gaussian Splatting camera orbit gives volume. A fall into a new world is a proposed reel bridge, not necessarily a scene in the standalone short.
+3. **3D world / Juggler homage** — a self-contained 3D production inspired by the Amiga Juggler. The character from demo 2 can enter its world in the reel. Reflective spheres may display footage from other demos using Cine Toaster's video-on-sphere warp. Evolution from early computer graphics to contemporary 3D is a promising direction, not a locked screenplay.
+4. **Music video** — an independent music-driven production, potentially featuring a character or element from the modern 3D world. Explore performance, rhythm, beats, editing, retiming, effects, audio and finishing. Musical concept, cast and track remain open.
+5. **Cine Toaster advertisement** — a standalone commercial for the product, potentially paying tribute to the original Video Toaster. The reel can enter the commercial via a television visible within the music video. Do not confuse this advertisement with the reel's own emotional ending.
+
+## Reel narrative (working spine)
+
+An archival cameraman films → his subjective view reveals the animated story → the animated character falls into the 3D/Juggler universe → a 3D element joins a music-video performance → a television within the music video broadcasts the Cine Toaster advertisement → the product is revealed → return to the original cameraman, astonished by the future of filmmaking.
+
+This is a **narrative direction**, not a final edit, timing, script or mandate that each standalone demo contain the bridges. The reel-only connective shots can be produced separately. Its circular ending should retain the emotional payoff after the product reveal.
+
+## Morphing — required workflow capability, implementation open (2026-10-17)
+
+**Decision:** Cine Toaster must **support morphing in its production workflow**; this does **not** imply building a native morphing engine. First investigate and evaluate existing external tools, plugins, libraries, ComfyUI workflows and services that can be orchestrated by Cine Toaster. Implement a native component only if integration cannot meet artistic, technical, licensing, reproducibility or operational requirements.
+
+**Initial cinematic use case:** a controllable visual metamorphosis between images/shots, particularly the transition from the *Commercial Break* / product reveal back to the archival cameraman's point of view. Other uses remain optional and story-led.
+
+**Integration contract to evaluate:** input images or video clips; adjustable duration and pacing; correspondence/masks or other controls when available; temporal coherence and quality; timeline/render-pipeline integration; preview, approval and repeatability; workflow parameters and asset provenance; licensing, cost and local/cloud execution. Compare conventional 2D morphing, video morphing, compositing and AI-assisted approaches without preselecting an engine.
+
+**Acceptance direction:** demonstrate an editable, repeatable morph between two chosen shots, with reviewable intermediate/result frames and recorded settings. Status: **required capability / solution to investigate / not yet verified**. Create or adapt tooling only if external solutions are inadequate.
+
+## Functional coverage to preserve and place opportunistically
+
+The following are **coverage obligations / opportunities**, **not fixed assignments or mandatory story beats**. Attach them to the production where they naturally serve the film. Track evidence of actual use, not merely availability of a feature.
+
+| Capability or prior commitment | Natural candidate | Placement / evidence still to decide |
+| --- | --- | --- |
+| Historical footage, rights, source, licence, credit, provenance, traceable derivatives | Historical cinema | Preserve the surviving source; restoration becomes visible in the film |
+| Live-action / archival footage with ray-traced CG, compositing, occlusion, keys/mattes and camera coherence | Historical cinema or 3D | Preserve the hybrid-scene validation objective |
+| Animation across techniques, consistent character identity, intentional visual-style evolution | Animated short | Story and style change together; 3DGS orbit remains exploratory |
+| 3D geometry, camera moves, materials, ray tracing, reflections, spherical video warp | 3D/Juggler | Show real execution; distinguish 3D demo from reel-only homage |
+| Music beats as production records, music-led edit, retiming, sound mix/stems | Music video | Preserve the earlier music-first technical objectives |
+| Narration / generated voices, dialogue placement, audio mix, titles, motion graphics, formats | Advertisement or other fitting demo | The old reel's offline voice path must not vanish untested |
+| Scene geography, blocking, eyeline/axis of action, continuity checks | Any narrative demo | Formerly exercised by The Last Signal; retain tests and real-scene evidence |
+| Multiple takes, comparison, selection reasons, human approvals and durable creative decisions | Across demos | Capture in normal production workflow |
+| Project-specific creative tooling: transition shader, declared custom shot fields, per-project looks | 3D, music video, advertisement, or reel | Preserve the *extension contract*, not necessarily copper bars or old parameter names |
+| Editorially justified transitions, sequence assembly, cross-production asset lineage | Reel | Previously five documented transitions; retain meaningful variety without forcing arbitrary counts into the film |
+| Project identity, isolation of jobs, switching projects, repeatable CLI checks | Test fixtures and portfolio | Technical tests need not become cinematic scenes |
+| Reproducible no-API-key demonstration | Small fixture or reduced reel path | Preserve as an accessible onboarding/test path, not a restriction on finished films |
+| Storyboard, previs, spatial consistency, model/workflow choice, FinOps, review gates, agent participation | Across demos | Cross-cutting evidence; do not invent claims of implemented features |
+
+For each obligation, later record **assigned production**, **planned cinematic use**, **test/evidence**, **status** (unassigned/planned/exercised/verified), and **cost implications**. Unassigned means *open for opportunity*, not dropped.
+
+## Superseded plan and migration safeguards
+
+The earlier set (The Last Signal as a narrative demo; a music piece also serving as an advertisement; an animated cartoon; a separate hybrid scene; and a card/transition-driven Amiga reel with Juggler only in the reel) is **superseded as a creative plan**. **The Last Signal is discontinued as a demo**, not reserved as a sixth production. Its tests/contracts may survive as technical fixtures.
+
+Do **not** immediately delete `examples/demo-project`, `examples/amiga-demo-reel`, their templates, `Makefile` commands or tests: first inventory dependencies, preserve coverage, and migrate runnable examples. The old Amiga reel's project-local `amiga-copper-bars`, `copper_phase`, `scanline_rate`, five reasoned transitions, offline voice and no-credential build are evidence of contracts to retain or replace with equivalent tests—not necessarily aesthetic requirements of the new films.
+
+The previous production order is no longer authoritative. A new sequence should follow creative dependencies, production readiness, budget and user approval. **No paid generation without explicit approval.**
+
+## Juggler narrative exploration — *Beyond the Stage* (2026-10-17)
+
+**Status: promising story treatment for further development, not an approved screenplay, shot list, final title or locked technical design.** Preserve the independent short's dramatic coherence; the reel may use alternative connecting shots.
+
+**Premise:** A juggler in an early-computer-graphics world wants to take his performance beyond the limits of his tiny stage. The technical evolution from classic Amiga-era CG to a rich cinematic 3D world becomes the *consequence of his pursuit of freedom*, rather than a parade of rendering features. Unreal Engine is a proposed production engine for the expansive environment, not an in-universe product advertisement or a confirmed Cine Toaster integration.
+
+**Four movements:**
+
+1. **Performance / limitation.** In a recognizably classic Amiga Juggler-inspired aesthetic, he performs a precise routine with three spheres and bows to an empty audience. Beyond the stage lies nothing. He notices a fourth sphere just beyond its edge, but cannot reach it: there is no floor.
+2. **Crossing / invention.** He throws his spheres beyond the boundary. Each impact reveals or establishes another piece of traversable space. He hesitates and steps beyond the old stage; for the first time the camera can follow him into a world with real spatial depth. This is the motivated passage from early CG visual language toward contemporary 3D, with **Unreal Engine** a candidate for the new environment, lighting, scale and cinematic camera.
+3. **Discovery / reinvention.** In a vast environment with architecture, vegetation, water and atmosphere, the original spheres are left behind. He must rediscover his art using elements of the world: a droplet, a luminous fragment and particles become his new juggling objects. His environment becomes his instrument.
+4. **New stage / resolution.** He performs again, now against the vast landscape. The three spheres rise like small planets. A fleeting image of a musical performance in one sphere can support the reel's next transition. He bows again: no longer trapped by the stage, he has found a whole world in which to perform.
+
+**Dramatic spine:** desire = expand his performance; obstacle = the world ends at the stage boundary; action = build a way beyond it using his juggling skill; transformation = encounter and learn from a larger world; resolution = turn the world into his stage.
+
+**To investigate before scripting:** how/why the fourth sphere appears; physical causality of the thrown spheres making new floor; how to stage the loss of the original spheres without confusing the viewer; the juggler's personality and emotional beats; whether the sphere's music-video image belongs in the independent ending or only the reel; the character's arrival from the animation short as **reel-only bridge**; period-faithful opening visuals and rights/credit for Amiga Juggler inspiration; Blender ↔ Unreal asset interchange, camera/scene handoff, rendering and compositing via Cine Toaster; visual continuity during the engine/style transition. None of these decisions implies existing Unreal support or authorizes paid rendering.
+
+## Cine Toaster advertisement — *Commercial Break* (2026-10-17)
+
+**Status: agreed creative concept for further development; working title only.** Visual references include the television-based opening of NewTek's *Demo Reel 3* and the conventions of professional product advertising. This is a standalone **fifth demo**, also usable as the reel's penultimate segment.
+
+**Central conceit:** We think we are watching a commercial break advertising several unrelated fictional products. Each spot is genuinely convincing as a product advertisement **and then reveals the Cine Toaster capabilities actually used to produce it**. Only at the end do we learn that the real product being advertised throughout was **Cine Toaster**, the studio behind every spot.
+
+**Proposed sequence:**
+
+1. **Television / broadcast frame.** Begin with a television in a space, evoking the NewTek reference without reproducing it verbatim. The set plays a broadcast and transitions into a commercial break. The camera may approach or enter the TV screen.
+2. **Series of fictional advertisements.** Each has its own art direction, photography, editing rhythm and plausible product identity. Exploratory examples (not a locked lineup): studio food photography with floating ingredients; a can falling into water with splashes, bubbles and condensation; perfume/beauty packshot with glass and reflections; automotive imagery with complex camera moves; macro droplets or particles.
+3. **Feature reveals after or within each spot.** Identify the **specific tools actually exercised** in producing that segment (e.g. layering/compositing, controlled camera movement, lighting, slow motion, fluid work, materials/reflections, ray tracing, 3D environments, morphing, motion graphics). These are illustrative capability targets, **not assertions that each is already implemented or was used**. The revelation should be elegantly embedded in the commercial's visual grammar, not a generic UI walkthrough.
+4. **Final reversal.** As the break seems to end, a last reveal connects the spots and identifies the actual advertiser: **Cine Toaster**. Product identity and a final tagline remain open; no tagline is approved yet.
+
+**Creative rules:** each fictional advertisement must succeed as an advertisement first, with its technical breakdown serving the spectacle; avoid a feature-list montage disguised as cinema. The exact number/order of spots, fictitious brands, look, sound, duration, voiceover and transitions remain open. Use truthful feature/provenance claims: the actual production graph and assets should substantiate the displayed capabilities.
+
+**Two valid openings:** the **standalone demo** starts with its own TV and commercial-break framing; the **integrated reel** can enter the break through the television already present in the music video, avoiding duplicate setup. The final Cine Toaster reveal leads into the archival cameraman's reaction; morphing/look transformation is a candidate, not a locked cut.
+
+**Further development:** select advertising genres against real Cine Toaster coverage; choose authentic visual treatments and soundtrack; design a coherent on-screen grammar for feature reveals; confirm asset rights and feasibility/cost; develop a shot-by-shot treatment only after these choices.
+
+## Music video — aesthetic and musical references (2026-10-17)
+
+**Status: reference board only. Story, performance format, soundtrack and exact imagery are open.** Do not treat the previously brainstormed “girl emerging from a screen” as an approved narrative.
+
+- **Musical territory:** Concrete Blonde, Blondie and T.S.O.L. as reference artists for the desired feel: late-1970s through 1990s new wave, alternative rock, post-punk and related surf-culture energy. These are *inspirations*, not tracks cleared for use, and not a request to reproduce an artist's voice or recordings.
+- **Audiovisual language:** MTV music videos of the 1980s and 1990s: adventurous music-led montage, visual experimentation, performance, graphic intervention and analog/video textures where artistically justified.
+- **Surf-film language:** *The Green Iguana* as a reference for surf imagery, ocean movement, landscape and the relationship between music, rhythm and surfing. The concept need not be limited to a conventional surfing narrative.
+- **Historical/cultural image:** Andy Warhol drawing/painting Debbie Harry on the Commodore Amiga in 1985: a possible touchstone connecting pop art, music, image-making and early digital creativity. Its exact narrative role is **deliberately undecided**; homage is optional, not a required scene.
+- **Music selection constraint:** investigate music with licenses that explicitly permit audiovisual synchronization, distribution and intended commercial/promotional use; check composition and master rights separately where applicable, attribution, derivatives and territorial/platform conditions. “Free to listen” or “royalty-free” does not automatically mean openly licensed or suitable. If no suitable existing music is available, explore original commissioned or appropriately licensed music in the desired general idiom.
+- **Reel connections:** entry from a Juggler sphere and exit via a television displaying the Cine Toaster commercial remain provisional integration ideas. The standalone music video must work without either bridge.
+
+**Next creative step:** shortlist licensable tracks and compare their emotional tone and structure before choosing the narrative, pace, cast, or visual treatment. Do not lock a storyline solely to justify a reference.
+
+## New capability candidate: morphing (2026-10-17)
+
+The proposed advertisement-to-archival-cameraman return creates a concrete cinematic motivation for **morphing**: a controlled transformation between two images/shapes/compositions, possibly combined with a reverse film-era look change and sound transition. Morphing is **not synonymous with** a cross-dissolve, grading, film grain or ordinary opacity blend.
+
+**Status: capability to investigate and specify, not implemented or committed to a particular algorithm.** Evaluate image/landmark-guided morphs, optical-flow-assisted morphs, geometry/depth-guided transformations and (where artistically warranted) model-based video transitions. Compare temporal stability, occlusions, controllability, artifact handling, deterministic/reproducible rendering, provenance, CPU/GPU cost, and compatibility with the existing shot compositing graph. Preserve start/end image and duration, easing, anchors/masks and human review as production decisions where relevant. First prototype should use a small, inspectable transition with known endpoints; avoid paid generation without approval.
+
+Potential placements: reel advertisement → archival camera, the animation short’s stylistic evolution, and other justified transformations. Do **not** force a morph if a match cut, lens/viewfinder reveal or look transformation serves the narrative better. A reverse film-stock look change is a separate, potentially already supported compositing concern.
+
+## Next documentation/production decisions
+
+- Write one-page artistic intentions for each standalone work, keeping reel-only bridges separate.
+- Maintain the coverage ledger above and allocate capabilities as story opportunities emerge.
+- Inventory old demo/CLI/test references and migrate before removing obsolete fixtures.
+- Refine the reel's middle-to-end transitions and emotional payoff without prematurely fixing scripts or duration.

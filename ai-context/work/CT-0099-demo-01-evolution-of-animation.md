@@ -54,6 +54,11 @@ remain herself.
 
 # Decisions (the user's, 2026-10-16)
 
+- 2026-10-17: the demo portfolio direction (`docs/demo-portfolio-direction.md`)
+  keeps this demo as demo 2, *Something New Is Coming*, in a five-work
+  portfolio feeding a circular reel; the fall into the 3D/Juggler world is a
+  reel-only bridge, not necessarily a scene of this short.
+
 - This is the first demo that must traverse the whole production flow and end
   as a complete, watchable film. Existing example productions may confirm file
   syntax and regress behavior, but do not define its creative standard or its
