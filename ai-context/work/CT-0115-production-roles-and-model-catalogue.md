@@ -105,6 +105,7 @@ the message for both Claude adapters.
 - Batch-aware generation: endpoint scaling read (REST v2), batch plan,
   scale-down guard, Coordinator read and prompt, development-skill rules
   (the author's losses: workers lowered mid-batch, one cold start per job).
+- Style catalogue: `collage-explainer` (Vox-like), at the author's request.
 - The development skill defers to the official RunPod plugin and names
   SINGULAR's skills as read-only measured sources; the LTX cold-start figures
   contradict each other (roadmap).

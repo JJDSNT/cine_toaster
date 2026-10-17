@@ -213,9 +213,17 @@ format (intake sheets in the format styles; answers are the person's, in the
 inbox or `toast intake`). RunPod/ComfyUI is three layers: generation recipes
 (`toast recipes`, doctor rows), the deterministic Generation Operations role
 that continues work when a consented job ends, and the `runpod-comfyui`
-development skill. Open: knowledge that evolves with use (design, with
-demotion as the hard half), SPEC-0019's sequence package and independent
-review, and real-model checks on a disposable film (paid: the author's go).
+development skill. Generation is batch-aware: recipes read the endpoint's
+workers and idle timeout, plan a batch (cold starts together against one by
+one) and refuse to call scaling down safe while jobs are in flight -- the
+author's losses on SINGULAR. The style catalogue gained `collage-explainer`
+(Vox-like). Next, in order (roadmap § Agent Runtime structure): send a batch
+to the RunPod queue in one go (paid path: with the author); real-model checks
+on a disposable film (images on Claude, an interview, a continuation: the
+author's quota); SPEC-0019's sequence package and independent review;
+SINGULAR's skills as the first runtime skills. Open designs: knowledge that
+evolves with use (demotion is the hard half); the LTX cold-start figures
+contradict each other.
 
 CT-0112 addresses the hidden-pending-decision / approval-without-stage-output
 gap (ADR 0032, SPEC-0018). A cross-workspace inbox derives current direction

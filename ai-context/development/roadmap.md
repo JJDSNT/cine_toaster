@@ -442,8 +442,14 @@ roles the supplied model serves. To do, in order:
 - [x] **Catalogue facts** (Claude models, 2026-10-17): context and prices
   from Anthropic's model table with its date. Codex models stay undescribed:
   the CLI does not report which model ran; a person adds theirs in their file.
-- [ ] **Real-model check of image input on Claude CLI and API.** Covered by
-  scripted tests only; run one Visual Prevalidation on a disposable film.
+- [ ] **Real-model checks on a disposable film** (the author's quota: ask
+  first). Scripted tests only so far for: image input on Claude CLI and API
+  (one Visual Prevalidation), one format interview (CT-0116), one Generation
+  Operations continuation after a real job; measure turn time and tokens per
+  step at the same time (item above).
+
+**Style catalogue (2026-10-17).** `collage-explainer` (aka Vox): a manner on
+the direction axis, combinable with the `explainer` format. Done.
 
 ### The demos line: the music piece, then the reel (opened 2026-10-13)
 
