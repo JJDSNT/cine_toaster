@@ -553,6 +553,18 @@ three drawings but no waiting gate/open question and no active jobs. Wire and
 validate one closed loop before adding gallery polish or more generated shots;
 do not imply that the embedded copilot already runs the MCP authoring cycle.
 
+**Where a demo film lives -- open (2026-10-17).** Demo 01 is
+`~/films/demo-01`: its own git repository (one commit, no remote, text
+uncommitted when checked), media ignored by design (ADR 0021), so its
+references and storyboard (about 48 MB of generated images) exist on one disk
+only. The author has not chosen a solution. Options weighed: a submodule (not
+recommended: carries only text, ties every toaster clone to the film); one
+repository per film with Git LFS or object storage for media, and a
+`make demo-01` / doctor bridge in the toaster. Decide before the film's media
+grows; related: Project Storage (CT-0117). Also to do: move The Last Signal
+(`examples/demo-project`, a fixture for 14 test files, `make demo`, the wheel
+and doctor) to `tests/fixtures/` under a neutral name, out of `make demo`.
+
 **Superseded as creative planning (2026-10-17):** the demo set and order
 below are replaced by [the demo portfolio direction](../../docs/demo-portfolio-direction.md):
 up to five standalone works -- historical cinema (CT-0097's archive), the
