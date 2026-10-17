@@ -316,6 +316,30 @@ Track scope and acceptance criteria in [CT-0084](../work/CT-0084-three-workspace
 - [ ] Compare existing feature menu + inspector with hybrid workspace/context navigation in a focused prototype.
 - [ ] Validate decisions, provenance and local exceptions with users before an implementation ADR.
 
+### The GUI is slow to load: measured causes (2026-10-17)
+
+Measured on a copy of Demo 01 (7 scenes): `/api/production` 3 ms (cached),
+`/api/creation` 2.0 s, `/api/decisions` 2.2 s, `/api/planning-context` 0.9 s,
+`/api/sequence-work` 0.8 s, `/api/storyboard` 0.5 s. One `creation_view`
+(profiled, 3.9 s under the profiler):
+
+- [ ] **The production is loaded 8 times per request.** The Creation sub-views
+  (`creation_review`, `storyboard`, `stage_handoff`, `directing`, ...) call
+  `load_production` themselves instead of the one already loaded; the web
+  layer's `cached_production` is not used by them. Solve: load once in
+  `creation_view` / `decision_inbox` and pass it down (most views already
+  accept `production=`).
+- [ ] **The style catalogue is re-parsed for every scene.** `_scene_style`
+  calls `list_styles` per scene: 57 calls, 2,109 TOML parses, 1.7 s. Solve:
+  one catalogue per `load_production` (or cache keyed by the style roots'
+  mtimes).
+- [ ] **Reference files are re-hashed on every read.** 99 SHA-256 digests,
+  0.8 s, repeated by `reference_snapshot` and `load_references`. Solve: a
+  digest cache keyed by (path, size, mtime_ns), disposable.
+- These costs grow with the film: CT-0113 saw Singular's preproduction take
+  over 120 s. The inbox link polls `/api/decisions` every 15 s per open tab.
+  Validate the fix on Demo 01 and read-only on Singular.
+
 ### Agent Runtime structure (CT-0115, ADR 0034, 2026-10-17)
 
 Review of CT-0108..CT-0114 with KDP Studio's agents-as-manifests and one-flow
