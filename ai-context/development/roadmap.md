@@ -17,6 +17,10 @@ tags:
 This roadmap orders architectural risk. It is not a promise that every listed
 technology will be adopted.
 
+## Newly captured production-operations backlog
+
+- **CT-0098 — Project Storage** (`ready`): show production footprint, remaining free space per destination volume, storage breakdown, and low-space render preflight. See `../work/CT-0098-project-storage.md` and [issue #1](https://github.com/JJDSNT/cine_toaster/issues/1). This is not yet implemented.
+
 ## Ordered plan from 2026-09-29
 
 This is the working order agreed after the camera, cut, and canvas
