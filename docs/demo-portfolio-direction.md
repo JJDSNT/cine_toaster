@@ -69,6 +69,19 @@ The previous production order is no longer authoritative. A new sequence should 
 
 **To investigate before scripting:** how/why the fourth sphere appears; physical causality of the thrown spheres making new floor; how to stage the loss of the original spheres without confusing the viewer; the juggler's personality and emotional beats; whether the sphere's music-video image belongs in the independent ending or only the reel; the character's arrival from the animation short as **reel-only bridge**; period-faithful opening visuals and rights/credit for Amiga Juggler inspiration; Blender ↔ Unreal asset interchange, camera/scene handoff, rendering and compositing via Cine Toaster; visual continuity during the engine/style transition. None of these decisions implies existing Unreal support or authorizes paid rendering.
 
+## Music video — aesthetic and musical references (2026-10-17)
+
+**Status: reference board only. Story, performance format, soundtrack and exact imagery are open.** Do not treat the previously brainstormed “girl emerging from a screen” as an approved narrative.
+
+- **Musical territory:** Concrete Blonde, Blondie and T.S.O.L. as reference artists for the desired feel: late-1970s through 1990s new wave, alternative rock, post-punk and related surf-culture energy. These are *inspirations*, not tracks cleared for use, and not a request to reproduce an artist's voice or recordings.
+- **Audiovisual language:** MTV music videos of the 1980s and 1990s: adventurous music-led montage, visual experimentation, performance, graphic intervention and analog/video textures where artistically justified.
+- **Surf-film language:** *The Green Iguana* as a reference for surf imagery, ocean movement, landscape and the relationship between music, rhythm and surfing. The concept need not be limited to a conventional surfing narrative.
+- **Historical/cultural image:** Andy Warhol drawing/painting Debbie Harry on the Commodore Amiga in 1985: a possible touchstone connecting pop art, music, image-making and early digital creativity. Its exact narrative role is **deliberately undecided**; homage is optional, not a required scene.
+- **Music selection constraint:** investigate music with licenses that explicitly permit audiovisual synchronization, distribution and intended commercial/promotional use; check composition and master rights separately where applicable, attribution, derivatives and territorial/platform conditions. “Free to listen” or “royalty-free” does not automatically mean openly licensed or suitable. If no suitable existing music is available, explore original commissioned or appropriately licensed music in the desired general idiom.
+- **Reel connections:** entry from a Juggler sphere and exit via a television displaying the Cine Toaster commercial remain provisional integration ideas. The standalone music video must work without either bridge.
+
+**Next creative step:** shortlist licensable tracks and compare their emotional tone and structure before choosing the narrative, pace, cast, or visual treatment. Do not lock a storyline solely to justify a reference.
+
 ## New capability candidate: morphing (2026-10-17)
 
 The proposed advertisement-to-archival-cameraman return creates a concrete cinematic motivation for **morphing**: a controlled transformation between two images/shapes/compositions, possibly combined with a reverse film-era look change and sound transition. Morphing is **not synonymous with** a cross-dissolve, grading, film grain or ordinary opacity blend.
