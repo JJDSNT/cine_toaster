@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { addressOf, type Navigation } from "./navigation.ts";
-import type { Seen } from "./Assistant.tsx";
+import type { Continuation, Seen } from "./Assistant.tsx";
 
 export function ContextAssistant({ seen, continuation, onRecordsChanged }: {
-  seen: Seen; continuation?: { decisionId: string; attempt?: string } | null; onRecordsChanged?: () => void;
+  seen: Seen; continuation?: Continuation | null; onRecordsChanged?: () => void;
 }) {
   const [state, setState] = useState("checking");
   const [open, setOpen] = useState(true);

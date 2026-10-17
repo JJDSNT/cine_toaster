@@ -15,7 +15,7 @@ from .roles import ROLES
 from ..production_context import WORK_POLICY
 
 MAX_STEPS, MAX_READS, MAX_WRITES = (ROLES["inception"].budgets[key] for key in ("steps", "reads", "writes"))
-TOOLS = ("read", "save_concept", "save_screenplay", "assess_readiness")
+TOOLS = ("read", "save_concept", "save_screenplay", "assess_readiness", "ask_questions")
 STOPS = ("complete", "needs_direction", "needs_review", "blocked", "paused")
 
 SYSTEM = """You are the Inception specialist inside Cine Toaster's Agent Runtime.
@@ -48,6 +48,16 @@ the exact question/scope. Existing pending assessments already have a review UI.
 Use needs_direction only for a concrete creative choice or information the human
 must supply. Resolve agent-owned gaps yourself when you have the capability.
 
+Interview before advancing (SPEC-0020). The creation record carries the format's
+intake sheet: each item, why it matters and the stage it unlocks, with what was
+asked and answered. Compare it with everything the records already establish.
+For what only the person can tell you and the records do not say, use
+`ask_questions`: at most three at a time, the most blocking first, each in the
+director's language with its reason, then respond needs_direction. Never ask
+what the records answer, never answer for the person, never repeat an open
+question. If the format itself is unknown, ask that first. An answered item is
+the person's word: use it, and cite it when it shapes a candidate.
+
 Tools do NOT approve human gates, delete, publish masters, promote canonical
 screenplays, generate images, browse the web or dispatch background tasks. A
 direction approval does not authorise paid generation. Describe a real missing
@@ -77,6 +87,8 @@ SCHEMA = {"type": "object", "properties": {
     "status": {"type": "string", "enum": list(STOPS)},
     "query": {"type": "string", "enum": list(READS)},
     "scene": TEXT, "shot": TEXT, "text": TEXT,
+    "questions": {"type": "array", "items": {"type": "object", "properties": {
+        "item": TEXT, "question": TEXT, "why": TEXT, "based_on": TEXT}, "required": ["item", "question", "why"]}},
     "draft": {"type": "object", "properties": {
         "title": TEXT, "text": TEXT, "based_on": TEXT, "concept": TEXT, "rationale": TEXT,
         "references": {"type": "array", "items": TEXT}}, "required": ["title", "text"]},
@@ -147,7 +159,21 @@ def creation_digest(value: dict) -> str:
         "references": [{"id": item["id"], "title": item.get("title"), "notes": item.get("notes"),
                         "findings": item.get("findings")} for item in value.get("references", [])[:30]],
         "findings": value.get("findings", [])[:12],
+        "intake": _intake_digest(value.get("intake")),
     }, 14000)
+
+
+def _intake_digest(intake: dict | None) -> dict:
+    """The format's sheet against what was asked and answered, shortly."""
+    if not intake:
+        return {"unavailable": True}
+    return {"format": intake.get("format"), "production_says": intake.get("production_says", ""),
+            "open_count": intake.get("open_count", 0),
+            "missing_required": intake.get("missing_required", []),
+            "items": [{"id": row["id"], "ask": row["ask"], "why": row["why"], "unlocks": row["unlocks"],
+                       "status": row["status"], "question_id": (row.get("question") or {}).get("id"),
+                       "answer": (row.get("answer") or {}).get("answer"),
+                       "answer_id": (row.get("answer") or {}).get("id")} for row in intake.get("items", [])]}
 
 
 def _review_ready(state: dict) -> bool:
@@ -247,6 +273,9 @@ def nodes(model, runtime):
                     if not value.get("source_digest"):
                         raise ValueError("Source material cannot be verified; reread or repair the production context")
                     result = runtime.save_inception_draft(payload)
+                elif action == "ask_questions":
+                    result = runtime.ask_intake({"questions": call.get("questions") or [],
+                                                 "expected_revision": value["revision"]})
                 elif action == "assess_readiness":
                     if not value.get("source_digest"):
                         raise ValueError("Source material cannot be verified; reread or repair the production context")

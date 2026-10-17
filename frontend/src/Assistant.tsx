@@ -76,11 +76,14 @@ function readMessage(value: unknown): string {
   return "";
 }
 
+/** A human-originated continuation: after a saved direction decision, or after answering the interview. */
+export interface Continuation { decisionId?: string; attempt?: string; intake?: string }
+
 interface Props {
   seen: Seen;
   onHighlight: (shot: string) => void;
   onNavigate?: (where: Navigation) => void;
-  continuation?: { decisionId: string; attempt?: string } | null;
+  continuation?: Continuation | null;
   onProductionUpdate?: () => void;
 }
 
@@ -105,7 +108,8 @@ function Conversation({ seen, onHighlight, onNavigate, onProductionUpdate, conti
   }, [update, onProductionUpdate]);
   const running = agent?.isRunning;
   useEffect(() => {
-    const id = continuation?.decisionId;
+    const intake = continuation?.intake;
+    const id = continuation?.decisionId || intake;
     const intent = id + (continuation?.attempt ? "-" + continuation.attempt : "");
     if (!id || !agent || !isReady || running || continued.current.has(intent)) return;
     continued.current.add(intent);
@@ -114,10 +118,11 @@ function Conversation({ seen, onHighlight, onNavigate, onProductionUpdate, conti
     // This is a human-originated CoAgent interaction, not a second dispatcher.
     // `resume` is typed state bound to this one message (ADR 0034); the graph
     // resolves the decision from production records before using it.
-    const message = `decision-${intent}`;
-    agent.setState({ ...(agent.state ?? {}), resume: { decision: id, message } });
-    agent.addMessage({ id: message, role: "user",
-      content: "Continue from the direction I just recorded. Read the saved decision and its scope before acting." });
+    const message = `${intake ? "intake" : "decision"}-${intent}`;
+    agent.setState({ ...(agent.state ?? {}), resume: intake ? { intake, message } : { decision: id, message } });
+    agent.addMessage({ id: message, role: "user", content: intake ?
+      "I answered your interview questions. Read my answers in the records and continue." :
+      "Continue from the direction I just recorded. Read the saved decision and its scope before acting." });
     void copilotkit.runAgent({ agent }).catch((error: unknown) => {
       setContinuationError(`The decision was saved, but continuation failed: ${String(error)}. Ask the assistant to continue when available.`);
     });

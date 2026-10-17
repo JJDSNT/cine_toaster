@@ -23,6 +23,8 @@ def decision_inbox(root):
         agent_work.append({'id': current['id'], 'state': 'needs_reassessment',
                            'instruction': 'Agent must refresh the proposal before a human can decide.',
                            'url': '/app/creation.html#direction-review'})
+    from .intake import inbox_items
+    items.extend(inbox_items(creation['intake']))
     for scene in production['scenes']:
         for identity, gate in (scene.get('gates') or {}).items():
             if gate.get('state') != 'waiting':
@@ -45,4 +47,4 @@ def decision_inbox(root):
     return {'project_id': production['id'], 'revision': creation['revision'], 'pending_count': len(items),
             'agent_work_count': pending_agent,
             'items': items, 'agent_work': agent_work,
-            'coverage': 'Saved current direction requests and waiting scene/workflow gates. Warnings and informal choices are not invented gates.'}
+            'coverage': 'Saved current direction requests, open interview questions and waiting scene/workflow gates. Warnings and informal choices are not invented gates.'}

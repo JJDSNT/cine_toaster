@@ -38,3 +38,41 @@ aspect = "16:9"
 total_seconds = [15, 60]
 hook_seconds = 3
 end_card = true
+
+# What must be known before this format advances: asked by the Inception agent, answered by a person (SPEC-0020).
+
+[[intake]]
+id = "product"
+ask = "What is advertised, and what must be shown of it (packshot, logo, claims)?"
+why = "An advertisement is judged by what it shows of the product."
+unlocks = "screenplay"
+
+[[intake]]
+id = "message"
+ask = "What single idea must the viewer leave with?"
+why = "Every shot serves one message; without it the spot has none."
+unlocks = "inception"
+
+[[intake]]
+id = "audience"
+ask = "Who is it for?"
+why = "Decides tone, casting and references."
+unlocks = "inception"
+
+[[intake]]
+id = "duration"
+ask = "How long: 6, 15, 30 or 60 seconds, and in which cut-downs?"
+why = "Fixes the number of beats and the shots per beat."
+unlocks = "screenplay"
+
+[[intake]]
+id = "mandatories"
+ask = "What is mandatory or forbidden (legal text, claims, brand guidelines)?"
+why = "Mandatories are not creative choices; missing one fails the spot."
+unlocks = "masters"
+
+[[intake]]
+id = "delivery"
+ask = "Where will it run (TV, social, cinema)?"
+why = "Decides aspect ratio, captions and loudness."
+unlocks = "masters"

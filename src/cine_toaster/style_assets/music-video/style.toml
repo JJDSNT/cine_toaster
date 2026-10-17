@@ -34,3 +34,41 @@ notes = "performed to the lens, lip-synced"
 [format]
 aspect = "16:9"
 total_seconds = [120, 300]
+
+# What must be known before this format advances: asked by the Inception agent, answered by a person (SPEC-0020).
+
+[[intake]]
+id = "track"
+ask = "Which song is it, and is the final mix available (file, length, BPM if known)?"
+why = "The song is the timeline: cuts, sections and length all come from it."
+unlocks = "assembly"
+
+[[intake]]
+id = "performance"
+ask = "Is it performance, narrative, concept, or a mix? Who performs?"
+why = "Decides whether shots are lip-synced coverage or a story, and who must be cast."
+unlocks = "screenplay"
+
+[[intake]]
+id = "lyrics"
+ask = "Are there lyrics, and should the images follow them, play against them, or ignore them?"
+why = "The lyrics are the closest thing to a screenplay a music video has."
+unlocks = "screenplay"
+
+[[intake]]
+id = "artist_identity"
+ask = "Is there an artist identity to respect (look, colours, past videos, logo)?"
+why = "Keeps the video in the artist's world rather than a generic one."
+unlocks = "storyboard"
+
+[[intake]]
+id = "duration"
+ask = "Full song, an edit, or a teaser? Any length a platform imposes?"
+why = "Fixes the total length and what of the song is used."
+unlocks = "assembly"
+
+[[intake]]
+id = "delivery"
+ask = "Where will it be shown (YouTube, vertical reels, a screen at a concert)?"
+why = "Decides aspect ratio, captions and safe areas."
+unlocks = "masters"

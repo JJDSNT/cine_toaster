@@ -81,6 +81,15 @@ there is no hidden background continuation.
 ## Art Direction and Visual Prevalidation
 
 Art Direction and Visual Prevalidation (CT-0110) run inside the same assistant.
+Before advancing, the Inception agent interviews you about what the film's
+format needs (a music video: the song, performance or narrative, lyrics,
+length, where it will be shown). It asks only what the records do not already
+say, a few questions at a time, each with why it matters. Answer in **Awaiting
+you** or at the terminal (`toast intake <film> --answer QUESTION "your words"`);
+your words are kept as records, and answering the last question lets the
+agent continue. The questions for each format live in its style
+(`[[intake]]` in `style_assets/<format>/style.toml`, SPEC-0020).
+
 Ask it to develop a visual direction or review existing reference images against
 an intention. It saves briefs and image-based findings in Creation; no manual
 forms are needed. Each generation attempt asks for quota consent over its exact

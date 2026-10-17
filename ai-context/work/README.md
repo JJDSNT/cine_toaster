@@ -69,6 +69,8 @@ the user's validation).
 
 Compositing, the demos line and earlier:
 
+- [CT-0116](CT-0116-format-intake.md) — format intake: the agent interviews
+  before advancing, the person answers in the inbox or `toast intake` (review)
 - [CT-0115](CT-0115-production-roles-and-model-catalogue.md) — agent review:
   declared roles, model capabilities and catalogue, role bindings; the RunPod/
   ComfyUI three layers and the format interviewer planned (doing)

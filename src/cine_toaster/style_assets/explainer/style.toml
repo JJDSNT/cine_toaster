@@ -35,3 +35,29 @@ notes = "friendly, clear"
 aspect = "16:9"
 total_seconds = [30, 180]
 captions = true
+
+# What must be known before this format advances: asked by the Inception agent, answered by a person (SPEC-0020).
+
+[[intake]]
+id = "subject"
+ask = "What must be explained, and to whom?"
+why = "The audience decides the level and the vocabulary."
+unlocks = "inception"
+
+[[intake]]
+id = "takeaway"
+ask = "What should the viewer be able to do or understand afterwards?"
+why = "The script is built backwards from it."
+unlocks = "screenplay"
+
+[[intake]]
+id = "voice"
+ask = "Is there a narrator (whose voice, which language)?"
+why = "Narration fixes the pace and the timing of every image."
+unlocks = "assembly"
+
+[[intake]]
+id = "duration"
+ask = "How long?"
+why = "Fixes how much can be explained."
+unlocks = "screenplay"

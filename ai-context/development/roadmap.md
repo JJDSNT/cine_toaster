@@ -348,15 +348,14 @@ roles the supplied model serves. To do, in order:
   only reads and answers (a report) becomes a declaration with fixed readers.
   Do it with the first such role (the format interviewer is a candidate),
   not as a placeholder.
-- [ ] **Format intake (the interviewer).** Agents can stop with
-  `needs_direction`, but nothing knows what a format needs (a music video:
-  the track, duration, BPM, performance or narrative, lyrics), and the
-  question and answer live only in chat (CT-0112's informal-question gap).
-  Solve: format sheets as data (what must be known, and what each item
-  unlocks); Inception compares the sheet with the records and asks only what
-  cannot be inferred, a few questions at a time with the reason; questions
-  and answers are production records shown in the decision inbox. Model on
-  KDP Studio's interviewer manifest.
+- [x] **Format intake (the interviewer)** (done 2026-10-17, CT-0116,
+  SPEC-0020). Format styles carry `[[intake]]` sheets (seven formats);
+  Inception asks with `ask_questions` only what the records do not say, a few
+  at a time with the reason; questions and the person's answers are Creation
+  records, shown in the decision inbox (answer box), `toast intake` and MCP
+  `read_intake`; answering the last open question continues in Inception.
+  Remaining: sheets for non-format films (a short with no format style gets
+  only the `format` question), and a real-model interview on a disposable film.
 - [ ] **Generation recipes.** ComfyUI/endpoint graphs described in filmmaking
   terms (inputs, models, VRAM, rate, endpoint variable); the graph stays in
   the provider adapter.

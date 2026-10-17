@@ -36,3 +36,29 @@ aspect = "2.39:1"
 total_seconds = [60, 150]
 hook_seconds = 3
 end_card = true
+
+# What must be known before this format advances: asked by the Inception agent, answered by a person (SPEC-0020).
+
+[[intake]]
+id = "subject"
+ask = "What is the trailer for, and what may it reveal?"
+why = "A trailer sells without spoiling; what may be shown bounds every shot."
+unlocks = "screenplay"
+
+[[intake]]
+id = "material"
+ask = "Is there existing footage, or is everything to be made?"
+why = "Decides whether this is an edit of material or a production."
+unlocks = "screenplay"
+
+[[intake]]
+id = "duration"
+ask = "How long?"
+why = "Fixes the number of beats."
+unlocks = "assembly"
+
+[[intake]]
+id = "music"
+ask = "Is there music chosen, or should the cut find one?"
+why = "A trailer is cut to its music."
+unlocks = "assembly"

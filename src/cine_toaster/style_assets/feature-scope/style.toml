@@ -36,3 +36,23 @@ notes = "the film's own register"
 
 [format]
 aspect = "2.39:1"
+
+# What must be known before this format advances: asked by the Inception agent, answered by a person (SPEC-0020).
+
+[[intake]]
+id = "logline"
+ask = "What is the story in one sentence?"
+why = "Everything after the logline is development of it."
+unlocks = "inception"
+
+[[intake]]
+id = "duration"
+ask = "What running time?"
+why = "Fixes the number of scenes and the scope of production."
+unlocks = "screenplay"
+
+[[intake]]
+id = "budget"
+ask = "Is there a generation budget or deadline?"
+why = "Decides how much can be generated and in what order."
+unlocks = "budget"

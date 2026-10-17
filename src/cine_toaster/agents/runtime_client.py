@@ -46,6 +46,9 @@ class RuntimeClient:
     def assess_inception(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._call("/api/creation/assessment", payload)
 
+    def ask_intake(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._call("/api/creation/intake-questions", payload)
+
     def save_art_brief(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._call("/api/creation/art-brief", payload)
 

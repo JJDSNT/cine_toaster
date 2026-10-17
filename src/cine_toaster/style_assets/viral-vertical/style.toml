@@ -38,3 +38,29 @@ aspect = "9:16"
 total_seconds = [7, 60]
 hook_seconds = 2
 captions = true
+
+# What must be known before this format advances: asked by the Inception agent, answered by a person (SPEC-0020).
+
+[[intake]]
+id = "platform"
+ask = "Which platform (TikTok, Reels, Shorts)?"
+why = "Each has its own length, safe areas and caption habits."
+unlocks = "masters"
+
+[[intake]]
+id = "hook"
+ask = "What happens in the first two seconds?"
+why = "A vertical piece lives or dies in its hook."
+unlocks = "screenplay"
+
+[[intake]]
+id = "duration"
+ask = "How long?"
+why = "Fixes the beats after the hook."
+unlocks = "screenplay"
+
+[[intake]]
+id = "sound"
+ask = "Is there a trending sound or voice-over to use?"
+why = "The sound often carries the piece."
+unlocks = "assembly"

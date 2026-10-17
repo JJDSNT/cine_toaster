@@ -189,12 +189,22 @@ def resumed(state: dict[str, Any], human: Any) -> str:
     records before acting on it.
     """
 
+    return _resumed(state, human, "decision")
+
+
+def _resumed(state: dict[str, Any], human: Any, kind: str) -> str:
     resume = state.get("resume") or {}
-    decision = str(resume.get("decision") or "") if isinstance(resume, dict) else ""
-    if not decision or len(decision) > 80 or not all(c.isalnum() or c in "-_" for c in decision):
+    named = str(resume.get(kind) or "") if isinstance(resume, dict) else ""
+    if not named or len(named) > 80 or not all(c.isalnum() or c in "-_" for c in named):
         return ""
     message = getattr(human, "id", "") or ""
-    return decision if message and resume.get("message") == message else ""
+    return named if message and resume.get("message") == message else ""
+
+
+def resumed_intake(state: dict[str, Any], human: Any) -> str:
+    """The interview answer a continuation names: the person answered, so Inception continues (SPEC-0020)."""
+
+    return _resumed(state, human, "intake")
 
 
 STEP_WORDS = {"done": "feito", "skipped": "pulado", "running": "rodando", "waiting": "esperando você",
@@ -256,7 +266,9 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None, models=None):
             except Exception:
                 blank = False  # an unreadable imported screenplay is not proof of a blank film
         decision_id = resumed(state, human)
-        role = "inception" if seen.get("Current room") == "creation" or blank or decision_id else "coordinator"
+        answered = resumed_intake(state, human)
+        role = ("inception" if seen.get("Current room") == "creation" or blank or decision_id or answered
+                else "coordinator")
         if decision_id:
             try:
                 creative = runtime.creation()
@@ -270,7 +282,8 @@ def build(model: Model, runtime: RuntimeClient, checkpointer=None, models=None):
                     role = 'art_direction'
             except Exception:
                 pass  # the specialist validates the exact canonical decision before acting
-        why = "Creation workspace" if seen.get("Current room") == "creation" else "New film without screenplay" if blank else "Production request and whole-film context"
+        why = ("Interview answered" if answered else "Creation workspace" if seen.get("Current room") == "creation"
+               else "New film without screenplay" if blank else "Production request and whole-film context")
         return {**scratch_reset(), "resume": {}, "project_id": project_id or state.get("project_id", ""), "turn": turn,
                 "active_role": role, "routing_reason": why, "proposal": {}, "notes": [],
                 "planning_scene": seen.get("Current scene id", ""),

@@ -34,3 +34,29 @@ notes = "real people, unperformed"
 [format]
 aspect = "16:9"
 captions = true
+
+# What must be known before this format advances: asked by the Inception agent, answered by a person (SPEC-0020).
+
+[[intake]]
+id = "subjects"
+ask = "Who is interviewed, and is the material recorded or to be recorded?"
+why = "Decides whether this is an edit of interviews or a production."
+unlocks = "screenplay"
+
+[[intake]]
+id = "question"
+ask = "What is the documentary's central question?"
+why = "The edit selects what answers it."
+unlocks = "inception"
+
+[[intake]]
+id = "archive"
+ask = "Is there archive material, and are its rights cleared?"
+why = "Archive shapes the visual language and the legal limits."
+unlocks = "masters"
+
+[[intake]]
+id = "duration"
+ask = "How long?"
+why = "Fixes how much of the material is used."
+unlocks = "assembly"

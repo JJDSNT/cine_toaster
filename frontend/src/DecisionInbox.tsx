@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { request, type CreationState } from "./creation.ts";
 import { InceptionReview } from "./InceptionReview.tsx";
 import { ContextAssistant } from "./ContextAssistant.tsx";
+import type { Continuation } from "./Assistant.tsx";
 import "./decisions.css";
 import { workScope, workState, type AgentWork } from "./productionWork.ts";
 
@@ -28,11 +29,35 @@ export function DecisionLink() {
     <a className="decision-link" href="/app/decisions.html#agent-work">AI work · {failed ? "unavailable" : workCount ?? "…"}</a></>;
 }
 
+/** One interview question, answered in the person's own words (SPEC-0020). */
+function IntakeAnswer({ item, revision, onAnswered }: {
+  item: Inbox["items"][number]; revision: number; onAnswered: (answer: string, last: boolean) => Promise<void>;
+}) {
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  async function save() {
+    setSaving(true); setError("");
+    try {
+      const result = await request<{ answer: { id: string } }>("/api/creation/intake-answer",
+        { question: item.id, answer: text, expected_revision: revision });
+      const inbox = await request<Inbox>("/api/decisions");
+      await onAnswered(result.answer.id, !inbox.items.some((other) => other.kind === "question"));
+    } catch (reason) { setError(String(reason)); } finally { setSaving(false); }
+  }
+  return <section id="intake" aria-label="Interview question"><h3>{item.question}</h3>
+    <p>Why it matters: {item.why}</p><p>Format: {item.scope}</p>
+    <label>Your answer<textarea value={text} onChange={(event) => setText(event.target.value)} rows={3} /></label>
+    <button disabled={saving || !text.trim()} onClick={() => void save()}>{saving ? "Saving…" : "Save answer"}</button>
+    {error && <p role="alert">Not saved: {error}</p>}
+    <p className="prep-help">{item.next_step} Your words are kept as they are; nothing is approved by answering.</p></section>;
+}
+
 export function DecisionInbox() {
   const [data, setData] = useState<Inbox | null>(null);
   const [creation, setCreation] = useState<CreationState | null>(null);
   const [error, setError] = useState("");
-  const [continuation, setContinuation] = useState<{ decisionId: string; attempt?: string } | null>(null);
+  const [continuation, setContinuation] = useState<Continuation | null>(null);
   const [work, setWork] = useState<AgentWork | null>(null);
   async function reload() {
     try {
@@ -56,6 +81,9 @@ export function DecisionInbox() {
           {item.kind === "direction" && creation?.inception_review?.current?.id === item.id ?
             <InceptionReview data={creation} title="Your decision" reload={reload}
               onDecision={(decisionId, attempt) => { setWork(null); setContinuation({ decisionId, attempt }); }} /> :
+            item.kind === "question" && creation ?
+            <IntakeAnswer item={item} revision={creation.revision} onAnswered={async (answer, last) => {
+              await reload(); if (last) { setWork(null); setContinuation({ intake: answer }); } }} /> :
             <><h3>{item.question}</h3><p>Scope: {item.scope}</p><p>{item.why}</p><p>After your decision: {item.next_step}</p></>}
         </article>)}
         <section id="agent-work" aria-label="AI work"><h2>AI work & retained outputs</h2>

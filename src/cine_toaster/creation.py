@@ -78,6 +78,8 @@ def load_creation(root: Path, *, production: dict | None = None) -> dict[str, An
         validate_handoffs(state)
         from .sequence_work import validate_sequence_work
         validate_sequence_work(state)
+        from .intake import validate_intake
+        validate_intake(state)
         return {**state, "rounds": state.get("rounds", []), "assessments": state.get("assessments", []),
                 "assessment_decisions": state.get("assessment_decisions", [])}
     except (OSError, ValueError, TypeError, AttributeError) as error:
@@ -166,9 +168,11 @@ def creation_view(root: Path) -> dict[str, Any]:
     from .directing import directing_view
     from .stage_handoff import handoff_view
     from .sequence_work import sequence_work_view
+    from .intake import intake_view
     return {**state, "handoffs": handoff_view(root, state), "directing": directing_view(root, state), "art_direction": art_view(root, state, source_digest), "title": production["title"], "references": references, "findings": findings,
             "source_digest": source_digest,
             "sequence_work": sequence_work_view(root, state, production, material_digest=source_digest),
+            "intake": intake_view(root, state, production),
             "inception_review": inception_review_view(root, state),
             "active_rounds": active_rounds,
             "reference_history": reference_history(references, state["drafts"], production.get("cast") or {}, active_rounds,

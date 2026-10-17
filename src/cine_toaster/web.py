@@ -817,6 +817,22 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             except CineToasterError as error:
                 self._send_json(error.public_dict(), HTTPStatus(error.http_status))
             return
+        if parsed.path in ("/api/creation/intake-questions", "/api/creation/intake-answer"):
+            from .intake import answer_intake, ask_intake
+            from .state import Actor
+            try:
+                payload = self._read_json_body(limit=64 * 1024)
+                if parsed.path.endswith("questions"):
+                    result = ask_intake(self.project_root, questions=payload.get("questions"),
+                        expected_revision=payload.get("expected_revision"), actor=Actor(id="creation-agent", kind="agent"))
+                else:
+                    result = answer_intake(self.project_root, question=payload.get("question"),
+                        answer=payload.get("answer"), expected_revision=payload.get("expected_revision"),
+                        actor=Actor(id="director", kind="human"))
+                self._send_json(result)
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
         if parsed.path == "/api/creation/sequence-review-request":
             from .sequence_work import request_sequence_review
             from .state import Actor

@@ -256,6 +256,24 @@ def build(root: Path, manager=None):
                        actor=Actor(**ACTOR)))
 
     @server.tool(annotations=reading)
+    def read_intake() -> dict[str, Any]:
+        """The format interview: the format's intake sheet, what was asked, and the person's answers (SPEC-0020)."""
+        from .intake import intake_view
+        return _answer(lambda: intake_view(runtime.root))
+
+    @server.tool(annotations=working)
+    def ask_intake_questions(questions: list[dict[str, str]], expected_revision: int) -> dict[str, Any]:
+        """Ask the person what only they can tell and the records do not say: at most a few, each with why.
+
+        Each question: {item (a sheet item id, or a new id), question, why, based_on (an answer id when asking
+        again)}. You never answer: the person does, in the decision inbox or `toast intake --answer`.
+        """
+        from .intake import ask_intake
+        from .state import Actor
+        return _answer(lambda: ask_intake(runtime.root, questions=questions, expected_revision=expected_revision,
+                                          actor=Actor(**ACTOR)))
+
+    @server.tool(annotations=reading)
     def read_scene(scene: str) -> str:
         """One scene's records: blocks, workflow runs, gates, pictures, findings, location."""
         return read(runtime, "scene", {"scene": scene})

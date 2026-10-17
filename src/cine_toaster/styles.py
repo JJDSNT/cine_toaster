@@ -107,6 +107,8 @@ def _load(path: Path, origin: str) -> dict[str, Any]:
         "use_when": _words(raw.get("use_when")),
         "avoid_when": _words(raw.get("avoid_when")),
         "references": _words(raw.get("references")),
+        # What a production of this format needs known before it advances (SPEC-0020, `intake.py`).
+        "intake": [dict(item) for item in raw.get("intake") or [] if isinstance(item, dict)],
         "origin": origin,
         "directory": str(path.parent),
     }

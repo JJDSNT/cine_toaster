@@ -1172,6 +1172,39 @@ def command_continuity(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_intake(args: argparse.Namespace) -> int:
+    """The format interview (SPEC-0020): what the format needs, what was asked, and your answers."""
+
+    from .creation import load_creation
+    from .intake import answer_intake, intake_view
+    from .state import Actor
+
+    root = Path(args.project).expanduser().resolve()
+    if args.answer:
+        question, text = args.answer
+        # Whoever types at this terminal is the person the question was put to.
+        answer_intake(root, question=question, answer=text, expected_revision=load_creation(root)["revision"],
+                      actor=Actor(id="director", kind="human"))
+    view = intake_view(root)
+    if args.json:
+        print(json.dumps(view, indent=2, ensure_ascii=False))
+        return 0
+    form = view["format"]
+    print(f"Format: {form['name']} ({form['source']})" if form else "Format: not known yet"
+          + (f" -- the production says {view['production_says']!r}" if view["production_says"] else ""))
+    for row in view["items"]:
+        mark = {"answered": "answered", "open": "ASKED", "not_asked": "not asked"}[row["status"]]
+        print(f"  [{mark}] {row['id']}: {row['ask']}" + (f"  (unlocks {row['unlocks']})" if row["unlocks"] else ""))
+        if row["status"] == "open":
+            print(f"      question {row['question']['id']}: {row['question']['question']}")
+            print(f"      why: {row['question']['why']}")
+        if row["answer"]:
+            print(f"      you said: {row['answer']['answer']}")
+    if view["open_count"]:
+        print(f"Answer with: toast intake {args.project} --answer QUESTION_ID \"your words\"")
+    return 0
+
+
 def command_status(args: argparse.Namespace) -> int:
     """Where the production stands, sequence by sequence: the Producer's report (docs/production-agents.md)."""
 
@@ -2534,6 +2567,13 @@ def build_parser() -> argparse.ArgumentParser:
     continuity_parser.add_argument("--shot", help="... at this shot, after the scene's declared changes")
     continuity_parser.add_argument("--json", action="store_true")
     continuity_parser.set_defaults(function=command_continuity)
+
+    intake_parser = subparsers.add_parser(
+        "intake", help="The format interview: what the format needs, the agent's questions, and your answers")
+    intake_parser.add_argument("project", type=Path)
+    intake_parser.add_argument("--answer", nargs=2, metavar=("QUESTION", "TEXT"), help="answer one open question")
+    intake_parser.add_argument("--json", action="store_true")
+    intake_parser.set_defaults(function=command_intake)
 
     status_parser = subparsers.add_parser(
         "status", help="Where the production stands: shots with a take or awaiting one, versions, blockers, next decisions")

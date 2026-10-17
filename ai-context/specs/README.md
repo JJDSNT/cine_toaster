@@ -55,6 +55,7 @@ work is tracked separately under `ai-context/work/`.
 | `SPEC-0017` | Directing shot proposals and independent continuity review | accepted | partial |
 | `SPEC-0018` | Decision inbox and approved stage inputs | accepted | partial |
 | `SPEC-0019` | Sequence-level Inception adherence, screenplay/storyboard evidence and independent review | accepted | partial |
+| `SPEC-0020` | Format intake: the agent asks what a format needs, a person answers | accepted | complete |
 
 ## Rule
 
