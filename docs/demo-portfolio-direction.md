@@ -22,6 +22,16 @@ An archival cameraman films → his subjective view reveals the animated story �
 
 This is a **narrative direction**, not a final edit, timing, script or mandate that each standalone demo contain the bridges. The reel-only connective shots can be produced separately. Its circular ending should retain the emotional payoff after the product reveal.
 
+## Morphing — required capability to develop (2026-10-17)
+
+**Decision: morphing is a feature-development requirement for Cine Toaster**, not merely a possible aesthetic transition or an existing capability claim. Track it in the product backlog and in the reel's production readiness checks.
+
+**Initial use case:** an intentional, controllable visual metamorphosis between images/shots, especially the passage from the Cine Toaster commercial/reveal back to the historical cameraman's view. Other applications may include object, character or scene transformations in demos, where narratively justified.
+
+**Requirements to investigate and implement:** source/target image or clip inputs; transition timing and easing; spatial/temporal correspondence or control points/masks where needed; coherent intermediate frames without distracting artifacts; integration with timeline/transition tooling and rendering pipeline; reproducible parameters and asset provenance; preview and approval workflow. Evaluate 2D image morphing versus video/AI-assisted morphing and whether compositing or model-based workflows best serve each use case. Do not presume a specific engine, model or algorithm yet.
+
+**Acceptance direction:** demonstrate an editable, repeatable morph between two deliberately chosen shots with a smooth temporal result, documented production settings, and reviewable output. Implementation status: **planned / not verified**.
+
 ## Functional coverage to preserve and place opportunistically
 
 The following are **coverage obligations / opportunities**, **not fixed assignments or mandatory story beats**. Attach them to the production where they naturally serve the film. Track evidence of actual use, not merely availability of a feature.
