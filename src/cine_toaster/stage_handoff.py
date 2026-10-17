@@ -15,11 +15,47 @@ from .state import Actor, now, scene_lock
 from .storyboard import load_storyboard, register_storyboard_candidate
 
 
+def target_members(target):
+    """Every (scene, shot) a handoff target covers, in order: one scene, or a canonical sequence."""
+    if 'sequence' in target:
+        return [(item['scene'], shot) for item in target['scenes'] for shot in item['shots']]
+    return [(target['scene'], shot) for shot in target['shots']]
+
+
+def target_scenes(target):
+    return [item['scene'] for item in target['scenes']] if 'sequence' in target else [target['scene']]
+
+
+def sequence_target(production, sequence):
+    """The canonical sequence as a handoff target: its declared scenes in order, each with all its shots.
+
+    Membership comes from the production's `sequences` (ADR 0008), never from scene numbering:
+    Singular's Genebra is 1-01..1-04 with 1-02A/B/C because the film says so.
+    """
+    from .production_context import work_structure
+    try:
+        scope = work_structure(production, sequence=sequence)['sequences']
+    except (ResourceNotFoundError, ValidationError):
+        return None
+    chosen = next((item for item in scope if item['id'] == sequence), None)
+    if not chosen or not chosen['scene_ids'] or chosen['missing_scene_ids']:
+        return None
+    scenes = {item['id']: item for item in production['scenes']}
+    members = [{'scene': identity, 'shots': [shot['id'] for shot in scenes[identity]['shots']]}
+               for identity in chosen['scene_ids']]
+    if not all(item['shots'] for item in members):
+        return None
+    return {'sequence': sequence, 'label': chosen['label'], 'scenes': members}
+
+
 def preview_handoff(root, assessment, state=None):
     state = load_creation(root) if state is None else state
     proposal = assessment['proposal']; production = load_production(root)
     plan = next((item for item in state.get('direction_plans', []) if item['id'] == proposal.get('direction_plan')), None)
     target = proposal.get('target')
+    if target is None and isinstance(proposal.get('sequence'), str) and proposal['sequence']:
+        # The director's unit of review: a whole canonical sequence (ADR 0035).
+        target = sequence_target(production, proposal['sequence'])
     if target is None and plan:
         associated = [item.get('existing_shot') for item in plan['shots']]
         target = {'scene': plan['scene'], 'shots': associated} if all(associated) else None
@@ -32,7 +68,10 @@ def preview_handoff(root, assessment, state=None):
             shots = [shot['id'] for shot in scene['shots'] if re.search(r'(?<![\w-])' + re.escape(shot['id']) + r'(?![\w-])', scope)]
             if shots:
                 target = {'scene': scene['id'], 'shots': shots}
-    if target is not None:
+    if isinstance(target, dict) and 'sequence' in target:
+        if target != sequence_target(production, target['sequence']):
+            target = None  # a stale or hand-made sequence target is never authority
+    elif target is not None:
         scene = next((item for item in production['scenes'] if item['id'] == target.get('scene')), None) if isinstance(target, dict) else None
         shots = target.get('shots') if isinstance(target, dict) else None
         if (not scene or not isinstance(shots, list) or not shots or any(not isinstance(s, str) for s in shots)
@@ -78,7 +117,7 @@ def _snapshot(root, state, pinned=None):
 def make_handoff(root, state, assessment, decision, expected_preview):
     preview = preview_handoff(root, assessment, state)
     if not preview['can_advance'] or preview['sha256'] != expected_preview:
-        raise ValidationError('The explicit scene/shot handoff changed or is unavailable; inspect the scoped proposal')
+        raise ValidationError('The explicit scene/shot or sequence handoff changed or is unavailable; inspect the scoped proposal')
     snapshot = _snapshot(root, {**state, '_assessment_references': assessment['materials']['references']})
     return {'id': 'handoff_' + uuid.uuid4().hex[:16], 'assessment': assessment['id'], 'decision': decision['id'],
             'destination': preview['destination'], 'target': preview['target'], 'scope': preview['scope'],
@@ -98,8 +137,19 @@ def validate_handoffs(state):
                 or not isinstance(item.get('target'), dict) or item.get('destination') != 'storyboard'):
             raise ValueError('Invalid retained stage handoff')
         target = item['target']
-        if (not isinstance(target.get('scene'), str) or not isinstance(target.get('shots'), list) or not target['shots']
-                or any(not isinstance(shot, str) for shot in target['shots']) or len(set(target['shots'])) != len(target['shots'])
+        if 'sequence' in target:
+            parts = target.get('scenes')
+            valid = (isinstance(target['sequence'], str) and isinstance(parts, list) and parts
+                     and all(isinstance(part, dict) and isinstance(part.get('scene'), str)
+                             and isinstance(part.get('shots'), list) and part['shots']
+                             and all(isinstance(shot, str) for shot in part['shots'])
+                             and len(set(part['shots'])) == len(part['shots']) for part in parts)
+                     and len({part['scene'] for part in parts}) == len(parts))
+        else:
+            valid = (isinstance(target.get('scene'), str) and isinstance(target.get('shots'), list) and target['shots']
+                     and all(isinstance(shot, str) for shot in target['shots'])
+                     and len(set(target['shots'])) == len(target['shots']))
+        if (not valid
                 or any(not isinstance(item['sources'].get(key), list) for key in
                        ('scripts', 'references', 'drafts', 'rounds', 'art_briefs', 'direction_plans', 'continuity_reviews', 'storyboard'))):
             raise ValueError('Invalid retained handoff target/source snapshot')
@@ -120,11 +170,21 @@ def handoff_current(root, state, item):
 def handoff_view(root, state=None):
     state = load_creation(root) if state is None else state
     boards = load_storyboard(root)['candidates'] if state.get('stage_handoffs') else []
-    return [{**item, 'stale': not handoff_current(root, state, item),
-             'outputs': [{'id': board['id'], 'scene': board['scene'], 'shot': board['shot'],
-                         'url': '/app/preproduction.html?' + urlencode({'scene': board['scene'], 'shot': board['shot'], 'candidate': board['id']})}
-                         for board in boards if board.get('provenance', {}).get('handoff') == item['id']],
-             'execution': 'not_tracked_here'} for item in state.get('stage_handoffs', [])]
+    views = []
+    latest = (state.get('assessments') or [{}])[-1].get('id')
+    for item in state.get('stage_handoffs', []):
+        outputs = [{'id': board['id'], 'scene': board['scene'], 'shot': board['shot'],
+                    'url': '/app/preproduction.html?' + urlencode({'scene': board['scene'], 'shot': board['shot'], 'candidate': board['id']})}
+                   for board in boards if board.get('provenance', {}).get('handoff') == item['id']]
+        drawn = {(output['scene'], output['shot']) for output in outputs}
+        members = target_members(item['target'])
+        views.append({**item, 'stale': not handoff_current(root, state, item), 'outputs': outputs,
+                      # A newer request (a sequence after a scene study) supersedes it: it is history, not work.
+                      'superseded': item['assessment'] != latest,
+                      'missing': [{'scene': scene, 'shot': shot} for scene, shot in members if (scene, shot) not in drawn],
+                      'coverage': {'shots': len(members), 'drawn': len(members) - len([1 for pair in members if pair not in drawn])},
+                      'execution': 'not_tracked_here'})
+    return views
 
 
 def publish_storyboard_reference(root, *, handoff, scene, shot, reference, file, title,
@@ -146,7 +206,7 @@ def publish_storyboard_reference(root, *, handoff, scene, shot, reference, file,
             raise ValidationError('Approved handoff inputs changed; reassess before publishing')
         if state.get('assessments', [])[-1]['id'] != item['assessment']:
             raise ValidationError('Another assessment superseded this development request')
-        if scene != item['target']['scene'] or shot not in item['target']['shots']:
+        if (scene, shot) not in target_members(item['target']):
             raise PermissionDeniedError('Storyboard target exceeds the human-approved handoff')
         snapshot = reference_snapshot(root, [reference])[0]
         if not isinstance(file, str) or file not in snapshot['files']:

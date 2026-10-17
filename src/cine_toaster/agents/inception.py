@@ -58,6 +58,11 @@ what the records answer, never answer for the person, never repeat an open
 question. If the format itself is unknown, ask that first. An answered item is
 the person's word: use it, and cite it when it shapes a candidate.
 
+A storyboard proposal is for the director's unit of review, a canonical
+sequence: set proposal.sequence to its id (from the work structure) so the
+approval hands the whole sequence -- every scene and shot, in order -- to Art
+Direction. A scene-only study is a partial study, never the storyboard request.
+
 Tools do NOT approve human gates, delete, publish masters, promote canonical
 screenplays, generate images, browse the web or dispatch background tasks. A
 direction approval does not authorise paid generation. Describe a real missing
@@ -103,7 +108,7 @@ SCHEMA = {"type": "object", "properties": {
             "required": ["destination", "status", "summary", "gaps"]}},
         "proposal": {"type": "object", "properties": {
             "destination": {"type": "string", "enum": ["screenplay", "storyboard", "masters"]},
-            "question": TEXT, "scope": TEXT, "why": TEXT, "next_step": TEXT},
+            "question": TEXT, "scope": TEXT, "why": TEXT, "next_step": TEXT, "sequence": TEXT},
             "required": ["destination", "question", "scope", "why", "next_step"]}},
         "required": ["title", "summary", "readiness", "proposal"]},
 }, "required": ["reply", "action"]}
@@ -326,6 +331,8 @@ def nodes(model, runtime):
                     supplied = call.get("assessment") or {}
                     payload = {key: supplied[key] for key in ("title", "summary", "readiness", "proposal", "references")
                                if supplied.get(key) is not None}
+                    if isinstance(payload.get("proposal"), dict):  # strict-schema adapters send unused fields as null
+                        payload["proposal"] = {key: value for key, value in payload["proposal"].items() if value is not None}
                     payload.update(expected_revision=value["revision"], expected_source_digest=value["source_digest"])
                     result = runtime.assess_inception(payload)
                 else:

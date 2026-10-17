@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { request, type CreationState } from "./creation.ts";
+import { request, targetLabel, targetShotCount, type CreationState } from "./creation.ts";
 
 const statusNames = { ready: "Enough to proceed", needs_work: "Gaps to resolve", not_assessed: "Not assessed" };
 
@@ -44,11 +44,11 @@ export function InceptionReview({ data, reload, onDecision, title = "Is there en
       {current.status === "awaiting_decision" && <>
         <p className="prep-help">This approves the proposed direction, not finished storyboard images, cast masters or paid generation.</p>
         {current.handoff_preview?.can_advance && <p>Advance approved inputs to storyboard development: <strong>
-          {current.handoff_preview.target?.scene} / {current.handoff_preview.target?.shots.join(", ")}</strong>.
+          {current.handoff_preview.target ? targetLabel(current.handoff_preview.target) : ""}</strong>.
           The assistant will develop this scope; new image generation needs separate quota consent.</p>}
         {!current.handoff_preview?.can_advance && current.proposal.destination === "storyboard" && current.proposal.review_kind !== "storyboard_candidates" &&
           <p className="prep-help">This records direction only. Automatic storyboard development needs an explicit existing scene/shot target;
-            promoting local proposed shot IDs into canonical shots is not implemented.</p>}
+            promoting local proposed shot IDs into canonical shots is not implemented. A storyboard request names a canonical sequence.</p>}
         <div className="prep-actions"><button disabled={busy} onClick={() => void decide("approved")}>
           {current.handoff_preview?.can_advance ? "Approve & advance" : "Approve direction"}</button>
           <button disabled={busy} aria-expanded={editing} onClick={() => setEditing(!editing)}>Request changes</button></div>
@@ -61,9 +61,9 @@ export function InceptionReview({ data, reload, onDecision, title = "Is there en
         {current.decision.guidance && ` ${current.decision.guidance}`}</p>}
       {current.next_agent_action && <p className="prep-help">Next agent instruction: {current.next_agent_action.instruction}
         {" · This instruction alone is not proof of execution; check the assistant's activity."}</p>}
-      {handoff && <div><h3>Approved stage input · {handoff.target.scene}</h3>
+      {handoff && <div><h3>Approved stage input · {targetLabel(handoff.target)}</h3>
         <p>{handoff.stale ? "Source material changed; reassessment needed." :
-          `${handoff.outputs.length} retained output(s) · ${handoff.target.shots.length} target shot(s). This is not a running-job claim.`}</p>
+          `${handoff.outputs.length} retained output(s) · ${targetShotCount(handoff.target)} target shot(s). This is not a running-job claim.`}</p>
         {handoff.outputs.map((item) => <p key={item.id}><a href={item.url}>See storyboard {item.scene} / {item.shot}</a></p>)}
         {!handoff.stale && onDecision && <button onClick={() => onDecision(handoff.decision,
           `retry-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`)}>Continue approved work</button>}

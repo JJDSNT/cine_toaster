@@ -46,6 +46,9 @@ def _validate_assessment(title, summary, readiness, proposal):
         raise ValidationError("The proposal must name an assessed destination")
     for key in ("question", "scope", "why", "next_step"):
         _text(proposal.get(key), f"proposal {key}")
+    if proposal.get("sequence") is not None and (not isinstance(proposal["sequence"], str) or not proposal["sequence"].strip()
+                                   or len(proposal["sequence"]) > 120):
+        raise ValidationError("proposal sequence must be a canonical sequence id")
 
 
 def validate_review_records(state: dict):

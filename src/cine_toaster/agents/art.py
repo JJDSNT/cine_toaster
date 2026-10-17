@@ -13,9 +13,12 @@ from .models import supports
 from .reads import overview, production_work
 from .roles import ROLES
 from ..production_context import WORK_POLICY
+from ..stage_handoff import target_members, target_scenes
 
 MAX_STEPS, MAX_REVIEWS, MAX_GENERATIONS = (ROLES["art_direction"].budgets[key]
                                            for key in ("steps", "reviews", "generations"))
+#: Drawings one consented batch may hold: a sequence's missing shots, not an open-ended run.
+MAX_BATCH = 30
 WAIT_SECONDS = 25
 
 SYSTEM = """You are the Art Direction specialist in Cine Toaster's Agent Runtime.
@@ -44,6 +47,13 @@ needs_review only after that request exists. No external research, deletion,
 arbitrary filesystem/shell tools or automatic gate/master decisions. Work only
 within the human's scope. A greeting/status question is not permission to generate.
 
+A sequence handoff covers every scene and shot of a canonical sequence, in
+order: the director reviews the sequence, so work through all of it. When
+drawings are missing, plan them together with plan_batch (one item per missing
+shot: scene, shot, title naming them, the request, parents) and ask for one
+consent with generate; the jobs run together and Generation Operations brings
+each finished picture back to you to keep, publish with save_storyboard for its
+shot, and inspect. Use read_context with `scene` to focus another scene.
 An approved stage handoff is exact input authority for the displayed scene/shot
 targets, not final storyboard approval. Develop its instruction rather than
 asking for the same direction approval again. save_storyboard publishes an
@@ -63,8 +73,12 @@ of these candidates, never approval of the final production storyboard.
 
 TEXT = {'type': 'string'}
 SCHEMA = {'type': 'object', 'properties': {
-    'action': {'type': 'string', 'enum': ['save_brief', 'plan_generation', 'generate', 'check_job',
+    'action': {'type': 'string', 'enum': ['save_brief', 'plan_generation', 'plan_batch', 'generate', 'check_job',
                 'inspect', 'read_context', 'save_storyboard', 'request_review', 'respond']},
+    'scene': TEXT,
+    'batch': {'type': 'array', 'items': {'type': 'object', 'properties': {
+        'scene': TEXT, 'shot': TEXT, 'title': TEXT, 'request': TEXT, 'parents': {'type': 'array', 'items': TEXT}},
+        'required': ['scene', 'shot', 'title', 'request', 'parents']}},
     'reply': TEXT, 'status': {'type': 'string', 'enum': ['complete', 'needs_direction', 'needs_review', 'blocked']},
     'brief': TEXT, 'job': TEXT, 'references': {'type': 'array', 'items': TEXT},
     'board': {'type': 'object', 'properties': {key: TEXT for key in
@@ -132,6 +146,13 @@ def board_brief(board):
                            for item in board.get('candidates') or []]}
 
 
+def _scope(target):
+    if 'sequence' in target:
+        return (f"{target.get('label') or target['sequence']} ({len(target['scenes'])} scenes, "
+                f"{sum(len(part['shots']) for part in target['scenes'])} shots, in order)")
+    return f"{target['scene']} / {', '.join(target['shots'])}"
+
+
 def nodes(model, runtime, reviewer=None, waits=None):
     """`reviewer` serves Visual Prevalidation: a separate call, and possibly another model the person bound.
 
@@ -147,18 +168,33 @@ def nodes(model, runtime, reviewer=None, waits=None):
             value = runtime.creation()
             film = overview(runtime.production())
             screenplay = bounded(runtime.screenplay(), 7000)
-            handoff = next((item for item in value.get('handoffs', []) if item['decision'] == state.get('resume_decision_id')), None)
+            decision = state.get('resume_decision_id') or state.get('art_handoff_decision') or ''
+            handoff = next((item for item in value.get('handoffs', []) if item['decision'] == decision), None) if decision else None
             if handoff and handoff['stale']:
                 raise ValueError('The approved handoff inputs changed; a new assessment is needed')
             if handoff:
                 current = (value.get('inception_review') or {}).get('current') or {}
                 if not state.get('art_handoff_verified') and (current.get('decision') or {}).get('id') != handoff['decision']:
                     raise ValueError('This is not the current approved development request')
-            target = handoff['target']['scene'] if handoff else ''
+            target, sequence = '', None
+            if handoff:
+                scenes = target_scenes(handoff['target'])
+                missing = [item['scene'] for item in handoff.get('missing', [])]
+                # A sequence is worked scene by scene: the one asked for, else the first still missing drawings.
+                focus = state.get('art_focus_scene', '')
+                target = focus if focus in scenes else next((scene for scene in scenes if scene in missing), scenes[0])
+                if 'sequence' in handoff['target']:
+                    sequence = {'sequence': handoff['target']['sequence'], 'label': handoff['target'].get('label'),
+                                'coverage': handoff.get('coverage'), 'focus': target,
+                                'scenes': [{'scene': part['scene'], 'shots': part['shots'],
+                                            'missing': [item['shot'] for item in handoff.get('missing', [])
+                                                        if item['scene'] == part['scene']]}
+                                           for part in handoff['target']['scenes']]}
             return {'art_context': {'creation': value, 'film': film, 'screenplay': screenplay,
-                    'handoff': handoff, 'scene': runtime.scene(target) if target else None,
+                    'handoff': handoff, 'sequence': sequence, 'scene': runtime.scene(target) if target else None,
                     'storyboard': runtime.storyboard(target) if target else None},
                     'art_handoff_verified': bool(handoff),
+                    'art_handoff_decision': handoff['decision'] if handoff else state.get('art_handoff_decision', ''),
                     'active_role': 'art_direction', 'agent_status': {'role': 'art_direction', 'state': 'working'}}
         except Exception as error:
             return stop(state, f'Não consegui ler o contexto de arte: {error}')
@@ -184,6 +220,8 @@ def nodes(model, runtime, reviewer=None, waits=None):
                   # Each part has its own budget: the approved handoff (with its instruction) is never
                   # squeezed out by a large scene or storyboard record.
                   f"\nApproved stage input (handoff): {bounded(state['art_context'].get('handoff'), 8000)}"
+                  f"\nThe approved sequence, scene by scene (what still needs drawings): "
+                  f"{bounded(state['art_context'].get('sequence'), 4000)}"
                   f"\nActual target scene: {bounded(scene_brief(state['art_context'].get('scene')), 9000)}"
                   f"\nIts current drawings: {bounded(board_brief(state['art_context'].get('storyboard')), 7000)}"
                   f"\nInception: {creation_digest(value)}\nArt records: {bounded(value.get('art_direction', {}), 16000)}"
@@ -206,14 +244,16 @@ def nodes(model, runtime, reviewer=None, waits=None):
         visual_attempt = 0
         try:
             if action == 'read_context':
+                if call.get('scene'):
+                    state = {**state, 'art_focus_scene': str(call['scene'])}
                 fresh = context(state)
                 same = fresh.get('art_context') == state.get('art_context')
                 # Say what the reread found: without a receipt the model kept asking for the same read.
                 note = ('Reread: nothing changed. Everything available is already shown above; act on it '
                         '(save_brief, plan_generation, save_storyboard, inspect) or respond.' if same else
                         'Reread: the records changed; the context above is current.')
-                return {**fresh, 'art_pending': {}, 'art_receipts': [*state.get('art_receipts', []),
-                        {'action': action, 'ok': True, 'result': note}]}
+                return {**fresh, 'art_pending': {}, 'art_focus_scene': state.get('art_focus_scene', ''),
+                        'art_receipts': [*state.get('art_receipts', []), {'action': action, 'ok': True, 'result': note}]}
             if not preconditions['expected_source_digest']:
                 raise ValueError('Source context cannot be verified')
             if action == 'save_brief':
@@ -227,6 +267,25 @@ def nodes(model, runtime, reviewer=None, waits=None):
                                                | {'art_brief': brief['id'], 'concept': brief.get('concept', '')})
                 return {'art_pending': {}, 'art_plan': plan, 'art_plan_source': preconditions,
                         'art_receipts': [*state.get('art_receipts', []), {'action': action, 'ok': True, 'result': plan}]}
+            elif action == 'plan_batch':
+                brief = next(item for item in value.get('art_briefs', []) if item['id'] == call.get('brief'))
+                items = call.get('batch') or []
+                handoff = state['art_context'].get('handoff')
+                allowed = set(target_members(handoff['target'])) if handoff else set()
+                if not items or len(items) > MAX_BATCH:
+                    raise ValueError(f'A batch holds 1 to {MAX_BATCH} drawings')
+                if handoff and any((item.get('scene'), item.get('shot')) not in allowed for item in items):
+                    raise ValueError('Every batch item must be a shot of the approved handoff')
+                plans = [runtime.plan_reference({key: item[key] for key in ('title', 'request', 'parents') if key in item}
+                                                | {'art_brief': brief['id'], 'concept': brief.get('concept', '')})
+                         for item in items]
+                plan = {'batch': plans, 'targets': [{'scene': item['scene'], 'shot': item['shot'], 'title': item['title']}
+                                                    for item in items],
+                        'available': all(item.get('available') for item in plans), 'title': f'{len(plans)} drawings'}
+                return {'art_pending': {}, 'art_plan': plan, 'art_plan_source': preconditions,
+                        'art_receipts': [*state.get('art_receipts', []), {'action': action, 'ok': True,
+                                         'result': {'planned': len(plans), 'targets': plan['targets'],
+                                                    'available': plan['available']}}]}
             elif action == 'inspect':
                 if state.get('art_reviews', 0) >= MAX_REVIEWS:
                     return stop(state, 'A pré-validação atingiu o limite de tentativas; preciso de direção para outra rodada.', 'needs_direction')
@@ -265,19 +324,28 @@ def nodes(model, runtime, reviewer=None, waits=None):
                 if not review or review['stale'] or review['verdict'] != 'ready_for_human':
                     raise ValueError('A current successful pixel review is required before human approval is requested')
                 handoff = state['art_context'].get('handoff')
-                extra = {}
+                extra, reviewed = {}, [review['id']]
                 if handoff:
                     outputs = handoff['outputs']
-                    if set(handoff['target']['shots']) - {item['shot'] for item in outputs}:
+                    members = target_members(handoff['target'])
+                    if set(members) - {(item['scene'], item['shot']) for item in outputs}:
                         raise ValueError('Some approved storyboard targets still have no retained output; finish or report the actual limit')
                     latest = {}
-                    for board in state['art_context']['storyboard']['candidates']:
+                    # Every scene of the target, not only the one in focus: a sequence is reviewed whole.
+                    for board in runtime.storyboard()['candidates']:
                         if board.get('provenance', {}).get('handoff') == handoff['id']:
-                            latest[board['shot']] = board
-                    if any(board['provenance']['reference'] not in review['targets'] for board in latest.values()):
-                        raise ValueError('The visual review did not inspect every current storyboard output in this scope')
+                            latest[(board['scene'], board['shot'])] = board
+                    # Inspection runs in batches of at most eight pictures: any current successful review counts.
+                    current = [item for item in value.get('art_direction', {}).get('reviews', [])
+                               if not item['stale'] and item['verdict'] == 'ready_for_human']
+                    inspected = {ref for item in current for ref in item['targets']}
+                    if any(board['provenance']['reference'] not in inspected for board in latest.values()):
+                        raise ValueError('The visual reviews did not inspect every current storyboard output in this scope')
+                    reviewed = [item['id'] for item in current
+                                if any(board['provenance']['reference'] in item['targets'] for board in latest.values())]
                     extra = {'target': handoff['target'], 'storyboard_candidates': [item['id'] for item in outputs],
-                             'source_handoff': handoff['id'], 'review_kind': 'storyboard_candidates'}
+                             'source_handoff': handoff['id'], 'review_kind': 'storyboard_candidates',
+                             'visual_reviews': reviewed}
                 result = runtime.assess_inception({'title': 'Storyboard candidates ready for review' if handoff else 'Art direction ready for review', 'summary': review['summary'],
                     'references': review['targets'],
                     'readiness': [{'destination': 'storyboard', 'status': 'ready',
@@ -285,7 +353,7 @@ def nodes(model, runtime, reviewer=None, waits=None):
                     'proposal': {'destination': 'storyboard', 'question': 'Review these retained storyboard candidates?' if handoff else 'Use this visual direction to develop the storyboard?',
                         **extra,
                         'art_brief': review['brief'], 'visual_review': review['id'],
-                        'scope': (f"{handoff['target']['scene']} / {', '.join(handoff['target']['shots'])}: retained drawing candidates, not final storyboard approval."
+                        'scope': (_scope(handoff['target']) + ": retained drawing candidates, not final storyboard approval."
                                   if handoff else f"Art brief {review['brief']}; visual review {review['id']}. Not master/storyboard approval."),
                         'why': review['summary'], 'next_step': ('Use the reviewed drawings to discuss the next planning step; no automatic 3D or master production.'
                                   if handoff else 'Develop storyboard candidates from this exact visual direction; preserve alternatives.')},
@@ -312,19 +380,31 @@ def nodes(model, runtime, reviewer=None, waits=None):
             return stop(state, 'Não há um plano de geração disponível. Confira o adaptador com toast doctor.')
         if state.get('art_generations', 0) >= MAX_GENERATIONS:
             return stop(state, 'Limite de geração atingido; preservei todas as alternativas.', 'needs_direction')
-        answer = interrupt({'message': f"Gerar uma imagem exploratória: {plan['title']}? Consome quota da assinatura; "
-                            f"não é gratuito nem aprovação criativa.\n{plan['prompt']}", 'plan': plan})
+        batch = plan.get('batch')
+        if batch:
+            listed = '\n'.join(f"- {item['scene']} {item['shot']}: {item['title']}" for item in plan['targets'])
+            message = (f"Gerar {len(batch)} desenhos de storyboard de uma vez? Consome quota da assinatura (cerca de "
+                       f"1 a 2 min cada); não é gratuito nem aprovação criativa. Cada um volta para revisão.\n{listed}")
+        else:
+            message = (f"Gerar uma imagem exploratória: {plan['title']}? Consome quota da assinatura; "
+                       f"não é gratuito nem aprovação criativa.\n{plan['prompt']}")
+        answer = interrupt({'message': message, 'plan': plan})
         if not isinstance(answer, dict) or answer.get('approved') is not True:
-            return stop(state, 'Não gerei a imagem. O brief foi preservado.', 'complete')
+            return stop(state, 'Não gerei nada. O brief foi preservado.', 'complete')
         try:
             current = runtime.creation()
             expected = state['art_plan_source']
             if current['revision'] != expected['expected_revision'] or current.get('source_digest') != expected['expected_source_digest']:
                 raise ValueError('Material changed after the plan; inspect and confirm a new plan')
-            if runtime.plan_reference(plan) != plan:
+            plans = batch or [plan]
+            if any(runtime.plan_reference(item) != item for item in plans):
                 raise ValueError('Generation plan changed; inspect and confirm again')
-            job = runtime.start_reference(plan)
-            return {'art_pending': {}, 'art_job': job['id'], 'art_waiting': True, 'art_plan': {},
+            # The consent covers exactly these plans; all are sent together so they share warm workers.
+            jobs = [runtime.start_reference(item) for item in plans]
+            targets = plan.get('targets') or [{}]
+            started = {job['id']: target for job, target in zip(jobs, targets)}
+            return {'art_pending': {}, 'art_job': jobs[0]['id'], 'art_waiting': True, 'art_plan': {},
+                    'art_batch': {**state.get('art_batch', {}), **started},
                     'art_generations': state.get('art_generations', 0) + 1}
         except Exception as error:
             return stop(state, f'A geração não pôde ser iniciada: {error}')
@@ -337,6 +417,18 @@ def nodes(model, runtime, reviewer=None, waits=None):
                 time.sleep(1)
                 job = runtime.job(state['art_job'])
             thread = ((config or {}).get('configurable') or {}).get('thread_id')
+            if waits is not None and thread:
+                # Every other drawing of the batch not yet kept is left to Generation Operations,
+                # whatever this one does: none of them may be lost if this one finishes first.
+                for identity in state.get('art_batch', {}):
+                    if identity == job['id']:
+                        continue
+                    try:
+                        if not runtime.job(identity).get('adopted_at'):
+                            waits.add(thread=thread, project_id=state.get('project_id', ''), job=identity,
+                                      role='art_direction')
+                    except Exception:
+                        continue
             if job['state'] in ('queued', 'running') and waits is not None and thread:
                 waits.add(thread=thread, project_id=state.get('project_id', ''), job=job['id'], role='art_direction')
                 return stop(state, f"O job {job['id']} continua {job['state']}. Operações de geração o acompanham: "
@@ -349,8 +441,10 @@ def nodes(model, runtime, reviewer=None, waits=None):
                 return stop(state, f"O job {job['id']} terminou em {job['state']}: {job.get('error')}", art_waiting=False)
             if not job.get('adopted_at'):
                 runtime.keep_reference(job['id'])  # overwrite is always false
-            return {**refreshed(state, 'keep_reference', {'job': job['id'], 'reference': job['result']['summary']['reference']}),
-                    'art_waiting': False}
+            kept = {'job': job['id'], 'reference': job['result']['summary']['reference']}
+            if job['id'] in state.get('art_batch', {}):
+                kept['for'] = state['art_batch'][job['id']]  # the shot this drawing was planned for
+            return {**refreshed(state, 'keep_reference', kept), 'art_waiting': False}
         except Exception as error:
             return stop(state, f'Não consegui concluir a retenção da referência: {error}', art_waiting=False)
 

@@ -47,8 +47,11 @@ ROLES: dict[str, Role] = {role.id: role for role in (
          budgets={"steps": 8, "reviews": 2, "generations": 2},
          scratch={"art_context": {}, "art_steps": 0, "art_receipts": [], "art_pending": {},
                   "art_plan": {}, "art_plan_source": {}, "art_generations": 0, "art_reviews": 0,
-                  "art_waiting": False, "art_review_request": "", "art_handoff_verified": False},
-         kept={"art_job": str}),
+                  "art_waiting": False, "art_review_request": "", "art_handoff_verified": False,
+                  "art_focus_scene": ""},
+         # Kept across turns: a batch outlives the turn that started it, and a Generation Operations
+         # continuation must still know which approved handoff it serves.
+         kept={"art_job": str, "art_batch": dict, "art_handoff_decision": str}),
     Role("visual_prevalidation", "Visual Prevalidation", "reviewer",
          needs=frozenset({"structured_output", "vision"}), within="art_direction"),
     Role("directing", "Directing / Shot Planning", "author",

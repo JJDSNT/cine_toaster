@@ -35,7 +35,8 @@ export interface CreationState {
   handoffs?: StageHandoff[];
 }
 export interface StageHandoff {
-  id: string; decision: string; destination: string; target: { scene: string; shots: string[] };
+  id: string; decision: string; destination: string; target: HandoffTarget;
+  coverage?: { shots: number; drawn: number }; missing?: { scene: string; shot: string }[];
   scope: string; instruction: string; stale: boolean;
   outputs: { id: string; scene: string; shot: string; url: string }[];
 }
@@ -67,7 +68,7 @@ export interface InceptionAssessment {
     gaps: { description: string; owner: string; next_action: string }[] }[];
   proposal: { destination: string; question: string; scope: string; why: string; next_step: string; direction_plan?: string; continuity_review?: string; review_kind?: string };
   decision: { id: string; outcome: string; guidance: string } | null;
-  handoff_preview?: { can_advance: boolean; target: { scene: string; shots: string[] } | null; sha256: string };
+  handoff_preview?: { can_advance: boolean; target: HandoffTarget | null; sha256: string };
   next_agent_action: { instruction: string; status: string; owner: string } | null;
 }
 export interface InceptionReviewState { current: InceptionAssessment | null; history: unknown[]; decisions: unknown[] }
@@ -99,4 +100,21 @@ export function referenceGroups(data: CreationState) {
   if (unassigned.length) groups.push({ id: "unassigned", title: groups.length ? "Unassigned references" : "References",
     number: null, round: null, references: unassigned, missing: [] });
   return groups;
+}
+
+/** One scene's shots, or a whole canonical sequence: the director's unit of review (ADR 0035). */
+export type HandoffTarget =
+  | { scene: string; shots: string[] }
+  | { sequence: string; label?: string; scenes: { scene: string; shots: string[] }[] };
+
+export function targetLabel(target: HandoffTarget): string {
+  if ("sequence" in target) {
+    const shots = target.scenes.reduce((total, part) => total + part.shots.length, 0);
+    return `${target.label || target.sequence}: ${target.scenes.length} scenes, ${shots} shots, in order`;
+  }
+  return `${target.scene} / ${target.shots.join(", ")}`;
+}
+
+export function targetShotCount(target: HandoffTarget): number {
+  return "sequence" in target ? target.scenes.reduce((total, part) => total + part.shots.length, 0) : target.shots.length;
 }

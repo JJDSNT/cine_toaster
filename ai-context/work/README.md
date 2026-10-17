@@ -72,6 +72,8 @@ the user's validation).
 
 Compositing, the demos line and earlier:
 
+- [CT-0118](CT-0118-sequence-storyboard-handoff.md) — a storyboard request for a
+  whole canonical sequence, one consent per batch (ADR 0035; review)
 - [CT-0116](CT-0116-format-intake.md) — format intake: the agent interviews
   before advancing, the person answers in the inbox or `toast intake` (review)
 - [CT-0115](CT-0115-production-roles-and-model-catalogue.md) — agent review:

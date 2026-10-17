@@ -54,3 +54,15 @@ Closing a page/service failure can prevent a conversational run. Saved handoff
 and output records survive; the GUI offers continuation through the same
 CoAgent, and makes incomplete/blocked next work visible. No durable autonomous
 worker is implied. Tests use disposable films, never Demo 01 approvals.
+
+## Amendment (ADR 0035, 2026-10-17): sequence targets and batch consent
+
+A storyboard proposal may name `sequence`; its handoff target is the canonical
+sequence `{sequence, label, scenes: [{scene, shots}]}` in declared order, valid
+only while equal to the current declaration. Publication accepts any shot of
+the target. The handoff view adds `coverage` {shots, drawn}, `missing` and
+`superseded` (a newer assessment exists); superseded handoffs leave the inbox's
+AI work. Art Direction's `plan_batch` + one `generate` consent send every
+planned drawing together; Generation Operations continues each job. The review
+request needs a drawing for every target shot and current visual reviews that
+together inspected every current drawing.

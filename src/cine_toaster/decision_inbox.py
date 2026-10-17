@@ -3,6 +3,7 @@ from urllib.parse import urlencode
 
 from .creation import creation_view
 from .project import load_production
+from .stage_handoff import target_scenes
 
 
 def decision_inbox(root):
@@ -44,11 +45,15 @@ def _decision_inbox(root):
                           'url': '/?' + urlencode({'scene': scene['id']}) + '#workflow',
                           'evidence': {'candidates': gate.get('candidates', [])}, 'actions': ['open_origin']})
     for handoff in creation.get('handoffs', []):
+        if handoff.get('superseded'):
+            continue  # kept in the journal as history; a newer request owns the work
         agent_work.append({'id': handoff['id'], 'state': 'sources_changed' if handoff['stale'] else
-                           'outputs_retained' if handoff['outputs'] else 'awaiting_agent_output',
+                           'outputs_retained' if handoff['outputs'] and not handoff.get('missing') else
+                           'awaiting_agent_output',
                            'instruction': handoff['instruction'], 'decision': handoff['decision'],
                            'target': handoff['target'], 'outputs': handoff['outputs'],
-                           'url': '/app/preproduction.html?' + urlencode({'scene': handoff['target']['scene']})})
+                           'coverage': handoff.get('coverage'), 'missing': handoff.get('missing', []),
+                           'url': '/app/preproduction.html?' + urlencode({'scene': target_scenes(handoff['target'])[0]})})
     agent_work.extend(creation.get('sequence_work', {}).get('items', []))
     pending_agent = sum(item['state'] != 'outputs_retained' for item in agent_work)
     return {'project_id': production['id'], 'revision': creation['revision'], 'pending_count': len(items),
