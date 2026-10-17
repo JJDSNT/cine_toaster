@@ -39,6 +39,9 @@ execution history and links to those destinations.
 
 ## Work queue
 
+- `CT-0098` — Project Storage: production disk footprint, free capacity, per-volume breakdown and render preflight (`ready`; [issue #1](https://github.com/JJDSNT/cine_toaster/issues/1)).
+
+
 The ordered plan in [`development/roadmap.md`](../development/roadmap.md)
 is complete; after the close-out of 2026-10-03, what remains is its
 **Backlog** section. Five records stay open on purpose: CT-0020, CT-0028,
