@@ -1149,6 +1149,16 @@ def serve_project(
     for line in startup_urls(host, server.server_address[1]):
         print(line)
     print("Press Ctrl+C to stop.")
+    import signal
+    import threading as _threading
+
+    if _threading.current_thread() is _threading.main_thread():
+        # A `kill` (SIGTERM) stops like Ctrl+C, so the assistant's Copilot Runtime is
+        # stopped with it instead of being left running on its port (found 2026-10-17).
+        def _terminate(signum, frame):
+            raise KeyboardInterrupt
+
+        signal.signal(signal.SIGTERM, _terminate)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

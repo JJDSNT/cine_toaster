@@ -108,6 +108,30 @@ LOOP = Loop(role='art_direction', steps='art_steps', pending='art_pending', sche
                                         if not (state.get('background') and action == 'generate')))
 
 
+#: What Art Direction reads of a scene and of its storyboard (KDP Studio's fixed *readers*): the
+#: shots it draws, not the scene's whole operational record (takes, sound, retiming...).
+SHOT_FIELDS = ('id', 'label', 'description', 'framing', 'camera', 'camera_text', 'move', 'duration_seconds',
+               'subject', 'looks_at', 'emotion', 'look', 'variant', 'script', 'covers', 'notes', 'approved_picture')
+BOARD_FIELDS = ('id', 'shot', 'title', 'version', 'based_on', 'note', 'image', 'image_available', 'inputs',
+                'provenance', 'review', 'findings', 'created_at')
+
+
+def scene_brief(scene):
+    if not scene:
+        return None
+    return {**{key: scene.get(key) for key in ('id', 'title', 'summary', 'direction', 'location', 'style', 'phase')},
+            'shots': [{key: shot.get(key) for key in SHOT_FIELDS if shot.get(key) not in (None, '', [], {})}
+                      for shot in scene.get('shots') or []]}
+
+
+def board_brief(board):
+    if not board:
+        return None
+    return {'scene': board.get('scene'), 'revision': board.get('revision'), 'coverage': board.get('coverage'),
+            'candidates': [{key: item.get(key) for key in BOARD_FIELDS if key in item}
+                           for item in board.get('candidates') or []]}
+
+
 def nodes(model, runtime, reviewer=None, waits=None):
     """`reviewer` serves Visual Prevalidation: a separate call, and possibly another model the person bound.
 
@@ -157,7 +181,11 @@ def nodes(model, runtime, reviewer=None, waits=None):
     def reason(state):
         value = state['art_context']['creation']
         prompt = (f"Whole film: {state['art_context']['film']}\nScreenplay: {state['art_context']['screenplay']}"
-                  f"\nApproved stage input and actual target scene/drawings: {bounded({key:state['art_context'].get(key) for key in ('handoff','scene','storyboard')}, 24000)}"
+                  # Each part has its own budget: the approved handoff (with its instruction) is never
+                  # squeezed out by a large scene or storyboard record.
+                  f"\nApproved stage input (handoff): {bounded(state['art_context'].get('handoff'), 8000)}"
+                  f"\nActual target scene: {bounded(scene_brief(state['art_context'].get('scene')), 9000)}"
+                  f"\nIts current drawings: {bounded(board_brief(state['art_context'].get('storyboard')), 7000)}"
                   f"\nInception: {creation_digest(value)}\nArt records: {bounded(value.get('art_direction', {}), 16000)}"
                   f"\nReceipts: {bounded(state.get('art_receipts', []), 14000)}"
                   f"\nLimits: {MAX_STEPS-state.get('art_steps', 0)} steps, "
@@ -178,7 +206,14 @@ def nodes(model, runtime, reviewer=None, waits=None):
         visual_attempt = 0
         try:
             if action == 'read_context':
-                return {**context(state), 'art_pending': {}}
+                fresh = context(state)
+                same = fresh.get('art_context') == state.get('art_context')
+                # Say what the reread found: without a receipt the model kept asking for the same read.
+                note = ('Reread: nothing changed. Everything available is already shown above; act on it '
+                        '(save_brief, plan_generation, save_storyboard, inspect) or respond.' if same else
+                        'Reread: the records changed; the context above is current.')
+                return {**fresh, 'art_pending': {}, 'art_receipts': [*state.get('art_receipts', []),
+                        {'action': action, 'ok': True, 'result': note}]}
             if not preconditions['expected_source_digest']:
                 raise ValueError('Source context cannot be verified')
             if action == 'save_brief':

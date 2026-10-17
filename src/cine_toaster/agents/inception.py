@@ -142,8 +142,52 @@ def bounded(value: Any, limit: int = 9000) -> str:
         text = json.dumps(_shrink(value, chars, items), ensure_ascii=False, default=str)
     if len(text) <= limit:
         return text
-    return json.dumps({"cut": f"too large to give here ({len(json.dumps(value, default=str))} characters); "
-                              "use a focused read"})
+    # Still too large: share the limit among the keys, in proportion to their size, rather than
+    # give nothing (an empty answer made Art Direction reread the same context until its budget ran out).
+    shrunk = _shrink(value, _SHRINK[-1][0], _SHRINK[-1][1])
+    for share in (1.0, 0.8, 0.6, 0.4, 0.25):
+        text = json.dumps(_fit(shrunk, int(limit * share)), ensure_ascii=False, default=str)
+        if len(text) <= limit:
+            return text
+    return json.dumps({"cut": f"too large to give here ({len(json.dumps(value, default=str))} characters)"})
+
+
+def _size(value: Any) -> int:
+    return len(json.dumps(value, ensure_ascii=False, default=str))
+
+
+def _fit(value: Any, budget: int) -> Any:
+    """Shrink `value` towards `budget` characters of JSON by dividing it among its parts."""
+
+    if _size(value) <= budget:
+        return value
+    if isinstance(value, str):
+        keep = max(budget - 40, 0)
+        return value[:keep] + f" … [{len(value) - keep} characters cut]"
+    if isinstance(value, dict):
+        sizes = {key: _size(item) for key, item in value.items()}
+        total = sum(sizes.values()) or 1
+        room = max(budget - 8 * len(value), 0)
+        # Small parts (ids, states, the instruction) stay whole; large ones share what is left.
+        small = {key for key, size in sizes.items() if size <= room / max(len(value), 1)}
+        left = room - sum(sizes[key] for key in small)
+        large = total - sum(sizes[key] for key in small) or 1
+        fitted = {key: item if key in small else _fit(item, max(int(left * sizes[key] / large), 24))
+                  for key, item in value.items()}
+        # Many small keys can outweigh the budget on their own: leave out the largest, and say which.
+        omitted = []
+        while _size(fitted) > budget and len(fitted) > 1:
+            largest = max((key for key in fitted if key != "_omitted"), key=lambda key: _size(fitted[key]))
+            omitted.append(largest)
+            fitted = {key: item for key, item in fitted.items() if key != largest}
+            fitted["_omitted"] = omitted
+        return fitted
+    if isinstance(value, list):
+        if not value:
+            return value
+        each = max(budget // len(value), 24)
+        return [_fit(item, each) for item in value]
+    return value
 
 
 def creation_digest(value: dict) -> str:

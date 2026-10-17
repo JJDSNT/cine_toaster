@@ -253,6 +253,20 @@ evidence, not proof that the upstream stage was completed.
 
 # Frictions (work that left the tool)
 
+- First storyboard continuation, 2026-10-17: the director approved SC-010's
+  storyboard direction; Art Direction ran eight `read_context` steps and hit
+  its turn limit without drawing. Cause: its handoff + scene + drawings
+  (~41k characters) were given to it as 72 characters -- `bounded()` (CT-0115)
+  fell back to "too large" when structural shrinking could not fit -- and
+  `read_context` returned the same context with no receipt. Fixed: `bounded`
+  divides its limit among keys and names what it omits; Art Direction reads
+  the handoff, a scene brief and a drawings brief with separate budgets; a
+  reread says when nothing changed. A dry run with the real model then saved
+  its brief on the first step.
+- Stopping the GUI server with a signal left its Copilot Runtime (Node, :8789)
+  running, which would block the next start. Fixed: SIGTERM stops the
+  server like Ctrl+C, assistant included.
+
 - The generation budget is per machine, not per film (2026-10-17): one
   ledger (`$XDG_STATE_HOME/cine-toaster/spend.json`) shared with Singular
   (US$ 0.58 spent of US$ 2.00). The author's ceiling for this demo's video

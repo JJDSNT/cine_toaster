@@ -218,8 +218,23 @@ class BoundedTests(unittest.TestCase):
         self.assertTrue(any("items cut" in item for item in cut["drafts"] if isinstance(item, str)))
         self.assertIn("characters cut", cut["drafts"][0]["text"])
 
-    def test_what_fits_is_untouched_and_what_never_fits_says_so(self):
+    def test_what_fits_is_untouched_and_what_cannot_fit_names_what_was_left_out(self):
         from cine_toaster.agents.inception import bounded
 
         self.assertEqual(bounded({"a": "b"}), '{"a": "b"}')
-        self.assertIn("focused read", json.loads(bounded({f"k{i}": i for i in range(5000)}, 200))["cut"])
+        cut = json.loads(bounded({f"k{i}": i for i in range(5000)}, 200))
+        self.assertLessEqual(len(json.dumps(cut)), 200)
+        self.assertTrue("_omitted" in cut or "cut" in cut)
+
+    def test_a_large_record_is_never_reduced_to_nothing(self):
+        """Regression: Art Direction got 72 characters for its handoff, scene and drawings, and reread 8 times."""
+        from cine_toaster.agents.inception import bounded
+
+        shot = {f"field_{i}": f"value {i} " * 6 for i in range(60)}
+        record = {"handoff": {"instruction": "Develop the opening's ink-discovery beat."},
+                  "scene": {"shots": [dict(shot) for _ in range(4)], **{f"k{i}": i for i in range(40)}},
+                  "storyboard": {"candidates": [{"id": f"b{i}", "note": "x" * 3000} for i in range(6)]}}
+        text = bounded(record, 6000)
+        self.assertLessEqual(len(text), 6000)
+        self.assertIn("ink-discovery beat", text)
+        self.assertGreater(len(text), 3000)
