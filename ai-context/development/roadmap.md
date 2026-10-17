@@ -582,6 +582,13 @@ three drawings but no waiting gate/open question and no active jobs. Wire and
 validate one closed loop before adding gallery polish or more generated shots;
 do not imply that the embedded copilot already runs the MCP authoring cycle.
 
+**A budget per production (found 2026-10-17, Demo 01).** `spend.py` keeps one
+machine-wide ceiling and ledger; a film's own ceiling (the author's US$ 15
+for Demo 01's video) cannot be set without raising Singular's. Solve: a
+ceiling per project id in the same ledger (entries already carry their
+label), checked with the machine ceiling as an outer bound; `toast budget
+PROJECT set USD`; the GUI and doctor show the film's own.
+
 **Where a demo film lives -- open (2026-10-17).** Demo 01 is
 `~/films/demo-01`: its own git repository (one commit, no remote, text
 uncommitted when checked), media ignored by design (ADR 0021), so its

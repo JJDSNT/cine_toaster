@@ -5,7 +5,7 @@ type: work
 status: doing
 owner: claude-code
 created_at: 2026-10-16
-updated_at: 2026-10-16
+updated_at: 2026-10-17
 tags:
   - demos
   - animation
@@ -252,6 +252,11 @@ evidence, not proof that the upstream stage was completed.
   Storyboard approval and master-face choice remain open human decisions.
 
 # Frictions (work that left the tool)
+
+- The generation budget is per machine, not per film (2026-10-17): one
+  ledger (`$XDG_STATE_HOME/cine-toaster/spend.json`) shared with Singular
+  (US$ 0.58 spent of US$ 2.00). The author's ceiling for this demo's video
+  (US$ 15) can only be expressed as the machine-wide ceiling. In the roadmap.
 
 - `toast new` starts no git; the film's history was started by hand
   (migrate's `.gitignore`, `git init`). In the roadmap.
