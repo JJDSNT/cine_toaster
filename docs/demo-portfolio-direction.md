@@ -69,6 +69,25 @@ The previous production order is no longer authoritative. A new sequence should 
 
 **To investigate before scripting:** how/why the fourth sphere appears; physical causality of the thrown spheres making new floor; how to stage the loss of the original spheres without confusing the viewer; the juggler's personality and emotional beats; whether the sphere's music-video image belongs in the independent ending or only the reel; the character's arrival from the animation short as **reel-only bridge**; period-faithful opening visuals and rights/credit for Amiga Juggler inspiration; Blender ↔ Unreal asset interchange, camera/scene handoff, rendering and compositing via Cine Toaster; visual continuity during the engine/style transition. None of these decisions implies existing Unreal support or authorizes paid rendering.
 
+## Cine Toaster advertisement — *Commercial Break* (2026-10-17)
+
+**Status: agreed creative concept for further development; working title only.** Visual references include the television-based opening of NewTek's *Demo Reel 3* and the conventions of professional product advertising. This is a standalone **fifth demo**, also usable as the reel's penultimate segment.
+
+**Central conceit:** We think we are watching a commercial break advertising several unrelated fictional products. Each spot is genuinely convincing as a product advertisement **and then reveals the Cine Toaster capabilities actually used to produce it**. Only at the end do we learn that the real product being advertised throughout was **Cine Toaster**, the studio behind every spot.
+
+**Proposed sequence:**
+
+1. **Television / broadcast frame.** Begin with a television in a space, evoking the NewTek reference without reproducing it verbatim. The set plays a broadcast and transitions into a commercial break. The camera may approach or enter the TV screen.
+2. **Series of fictional advertisements.** Each has its own art direction, photography, editing rhythm and plausible product identity. Exploratory examples (not a locked lineup): studio food photography with floating ingredients; a can falling into water with splashes, bubbles and condensation; perfume/beauty packshot with glass and reflections; automotive imagery with complex camera moves; macro droplets or particles.
+3. **Feature reveals after or within each spot.** Identify the **specific tools actually exercised** in producing that segment (e.g. layering/compositing, controlled camera movement, lighting, slow motion, fluid work, materials/reflections, ray tracing, 3D environments, morphing, motion graphics). These are illustrative capability targets, **not assertions that each is already implemented or was used**. The revelation should be elegantly embedded in the commercial's visual grammar, not a generic UI walkthrough.
+4. **Final reversal.** As the break seems to end, a last reveal connects the spots and identifies the actual advertiser: **Cine Toaster**. Product identity and a final tagline remain open; no tagline is approved yet.
+
+**Creative rules:** each fictional advertisement must succeed as an advertisement first, with its technical breakdown serving the spectacle; avoid a feature-list montage disguised as cinema. The exact number/order of spots, fictitious brands, look, sound, duration, voiceover and transitions remain open. Use truthful feature/provenance claims: the actual production graph and assets should substantiate the displayed capabilities.
+
+**Two valid openings:** the **standalone demo** starts with its own TV and commercial-break framing; the **integrated reel** can enter the break through the television already present in the music video, avoiding duplicate setup. The final Cine Toaster reveal leads into the archival cameraman's reaction; morphing/look transformation is a candidate, not a locked cut.
+
+**Further development:** select advertising genres against real Cine Toaster coverage; choose authentic visual treatments and soundtrack; design a coherent on-screen grammar for feature reveals; confirm asset rights and feasibility/cost; develop a shot-by-shot treatment only after these choices.
+
 ## Music video — aesthetic and musical references (2026-10-17)
 
 **Status: reference board only. Story, performance format, soundtrack and exact imagery are open.** Do not treat the previously brainstormed “girl emerging from a screen” as an approved narrative.
