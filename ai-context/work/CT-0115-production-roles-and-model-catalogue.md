@@ -92,6 +92,9 @@ the message for both Claude adapters.
   `LoopTests` added.
 - `bounded()` shrinks by structure, never severs JSON; draft texts are cut
   with a marker; `BoundedTests` added.
+- Claude API: system prompt cached (`cache_control` ephemeral), cache reads
+  recorded in `last`. Catalogue: Claude Fable 5.1, Opus/Sonnet/Haiku 5.5 with
+  1M context and prices (Anthropic model table, 2026-10-06).
 
 # To do
 

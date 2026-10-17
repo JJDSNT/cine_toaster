@@ -35,24 +35,37 @@ adapters:
     notes: one ephemeral, read-only `codex exec` per step; all host tools disabled
 
 models:
+  # Context and prices: Anthropic's model table as cached by the claude-api
+  # skill on 2026-10-06 (first-party API rates, US$ per million tokens).
+  claude-fable-5-1:
+    family: claude
+    tier: most capable widely released; long turns on hard tasks
+    context_tokens: 1000000
+    price_per_mtok: {input: 10.00, output: 50.00}
+    strengths: [creative_writing, planning, visual_critique, continuity_audit]
+    cost_class: highest
+    source: Anthropic model table, 2026-10-06
   claude-opus-5-5:
     family: claude
-    tier: most capable of its family
-    context_tokens: null
+    tier: most capable of the Opus line; the API adapter's default
+    context_tokens: 1000000
+    price_per_mtok: {input: 4.00, output: 20.00}
     strengths: [creative_writing, planning, visual_critique, continuity_audit]
     cost_class: high
-    source: Anthropic's model family listing, 2026
+    source: Anthropic model table, 2026-10-06
   claude-sonnet-5-5:
     family: claude
     tier: balanced capability and cost
-    context_tokens: null
+    context_tokens: 1000000
+    price_per_mtok: {input: 2.00, output: 10.00}
     strengths: [creative_writing, planning, continuity_audit]
     cost_class: medium
-    source: Anthropic's model family listing, 2026
+    source: Anthropic model table, 2026-10-06
   claude-haiku-5-5:
     family: claude
     tier: fastest and least costly of its family
-    context_tokens: null
+    context_tokens: 1000000
+    price_per_mtok: {input: 0.10, output: 0.50}
     strengths: [fast_extraction]
     cost_class: low
-    source: Anthropic's model family listing, 2026
+    source: Anthropic model table, 2026-10-06

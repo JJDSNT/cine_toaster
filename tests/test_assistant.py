@@ -287,6 +287,7 @@ class ClaudeApiAdapterTests(unittest.TestCase):
         self.assertEqual(answer, {"reply": "ok", "action": "none"})
         self.assertEqual(sent["model"], "claude-opus-5-5")
         self.assertEqual(sent["output_config"]["effort"], "low")
+        self.assertEqual(sent["system"][0]["cache_control"], {"type": "ephemeral"})
         schema = sent["output_config"]["format"]["schema"]
         self.assertFalse(schema["additionalProperties"])
         self.assertFalse(schema["properties"]["navigate"]["additionalProperties"])  # nested objects closed too

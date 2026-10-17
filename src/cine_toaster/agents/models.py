@@ -215,7 +215,9 @@ class ClaudeApi:
             response = client.beta.messages.create(
                 model=self.model,
                 max_tokens=16000,
-                system=system,
+                # A role's system prompt is the same on every step of every turn: cache it.
+                # (Below the model's minimum cacheable length it silently isn't cached.)
+                system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
                 messages=[{"role": "user", "content": content}],
                 output_config={"effort": self.effort,
                                "format": {"type": "json_schema", "schema": _closed(schema)}},
@@ -233,7 +235,8 @@ class ClaudeApi:
         if response.stop_reason == "refusal":
             raise ModelUnavailable("The model declined to answer this turn")
         usage = getattr(response, "usage", None)
-        self.last = {"model": response.model, "output_tokens": getattr(usage, "output_tokens", 0)}
+        self.last = {"model": response.model, "output_tokens": getattr(usage, "output_tokens", 0),
+                     "cache_read_input_tokens": getattr(usage, "cache_read_input_tokens", 0) or 0}
         text = next((block.text for block in response.content if block.type == "text"), "")
         try:
             return json.loads(text)

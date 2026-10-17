@@ -333,9 +333,12 @@ roles the supplied model serves. To do, in order:
   cut marked with what was left out. Fixed per-role *readers* (KDP Studio)
   come with read-and-answer roles as data, below.
 - [ ] **Fewer, cheaper model steps.** Each step is a fresh CLI process (up to
-  8 x 180 s a turn). Solve: native tool calling on adapters that support it
-  (Claude API), prompt caching of the stable system/context prefix; measure
-  turn time before and after on Demo 01.
+  8 x 180 s a turn). Done: the Claude API adapter caches each role's system
+  prompt and records `cache_read_input_tokens`. Remaining: measure turn time
+  and tokens per step on a disposable Demo 01 copy (paid: ask first), then
+  decide on native tool calling -- it exists on one adapter only, so it would
+  fork the loop; adopt it only if the measurement shows the step count, not
+  the step cost, dominates.
 - [x] **One role loop** (done 2026-10-17). `agents/loop.py`: one reasoning
   step for every role (budget before the model, allowed actions, delegation,
   honest `respond`, `needs_review` only when something is saved); Inception,
@@ -369,8 +372,9 @@ roles the supplied model serves. To do, in order:
   never packaged as a runtime skill.
 - [ ] **Sequence Adherence reviewer** (SPEC-0019), then further authors
   (Cinematography/masters, Editing, Sound) as Demo 01 needs them.
-- [ ] **Catalogue facts.** Context sizes are `null` (not known here); fill
-  them from the providers' documentation with the source, never a guess.
+- [x] **Catalogue facts** (Claude models, 2026-10-17): context and prices
+  from Anthropic's model table with its date. Codex models stay undescribed:
+  the CLI does not report which model ran; a person adds theirs in their file.
 - [ ] **Real-model check of image input on Claude CLI and API.** Covered by
   scripted tests only; run one Visual Prevalidation on a disposable film.
 
