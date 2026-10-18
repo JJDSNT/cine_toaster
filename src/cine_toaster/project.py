@@ -1869,6 +1869,10 @@ def _load_production(root: Path) -> dict[str, Any]:
             )
 
     _inherit_derive(manifest.get("pictures"), scenes)
+    # A scene entered on action, in a film that chains its scenes, starts on the previous scene's last frame.
+    chains = bool((manifest.get("clips") or {}).get("chain_entries")) if isinstance(manifest.get("clips"), dict) else False
+    for scene in scenes:
+        scene["chained"] = chains and str((scene.get("enter") or {}).get("type") or "") in ("action", "match")
 
     production = field(manifest, "production") or {}
     active_scene_id = vtext(production, "active_scene")

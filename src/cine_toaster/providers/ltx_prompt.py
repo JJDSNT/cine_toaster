@@ -35,6 +35,8 @@ class ShotPrompt:
     #: What holds still in a single shot (`holds`): the setting, all but the light, or the setting with
     #: people free to enter or leave (SINGULAR's `so_a_luz` and `entra_sai`).
     holds: str = "setting"
+    #: How this shot is entered from the one before (the breakdown's cut type): a `continuation` is no cut at all.
+    cut: str = "hard"
 
 
 #: A single shot's sentence on what stays as in the first frame, by `holds` (SINGULAR's rules of 17/09).
@@ -95,7 +97,9 @@ def block_prompt_sections(shots: list[ShotPrompt], style: str = "") -> list[str]
                 # A single shot says what holds right after the camera, before the action (SINGULAR's order).
                 parts.append(HOLDS.get(shot.holds, HOLDS["setting"]))
         else:
-            opening = "A hard cut transitions to a new shot" + (f", {camera}" if camera else "")
+            # A continuation is one unbroken shot: told "a hard cut", the model cut (Demo 01, SC-010 P1 to P2).
+            opening = ("Without any cut, the same unbroken shot carries on" if shot.cut == "continuation"
+                       else "A hard cut transitions to a new shot") + (f", {camera}" if camera else "")
             parts.append(f"{opening}: {_lower_first(shot.picture)}." if shot.picture else f"{opening}.")
         if shot.action:
             parts.append(_sentence(shot.action))

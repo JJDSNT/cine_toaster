@@ -344,7 +344,8 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
         prompts.append(ShotPrompt(picture, _camera(scene, shot), action, lines,
                                   sound if isinstance(sound, str) else "", _acting(production, scene, shot),
                                   "bridge" if bridge and shot_id == block.shots[-1]
-                                  else str(shot.get("holds") or "setting")))
+                                  else str(shot.get("holds") or "setting"),
+                                  str((shot.get("cut") or {}).get("type") or "hard")))
     # The style in force reaches the model in words of craft, never a name (CT-0049).
     style = (scene.get("style") or {}).get("prompt", "")
     frames = requested_cuts(block.durations, FPS)

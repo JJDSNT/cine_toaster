@@ -400,6 +400,14 @@ def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.w
         if speaks and not words:
             plan.notes.append(f"{shot['id']} speaks, but its take has no word timings; cut by duration.")
         opening = OPENING_SECONDS if shot.get("source") == "generated" else 0.0
+        # A slice of a block continues the shot before it, and a scene that starts on the previous scene's last
+        # frame continues that scene: neither opens on a still, so trimming would cut a jump into one motion
+        # (claim still-opening: "except in continuations"; Demo 01's blocks lost a third of a second per cut).
+        block_shots = [item["id"] for item in scene["shots"] if item.get("block") and item.get("block") == shot.get("block")]
+        if shot.get("block") and block_shots and block_shots[0] != shot["id"]:
+            opening = 0.0
+        if shot.get("block") and block_shots and block_shots[0] == shot["id"] and scene.get("chained"):
+            opening = 0.0
         start, end, method, note = _cut(shot.get("trim") or {}, info["duration"],
                                         float(shot.get("duration_seconds") or 0), words, opening)
         spoken = [(a, b) for a, b in words if a >= start - 0.05 and b <= end + 0.05]
