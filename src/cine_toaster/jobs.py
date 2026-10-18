@@ -1101,6 +1101,13 @@ def _run_assemble_sequence(context: JobContext) -> dict[str, Any]:
         name = f"sequence.{item['id']}.mp4"
         render(root, copied, context.staging / name, context.staging / f"work-{item['id']}", context.run_process,
                span=(share * index, share * (index + 1)))
+        if item.get("loudness") is not None:
+            loud = context.staging / f"loud-{name}"
+            context.run_process(["ffmpeg", "-y", "-loglevel", "error", "-i", str(context.staging / name),
+                                 "-af", f"loudnorm=I={item['loudness']}:TP=-1.0:LRA=11", "-c:v", "copy",
+                                 "-c:a", "aac", "-b:a", "256k", "-ar", "48000", str(loud)],
+                                message=f"{item['name']} at {item['loudness']:g} LUFS")
+            loud.replace(context.staging / name)
         shutil.rmtree(context.staging / f"work-{item['id']}", ignore_errors=True)
         renditions.append({"staged": name, "destination": f"{sequence_versions(sequence_id)}/{version}.{item['id']}.mp4",
                            "rendition": item["id"]})

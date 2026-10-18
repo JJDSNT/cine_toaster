@@ -179,7 +179,16 @@ def renditions(value: Any, styles: dict[str, dict[str, Any]]) -> tuple[list[dict
                 problems.append(f"delivers a rendition with the aspect {aspect!r}, which is not width:height")
                 continue
             name = str(entry.get("name") or aspect)
-            found.append({"id": _slug(name), "name": name, "aspect": aspect, "captions": bool(entry.get("captions"))})
+            item = {"id": _slug(name), "name": name, "aspect": aspect, "captions": bool(entry.get("captions"))}
+            # The platform's loudness (LUFS): Instagram and YouTube play at about -14 and only turn louder files
+            # down, so a -24 broadcast mix sounds quiet there (Demo 01).
+            if entry.get("loudness") is not None:
+                try:
+                    item["loudness"] = float(entry["loudness"])
+                except (TypeError, ValueError):
+                    problems.append(f"delivers {name} at a loudness that is not a number of LUFS")
+                    continue
+            found.append(item)
             continue
         item = styles.get(str(entry)) or lookup(styles, str(entry))
         if item is None or item["axis"] != "format":
