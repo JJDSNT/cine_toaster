@@ -59,3 +59,6 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 @media (max-width: 850px) { .creation-assistant { position: static; width: 100%; } }
 @media (max-width: 540px) { .creation-history { width: 100%; } .creation-work { width: 100%; } .creation-compare { grid-template-columns: 1fr; }
   .creation-editor, .creation-references, .creation-generation { padding: .8rem; } }
+/* Folded sections: one line each until opened. */
+.creation-fold > summary, details.creation-image-round > summary { cursor: pointer; padding: .55rem 0; }
+details.creation-fold, details.creation-image-round { border-top: 1px solid #344138; }

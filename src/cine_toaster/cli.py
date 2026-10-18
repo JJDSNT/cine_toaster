@@ -820,6 +820,14 @@ def command_storyboard(args: argparse.Namespace) -> int:
     from .commands import dispatch
 
     root = Path(args.project).expanduser().resolve()
+    if args.storyboard_command == "animatic":
+        from .storyboard_animatic import render
+        result = render(root, args.sequence)
+        print(f"{result['path']}: {result['shots']} shots, {result['seconds']} s (version {result['version']})")
+        for label, items in (("no drawing yet", result["missing"]), ("no declared duration", result["undeclared_durations"])):
+            if items:
+                print(f"  {label}: {', '.join(items)}")
+        return 0
     if args.storyboard_command in ("candidates", "add"):
         from .storyboard import register_storyboard_candidate, storyboard_view
         from .state import Actor
@@ -2528,6 +2536,10 @@ def build_parser() -> argparse.ArgumentParser:
     adding.add_argument("--provenance", type=Path, help="JSON object with prompt and actual generation inputs when known")
     adding.add_argument("--actor", default=os.environ.get("USER", "director"))
     adding.add_argument("--actor-kind", choices=("human", "agent"), default="human")
+    animatic_parser = board_sub.add_parser(
+        "animatic", help="A sequence's storyboard in time: each shot's latest drawing for its duration (a new file each run)")
+    animatic_parser.add_argument("project", type=Path)
+    animatic_parser.add_argument("sequence")
     for name, text in (("approve", "What the storyboard defines will be produced"), ("reopen", "Back to fitting it")):
         item = board_sub.add_parser(name, help=text)
         item.add_argument("project", type=Path)

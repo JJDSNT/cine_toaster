@@ -28,10 +28,12 @@ export function InceptionReview({ data, reload, onDecision, title = "Is there en
     } catch (reason) { setError(String(reason)); } finally { setBusy(false); }
   }
   const handoff = data.handoffs?.find((item) => item.decision === current.decision?.id);
-  return <section id="direction-review" className="creation-readiness" aria-label="Inception readiness">
-    <div className="prep-section-heading"><h2>{title}</h2><span className="prep-badge">
+  // Open only while it waits for the director; a decided request folds to one line.
+  return <details id="direction-review" className="creation-readiness creation-fold" aria-label="Inception readiness"
+    open={current.status === "awaiting_decision"}>
+    <summary className="prep-section-heading"><strong>{title}</strong><span className="prep-badge">
       {current.status === "awaiting_decision" ? "Awaiting your decision" : current.status === "approved" ? "Direction approved"
-        : current.status === "changes_requested" ? "Changes requested · agent to reassess" : "Material changed · agent to reassess"}</span></div>
+        : current.status === "changes_requested" ? "Changes requested · agent to reassess" : "Material changed · agent to reassess"}</span></summary>
     <p>{current.summary}</p>
     <div className="creation-readiness-destinations">{current.readiness.map((item) => <article key={item.destination}>
       <h3>{item.destination === "screenplay" ? "Screenplay" : item.destination === "storyboard" ? "Storyboard" : "Shot masters"}</h3>
@@ -77,5 +79,5 @@ export function InceptionReview({ data, reload, onDecision, title = "Is there en
     <details><summary>Assessment & decision history · {data.inception_review!.history.length} retained</summary>
       <pre>{JSON.stringify({ assessments: data.inception_review!.history, decisions: data.inception_review!.decisions }, null, 2)}</pre>
     </details>
-  </section>;
+  </details>;
 }

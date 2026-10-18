@@ -54,6 +54,14 @@ remain herself.
 
 # Decisions (the user's, 2026-10-16)
 
+- 2026-10-18: no redo for likeness to existing characters (the Bambi-like fawn
+  of SC-030): "isso seria uma preocupação para ter sido sanada antes, agora é
+  tarde". Likeness is to be prevented at the brief stage in later films
+  (roadmap: a likeness criterion in visual reviews by default).
+- 2026-10-18: `toast storyboard animatic` made `renders/animatics/
+  the-ascent-storyboard-v1.mp4` (24 shots, 103 s) for reviewing the sequence
+  in time.
+
 - 2026-10-17: the demo portfolio direction (`docs/demo-portfolio-direction.md`)
   keeps this demo as demo 2, *Something New Is Coming*, in a five-work
   portfolio feeding a circular reel; the fall into the 3D/Juggler world is a

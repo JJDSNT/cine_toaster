@@ -43,8 +43,9 @@ export function ReferenceGallery({ data, selected, compare, select, toggleCompar
     if (group.storyboard) return <details className="creation-image-round" key={group.id}>
       <summary><strong>{group.title}</strong> · {group.references.length} images, by scene and shot ·{" "}
         <a href="/app/preproduction.html">open them in Screenplay & Storyboard</a></summary>{body}</details>;
-    return <section className="creation-image-round" key={group.id} aria-label={group.number ? `Round ${group.number}: ${group.title}` : group.title}>
-      <div className="prep-section-heading"><h3>{group.number ? `Round ${group.number} · ` : ""}{group.title}</h3>
-        <span className="prep-help">{group.references.length} images</span></div>{body}</section>;
+    // Every group folds to one line; the page lists rounds, the images open on demand.
+    return <details className="creation-image-round" key={group.id} aria-label={group.number ? `Round ${group.number}: ${group.title}` : group.title}>
+      <summary><strong>{group.number ? `Round ${group.number} · ` : ""}{group.title}</strong> · {group.references.length} images</summary>
+      {body}</details>;
   })}</div>;
 }
