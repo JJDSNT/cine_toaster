@@ -564,6 +564,13 @@ def _gate_step(root, production, scene, state, run, step, directory) -> bool:
 
     if step["state"] == "pending":
         approved = state.approved_pictures().get(step["shot"])
+        if approved and not step.get("again") and run.get("template") == "masters":
+            # A version made after the approved one is asked about again (Demo 01: the iris left the pictures).
+            shot = next(item for item in scene["shots"] if item["id"] == step["shot"])
+            work = work_directory_for(root / scene["file"])
+            made = [relative(root, path) for path in picture_versions(work, picture_stem(work, str(shot["number"])))]
+            if made and approved in made and made.index(approved) < len(made) - 1:
+                approved = ""
         if approved and not step.get("again"):
             step["state"], step["note"], step["outputs"] = "skipped", "already approved", [approved]
             _save(root, scene["id"], directory, state, run)

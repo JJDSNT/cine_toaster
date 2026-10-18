@@ -43,6 +43,9 @@ HOLDS = {
     "light": "The camera, the framing and every object stay exactly as in the first frame, only the light "
              "changes, and nobody else enters the frame.",
     "open": "The setting stays exactly as in the first frame.",
+    # A shot whose camera travels with the action (Demo 01): "the setting stays exactly" made runners run in place.
+    "moving": "The camera moves with the action and the place slides past; it stays the same place, the same "
+              "light and the same people, and nobody else enters the frame.",
     # A shot that carries a cut into the next scene (a bridge, Demo 01): the place and its drawing change.
     "bridge": "Nobody else enters the frame; the motion carries straight through to the last frame.",
 }
