@@ -124,6 +124,22 @@ class MastersFromStoryboardTests(unittest.TestCase):
         self.assertEqual({step["state"] for step in others}, {"waiting"})
         self.assertNotEqual(run["state"], "failed")
 
+    def test_a_drawing_becomes_the_next_version_cropped_to_the_frame(self):
+        from cine_toaster.pictures import adopt_drawing
+
+        wide = Path(self.picture.parent) / "wide.png"
+        Image.new("RGB", (200, 90), "white").save(wide)
+        self.picture = wide
+        self.draw("SC-010", "P2")
+        made = adopt_drawing(self.root, "SC-010", "P2", offset=0.0)
+        picture = self.root / made["picture"]
+        with Image.open(picture) as image:
+            self.assertEqual(image.size, (160, 90))
+        self.assertEqual(made["crop"]["box"], [0, 0, 160, 90])
+        self.assertTrue(picture.with_name(picture.name + ".provenance.json").is_file())
+        again = adopt_drawing(self.root, "SC-010", "P2")
+        self.assertNotEqual(again["picture"], made["picture"])  # a new version, never a replacement
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -123,6 +123,63 @@ def picture_versions(work: Path, stem: str) -> list[Path]:
     return [path for _, path in sorted(found)]
 
 
+def adopt_drawing(root: Path, scene_id: str, shot_id: str, *, offset: float = 0.5) -> dict[str, Any]:
+    """The shot's approved storyboard drawing as its next master version, fitted to the film's frame.
+
+    When a drawing already is the picture (Demo 01: an image tool refused to
+    redraw a deer it took for a protected character), it becomes a version
+    beside the others -- cropped to the film's proportions, `offset` placing
+    the window from the left (0) to the right (1) of what is cut -- with a
+    record of where it came from. Nothing is generated; nothing is replaced.
+    """
+
+    import json
+
+    from PIL import Image
+
+    from .project import load_production
+    from .storyboard import load_storyboard
+
+    root = Path(root).expanduser().resolve()
+    if not 0.0 <= float(offset) <= 1.0:
+        raise ValidationError("offset is from 0 (keep the left) to 1 (keep the right)")
+    production = load_production(root)
+    scene = next((item for item in production["scenes"] if item["id"] == scene_id), None)
+    shot = next((item for item in (scene or {}).get("shots", []) if item["id"] == shot_id), None)
+    if shot is None:
+        raise ValidationError(f"No shot {scene_id} {shot_id}")
+    drawings = [item for item in load_storyboard(root)["candidates"] if item["scene"] == scene_id and item["shot"] == shot_id]
+    drawing = max(drawings, key=lambda item: item.get("version") or 0, default=None)
+    if drawing is None:
+        raise ValidationError(f"{scene_id} {shot_id} has no storyboard drawing")
+    source = root / drawing["image"]["path"]
+    frame = production.get("frame") or {}
+    target = (frame["width"] / frame["height"]) if frame.get("width") and frame.get("height") else 16 / 9
+    work = work_directory_for(root / scene["file"])
+    work.mkdir(parents=True, exist_ok=True)
+    stem = picture_stem(work, str(shot["number"]))
+    versions = picture_versions(work, stem)
+    numbers = [int(m[1]) for path in versions if (m := re.fullmatch(rf"{re.escape(stem)}-(\d+)", path.stem))]
+    output = work / f"{stem}-{max(numbers, default=0) + 1}.png"
+    with Image.open(source) as image:
+        width, height = image.size
+        if width / height > target:  # wider: keep the full height, choose the columns
+            new = round(height * target)
+            left = round((width - new) * float(offset))
+            box = (left, 0, left + new, height)
+        else:  # taller: keep the full width, choose the rows
+            new = round(width / target)
+            top = round((height - new) * float(offset))
+            box = (0, top, width, top + new)
+        image.convert("RGB").crop(box).save(output)
+    record = {"kind": "adopted_drawing", "scene": scene_id, "shot": shot_id, "drawing": drawing["id"],
+              "drawing_version": drawing.get("version"), "source": relative(root, source),
+              "crop": {"box": list(box), "offset": float(offset), "from": [width, height]},
+              "made_with": "the approved storyboard drawing, cropped to the film's frame; nothing generated"}
+    output.with_name(output.name + ".provenance.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
+    return {"picture": relative(root, output), **record}
+
+
 def picture_stem(work: Path, number: str) -> str:
     """The name the shot's picture goes by: the one on disk, else `p08`, `pmA`."""
 

@@ -1416,6 +1416,13 @@ def command_picture(args: argparse.Namespace) -> int:
     from .providers.runpod import load_credentials
 
     root = Path(args.project).expanduser().resolve()
+    if args.from_drawing:
+        from .pictures import adopt_drawing
+
+        made = adopt_drawing(root, args.scene, args.shot, offset=args.offset)
+        print(f"Made {made['picture']} from the storyboard drawing {made['drawing']} (v{made['drawing_version']}), "
+              f"cropped {made['crop']['from'][0]}x{made['crop']['from'][1]} to {made['crop']['box']}; nothing generated.")
+        return 0
     if args.env_file:
         load_credentials(Path(args.env_file).expanduser())  # never printed
     plan, _, _ = _picture_plan(root, {"scene": args.scene, "shot": args.shot, "seed": args.seed})
@@ -2914,6 +2921,10 @@ def build_parser() -> argparse.ArgumentParser:
     picture_parser.add_argument("--dry-run", action="store_true", help="show the source, the faces and the prompt; send nothing")
     picture_parser.add_argument("--json", action="store_true", help="with --dry-run, the plan as JSON")
     picture_parser.add_argument("--env-file", help="read RUNPOD_API_KEY and RUNPOD_QWEN_ENDPOINT_ID from this file")
+    picture_parser.add_argument("--from-drawing", action="store_true",
+                                help="the approved storyboard drawing as the next version, cropped to the film's frame")
+    picture_parser.add_argument("--offset", type=float, default=0.5,
+                                help="with --from-drawing: where the crop sits, 0 (left/top) to 1 (right/bottom)")
     picture_parser.set_defaults(function=command_picture)
 
     voice_convert = subparsers.add_parser(
