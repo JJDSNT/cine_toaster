@@ -526,6 +526,13 @@ roles the supplied model serves. To do, in order:
   a flat painting after era 6's 3D. Solve: when a film declares an ordered
   progression of styles, check each step's record states its place and its
   bound against both neighbours, and add the cut review above for the joins.
+- [ ] **No command splits or inserts a shot (found 2026-10-18, Demo 01).**
+  The director kept a drawing as its own beat, so SC-050 P3 became two shots;
+  the breakdown was edited by hand (renumbering, durations, `covers`), and
+  the drawings already under the later shot ids had to be remapped by hand.
+  Solve: `split_shot` / `insert_shot` commands that renumber, re-split the
+  covered screenplay units, and carry each shot's drawings and decisions to
+  its new id, with an event, from the GUI as well as the CLI.
 - [ ] **Reconcile LTX cold-start knowledge (found 2026-10-17).** The recipe
   uses `generation.COLD_START_SECONDS = 150` (1-02A block 2: 245 s cold,
   2026-09-29) while `knowledge/providers/ltx-2.5.md` says "a cold start of
