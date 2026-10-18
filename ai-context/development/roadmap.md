@@ -591,6 +591,33 @@ roles the supplied model serves. To do, in order:
   unless `reframe: {x}` says where. Solve: a style gradient per line; a title
   wraps for narrow frames; the rendition plan finds each shot's subject (the
   storyboard or a detector) and proposes its window for review.
+- [ ] **A hidden cut must cut at full cover (found 2026-10-18, Demo 01 v9).**
+  The trunk and the leaves covered the frame, but the cut was not made there:
+  SC-020 runs on past the trunk into the black-and-white meadow, and SC-030
+  then dissolves into colour in the open (the same at the leaves into
+  SC-040). Solve: find the frame of fullest cover in the take (dark luma for
+  a trunk, white for spray, mist or glare, foreground coverage for leaves),
+  trim the scene there, start the next scene on that frame (already the
+  rule: the kept frame), and have it reveal its own style as the cover
+  slides away -- its first picture as the guide within the first second, at
+  full strength, and the prompt saying "already in this look as it clears",
+  not "transforms in the first two seconds". A device finder can propose the
+  cut point; the director confirms it.
+- [ ] **The second half needs the first half's continuity pass (found
+  2026-10-18, Demo 01 v9).** SC-050 to SC-070 have continuity problems the
+  director wants reviewed the way SC-010 to SC-030 were: shot by shot in
+  motion, written action that keeps her in frame, continuation cuts where
+  the action is one, then regenerate and review densely before assembling.
+- [ ] **A vertical rendition is a recomposition, not a crop (found
+  2026-10-18, Demo 01 v9).** The 9:16 Instagram version, cut from the 16:9
+  frames with a centred window (two shots moved by hand), loses the subject
+  and the composition in many shots: "não dá para dizer que é a mesma coisa
+  em outro formato". Solve, in order of cost: (1) a per-shot window that
+  follows the subject through the shot (a detector or the storyboard's
+  subject, keyframed), proposed for review; (2) for a format that matters,
+  masters recomposed in 9:16 from the same drawings and clips generated
+  natively at 9:16 (LTX takes the size) -- a second production of the same
+  cut, with its own approvals and spend.
 - [ ] **Reconcile LTX cold-start knowledge (found 2026-10-17).** The recipe
   uses `generation.COLD_START_SECONDS = 150` (1-02A block 2: 245 s cold,
   2026-09-29) while `knowledge/providers/ltx-2.5.md` says "a cold start of

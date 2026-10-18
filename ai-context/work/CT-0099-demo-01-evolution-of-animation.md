@@ -340,6 +340,12 @@ Left open, outside the repository:
 - The film repository (~/films/demo-01) has no remote: its media and history
   live only on this machine (roadmap: where a demo film lives).
 
+The director on v9 (2026-10-18), next session's work, in this order:
+1. Hidden cuts at full cover -- the trunk and the leaves were in the film but
+   the change happened after them, in the open (roadmap).
+2. A continuity pass on SC-050 to SC-070 like the one on SC-010 to SC-030.
+3. Instagram: the 9:16 crop is not the same film; recompose (roadmap).
+
 Product fixes from this stretch: frame check before a picture approval; a
 refused picture stops only its shot, with Try again; all approvals at once;
 `--from-drawing`; blockout "not needed"; the clips' setup shown in the strip;
