@@ -480,6 +480,9 @@ roles the supplied model serves. To do, in order:
   pass are recorded as amendments to the approved request (their words, the
   changed records, the affected shots) and keep it current; a change nobody
   directed still invalidates it.
+  Same for the breakdown: splitting SC-050 P3 and then restoring the four
+  shots, both at the director's word, each needed a new request and a click
+  (2026-10-18).
 - [ ] **Breakdown and drawings drift out of step (found 2026-10-18).** SC-070's
   drawings were planned from the batch titles, one shot off the breakdown:
   P5, a title card, was drawn as Lia standing, so she sat and stood up again.
