@@ -664,7 +664,11 @@ def command_generate(args: argparse.Namespace) -> int:
         manager.shutdown()
     summary = job["result"]["summary"]
     print(f"Made {summary['clip']} for US$ {summary['cost_usd']:.3f} (estimated {summary['estimate_usd']:.3f}).")
-    print(f"Slice it: toast slice {args.project} {plan.scene} {plan.block} --clip {summary['clip'].rsplit('/', 1)[-1]}")
+    if len(plan.shots) == 1 and plan.block == plan.shots[0]:
+        # One shot's generation is already its take (GEN, GEN-2, ...): there is nothing to slice.
+        print(f"Choose it: toast take select {args.project} {plan.scene} {plan.block} <take>  (toast shots lists them)")
+    else:
+        print(f"Slice it: toast slice {args.project} {plan.scene} {plan.block} --clip {summary['clip'].rsplit('/', 1)[-1]}")
     return 0
 
 
