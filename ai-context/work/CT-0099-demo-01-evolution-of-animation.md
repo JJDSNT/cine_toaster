@@ -271,6 +271,18 @@ drawings were realigned to the breakdown (she stays seated; P5 is the title
 card). Open: Lia is little stylised in SC-040; an unscripted castle in
 SC-040 P2. Next: the director's storyboard approval, then Lia's master face.
 
+Cut continuity pass (2026-10-18, the director: "vejo problemas de continuidade
+e não entendo pq o agente não percebeu"): six new versions, prompts only, no
+style change. SC-030 P3 v4 stays at P2's forest edge (meadow and fawn left,
+path into the forest right); SC-040 P2 v4 launches from the path's end over
+the waterfall gorge, so SC-050 P1 continues the same leap (match on action
+across the era change); SC-060 P1-P4 v3 are four framings: wide face with Lia
+small, high-angle fall arrested by hand and snagged sash, close reknotting
+of the sash, low-angle final reach (the sea and town no longer appear in this
+scene). Checked as pairs on a contact sheet; animatic v4
+(`renders/animatics/the-ascent-storyboard-v4.mp4`, 24 shots, 103 s). The
+missing cut review is in the roadmap. The unscripted castle in SC-040 P2 is gone.
+
 # Frictions (work that left the tool)
 
 - Storyboard corrections, 2026-10-18: to save tokens after costly agent turns,

@@ -485,6 +485,22 @@ roles the supplied model serves. To do, in order:
   P5, a title card, was drawn as Lia standing, so she sat and stood up again.
   Solve: plan each drawing from its shot's breakdown label and covered
   screenplay text, and check a title/kind shot is drawn as one.
+- [ ] **No review looks at the cut between two shots (found 2026-10-18, Demo
+  01).** The director found three continuity faults the agents had passed:
+  SC-030 P2 -> P3 moved back from the forest edge to the open meadow; SC-040
+  P2 and SC-050 P1 were two different leaps in a row (the era change fell
+  between repeated actions, not inside one); SC-060 P1, P2 and P4 were the
+  same framing. Causes: visual review criteria judge each shot against its
+  brief (era, age, action), never a pair of adjacent shots; review batches of
+  six cut the sequence at arbitrary points, so SC-040 -> SC-050 was never seen
+  side by side; the corrections run by hand were never reviewed; Continuity
+  checks declared facts, not pixels. Solve: a cut review in the Sequence
+  Adherence reviewer (SPEC-0019) -- every adjacent pair across the sequence,
+  scene boundaries included, as an overlapping window (shot n with n+1),
+  judged on place, screen direction, action carried across the cut against
+  the breakdown's `cut.type`/`reason`, and repeated framing within a scene
+  (shot sizes and angles should vary unless the breakdown says otherwise);
+  findings name the pair. Run it on every published drawing, whoever made it.
 - [ ] **Reconcile LTX cold-start knowledge (found 2026-10-17).** The recipe
   uses `generation.COLD_START_SECONDS = 150` (1-02A block 2: 245 s cold,
   2026-09-29) while `knowledge/providers/ltx-2.5.md` says "a cold start of
