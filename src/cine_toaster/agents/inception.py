@@ -218,8 +218,10 @@ def creation_digest(value: dict) -> str:
         "recent_human_directions": value.get("assessment_decisions", [])[-3:],
         "drafts": [{**item, "text": _shrink(item["text"], 1800, 0)} for item in value.get("drafts", [])[-6:]],
         "rounds": value.get("active_rounds", [])[-4:],
+        # Every reference by id and title: the newest are the ones the work just made (Demo 01: a
+        # first-30 cut hid the batch's last drawings from Art Direction).
         "references": [{"id": item["id"], "title": item.get("title"), "notes": item.get("notes"),
-                        "findings": item.get("findings")} for item in value.get("references", [])[:30]],
+                        "findings": item.get("findings")} for item in value.get("references", [])],
         "findings": value.get("findings", [])[:12],
         "intake": _intake_digest(value.get("intake")),
     }, 14000)

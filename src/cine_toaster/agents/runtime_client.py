@@ -86,6 +86,9 @@ class RuntimeClient:
     def job(self, job_id: str) -> dict[str, Any]:
         return self._call("/api/jobs/" + urllib.parse.quote(job_id, safe=""))
 
+    def jobs(self) -> list[dict]:
+        return self._call('/api/jobs')
+
     def reference_jobs(self) -> list[dict]:
         return [{key: job.get(key) for key in ('id', 'state', 'adopted_at', 'result', 'error')}
                 | {'art_brief': job.get('params', {}).get('art_brief')}

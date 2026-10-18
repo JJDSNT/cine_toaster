@@ -226,13 +226,40 @@ def nodes(model, runtime, reviewer=None, waits=None):
                                                         if item['scene'] == part['scene']]}
                                            for part in handoff['target']['scenes']]}
             return {'art_context': {'creation': value, 'film': film, 'screenplay': screenplay,
-                    'handoff': handoff, 'sequence': sequence, 'scene': runtime.scene(target) if target else None,
+                    'handoff': handoff, 'sequence': sequence, 'unpublished': unpublished(handoff),
+                    'scene': runtime.scene(target) if target else None,
                     'storyboard': runtime.storyboard(target) if target else None},
                     'art_handoff_verified': bool(handoff),
                     'art_handoff_decision': handoff['decision'] if handoff else state.get('art_handoff_decision', ''),
                     'active_role': 'art_direction', 'agent_status': {'role': 'art_direction', 'state': 'working'}}
         except Exception as error:
             return stop(state, f'Não consegui ler o contexto de arte: {error}')
+
+    def unpublished(handoff):
+        """Pictures made for this handoff and kept, not yet on its storyboard -- each with the shot its
+        plan named. Without this list the newest drawings were cut from a 30-reference summary (Demo 01)."""
+        if not handoff or not callable(getattr(runtime, 'jobs', None)):
+            return []
+        try:
+            jobs = runtime.jobs()
+            boards = runtime.storyboard()['candidates']
+        except Exception:
+            return []
+        published = {(board.get('provenance') or {}).get('reference') for board in boards
+                     if (board.get('provenance') or {}).get('handoff') == handoff['id']}
+        members = target_members(handoff['target'])
+        found = []
+        for job in jobs:
+            summary = (job.get('result') or {}).get('summary') or {}
+            reference = summary.get('reference')
+            if (job.get('kind') != 'generate_reference' or not job.get('adopted_at') or not reference
+                    or str(job.get('created_at') or '') < handoff['created_at'] or reference in published):
+                continue
+            title = summary.get('title') or (job.get('params') or {}).get('title', '')
+            planned = next(({'scene': scene, 'shot': shot} for scene, shot in members
+                            if title.startswith(f'{scene} {shot} ') or title.startswith(f'{scene} {shot}—')), None)
+            found.append({'reference': reference, 'title': title, **({'for': planned} if planned else {})})
+        return found
 
     def refreshed(state, action, result):
         update = {'art_pending': {}, 'art_receipts': [*state.get('art_receipts', []),
@@ -257,6 +284,8 @@ def nodes(model, runtime, reviewer=None, waits=None):
                   f"\nApproved stage input (handoff): {bounded(state['art_context'].get('handoff'), 8000)}"
                   f"\nThe approved sequence, scene by scene (what still needs drawings): "
                   f"{bounded(state['art_context'].get('sequence'), 4000)}"
+                  f"\nPictures made for it and kept, not yet published (save_storyboard each to its shot): "
+                  f"{bounded(state['art_context'].get('unpublished'), 5000)}"
                   f"\nActual target scene: {bounded(scene_brief(state['art_context'].get('scene')), 9000)}"
                   f"\nIts current drawings: {bounded(board_brief(state['art_context'].get('storyboard')), 7000)}"
                   f"\nInception: {creation_digest(value)}\nArt records: {bounded(value.get('art_direction', {}), 16000)}"
