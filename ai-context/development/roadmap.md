@@ -526,13 +526,25 @@ roles the supplied model serves. To do, in order:
   a flat painting after era 6's 3D. Solve: when a film declares an ordered
   progression of styles, check each step's record states its place and its
   bound against both neighbours, and add the cut review above for the joins.
-- [ ] **No command splits or inserts a shot (found 2026-10-18, Demo 01).**
-  The director kept a drawing as its own beat, so SC-050 P3 became two shots;
-  the breakdown was edited by hand (renumbering, durations, `covers`), and
-  the drawings already under the later shot ids had to be remapped by hand.
-  Solve: `split_shot` / `insert_shot` commands that renumber, re-split the
-  covered screenplay units, and carry each shot's drawings and decisions to
-  its new id, with an event, from the GUI as well as the CLI.
+- [ ] **Breakdown editing commands (found 2026-10-18, Demo 01; the director
+  asked for them).** The director kept a drawing as its own beat, so SC-050
+  P3 became two shots; the breakdown was edited by hand (renumbering,
+  durations, `covers`) and the drawings under the later shot ids remapped by
+  hand. Today no command changes the breakdown's structure. Solve: one family
+  of application commands, the same from GUI, CLI, MCP and agents:
+  - shots: `add_shot` (at the end), `insert_shot` (before/after a shot),
+    `split_shot` (at a screenplay unit or a time), `merge_shots`,
+    `remove_shot` (its drawings and takes kept, filed as retired), `move_shot`
+    (reorder within the scene, or to another scene);
+  - scenes: `add_scene`, `split_scene` (at a shot; the new scene inherits
+    style, cast and sequence, and asks for a heading), `merge_scenes`,
+    `move_scene` (order, or to another sequence);
+  - each one renumbers what follows, re-splits the covered screenplay units
+    and durations, carries every drawing, take, gate and decision to its new
+    id (never dropped, never silently reassigned), records an event, and
+    shows the storyboard approval as "breakdown changed" where it applies;
+  - an agent may propose them (Directing), a person applies them where they
+    change an approved breakdown.
 - [ ] **Reconcile LTX cold-start knowledge (found 2026-10-17).** The recipe
   uses `generation.COLD_START_SECONDS = 150` (1-02A block 2: 245 s cold,
   2026-09-29) while `knowledge/providers/ltx-2.5.md` says "a cold start of
