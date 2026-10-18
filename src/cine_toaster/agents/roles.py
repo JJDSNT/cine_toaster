@@ -44,7 +44,8 @@ ROLES: dict[str, Role] = {role.id: role for role in (
                   "inception_writes": 0, "inception_receipts": [], "pending_tool": {},
                   "returned_to_coordinator": False}),
     Role("art_direction", "Art Direction", "author",
-         budgets={"steps": 8, "reviews": 2, "generations": 2},
+         # A 24-shot sequence is inspected in four batches of six, plus re-checks of corrections.
+         budgets={"steps": 10, "reviews": 6, "generations": 2},
          scratch={"art_context": {}, "art_steps": 0, "art_receipts": [], "art_pending": {},
                   "art_plan": {}, "art_plan_source": {}, "art_generations": 0, "art_reviews": 0,
                   "art_waiting": False, "art_review_request": "", "art_handoff_verified": False,

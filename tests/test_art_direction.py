@@ -119,6 +119,20 @@ class ArtRecordsTests(FilmCase):
         self.assertEqual(load_creation(self.root)['art_briefs'][0]['id'], brief['id'])
         self.assertTrue(package['images_digest'])
 
+    def test_a_reworded_or_missing_finding_is_aligned_to_the_brief_never_passed(self):
+        from cine_toaster.agents.art import _aligned
+        criteria = ['The ink line boils.', 'Lia wears the sash.']
+        review = {'verdict': 'ready_for_human', 'findings': [
+            {'criterion': 'Ink line boils (paraphrased)', 'status': 'pass', 'evidence': 'Boiling line.', 'correction': '-'}]}
+        aligned = _aligned(review, criteria)
+        self.assertEqual([item['criterion'] for item in aligned['findings']], criteria)
+        self.assertEqual(aligned['findings'][1]['status'], 'uncertain')   # unjudged, not passed
+        self.assertEqual(aligned['verdict'], 'inconclusive')
+        both = _aligned({'verdict': 'ready_for_human', 'findings': [
+            {'criterion': 'reworded one', 'status': 'pass', 'evidence': 'x', 'correction': '-'},
+            {'criterion': 'reworded two', 'status': 'pass', 'evidence': 'y', 'correction': '-'}]}, criteria)
+        self.assertEqual((both['verdict'], both['findings'][1]['criterion']), ('ready_for_human', criteria[1]))
+
     def test_a_batch_review_marks_what_it_does_not_hold(self):
         from cine_toaster.art_direction import _review_fields
         brief = {'criteria': ['P1 reads as ink', 'P7 shows the summit']}
@@ -285,7 +299,8 @@ class ArtAgentTests(FilmCase):
         self.assertEqual(len(load_creation(self.root)['visual_reviews']), 1)
 
     def test_unbounded_loop_stops_at_resource_limit(self):
-        graph, _, _ = self.graph(*[{'action': 'read_context'} for _ in range(8)])
+        from cine_toaster.agents.art import MAX_STEPS
+        graph, _, _ = self.graph(*[{'action': 'read_context'} for _ in range(MAX_STEPS)])
         self.assertEqual(self.invoke(graph)['agent_status']['state'], 'resource_limit')
 
     def test_generation_refusal_never_submits_job(self):

@@ -178,6 +178,36 @@ def _error(error):
     return str(getattr(error, 'message', '') or error) or type(error).__name__
 
 
+def _aligned(review, criteria):
+    """The reviewer's findings, one per brief criterion in the brief's own words.
+
+    Demo 01: half the batch reviews were refused because the reviewer reworded a
+    criterion or skipped one. A finding is matched by its text, else by its place;
+    a criterion it did not judge becomes `uncertain`, which keeps the batch from
+    passing -- honestly unjudged, never silently passed.
+    """
+    findings = [item for item in review.get('findings') or [] if isinstance(item, dict)]
+    by_text = {str(item.get('criterion', '')).strip().lower(): item for item in findings}
+    aligned = []
+    for index, criterion in enumerate(criteria):
+        item = by_text.get(criterion.strip().lower())
+        if item is None and len(findings) == len(criteria):
+            item = findings[index]
+        if item is None:
+            item = {'status': 'uncertain', 'evidence': 'The reviewer gave no finding for this criterion.',
+                    'correction': 'Inspect again for this criterion.'}
+        aligned.append({**item, 'criterion': criterion,
+                        'evidence': str(item.get('evidence') or 'No evidence given.'),
+                        'correction': str(item.get('correction') or 'None given.')})
+    verdict = review.get('verdict')
+    judged = [item for item in aligned if item['status'] != 'not_in_batch']
+    if verdict == 'ready_for_human' and (not judged or any(item['status'] != 'pass' for item in judged)):
+        verdict = 'needs_changes' if any(item['status'] == 'fail' for item in aligned) else 'inconclusive'
+    if verdict == 'needs_changes' and not any(item['status'] == 'fail' for item in aligned):
+        verdict = 'inconclusive'
+    return {'findings': aligned, 'verdict': verdict}
+
+
 def _scope(target):
     if 'sequence' in target:
         return (f"{target.get('label') or target['sequence']} ({len(target['scenes'])} scenes, "
@@ -397,6 +427,7 @@ def nodes(model, runtime, reviewer=None, waits=None):
                     'comparison_inputs': parents, 'images_in_order': labels, 'batch': batch,
                             'film': state['art_context']['film'],
                             'canonical_pending_work': json.loads(production_work(value))}, ensure_ascii=False), REVIEW_SCHEMA, package['images'])
+                review = {**review, **_aligned(review, brief['criteria'])}
                 result = runtime.save_visual_review({key: review.get(key) for key in ('verdict', 'findings', 'summary')} |
                     {'brief': brief['id'], 'references': selected, 'targets': references,
                      'images_digest': package['images_digest']} | preconditions)
