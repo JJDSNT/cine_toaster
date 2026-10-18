@@ -454,6 +454,16 @@ roles the supplied model serves. To do, in order:
   Coordinator's proposal) submit every block first, then wait on all; the
   local executor bounds downloads, not submissions. Keep the state-file rule:
   a different pending request is refused, never resent.
+- [ ] **Agent turns cost too much for what they move (the author, 2026-10-18:
+  "o sistema está consumindo bastante tokens e não está avançando").**
+  Measured on Demo 01: an Art Direction turn is up to 10 model calls, each
+  resending the whole film's context; batch 1 of the storyboard was reviewed
+  twice with the same findings. Solve: (1) per-step prompts carry the role's
+  readers only, not the whole film and screenplay every step; (2) a review of
+  pictures that have not changed since a current review is refused with that
+  review's id; (3) bind coordination/reads to a cheaper model the person
+  supplied and keep the strongest for creating and reviewing (ADR 0034
+  bindings); (4) report tokens per turn in the GUI so cost is visible.
 - [ ] **Reconcile LTX cold-start knowledge (found 2026-10-17).** The recipe
   uses `generation.COLD_START_SECONDS = 150` (1-02A block 2: 245 s cold,
   2026-09-29) while `knowledge/providers/ltx-2.5.md` says "a cold start of
