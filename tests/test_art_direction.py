@@ -40,6 +40,18 @@ def observation(status='pass'):
 
 
 class FilmCase(unittest.TestCase):
+    def assertShowsThePicture(self, image):
+        """The reviewer sees a reduced copy of the registered picture, pinned by the original's digest."""
+        import hashlib
+        import io
+
+        self.assertEqual(image['sha256'], hashlib.sha256(self.picture.read_bytes()).hexdigest())
+        with Image.open(io.BytesIO(base64.b64decode(image['data']))) as shown:
+            self.assertEqual(shown.size, (32, 32))
+            red, green, blue = shown.convert('RGB').getpixel((16, 16))
+            self.assertGreater(red, 200)
+            self.assertLess(green + blue, 60)
+
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
@@ -91,7 +103,7 @@ class ArtRecordsTests(FilmCase):
 
     def test_real_pixels_are_bounded_and_registered_not_arbitrary_paths(self):
         package = image_package(self.root, [self.reference])
-        self.assertEqual(base64.b64decode(package['images'][0]['data']), self.picture.read_bytes())
+        self.assertShowsThePicture(package['images'][0])
         for invalid in ([], ['../../etc/passwd'], [self.reference] * 5):
             with self.assertRaises(CineToasterError):
                 image_package(self.root, invalid)
@@ -106,6 +118,16 @@ class ArtRecordsTests(FilmCase):
             image_package(self.root, [self.reference])
         self.assertEqual(load_creation(self.root)['art_briefs'][0]['id'], brief['id'])
         self.assertTrue(package['images_digest'])
+
+    def test_a_batch_review_marks_what_it_does_not_hold(self):
+        from cine_toaster.art_direction import _review_fields
+        brief = {'criteria': ['P1 reads as ink', 'P7 shows the summit']}
+        held = {'criterion': 'P1 reads as ink', 'status': 'pass', 'evidence': 'Ink line.', 'correction': 'None.'}
+        other = {'criterion': 'P7 shows the summit', 'status': 'not_in_batch', 'evidence': 'P7 not attached.',
+                 'correction': 'Reviewed in another batch.'}
+        _review_fields(brief, 'ready_for_human', [held, other], 'Batch passes.')
+        with self.assertRaises(CineToasterError):  # a batch holding nothing proves nothing
+            _review_fields(brief, 'ready_for_human', [{**held, 'status': 'not_in_batch'}, other], 'Empty.')
 
     def test_failed_or_uncertain_findings_cannot_claim_readiness(self):
         brief = self.brief()
@@ -221,7 +243,7 @@ class ArtAgentTests(FilmCase):
         self.assertIn('Canonical work structure:', json.loads(model.images[0][1])['film'])
         self.assertIn('"project_id": "shapes"', json.loads(model.images[0][1])['film'])
         self.assertNotIn('Conversation:', model.images[0][1])
-        self.assertEqual(base64.b64decode(model.images[0][2][0]['data']), self.picture.read_bytes())
+        self.assertShowsThePicture(model.images[0][2][0])
         self.assertEqual(creation_view(self.root)['inception_review']['current']['status'], 'awaiting_decision')
 
     def test_failed_review_drives_preserved_brief_correction(self):

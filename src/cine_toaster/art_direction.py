@@ -46,6 +46,23 @@ def _brief_fields(title, text, criteria):
         raise ValidationError('Visual criteria must be distinct')
 
 
+FINDING_STATUSES = ('pass', 'fail', 'uncertain', 'not_in_batch')
+#: Longest side of the copy a reviewer is shown: real pixels, small enough for eight per request.
+REVIEW_COPY_SIDE = 1280
+
+
+def _review_copy(data: bytes) -> tuple[bytes, str]:
+    """A JPEG copy of a picture for a visual review, pinned by the original's digest."""
+    from PIL import Image
+
+    with Image.open(io.BytesIO(data)) as image:
+        image = image.convert('RGB')
+        image.thumbnail((REVIEW_COPY_SIDE, REVIEW_COPY_SIDE))
+        out = io.BytesIO()
+        image.save(out, format='JPEG', quality=85)
+    return out.getvalue(), 'image/jpeg'
+
+
 def _review_fields(brief, verdict, findings, summary):
     _text(summary, 'review summary')
     if verdict not in VERDICTS or not isinstance(findings, list) or len(findings) != len(brief['criteria']):
@@ -55,11 +72,14 @@ def _review_fields(brief, verdict, findings, summary):
     if sorted(item.get('criterion', '') for item in findings) != sorted(brief['criteria']):
         raise ValidationError('Review criteria must match the exact brief')
     for item in findings:
-        if item.get('status') not in ('pass', 'fail', 'uncertain'):
-            raise ValidationError('Finding status must be pass, fail or uncertain')
+        if item.get('status') not in FINDING_STATUSES:
+            raise ValidationError('Finding status must be pass, fail, uncertain or not_in_batch')
         _text(item.get('evidence'), 'visible evidence')
         _text(item.get('correction'), 'correction or reason no correction is needed')
-    if verdict == 'ready_for_human' and any(item['status'] != 'pass' for item in findings):
+    # A sequence is inspected in batches: a criterion about shots this batch does not hold is
+    # `not_in_batch`, neither a pass nor a failure; the batch is ready when everything it holds passes.
+    judged = [item for item in findings if item['status'] != 'not_in_batch']
+    if verdict == 'ready_for_human' and (not judged or any(item['status'] != 'pass' for item in judged)):
         raise ValidationError('Failed or uncertain criteria cannot be ready for human review')
     if verdict == 'needs_changes' and not any(item['status'] == 'fail' for item in findings):
         raise ValidationError('Needs changes requires at least one failed criterion')
@@ -141,9 +161,13 @@ def image_package(root: Path, references: list[str]):
                     raise ValueError('unsupported format')
             except (OSError, ValueError) as error:
                 raise ValidationError('Reference contains an unreadable or unsupported raster') from error
-            total += len(data)
+            # The original is pinned by its digest; the reviewer sees a reduced copy of its pixels
+            # (eight full 1536x1024 PNGs exceeded the request, Demo 01).
+            shown, shown_mime = _review_copy(data)
+            total += len(shown)
             images.append({'reference': snapshot['id'], 'file': name, 'sha256': sha256,
-                           'mime_type': mime, 'data': base64.b64encode(data).decode('ascii')})
+                           'mime_type': shown_mime, 'source_mime_type': mime,
+                           'data': base64.b64encode(shown).decode('ascii')})
             if total > 24 * 1024 * 1024 or len(images) > 8:
                 raise ValidationError('Inspect at most 8 images / 24 MiB per review')
     if not images or any(not any(image['reference'] == ref for image in images) for ref in references):
