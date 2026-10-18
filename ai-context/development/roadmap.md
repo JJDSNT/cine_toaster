@@ -566,6 +566,24 @@ roles the supplied model serves. To do, in order:
   shots after it waited. A refusal is common and usually passes on a second
   try. Solve: retry a refused picture once (rephrased, the refusal recorded),
   then mark only that shot as needing attention and carry on with the rest.
+- [ ] **Clips are reviewed in motion before an assembly is offered (found
+  2026-10-18, Demo 01).** The first cut was declared done from one frame every
+  3 s; the director found a slideshow -- runners in place, held stills, Lia
+  vanishing, another girl's face. Solve: a clip review on dense frame strips
+  (2/s) judged for frozen stretches, a person leaving or changing identity,
+  motion in place, and the joins; its findings block "ready" like a failed
+  visual review.
+- [ ] **How a film is structured for image-to-video, as defaults (found
+  2026-10-18, Demo 01).** Measured: isolated per-shot clips from stills read
+  as a slideshow; one block per scene with written camera and action and
+  `holds: moving` for tracking shots animates; guides at continuation cuts
+  make dissolves, so a `continuation` cut has none (`guide_at_cut: false`);
+  ending on the next scene's picture made the person leave the frame, while
+  starting on the previous scene's last frame (`clips.chain_entries`) joins;
+  a style change in the open is mush, hidden behind an occluder or a white-out
+  it is invisible; a scene-long iris belongs to the montage (`reveal`), never
+  to the pictures. Solve: Directing proposes blocks, continuations and the
+  hidden-cut device per join; the masters and clip plans check them.
 - [ ] **Reconcile LTX cold-start knowledge (found 2026-10-17).** The recipe
   uses `generation.COLD_START_SECONDS = 150` (1-02A block 2: 245 s cold,
   2026-09-29) while `knowledge/providers/ltx-2.5.md` says "a cold start of
