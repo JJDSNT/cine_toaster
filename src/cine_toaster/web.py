@@ -260,6 +260,14 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             except CineToasterError as error:
                 self._send_json(error.public_dict(), HTTPStatus(error.http_status))
             return
+        if parsed.path == "/api/storyboard/sequence":
+            # A sequence's storyboard as a contact sheet, and its animatics (read only).
+            from .storyboard_animatic import sequence_view
+            try:
+                self._send_json(sequence_view(self.project_root, (query.get("sequence") or [""])[0]))
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
         if parsed.path == "/api/progress":
             # The film phase by phase: done, happening, waiting for the director, next (read only).
             from .jobs import public_job
@@ -845,6 +853,15 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
                     actor=Actor(id="storyboard-gui"), references=payload.get("references"),
                     based_on=payload.get("based_on", ""), note=payload.get("note", ""),
                     provenance=payload.get("provenance")))
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
+        if parsed.path == "/api/storyboard/animatic":
+            # A new numbered animatic of the sequence's current drawings; earlier ones are kept.
+            from .storyboard_animatic import render
+            try:
+                payload = self._read_json_body(limit=4 * 1024)
+                self._send_json(render(self.project_root, str(payload.get("sequence") or "")))
             except CineToasterError as error:
                 self._send_json(error.public_dict(), HTTPStatus(error.http_status))
             return

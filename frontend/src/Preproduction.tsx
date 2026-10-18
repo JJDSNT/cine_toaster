@@ -9,6 +9,7 @@ import { ShotPlanning } from "./ShotPlanning.tsx";
 import { InceptionReview } from "./InceptionReview.tsx";
 import { DecisionLink } from "./DecisionInbox.tsx";
 import { ProductionProgress } from "./ProductionProgress.tsx";
+import { SequenceStoryboard } from "./SequenceStoryboard.tsx";
 
 interface Unit { index: number; kind: string; text: string; speaker?: string; shots: string[] }
 interface Frame { shot_id: string; label: string; still: string; duration_seconds: number }
@@ -189,6 +190,7 @@ export function Preproduction() {
       <a href="/">Control Room</a><a href="/app/">Canvas</a>
     </nav>
     <ProductionProgress />
+    <SequenceStoryboard onOpen={(sceneId, shotId) => select({ scene: sceneId, shot: shotId, study: false })} />
     {error && <p className="prep-notice" role="alert">Refresh failed: {error}. Displaying the last loaded records.</p>}
     <div className="prep-body">
       <aside className="prep-scenes" aria-label="Scenes"><h2>Scenes</h2>

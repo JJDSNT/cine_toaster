@@ -1,0 +1,11 @@
+.sequence-storyboard { padding: .8rem 1.6rem 1rem; border-bottom: 1px solid #344138; }
+.sequence-storyboard > summary { cursor: pointer; padding: .3rem 0 .6rem; }
+.sequence-animatic { display: grid; gap: .5rem; max-width: 960px; margin-bottom: 1rem; }
+.sequence-animatic video { width: 100%; background: #000; border-radius: .3rem; }
+.sequence-animatic button { justify-self: start; }
+.sequence-sheet { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .5rem; }
+.sequence-sheet button { display: grid; gap: .25rem; width: 100%; padding: 0; background: none; border: 1px solid #2c362f; border-radius: .3rem; color: #bbc7ba; font-size: .72rem; text-align: left; cursor: pointer; }
+.sequence-sheet img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: .3rem .3rem 0 0; display: block; }
+.sequence-sheet span { padding: 0 .35rem .3rem; }
+.sequence-missing { aspect-ratio: 16 / 9; display: grid; place-items: center; background: #202020; }
+@media (max-width: 900px) { .sequence-storyboard { padding: .8rem 1rem; } .sequence-sheet { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -102,3 +102,28 @@ def render(root: Path, sequence: str) -> dict[str, Any]:
             "seconds": round(sum(shot["seconds"] for shot in shots), 2), "shots": len(shots),
             "missing": [f"{shot['scene']} {shot['shot']}" for shot in shots if not shot["image"]],
             "undeclared_durations": [f"{shot['scene']} {shot['shot']}" for shot in shots if not shot["declared"]]}
+
+
+def sequence_view(root: Path, sequence: str = "") -> dict[str, Any]:
+    """What the storyboard page shows of a sequence: its shots in order, as a contact sheet, and its animatics."""
+
+    root = Path(root).expanduser().resolve()
+    production = load_production(root)
+    sequences = [{"id": item["id"], "label": item.get("label") or item["id"]} for item in production.get("sequences") or []]
+    chosen = sequence or (sequences[0]["id"] if sequences else "")
+    if not chosen:
+        return {"sequences": [], "sequence": "", "shots": [], "animatics": []}
+    shots = plan(root, chosen)
+    for shot in shots:
+        shot["image_url"] = ("/media/" + str(Path(shot["image"]).relative_to(root))) if shot["image"] else ""
+        shot.pop("image", None)
+    folder = root / "renders" / "animatics"
+    animatics = []
+    for path in folder.glob(f"{chosen}-storyboard-v*.mp4") if folder.is_dir() else []:
+        number = path.stem.rsplit("-v", 1)[1]
+        if number.isdigit():
+            animatics.append({"version": int(number), "url": "/media/" + str(path.relative_to(root)),
+                              "made_at": path.stat().st_mtime})
+    animatics.sort(key=lambda item: item["version"], reverse=True)
+    return {"sequences": sequences, "sequence": chosen, "shots": shots, "animatics": animatics,
+            "seconds": round(sum(shot["seconds"] for shot in shots), 2)}
