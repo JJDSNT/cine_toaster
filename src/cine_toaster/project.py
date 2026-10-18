@@ -1019,6 +1019,8 @@ def _load_scene(
         "music": sound_beds["music"],
         # How the scene is entered from the previous one in its sequence (SPEC-0007, CT-0051).
         "enter": enter,
+        # A reveal over the whole scene, drawn in the assembly (Demo 01's iris): {kind: iris, from, to, until}.
+        "reveal": document.get("reveal") if isinstance(document.get("reveal"), dict) else None,
         # The style in force (CT-0049): the scene's, else the production's.
         "style": style,
         # The same cut in other formats, delivered with every version (CT-0049).

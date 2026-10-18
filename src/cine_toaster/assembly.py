@@ -181,6 +181,9 @@ class Plan:
     #: Once rendered, a still of each shot drawn by a graph (a card, a composite), by shot: what the frame at
     #: its middle is in the cut (CT-0072). Written in the render's work folder; the job adopts them.
     stills: dict[str, str] = field(default_factory=dict)
+    #: A reveal over the whole scene (Demo 01): {kind: iris, from, to, until} -- a circle growing without a stop
+    #: from `from` to `to` (fractions of the half-diagonal) by `until` (a fraction of the scene's length).
+    reveal: dict[str, Any] = field(default_factory=dict)
 
     @property
     def takes(self) -> dict[str, str]:
@@ -305,7 +308,7 @@ def _speaks(shot: dict[str, Any]) -> bool:
 def plan_scene(root: Path, scene: dict[str, Any], words_sidecar: str = "{stem}.words.json") -> Plan:
     """Which take of each shot, cut where, joined how."""
 
-    plan = Plan(scene=scene["id"])
+    plan = Plan(scene=scene["id"], reveal=dict(scene.get("reveal") or {}))
     cuts = {cut["to"]: cut for cut in scene.get("cuts") or []}
     joins: dict[str, Any] = {}  # the transition catalog and the GL check, read once if a cut needs them
     framed: list[str] = []  # reframed on whom, from the plan: one note for the scene
@@ -872,6 +875,28 @@ def still(root: Path, plan: Plan, shot: str, destination: Path, at: float | None
 from .compositing.reference import conform_filter  # one rule for fitting a picture to the frame (CT-0072)
 
 
+def iris_expression(start: float, end: float, until: float, duration: float) -> str:
+    """Whether a pixel is inside the iris at time T: a circle from the centre, growing evenly, never stopping."""
+
+    grow = f"({start}+({end}-{start})*min(T/{max(until * duration, 0.04):.3f},1))"
+    return f"lte(hypot(X-W/2,Y-H/2),{grow}*hypot(W/2,H/2))"
+
+
+def _iris(ffmpeg: str, picture: Path, plan: Plan, work: Path, run_process, span) -> Path:
+    """The scene seen through an iris that opens across its whole length (one continuous move, not per shot)."""
+
+    reveal = plan.reveal
+    inside = iris_expression(float(reveal.get("from", 0.1)), float(reveal.get("to", 1.0)),
+                             float(reveal.get("until", 1.0)), plan.duration)
+    output = work / "picture-iris.mp4"
+    run_process([ffmpeg, "-y", "-loglevel", "error", "-i", str(picture), "-vf",
+                 f"format=yuv444p,geq=lum='if({inside},lum(X,Y),16)':cb='if({inside},cb(X,Y),128)'"
+                 f":cr='if({inside},cr(X,Y),128)',format=yuv420p",
+                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", str(output)],
+                message="Opening the iris across the scene", span=span)
+    return output
+
+
 def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
            span: tuple[float, float] = (0.0, 1.0)) -> None:
     """Cut each take, normalise it, join the pictures and lay the sound.
@@ -1066,6 +1091,8 @@ def render(root: Path, plan: Plan, output: Path, work: Path, run_process,
     captions = [(starts[index] + max(0.0, a - segment.start), starts[index] + min(segment.end, b) - segment.start, text)
                 for index, segment in enumerate(plan.segments) for a, b, text in segment.captions
                 if b > segment.start and a < segment.end] if plan.format.get("captions") else []
+    if plan.reveal.get("kind") == "iris":
+        picture = _iris(ffmpeg, picture, plan, work, run_process, within(0.85, 0.9))
     titles = [(starts[index] + max(0.0, a - segment.start), starts[index] + min(segment.end, b) - segment.start, text)
               for index, segment in enumerate(plan.segments) for a, b, text in segment.subtitles
               if b > segment.start and a < segment.end]
