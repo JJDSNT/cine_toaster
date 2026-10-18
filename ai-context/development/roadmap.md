@@ -514,6 +514,18 @@ roles the supplied model serves. To do, in order:
   Screenplay & Storyboard page now approves or reopens a whole sequence
   (`workflows.decide_sequence_storyboard`: one human record per scene, a scene
   already in that phase skipped; an agent is refused).
+- [ ] **A storyboard approval does not pin the drawings (found 2026-10-18,
+  Demo 01).** The phase gate records the breakdown's digest only: after the
+  director approved The Ascent, SC-070 P2-P4 were redrawn (era 7 regressed
+  below era 6) and the scene still reads "approved", with no sign the
+  drawings changed. Solve: record the current drawing of every shot in the
+  gate, and show "drawings changed since the approval" as the breakdown
+  change is shown today.
+- [ ] **An evolution ladder must cover every step (found 2026-10-18).** The
+  ladder clauses were added to eras 3-6 only; era 7 had none and came out as
+  a flat painting after era 6's 3D. Solve: when a film declares an ordered
+  progression of styles, check each step's record states its place and its
+  bound against both neighbours, and add the cut review above for the joins.
 - [ ] **Reconcile LTX cold-start knowledge (found 2026-10-17).** The recipe
   uses `generation.COLD_START_SECONDS = 150` (1-02A block 2: 245 s cold,
   2026-09-29) while `knowledge/providers/ltx-2.5.md` says "a cold start of

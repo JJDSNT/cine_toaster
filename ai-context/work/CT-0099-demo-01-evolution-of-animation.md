@@ -283,6 +283,15 @@ scene). Checked as pairs on a contact sheet; animatic v4
 (`renders/animatics/the-ascent-storyboard-v4.mp4`, 24 shots, 103 s). The
 missing cut review is in the roadmap. The unscripted castle in SC-040 P2 is gone.
 
+The director approved The Ascent's storyboard (all seven scenes, from the new
+sequence button). Then, from the animatic: "na cena 6 p4 é meio 3d, mas na
+cena 7 p3 e p4 nao" -- confirmed: era 7 had no ladder clause and drew a flat
+painting. SC-070 P2-P4 v3 redrawn as painted-over 3D (P2 needed a second try:
+the image tool refused the first prompt without a reason); era 7's record
+now carries step 7 of 7; animatic v5. Lia's master face: none, by decision
+(left to Claude Code) -- her identity is her description, age variants and
+the age references, recorded in her cast sheet.
+
 # Frictions (work that left the tool)
 
 - Storyboard corrections, 2026-10-18: to save tokens after costly agent turns,
