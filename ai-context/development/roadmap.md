@@ -584,6 +584,13 @@ roles the supplied model serves. To do, in order:
   it is invisible; a scene-long iris belongs to the montage (`reveal`), never
   to the pictures. Solve: Directing proposes blocks, continuations and the
   hidden-cut device per join; the masters and clip plans check them.
+- [ ] **Titles and framing in a vertical rendition (found 2026-10-18, Demo 01).**
+  A one-line title fitted to a 9:16 width is tiny, and a two-line chrome title
+  spreads its horizon gradient over both lines (sky on one, ground on the
+  other); a shot whose subject sits off-centre is cut out of a 9:16 window
+  unless `reframe: {x}` says where. Solve: a style gradient per line; a title
+  wraps for narrow frames; the rendition plan finds each shot's subject (the
+  storyboard or a detector) and proposes its window for review.
 - [ ] **Reconcile LTX cold-start knowledge (found 2026-10-17).** The recipe
   uses `generation.COLD_START_SECONDS = 150` (1-02A block 2: 245 s cold,
   2026-09-29) while `knowledge/providers/ltx-2.5.md` says "a cold start of
