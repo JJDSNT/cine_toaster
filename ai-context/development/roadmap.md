@@ -472,6 +472,19 @@ roles the supplied model serves. To do, in order:
   era or age faults drop it or use the age reference), one consent, publish
   as new versions. Plus: a likeness check for protected characters (the
   SC-030 fawn came out as Bambi) in the visual review criteria by default.
+- [ ] **Style iteration re-opens the storyboard approval each time (found
+  2026-10-18, Demo 01).** A sequence handoff pins the production projection,
+  style records included, so each style correction the director asked for
+  (the evolution ladder, era 4 redefined) invalidated the approval and needed a
+  new request and a new click. Solve: the director's notes during a storyboard
+  pass are recorded as amendments to the approved request (their words, the
+  changed records, the affected shots) and keep it current; a change nobody
+  directed still invalidates it.
+- [ ] **Breakdown and drawings drift out of step (found 2026-10-18).** SC-070's
+  drawings were planned from the batch titles, one shot off the breakdown:
+  P5, a title card, was drawn as Lia standing, so she sat and stood up again.
+  Solve: plan each drawing from its shot's breakdown label and covered
+  screenplay text, and check a title/kind shot is drawn as one.
 - [ ] **Reconcile LTX cold-start knowledge (found 2026-10-17).** The recipe
   uses `generation.COLD_START_SECONDS = 150` (1-02A block 2: 245 s cold,
   2026-09-29) while `knowledge/providers/ltx-2.5.md` says "a cold start of
