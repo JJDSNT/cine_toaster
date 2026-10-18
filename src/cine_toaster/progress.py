@@ -76,11 +76,25 @@ def production_progress(root: Path, jobs: list[dict[str, Any]] | None = None) ->
         phase("storyboard", "next", f"{storyboard_approved} of {len(scenes)} scenes approved", "/app/preproduction.html")
 
     blocked_out = sum(1 for scene in scenes if (scene.get("geometry") or {}).get("cameras"))
-    phase("blockout", "active" if 0 < blocked_out < len(scenes) else "done" if scenes and blocked_out == len(scenes)
-          else "later", f"{blocked_out} of {len(scenes)} scenes laid out in 3D")
-    masters = sum(1 for shot in shots if shot.get("approved_picture"))
-    phase("masters", "done" if shots and masters == len(shots) else "active" if masters else "later",
-          f"{masters} of {len(shots)} master images approved")
+    pictured = [shot for shot in shots if shot.get("derive")]
+    # A blockout is needed where a master is made from a 3D board or a set's plate. A film whose masters
+    # are finished from its storyboard skips it, and says so rather than showing it half done (Demo 01).
+    needs_3d = [shot for shot in pictured if str(shot["derive"].get("from") or "").lower().startswith(("board", "location"))]
+    if pictured and not needs_3d:
+        phase("blockout", "skipped", "Not needed: the master images are finished from the storyboard"
+              + (f" ({blocked_out} scene(s) also have a 3D layout)" if blocked_out else ""))
+    else:
+        phase("blockout", "active" if 0 < blocked_out < len(scenes) else "done" if scenes and blocked_out == len(scenes)
+              else "later", f"{blocked_out} of {len(scenes)} scenes laid out in 3D")
+    # Title and composed shots make no picture: they are not counted against the masters.
+    counted = pictured or shots
+    masters = sum(1 for shot in counted if shot.get("approved_picture"))
+    asking = sum(1 for scene in scenes for gate in (scene.get("gates") or {}).values()
+                 if gate.get("kind") == "approve_picture" and gate.get("state") == "waiting")
+    phase("masters", "done" if counted and masters == len(counted) else "waiting_you" if asking
+          else "active" if masters else "later",
+          f"{masters} of {len(counted)} master images approved" + (f"; {asking} waiting for you" if asking else ""),
+          "/app/preproduction.html" if asking else "")
     clips = sum(1 for shot in shots if shot.get("selected_take"))
     phase("clips", "done" if shots and clips == len(shots) else "active" if clips else "later",
           f"{clips} of {len(shots)} shots with a chosen take")

@@ -5,16 +5,16 @@ import { useEffect, useState } from "react";
 import { request } from "./creation.ts";
 import "./progress.css";
 
-interface Phase { id: string; label: string; state: "done" | "active" | "waiting_you" | "next" | "later" | "blocked"; summary: string; url: string }
+interface Phase { id: string; label: string; state: "done" | "active" | "waiting_you" | "next" | "later" | "blocked" | "skipped"; summary: string; url: string }
 interface Progress {
   phases: Phase[]; current: string; now: string; next: string;
   you: { text: string; url: string; kind: string };
   jobs: { active: number; running: number; queued: number; failed: number; eta_minutes: number };
 }
 
-const MARK: Record<Phase["state"], string> = { done: "✓", active: "●", waiting_you: "!", next: "○", later: "○", blocked: "×" };
+const MARK: Record<Phase["state"], string> = { done: "✓", active: "●", waiting_you: "!", next: "○", later: "○", blocked: "×", skipped: "–" };
 const SAID: Record<Phase["state"], string> = {
-  done: "done", active: "in progress", waiting_you: "waiting for you", next: "next", later: "later", blocked: "blocked",
+  done: "done", active: "in progress", waiting_you: "waiting for you", next: "next", later: "later", blocked: "blocked", skipped: "not needed",
 };
 
 export function ProductionProgress() {
