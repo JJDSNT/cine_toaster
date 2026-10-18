@@ -140,6 +140,29 @@ class MastersFromStoryboardTests(unittest.TestCase):
         again = adopt_drawing(self.root, "SC-010", "P2")
         self.assertNotEqual(again["picture"], made["picture"])  # a new version, never a replacement
 
+    def test_trying_again_takes_up_the_refused_pictures_of_the_open_run(self):
+        from cine_toaster.project import scene_directory
+        from cine_toaster.state import load_scene_state
+        from cine_toaster.takes import work_directory_for
+        from cine_toaster.workflows import start_workflow
+
+        production = load_production(self.root)
+        scene = next(item for item in production["scenes"] if item["id"] == "SC-030")
+        shots = [shot for shot in scene["shots"] if shot.get("derive")]
+        work = work_directory_for(self.root / scene["file"])
+        work.mkdir(parents=True, exist_ok=True)
+        for shot in shots[1:]:
+            Image.new("RGB", (160, 90), "white").save(work / f"p{int(shot['number']):02d}.png")
+        agent = Actor(id="claude-code", kind="agent")
+        start_workflow(self.root, scene_id="SC-030", block_id="", template="masters", actor=agent)  # no runtime: shot 1 fails
+        Image.new("RGB", (160, 90), "white").save(work / f"p{int(shots[0]['number']):02d}.png")  # made another way
+        result = start_workflow(self.root, scene_id="SC-030", block_id="", template="masters", actor=agent)
+        self.assertEqual(result.type, "workflow.retried")
+        runs = load_scene_state(scene_directory(self.root, "SC-030"), "SC-030").workflows
+        self.assertEqual(len(runs), 1)
+        gate = next(step for step in next(iter(runs.values()))["steps"] if step["id"] == f"approve-{shots[0]['id']}")
+        self.assertEqual(gate["state"], "waiting")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -181,29 +181,52 @@ def start_workflow(root: Path, *, scene_id: str, block_id: str, actor: Actor, te
         active = [run for run in state.workflows.values() if run.get("state") not in FINISHED_RUN
                   and run.get("subject", {}).get("block", "") == subject["block"]
                   and run.get("subject", {}).get("shot", "") == subject["shot"]]
-        if active:
+        retried_run = ""
+        if active and template == "masters":
+            # Trying again: the open masters run takes its refused pictures up again (kept versions stay).
+            run = {**active[0], "steps": [dict(step) for step in active[0]["steps"]]}
+            retried = [step for step in run["steps"] if step["kind"] == "picture" and step["state"] == "failed"]
+            if not retried:
+                raise ValidationError(f"{scene_id} already has a masters run in progress ({run['id']}) "
+                                      "and none of its pictures was refused")
+            for step in retried:
+                step.update(state="pending", job=None, note=f"tried again ({step.get('note', '')})"[:400])
+            run["state"] = "running"
+            record = {"kind": "workflow.retried", "workflow": run["id"], "block": "masters", "shot": "",
+                      "actor": actor.public_dict(), "decided_at": now(), "command_id": command_id,
+                      "rationale": "refused pictures: " + ", ".join(step["shot"] for step in retried)}
+            committed = state.with_decision(decision=record, workflows={**state.workflows, run["id"]: run})
+            write_scene_state(directory, committed)
+            retried_run = run["id"]
+        elif active:
             what = f"Shot {shot_id}" if template == "shot" else f"Block {block_id}"
             raise ValidationError(f"{what} already has a workflow in progress ({active[0]['id']})")
-        run_id = "wf_" + uuid.uuid4().hex[:12]
-        stamp = now()
-        gates = dict(state.gates)
-        if template == "masters":
-            # A question left open by an earlier masters run that stopped is asked again by this one.
-            stopped = {rid for rid, item in state.workflows.items() if item.get("template") == "masters"
-                       and item.get("state") in FINISHED_RUN}
-            for gate_id, gate in state.gates.items():
-                if gate.get("state") == "waiting" and gate.get("workflow") in stopped:
-                    gates[gate_id] = {**gate, "state": "withdrawn", "decided_at": stamp,
-                                      "decided_by": {"id": "workflow", "kind": "system"},
-                                      "rationale": f"Asked again by the masters run {run_id}"}
-        run = {"id": run_id, "template": template, "subject": subject,
-               "state": "running", "steps": steps, "created_at": stamp, "updated_at": stamp,
-               "started_by": actor.public_dict()}
-        record = {"kind": "workflow.started", "workflow": run_id, "block": subject["block"], "shot": shot_id,
-                  "actor": actor.public_dict(),
-                  "decided_at": stamp, "command_id": command_id, "rationale": ""}
-        committed = state.with_decision(decision=record, workflows={**state.workflows, run_id: run}, gates=gates)
-        write_scene_state(directory, committed)
+        if not retried_run:
+            run_id = "wf_" + uuid.uuid4().hex[:12]
+            stamp = now()
+            gates = dict(state.gates)
+            if template == "masters":
+                # A question left open by an earlier masters run that stopped is asked again by this one.
+                stopped = {rid for rid, item in state.workflows.items() if item.get("template") == "masters"
+                           and item.get("state") in FINISHED_RUN}
+                for gate_id, gate in state.gates.items():
+                    if gate.get("state") == "waiting" and gate.get("workflow") in stopped:
+                        gates[gate_id] = {**gate, "state": "withdrawn", "decided_at": stamp,
+                                          "decided_by": {"id": "workflow", "kind": "system"},
+                                          "rationale": f"Asked again by the masters run {run_id}"}
+            run = {"id": run_id, "template": template, "subject": subject,
+                   "state": "running", "steps": steps, "created_at": stamp, "updated_at": stamp,
+                   "started_by": actor.public_dict()}
+            record = {"kind": "workflow.started", "workflow": run_id, "block": subject["block"], "shot": shot_id,
+                      "actor": actor.public_dict(),
+                      "decided_at": stamp, "command_id": command_id, "rationale": ""}
+            committed = state.with_decision(decision=record, workflows={**state.workflows, run_id: run}, gates=gates)
+            write_scene_state(directory, committed)
+    if retried_run:
+        event = append_event(root, Event.create("workflow.retried", production["id"], scene_id=scene_id,
+                                                workflow=retried_run, command_id=command_id))
+        advance(root, scene_id, retried_run)
+        return _result("workflow.retried", production, scene_id, committed.revision, event)
     event = append_event(root, Event.create("workflow.started", production["id"], scene_id=scene_id,
                                             workflow=run_id, block=subject["block"], shot=shot_id,
                                             command_id=command_id))
