@@ -65,6 +65,35 @@ class MastersFromStoryboardTests(unittest.TestCase):
         kinds = [step["kind"] for step in steps]
         self.assertEqual(kinds, sorted(kinds, key=lambda kind: kind != "picture"))  # every picture before any gate
 
+    def test_every_made_picture_is_asked_about_at_once_and_answers_come_in_any_order(self):
+        from cine_toaster.project import scene_directory
+        from cine_toaster.state import load_scene_state
+        from cine_toaster.takes import work_directory_for
+        from cine_toaster.workflows import advance, decide_gate, start_workflow
+
+        production = load_production(self.root)
+        scene = next(item for item in production["scenes"] if item["id"] == "SC-030")
+        shots = [shot for shot in scene["shots"] if shot.get("derive")]
+        self.assertGreaterEqual(len(shots), 2)
+        work = work_directory_for(self.root / scene["file"])
+        work.mkdir(parents=True, exist_ok=True)
+        for shot in shots:  # already made: the run skips making them and asks at once
+            Image.new("RGB", (64, 36), "white").save(work / f"p{int(shot['number']):02d}.png")
+        start_workflow(self.root, scene_id="SC-030", block_id="", template="masters",
+                       actor=Actor(id="claude-code", kind="agent"))
+        state = load_scene_state(scene_directory(self.root, "SC-030"), "SC-030")
+        run = next(iter(state.workflows.values()))
+        gates = [step for step in run["steps"] if step["kind"] == "gate"]
+        self.assertEqual({step["state"] for step in gates}, {"waiting"})
+        self.assertEqual(run["state"], "waiting")
+        last = state.gates[gates[-1]["gate"]]
+        decide_gate(self.root, scene_id="SC-030", gate_id=last["id"], outcome="approved", chosen=last["candidates"][0],
+                    actor=Actor(id="director", kind="human"))
+        run = advance(self.root, "SC-030", run["id"])
+        states = [step["state"] for step in run["steps"] if step["kind"] == "gate"]
+        self.assertEqual(states[-1], "done")
+        self.assertEqual(states[0], "waiting")
+
 
 if __name__ == "__main__":
     unittest.main()

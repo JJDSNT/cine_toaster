@@ -403,7 +403,46 @@ def advance(root: Path, scene_id: str, run_id: str) -> dict[str, Any]:
                 return run
             moved = _STEPS[step["kind"]](root, production, scene, state, run, step, directory)
             if not moved:
+                if run.get("template") == "masters" and run["state"] not in FINISHED_RUN:
+                    run = _all_gates(root, scene_id, run_id, directory)
+                    # A picture asked for again comes first in the list: go and make it.
+                    if run["state"] not in FINISHED_RUN and any(
+                            item["kind"] == "picture" and item["state"] == "pending" for item in run["steps"]):
+                        continue
                 return run
+
+
+def _all_gates(root: Path, scene_id: str, run_id: str, directory: Path) -> dict[str, Any]:
+    """A masters run asks about every picture already made at once, and takes each answer as it comes.
+
+    The director reviews a scene's pictures together (Demo 01): every gate
+    whose picture is made is opened, and every decided one moves its step,
+    whatever the order the decisions arrive in. Called inside `advance`'s lock.
+    """
+
+    handled: set[str] = set()
+    while True:
+        production, scene = _scene(root, scene_id)
+        state = load_scene_state(directory, scene_id)
+        run = {**state.workflows[run_id]}
+        run["steps"] = [dict(step) for step in run["steps"]]
+        if run["state"] in FINISHED_RUN:
+            return run
+        made = {step["shot"] for step in run["steps"] if step["kind"] == "picture" and step["state"] in FINISHED_STEP}
+        step = next((item for item in run["steps"] if item["kind"] == "gate" and item["state"] not in FINISHED_STEP
+                     and item["id"] not in handled and item["shot"] in made), None)
+        if step is None:
+            break
+        handled.add(step["id"])
+        _gate_step(root, production, scene, state, run, step, directory)
+    state = load_scene_state(directory, scene_id)
+    run = {**state.workflows[run_id]}
+    run["steps"] = [dict(step) for step in run["steps"]]
+    if run["state"] == "running" and any(step["state"] == "waiting" for step in run["steps"]) \
+            and not any(step["state"] in ("pending", "running") and step["kind"] == "picture" for step in run["steps"]):
+        run["state"] = "waiting"
+        _save(root, scene_id, directory, state, run)
+    return run
 
 
 def _submit(root: Path, run: dict[str, Any], step: dict[str, Any], kind: str, params: dict[str, Any]) -> bool:
