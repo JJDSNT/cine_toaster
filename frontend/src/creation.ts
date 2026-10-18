@@ -27,6 +27,7 @@ export interface CreationState {
   title: string; revision: number; drafts: Draft[]; references: Reference[];
   rounds: ExplorationRound[];
   active_rounds: ExplorationRound[];
+  storyboard_uses?: Record<string, { scene: string; shot: string; board: string; version?: number; order: number }[]>;
   findings: { draft: string; input: string; message: string }[];
   reference_history: { nodes: ReferenceHistoryNode[]; summary: { retained: number; reused: number; provider_input_links: number; cast_selections: number; review: string } };
   inception_review?: InceptionReviewState;
@@ -90,15 +91,25 @@ export function conceptOf(draft: Draft): string {
 export function referenceGroups(data: CreationState) {
   const known = new Map(data.references.map((item) => [item.id, item]));
   const assigned = new Set<string>();
-  const groups: { id: string; title: string; number: number | null; round: ExplorationRound | null; references: Reference[]; missing: string[] }[] = (data.active_rounds ?? data.rounds).map((round, index) => {
+  const groups: { id: string; title: string; number: number | null; round: ExplorationRound | null; references: Reference[];
+                  missing: string[]; storyboard?: boolean }[] = (data.active_rounds ?? data.rounds).map((round, index) => {
     round.references.forEach((ref) => assigned.add(ref.id));
     return { id: round.id, title: round.title, number: index + 1, round,
       references: round.references.map((ref) => known.get(ref.id)).filter((ref): ref is Reference => Boolean(ref)),
       missing: round.references.filter((ref) => !known.has(ref.id)).map((ref) => ref.id) };
   });
-  const unassigned = data.references.filter((item) => !assigned.has(item.id));
+  const uses = data.storyboard_uses ?? {};
+  // Storyboard drawings are filed apart, in scene/shot order, not mixed into "Unassigned" (Demo 01).
+  const drawings = data.references.filter((item) => !assigned.has(item.id) && uses[item.id]?.length)
+    .sort((a, b) => {
+      const [x, y] = [uses[a.id][0], uses[b.id][0]];
+      return x.order - y.order || x.shot.localeCompare(y.shot, undefined, { numeric: true });
+    });
+  const unassigned = data.references.filter((item) => !assigned.has(item.id) && !uses[item.id]?.length);
   if (unassigned.length) groups.push({ id: "unassigned", title: groups.length ? "Unassigned references" : "References",
     number: null, round: null, references: unassigned, missing: [] });
+  if (drawings.length) groups.push({ id: "storyboard", title: "Storyboard drawings", number: null, round: null,
+    references: drawings, missing: [], storyboard: true });
   return groups;
 }
 

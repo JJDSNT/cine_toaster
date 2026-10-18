@@ -464,6 +464,14 @@ roles the supplied model serves. To do, in order:
   review's id; (3) bind coordination/reads to a cheaper model the person
   supplied and keep the strongest for creating and reviewing (ADR 0034
   bindings); (4) report tokens per turn in the GUI so cost is visible.
+- [ ] **Correct what the reviews failed, as one batch (found 2026-10-18, Demo
+  01).** The corrections were planned by hand from the visual reviews and run
+  outside Art Direction to save tokens. Solve: an Art Direction action that
+  turns current failing findings into one batch plan (shot, correction,
+  parents chosen by the failure: composition faults keep the image parent,
+  era or age faults drop it or use the age reference), one consent, publish
+  as new versions. Plus: a likeness check for protected characters (the
+  SC-030 fawn came out as Bambi) in the visual review criteria by default.
 - [ ] **Reconcile LTX cold-start knowledge (found 2026-10-17).** The recipe
   uses `generation.COLD_START_SECONDS = 150` (1-02A block 2: 245 s cold,
   2026-09-29) while `knowledge/providers/ltx-2.5.md` says "a cold start of

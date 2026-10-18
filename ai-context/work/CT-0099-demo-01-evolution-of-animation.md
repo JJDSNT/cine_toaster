@@ -253,6 +253,19 @@ evidence, not proof that the upstream stage was completed.
 
 # Frictions (work that left the tool)
 
+- Storyboard corrections, 2026-10-18: to save tokens after costly agent turns,
+  the 13 corrections from the visual reviews (and the missing SC-020 P3) were
+  generated with `toast references generate` from a hand-written plan and
+  published with `publish_storyboard_reference` as new versions -- outside
+  Art Direction. The product should do this itself: "correct what the
+  reviews failed, as one batch, one consent" (roadmap). Result: The Ascent has
+  24 of 24 drawings. Checked by eye: SC-050 P1 now reads fourteen (fixed);
+  SC-010 P1 v3 barely differs from v2 (the image parent held the composition;
+  no crane-down, Lia still whole); SC-030 P2 v2 reaches the classic-colour
+  language but its fawn is a Bambi look-alike and Lia a recent-Disney face --
+  a rights problem to redo with an original deer design (the director's rule:
+  imitate the era's technique, never its characters).
+
 - First storyboard continuation, 2026-10-17: the director approved SC-010's
   storyboard direction; Art Direction ran eight `read_context` steps and hit
   its turn limit without drawing. Cause: its handoff + scene + drawings

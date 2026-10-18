@@ -176,6 +176,7 @@ def _creation_view(root: Path) -> dict[str, Any]:
     from .stage_handoff import handoff_view
     from .sequence_work import sequence_work_view
     from .intake import intake_view
+    boards = load_storyboard(root)["candidates"]
     return {**state, "handoffs": handoff_view(root, state), "directing": directing_view(root, state), "art_direction": art_view(root, state, source_digest), "title": production["title"], "references": references, "findings": findings,
             "source_digest": source_digest,
             "sequence_work": sequence_work_view(root, state, production, material_digest=source_digest),
@@ -183,7 +184,21 @@ def _creation_view(root: Path) -> dict[str, Any]:
             "inception_review": inception_review_view(root, state),
             "active_rounds": active_rounds,
             "reference_history": reference_history(references, state["drafts"], production.get("cast") or {}, active_rounds,
-                                                   load_storyboard(root)["candidates"])}
+                                                   boards),
+            # Which references are storyboard drawings, and of which shot: the Inception gallery files
+            # them apart instead of in "Unassigned" (the director, Demo 01).
+            "storyboard_uses": _storyboard_uses(boards, production)}
+
+
+def _storyboard_uses(boards: list[dict], production: dict) -> dict[str, list[dict]]:
+    order = {scene["id"]: index for index, scene in enumerate(production.get("scenes") or [])}
+    uses: dict[str, list[dict]] = {}
+    for board in boards:
+        reference = (board.get("provenance") or {}).get("reference")  # the picture published as this drawing
+        if reference:
+            uses.setdefault(reference, []).append({"scene": board["scene"], "shot": board["shot"], "board": board["id"],
+                                                   "version": board.get("version"), "order": order.get(board["scene"], 999)})
+    return uses
 
 
 def current_rounds(rounds: list[dict]) -> list[dict]:
