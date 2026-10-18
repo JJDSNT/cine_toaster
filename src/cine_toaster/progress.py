@@ -96,16 +96,31 @@ def production_progress(root: Path, jobs: list[dict[str, Any]] | None = None) ->
           f"{masters} of {len(counted)} master images approved" + (f"; {asking} waiting for you" if asking else ""),
           "/app/preproduction.html" if asking else "")
     clips = sum(1 for shot in shots if shot.get("selected_take"))
-    phase("clips", "done" if shots and clips == len(shots) else "active" if clips else "later",
-          f"{clips} of {len(shots)} shots with a chosen take")
+    # The clips are paid work on a configured generator: when the masters are done and the generator is
+    # not configured, that is what stops the film, and it is said -- never "nothing waits" (Demo 01).
+    setup = ""
+    if counted and masters == len(counted) and not clips:
+        from . import spend
+        from .providers.recipes import RECIPES, describe
+
+        video = [describe(recipe) for recipe in RECIPES.values() if recipe.kind == "image_to_video"]
+        if video and not any(item["configured"] for item in video):
+            setup = (f"The clips need the video generator ({video[0]['id']}), which is not configured here: "
+                     f"{', '.join(video[0]['missing'])}. Give them in an env file (toast doctor), and set the "
+                     f"budget for the clips (now US$ {spend.spent():.2f} spent of "
+                     f"US$ {float(spend.load().get('limit_usd') or 0):.2f}).")
+    phase("clips", "done" if shots and clips == len(shots) else "active" if clips else "blocked" if setup else "later",
+          f"{clips} of {len(shots)} shots with a chosen take" + (" -- the video generator is not configured" if setup else ""))
     versions = sum(len(sequence.get("versions") or []) for sequence in production.get("sequences") or [])
     phase("assembly", "active" if versions else "later", f"{versions} assembled version(s)")
 
     current = next((item for item in phases if item["state"] in ("waiting_you", "active")), None)
     upcoming = next((item for item in phases if item["state"] in ("next", "later")), None)
     if work["active"]:
-        now = (f"Drawing the storyboard: {work['running']} picture(s) in progress, {work['queued']} queued "
+        now = (f"Making pictures: {work['running']} in progress, {work['queued']} queued "
                f"-- about {work['eta_minutes']} min left.")
+    elif setup:
+        now = "Nothing is running: the clips wait for the video generator to be configured."
     elif inbox.get("agent_work_count"):
         now = "The AI has approved work to carry on; nothing is generating at this moment."
     else:
@@ -113,6 +128,8 @@ def production_progress(root: Path, jobs: list[dict[str, Any]] | None = None) ->
     if you:
         action = {"text": you.get("question", "A decision waits for you."), "url": you.get("url", ""),
                   "kind": you.get("kind", "")}
+    elif setup:
+        action = {"text": setup, "url": "", "kind": "setup"}
     else:
         action = {"text": "Nothing waits for you right now." + (" Come back when the drawings are done."
                   if work["active"] else ""), "url": "", "kind": ""}
