@@ -166,6 +166,50 @@ def _anchor_strength(production: dict[str, Any], scene_id: str, shot: dict[str, 
         return 0.0
 
 
+#: The frame (a multiple of 8) by which a chained scene has become its own first picture.
+CHAIN_ARRIVAL_FRAME = 48
+
+
+def entry_chain(root: Path, production: dict[str, Any], scene: dict[str, Any], shot_id: str) -> dict[str, Any] | None:
+    """The last frame of the previous scene, when this scene starts on it (`clips: {chain_entries: true}`).
+
+    SINGULAR measured it (claim last-frame-chaining): a stretch generated from
+    the last frame of the one before joins invisibly. A scene entered on action
+    or on a match begins on that frame and becomes its own first picture -- and
+    its style -- within its first two seconds, in the motion (Demo 01: ending on
+    the next scene's picture made Lia leave the frame to reach it).
+    """
+
+    from .blocks import last_frame
+
+    if not (production.get("clips") or {}).get("chain_entries"):
+        return None
+    if str((scene.get("enter") or {}).get("type") or "") not in ("action", "match"):
+        return None
+    moving = [shot for shot in scene["shots"] if shot.get("kind") != "title" and shot.get("source") != "composed"]
+    if not moving or moving[0]["id"] != shot_id:
+        return None
+    sequence = next((item for item in production.get("sequences") or [] if scene["id"] in (item.get("scene_ids") or [])),
+                    None)
+    order = list((sequence or {}).get("scene_ids") or [])
+    if scene["id"] not in order or order.index(scene["id"]) == 0:
+        return None
+    previous = next((item for item in production["scenes"] if item["id"] == order[order.index(scene["id"]) - 1]), None)
+    before = [shot for shot in (previous or {}).get("shots", []) if shot.get("kind") != "title"
+              and shot.get("source") != "composed"]
+    if not before:
+        return None
+    frame = last_frame(work_directory_for(root / previous["file"]), root, previous, str(before[-1]["number"]))
+    if frame is None:
+        raise ValidationError(f"{scene['id']} starts on the last frame of {previous['id']} {before[-1]['id']}, "
+                              "which has no chosen take yet: generate and choose it first")
+    style = (scene.get("style") or {}).get("prompt", "")
+    text = ("It begins exactly on the previous moment and continues its motion without a stop; within the first "
+            "two seconds the whole drawing transforms, in the motion, into this frame's look"
+            + (f": {style.split('.')[0].strip()}" if style else "") + ".")
+    return {"scene": previous["id"], "shot": before[-1]["id"], "frame": frame, "text": text}
+
+
 #: How strongly a bridge's last frame is held to the next scene's first master.
 BRIDGE_STRENGTH = 1.0
 
@@ -181,7 +225,8 @@ def entry_bridge(root: Path, production: dict[str, Any], scene: dict[str, Any], 
 
     from .blocks import reference_picture
 
-    if not (production.get("clips") or {}).get("end_on_entry"):
+    clips = production.get("clips") or {}
+    if not clips.get("end_on_entry") or clips.get("chain_entries"):
         return None
     if not scene["shots"] or scene["shots"][-1]["id"] != shot_id:
         # The last shot that makes a picture: a title or a card after it does not move.
@@ -254,6 +299,7 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
     notes: list[str] = list(early_notes)
     prompts, references = [], []
     bridge = entry_bridge(root, production, scene, block.shots[-1])
+    chain = entry_chain(root, production, scene, block.shots[0])
     for shot_id in block.shots:
         shot = shots[shot_id]
         source = _from_shot(scene, shot)
@@ -282,6 +328,8 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
         action = shot.get("description") or ("" if shot.get("label") == shot_id else shot.get("label") or "")
         if bridge and shot_id == block.shots[-1]:
             action = (action + " " + bridge["text"]).strip()
+        if chain and shot_id == block.shots[0]:
+            action = (chain["text"] + " " + action).strip()
         prompts.append(ShotPrompt(picture, _camera(scene, shot), action, lines,
                                   sound if isinstance(sound, str) else "", _acting(production, scene, shot),
                                   "bridge" if bridge and shot_id == block.shots[-1]
@@ -299,6 +347,13 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
         return float(value) if value not in (None, "") else GUIDE_STRENGTH
 
     guides = [Reference("first", references[0], 0, _digest(references[0]), strength(block.shots[0]))]
+    if chain:
+        # Start on the previous scene's last frame; arrive at this scene's first picture two seconds in.
+        guides = [Reference("chained", chain["frame"], 0, _digest(chain["frame"]), 1.0),
+                  Reference(block.shots[0], references[0], CHAIN_ARRIVAL_FRAME, _digest(references[0]),
+                            strength(block.shots[0]))]
+        notes.append(f"Starts on the last frame of {chain['scene']} {chain['shot']} (chain_entries) and becomes "
+                     f"{block.shots[0]}'s picture by frame {CHAIN_ARRIVAL_FRAME}.")
     for shot_id, ref, frame in zip(block.shots[1:], references[1:], frames[1:]):
         if shots[shot_id].get("guide_at_cut") is False:
             notes.append(f"{shot_id} asks for no guide at its cut; the model finds that shot by the prompt alone.")
@@ -324,7 +379,8 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
     return BlockPlan(
         continuity=continuity,
         avoid=avoid, negative=negative_text(avoid), avoid_mechanism=AVOID_MECHANISM,
-        scene=scene_id, block=block.id, shots=block.shots, seconds=int(seconds), image=references[0],
+        scene=scene_id, block=block.id, shots=block.shots, seconds=int(seconds),
+        image=chain["frame"] if chain else references[0],
         guides=guides, prompt=block_prompt(prompts, style), seed=seed, estimate_usd=estimate(seconds, rate), notes=notes,
         sections=[{"shot": shot_id, "text": text}
                   for shot_id, text in zip([*block.shots, ""], block_prompt_sections(prompts, style))],
