@@ -199,7 +199,18 @@ def entry_chain(root: Path, production: dict[str, Any], scene: dict[str, Any], s
               and shot.get("source") != "composed"]
     if not before:
         return None
-    frame = last_frame(work_directory_for(root / previous["file"]), root, previous, str(before[-1]["number"]))
+    work = work_directory_for(root / previous["file"])
+    frame = last_frame(work, root, previous, str(before[-1]["number"]))
+    if frame is not None and not frame.is_relative_to(root):
+        # Kept beside the clip, inside the film (SINGULAR's `p<n>-ultimo.png`): the chained scene's start is a
+        # production input with an address, not a cache file.
+        import shutil
+
+        from .blocks import _picture_stems
+
+        kept = work / f"{_picture_stems(str(before[-1]['number']))[-1]}-ultimo.png"
+        shutil.copyfile(frame, kept)
+        frame = kept
     if frame is None:
         raise ValidationError(f"{scene['id']} starts on the last frame of {previous['id']} {before[-1]['id']}, "
                               "which has no chosen take yet: generate and choose it first")
