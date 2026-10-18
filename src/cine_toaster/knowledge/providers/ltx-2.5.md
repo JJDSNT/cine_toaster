@@ -162,6 +162,78 @@ measured_on = "2026-10-18"
 evidence = ["Demo 01: ltx25-i2v found at max 0 after SINGULAR"]
 impact = "high"
 workaround = "Read `toast recipes --health ltx-2-5` before a batch; set max workers to at least 1 (min 0 keeps it free when idle), and back after."
+
+[[claims]]
+id = "isolated-clips-slideshow"
+claim = "Shots generated one by one from still masters read as a slideshow: each starts and ends still, and every cut jumps between unrelated motions."
+status = "measured"
+measured_on = "2026-10-18"
+evidence = ["Demo 01 v1-v3 (23 clips)"]
+impact = "high"
+workaround = "Generate each scene as one block of up to 20 s, with written camera and action per shot."
+
+[[claims]]
+id = "fixed-setting-runs-in-place"
+claim = "Told 'the setting stays exactly as in the first frame', a running figure runs in place like on a treadmill."
+status = "measured"
+measured_on = "2026-10-18"
+evidence = ["Demo 01 SC-020 v1"]
+impact = "high"
+workaround = "For a shot that travels, say the camera moves with the action (holds: moving)."
+
+[[claims]]
+id = "guides-at-continuation-dissolve"
+claim = "A master picture as a guide at a cut inside a continuous action makes the model dissolve from one pose to the next instead of animating between them."
+status = "measured"
+measured_on = "2026-10-18"
+evidence = ["Demo 01 SC-010 blocks 2-4"]
+impact = "high"
+workaround = "A continuation cut has no guide (guide_at_cut: false); the first frame and the prompt carry the motion."
+
+[[claims]]
+id = "end-on-other-picture-exits"
+claim = "Guiding a clip's last frame with a picture whose subject stands elsewhere makes the model take the subject out of the frame and bring it back."
+status = "measured"
+measured_on = "2026-10-18"
+evidence = ["Demo 01 bridges SC-020/030/040, SC-010 block 1-2"]
+impact = "high"
+workaround = "Chain instead: start the next scene on this scene's last frame (clips.chain_entries)."
+
+[[claims]]
+id = "chain-across-scenes"
+claim = "A scene started on the previous scene's last frame, guided to its own first picture two seconds in, continues the motion across the cut and changes style inside it."
+status = "measured"
+measured_on = "2026-10-18"
+evidence = ["Demo 01 SC-010 to SC-030"]
+impact = "high"
+workaround = "clips.chain_entries; the frame is the last one the cut keeps, after its trim."
+
+[[claims]]
+id = "open-style-change-mush"
+claim = "A change between distant drawing styles in the open reads as a double exposure, not a transformation."
+status = "measured"
+measured_on = "2026-10-18"
+evidence = ["Demo 01 bridges"]
+impact = "medium"
+workaround = "Hide it: end the scene behind an occluder or a white-out (trunk, leaves, spray, mist, sun glare) and start the next from that frame."
+
+[[claims]]
+id = "whiteout-overrun"
+claim = "After a white-out peaks, the model keeps inventing: a crystal tunnel, a sketch; and a long block's last seconds can drift to a pencil sketch."
+status = "measured"
+measured_on = "2026-10-18"
+evidence = ["Demo 01 SC-040, SC-050, SC-070 (blocks 1)"]
+impact = "medium"
+workaround = "Measure brightness and saturation per frame and trim at the peak (trim: {tail}); the chain then starts from the kept frame."
+
+[[claims]]
+id = "drawn-iris-not-continuous"
+claim = "An iris drawn into each master is interpolated between their sizes: it opens, closes and reopens."
+status = "measured"
+measured_on = "2026-10-18"
+evidence = ["Demo 01 SC-010 block 1"]
+impact = "medium"
+workaround = "Masters full-frame; the iris is a montage reveal over the whole scene (reveal: {kind: iris})."
 +++
 
 LTX 2.5 makes picture, speech and sound together from a starting image and a

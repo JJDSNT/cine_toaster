@@ -18,6 +18,20 @@ Last updated: 2026-10-17
 
 ## Current phase
 
+**Demo 01 (2026-10-18, CT-0099): The Ascent v7, 92 s, end to end in the
+product** -- storyboard approved per sequence, 23 masters finished from it
+(codex-image), clips on LTX 2.5 as one chained block per scene with a
+hidden-cut device at each era change, the iris as a montage reveal, music
+over the sequence; US$ 3.06 of generation. The director: "está quase".
+What it taught is in the product (masters workflow, frame check, Try again,
+`--from-drawing`, `chain_entries`, continuation cuts, `holds: moving`,
+`reveal`, block trims) and in `knowledge/providers/ltx-2.5.md` (8 claims).
+Open, in the roadmap: clips reviewed in motion before an assembly is
+offered; Directing proposing blocks, continuations and hidden-cut devices;
+cut review across shots; breakdown editing commands; a drawing as its
+master; an approval that pins drawings. Next: the director's review of v7,
+then an Instagram rendition (`deliver:`).
+
 The ordered plan (steps 1-13) is complete, and its work was closed out on
 2026-10-03: 19 records closed, their loose ends gathered in one prioritised
 backlog (`development/roadmap.md` § Backlog). Five records stay open on

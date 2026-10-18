@@ -314,6 +314,17 @@ The Ascent v1 assembled (96.3 s); its review found four clips to redo:
 SC-030 P3 (bridge lost Lia), SC-050 P3 (Lia slips out), SC-070 P2 (drifts to
 another girl's face), SC-070 P3 (colour drift).
 
+The director, on v3: "ficou muito ruim ... praticamente um slideshow". Cause
+(mine, with the product allowing it): isolated per-shot clips from stills,
+no camera written, "the setting stays exactly" making runners run in place,
+a drawn iris, bridges ending on the next picture. Rebuilt: one block per
+scene with written camera and action, continuation cuts without guides,
+scenes chained on the previous one's kept last frame, the iris as a
+scene-long montage reveal, a hidden-cut device per era change (projector
+flicker, trunk, leaves, spray, mist, sun glare), artefacts trimmed at points
+measured on brightness and saturation, SC-050 regenerated. v7 (92 s): "está
+quase". Learnings in knowledge/providers/ltx-2.5.md and the roadmap.
+
 Product fixes from this stretch: frame check before a picture approval; a
 refused picture stops only its shot, with Try again; all approvals at once;
 `--from-drawing`; blockout "not needed"; the clips' setup shown in the strip;
