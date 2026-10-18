@@ -1257,6 +1257,26 @@ def _execution(record_path: Path) -> dict[str, Any]:
             "delay_ms": record.get("delayTime", 0), "execution_ms": record.get("executionTime", 0)}
 
 
+def _warm_worker(ledger: dict[str, Any], record: dict[str, Any], *, idle_seconds: float = 600) -> bool:
+    """Whether the job's worker had just finished another job: then its delay was a queue, not a start."""
+
+    from datetime import UTC, datetime, timedelta
+
+    worker = record.get("workerId")
+    if not worker:
+        return False
+    took = (float(record.get("delayTime") or 0) + float(record.get("executionTime") or 0)) / 1000
+    since = datetime.now(UTC) - timedelta(seconds=took + idle_seconds)
+    for entry in ledger.get("entries", []):
+        if entry.get("worker") == worker and entry.get("remote") != record.get("id"):
+            try:
+                if datetime.fromisoformat(entry["at"]) >= since:
+                    return True
+            except (KeyError, ValueError):
+                continue
+    return False
+
+
 def _record_spend(context: JobContext, record_path: Path, rate: float, what: str, estimate_usd: float) -> float:
     """What the platform billed is spent whatever the outcome; returns it."""
 
@@ -1264,12 +1284,14 @@ def _record_spend(context: JobContext, record_path: Path, rate: float, what: str
     from .providers import runpod
 
     record = json.loads(record_path.read_text(encoding="utf-8")) if record_path.is_file() else {}
-    cost = runpod.cost_usd(record, rate) if record else 0.0
+    warm = _warm_worker(spend.load(), record)
+    cost = runpod.cost_usd(record, rate, warm=warm) if record else 0.0
     if record.get("id"):
         # The endpoint and the billed seconds let FinOps share a billed hour among its jobs (CT-0061).
         spend.record(cost, what, job=context.job_id, remote=record["id"], status=record.get("status", ""),
                      estimate_usd=estimate_usd, endpoint=record.get("endpoint", ""),
-                     seconds=round(runpod.job_seconds(record), 3))
+                     seconds=round(runpod.job_seconds(record), 3), worker=record.get("workerId", ""),
+                     warm=warm)
     return cost
 
 

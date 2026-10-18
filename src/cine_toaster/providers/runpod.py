@@ -228,10 +228,22 @@ def _poll(
     raise ProviderError(f"Job {job_id}: exhausted transport attempts", job_id=job_id)
 
 
-def cost_usd(status: dict[str, Any], hourly_rate: float) -> float:
-    """What the job actually cost, from the time the platform reports."""
+#: The longest delay counted as a worker starting; past it, the job was waiting in the queue, which is not billed.
+MAX_BILLED_DELAY_SECONDS = 300
 
-    seconds = (status.get("delayTime", 0) + status.get("executionTime", 0)) / 1000
+
+def cost_usd(status: dict[str, Any], hourly_rate: float, *, warm: bool = False) -> float:
+    """What the job cost, from the time the platform reports.
+
+    `delayTime` is queue time plus, on a cold worker, its start. Only the start
+    is billed: a job sent to a worker that just ran another (`warm`) pays its
+    execution alone, and a cold one at most the longest plausible start. Counting
+    the whole delay billed 22 jobs queued on one worker as US$ 4.59 for about
+    twenty minutes of a US$ 1.75/h GPU (Demo 01, 2026-10-18).
+    """
+
+    delay = 0.0 if warm else min(float(status.get("delayTime", 0)) / 1000, MAX_BILLED_DELAY_SECONDS)
+    seconds = delay + float(status.get("executionTime", 0)) / 1000
     return seconds * hourly_rate / 3600
 
 
