@@ -302,6 +302,25 @@ project.yaml finishes every approved drawing through codex-image, with a
 The ending title is the catalog's `chrome` (the director's idea); titles now
 fit the frame (`titles.fit_to_frame`).
 
+Masters and clips, 2026-10-18. 23 masters approved by the director (SC-030 P2-P3
+are the drawings cropped to 16:9: the image tool refused the Bambi-like deer
+three times). Clips on RunPod `ltx25-i2v` (found at max 0 workers; raised to 1,
+min 0): `clips.end_on_entry` bridges every scene entered on action -- the last
+shot ends on the next scene's first master, at full strength, and the person
+must stay in frame (the first bridge lost Lia and froze its end). 24 jobs cost
+about US$ 0.55 (the ledger first said 4.59: queue wait counted as billed --
+fixed). Music: "New Horizon" by Soundrider/Dope, CC BY 3.0, over the sequence.
+The Ascent v1 assembled (96.3 s); its review found four clips to redo:
+SC-030 P3 (bridge lost Lia), SC-050 P3 (Lia slips out), SC-070 P2 (drifts to
+another girl's face), SC-070 P3 (colour drift).
+
+Product fixes from this stretch: frame check before a picture approval; a
+refused picture stops only its shot, with Try again; all approvals at once;
+`--from-drawing`; blockout "not needed"; the clips' setup shown in the strip;
+RunPod's answer in errors and a refused submission retryable; pictures sent as
+JPEG under the 10 MiB body limit; the action from the breakdown label; the
+place's sound; `.env.example`.
+
 # Frictions (work that left the tool)
 
 - Storyboard corrections, 2026-10-18: to save tokens after costly agent turns,
