@@ -144,6 +144,24 @@ measured_on = "2026-09-17"
 evidence = ["SINGULAR 1-04"]
 impact = "low"
 workaround = "Guide with a master image of the face not smiling."
+
+[[claims]]
+id = "request-body-limit"
+claim = "RunPod refuses a /run request body over 10 MiB (400, 'exceeded max body size'); three full-size PNG masters as base64 exceeded it."
+status = "measured"
+measured_on = "2026-10-18"
+evidence = ["Demo 01 SC-040 P2, a bridge with a start, a frame-zero guide and an end guide"]
+impact = "high"
+workaround = "Pictures travel as JPEG at most 1920 px (providers/ltx.py PICTURE_EDGE); the workflow resizes to 1280x720 anyway."
+
+[[claims]]
+id = "zero-max-workers"
+claim = "An endpoint scaled to 0..0 workers takes no job at all; scaling it to 0 to stop spending survives across productions."
+status = "measured"
+measured_on = "2026-10-18"
+evidence = ["Demo 01: ltx25-i2v found at max 0 after SINGULAR"]
+impact = "high"
+workaround = "Read `toast recipes --health ltx-2-5` before a batch; set max workers to at least 1 (min 0 keeps it free when idle), and back after."
 +++
 
 LTX 2.5 makes picture, speech and sound together from a starting image and a

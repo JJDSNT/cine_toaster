@@ -1256,6 +1256,8 @@ def command_recipes(args: argparse.Namespace) -> int:
         print(f"  workers {config['workers_min']}..{config['workers_max']}, idle timeout {config['idle_timeout_seconds']} s, "
               f"scaling {config['scaling']}, FlashBoot {config['flashboot']}" if config["readable"]
               else f"  configuration not readable -- {config['reason']}")
+        if config.get("readable") and config.get("workers_max") == 0:
+            print("  TAKES NO JOB: max workers is 0. Raise it to at least 1 before sending (min 0 costs nothing idle).")
         print(f"  scaling down now: {'safe' if value['scale_down']['safe'] else 'NOT safe'} ({value['scale_down']['reason']})")
         return 0
     found = recipes()

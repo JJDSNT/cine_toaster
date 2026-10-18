@@ -196,12 +196,15 @@ def batch_plan(recipe_id: str, jobs: int, *, seconds_each: float | None = None,
     state = state if state is not None else health(recipe_id)
     config = config if config is not None else endpoint_config(recipe_id)
     warm = int(state.get("warm_workers") or 0) if state.get("readable") else 0
+    stopped = bool(config.get("readable")) and config.get("workers_max") == 0
     most = int(config.get("workers_max") or 1) if config.get("readable") else 1
     idle = config.get("idle_timeout_seconds") if config.get("readable") else None
     rounds = -(-jobs // max(most, 1))
     starts_together = 0 if warm >= min(jobs, most) else min(jobs, most) - warm
     advice = [f"Send the {jobs} job(s) together: up to {most} worker(s) start once and the rest queue on warm "
               "workers." if jobs > 1 else "One job."]
+    if stopped:
+        advice.insert(0, "The endpoint TAKES NO JOB: its max workers is 0. Raise it to at least 1 first.")
     if idle is not None:
         advice.append(f"Workers stay warm {idle} s after their last job: anything sent later pays a cold start "
                       f"(about {cold:.0f} s) again.")

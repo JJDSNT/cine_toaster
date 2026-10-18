@@ -287,16 +287,33 @@ def build_request(
 
     return {
         "workflow": workflow,
-        "images": [
-            {
-                "name": name,
-                "image": MEDIA_TYPES.get(path.suffix.lower(), "data:image/png")
-                + ";base64,"
-                + base64.b64encode(path.read_bytes()).decode(),
-            }
-            for name, path in files
-        ],
+        "images": [{"name": name, "image": _data_uri(path)} for name, path in files],
     }
+
+
+#: RunPod refuses a request body over 10 MiB; three full-size PNG masters exceeded it (Demo 01).
+#: Pictures travel as JPEG no larger than this edge -- the workflow resizes them to 1280x720 anyway.
+PICTURE_EDGE = 1920
+
+
+def _data_uri(path: Path) -> str:
+    """A file as the worker receives it: pictures re-encoded small enough, anything else as it is."""
+
+    if path.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp"):
+        import io
+
+        from PIL import Image
+
+        try:
+            with Image.open(path) as image:
+                image = image.convert("RGB")
+                image.thumbnail((PICTURE_EDGE, PICTURE_EDGE))
+                buffer = io.BytesIO()
+                image.save(buffer, "JPEG", quality=92)
+            return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode()
+        except OSError:
+            pass  # not a picture PIL reads: sent as it is
+    return MEDIA_TYPES.get(path.suffix.lower(), "data:image/png") + ";base64," + base64.b64encode(path.read_bytes()).decode()
 
 
 def find_video(output: dict[str, Any]) -> str | None:

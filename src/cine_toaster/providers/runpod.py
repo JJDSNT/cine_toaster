@@ -16,7 +16,7 @@ from . import ProviderError, ProviderNotConfigured
 
 
 RUN_BASE = "https://api.runpod.ai/v2"
-TERMINAL_FAILURES = ("FAILED", "CANCELLED", "TIMED_OUT")
+TERMINAL_FAILURES = ("FAILED", "CANCELLED", "TIMED_OUT", "REFUSED")
 RETRIABLE_STATUS = {429, 500, 502, 503, 504}
 POLL_SECONDS = 5
 REQUEST_TIMEOUT = 300
@@ -63,8 +63,18 @@ def request(path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
     )
     http.add_header("Authorization", f"Bearer {_api_key()}")
     http.add_header("Content-Type", "application/json")
-    with urllib.request.urlopen(http, timeout=REQUEST_TIMEOUT) as response:
-        return json.loads(response.read())
+    try:
+        with urllib.request.urlopen(http, timeout=REQUEST_TIMEOUT) as response:
+            return json.loads(response.read())
+    except urllib.error.HTTPError as error:
+        # What RunPod said, not only its code: a 409 or a 400 is diagnosed from its body (Demo 01).
+        said = ""
+        try:
+            said = error.read().decode("utf-8", "replace")[:400]
+        except Exception:  # noqa: BLE001 -- the body is a courtesy
+            pass
+        raise ProviderError(f"RunPod answered {error.code} {error.reason} on {path.split('/')[-1] or path}"
+                            + (f": {said}" if said else ""), status=error.code) from error
 
 
 def _write_atomically(path: Path, state: dict[str, Any]) -> None:
@@ -145,7 +155,15 @@ def run_job(
         state["output_suffix"] = suffix
         state_file.parent.mkdir(parents=True, exist_ok=True)
         _write_atomically(state_file, state)
-        response = send(f"/{endpoint_id}/run", {"input": payload})
+        try:
+            response = send(f"/{endpoint_id}/run", {"input": payload})
+        except ProviderError as error:
+            # A 4xx answer means nothing was queued: record it as refused, so trying again is allowed.
+            # A timeout or a 5xx stays ambiguous (SUBMITTING) and is checked against the queue first.
+            if 400 <= int((error.details or {}).get("status") or 0) < 500:
+                state.update(status="REFUSED", error=error.message)
+                _write_atomically(state_file, state)
+            raise
         state.update(id=response["id"], status=response.get("status", "IN_QUEUE"))
         _write_atomically(state_file, state)
 

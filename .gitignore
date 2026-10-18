@@ -20,3 +20,8 @@ build/
 /frontend/node_modules/
 /src/cine_toaster/web_assets/app/
 /src/cine_toaster/web_assets/copilot/
+
+# Credentials and endpoint ids: never in the repository. `.env.example` lists what can be set.
+.env
+*.env
+!.env.example
