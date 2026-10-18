@@ -105,14 +105,18 @@ def _block_steps(scene: dict[str, Any], block_id: str) -> list[dict[str, Any]]:
 
 
 def _master_steps(scene: dict[str, Any]) -> list[dict[str, Any]]:
-    """Every master picture of a scene and its approval, and nothing paid after: no clip is generated."""
+    """Every master picture of a scene, then their approvals, and nothing paid after: no clip is generated.
 
-    steps: list[dict[str, Any]] = []
-    for master in _masters(scene, [shot["id"] for shot in scene["shots"]]):
-        steps.append({"id": f"picture-{master['id']}", "kind": "picture", "shot": master["id"],
-                      "label": f"Picture {master['number']}", "state": "pending", "seed": 1})
-        steps.append({"id": f"approve-{master['id']}", "kind": "gate", "shot": master["id"],
-                      "label": f"Approve picture {master['number']}", "state": "pending"})
+    All the pictures come first, so the director reviews the scene's pictures
+    together rather than waiting on each before the next is made (Demo 01).
+    """
+
+    masters = _masters(scene, [shot["id"] for shot in scene["shots"]])
+    steps: list[dict[str, Any]] = [
+        {"id": f"picture-{master['id']}", "kind": "picture", "shot": master["id"],
+         "label": f"Picture {master['number']}", "state": "pending", "seed": 1} for master in masters]
+    steps += [{"id": f"approve-{master['id']}", "kind": "gate", "shot": master["id"],
+               "label": f"Approve picture {master['number']}", "state": "pending"} for master in masters]
     if not steps:
         raise ValidationError(f"{scene['id']} has no shot that says how its picture is made (derive)")
     return steps

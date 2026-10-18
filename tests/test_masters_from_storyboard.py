@@ -62,6 +62,8 @@ class MastersFromStoryboardTests(unittest.TestCase):
         steps = _master_steps(scene)
         self.assertEqual({step["kind"] for step in steps}, {"picture", "gate"})
         self.assertEqual(len(steps), 2 * len([s for s in scene["shots"] if s.get("derive")]))
+        kinds = [step["kind"] for step in steps]
+        self.assertEqual(kinds, sorted(kinds, key=lambda kind: kind != "picture"))  # every picture before any gate
 
 
 if __name__ == "__main__":
