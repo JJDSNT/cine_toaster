@@ -7,6 +7,8 @@ export function InceptionReview({ data, reload, onDecision, title = "Is there en
   data: CreationState; reload: () => Promise<void>; onDecision?: (decisionId: string, attempt?: string) => void; title?: string;
 }) {
   const [sent, setSent] = useState("");
+  // A decision made here keeps the section open, so its confirmation and next step are seen (Demo 01).
+  const [decidedHere, setDecidedHere] = useState(false);
   const [editing, setEditing] = useState(false);
   const [guidance, setGuidance] = useState("");
   const [error, setError] = useState("");
@@ -17,6 +19,7 @@ export function InceptionReview({ data, reload, onDecision, title = "Is there en
     <p className="prep-help">The agent needs to assess the next steps and present a recommendation; there is no approval request yet.</p>
   </section>;
   async function decide(outcome: "approved" | "changes_requested") {
+    setDecidedHere(true);
     setBusy(true); setError("");
     try {
       const result = await request<{ decision: { id: string } }>("/api/creation/direction", { assessment: current!.id, outcome, guidance,
@@ -30,7 +33,7 @@ export function InceptionReview({ data, reload, onDecision, title = "Is there en
   const handoff = data.handoffs?.find((item) => item.decision === current.decision?.id);
   // Open only while it waits for the director; a decided request folds to one line.
   return <details id="direction-review" className="creation-readiness creation-fold" aria-label="Inception readiness"
-    open={current.status === "awaiting_decision"}>
+    open={current.status === "awaiting_decision" || decidedHere}>
     <summary className="prep-section-heading"><strong>{title}</strong><span className="prep-badge">
       {current.status === "awaiting_decision" ? "Awaiting your decision" : current.status === "approved" ? "Direction approved"
         : current.status === "changes_requested" ? "Changes requested · agent to reassess" : "Material changed · agent to reassess"}</span></summary>

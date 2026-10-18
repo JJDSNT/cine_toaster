@@ -176,7 +176,9 @@ def handoff_view(root, state=None):
         outputs = [{'id': board['id'], 'scene': board['scene'], 'shot': board['shot'],
                     'url': '/app/preproduction.html?' + urlencode({'scene': board['scene'], 'shot': board['shot'], 'candidate': board['id']})}
                    for board in boards if board.get('provenance', {}).get('handoff') == item['id']]
-        drawn = {(output['scene'], output['shot']) for output in outputs}
+        # A shot is drawn when it has any storyboard drawing: a newer request over the same sequence
+        # inherits the drawings made under the earlier one (they are versions, never discarded).
+        drawn = {(board['scene'], board['shot']) for board in boards}
         members = target_members(item['target'])
         views.append({**item, 'stale': not handoff_current(root, state, item), 'outputs': outputs,
                       # A newer request (a sequence after a scene study) supersedes it: it is history, not work.
