@@ -259,6 +259,18 @@ evidence, not proof that the upstream stage was completed.
   to what the animatic must prove. Complete the remaining six scene layouts.
   Storyboard approval and master-face choice remain open human decisions.
 
+## Storyboard pass, 2026-10-18
+
+The Ascent has 24 of 24 drawings, reviewed by the director through the
+contact sheet and animatic v3 (`renders/animatics/the-ascent-storyboard-v3.mp4`).
+Decisions on the way: SC-010's iris opens across the scene (small, medium,
+almost open -- the director's idea); an evolution ladder bounds each era's
+finish below the next; era 4 keeps the chronology as late-1950s stylised
+design with depth (option A, after "a profundidade regride"); SC-070's
+drawings were realigned to the breakdown (she stays seated; P5 is the title
+card). Open: Lia is little stylised in SC-040; an unscripted castle in
+SC-040 P2. Next: the director's storyboard approval, then Lia's master face.
+
 # Frictions (work that left the tool)
 
 - Storyboard corrections, 2026-10-18: to save tokens after costly agent turns,
