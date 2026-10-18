@@ -154,6 +154,18 @@ def plan_shot(root: Path, production: dict[str, Any], scene_id: str, shot_id: st
     return plan_block(root, production, scene_id, "", seed=seed, rate=rate, shot_id=shot_id)
 
 
+def _anchor_strength(production: dict[str, Any], scene_id: str, shot: dict[str, Any]) -> float:
+    """`clips.anchor_end`: a strength, or a map of `SC-xxx Pn` to strengths, for shots held to their own picture."""
+
+    value = (production.get("clips") or {}).get("anchor_end")
+    if isinstance(value, dict):
+        value = value.get(f"{scene_id} {shot['id']}")
+    try:
+        return float(value) if value else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
 #: How strongly a bridge's last frame is held to the next scene's first master.
 BRIDGE_STRENGTH = 1.0
 
@@ -292,6 +304,12 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
             notes.append(f"{shot_id} asks for no guide at its cut; the model finds that shot by the prompt alone.")
             continue
         guides.append(Reference(shot_id, ref, frame, _digest(ref), strength(shot_id)))
+    anchor = _anchor_strength(production, scene_id, shots[block.shots[-1]])
+    if anchor and not bridge:
+        # The shot ends held to its own picture: measured on Demo 01 (SC-070 P2), a wide hold drifted into another
+        # person's close-up twice; its own master at the last frame keeps who and where it is.
+        guides.append(Reference("anchor", references[-1], -1, _digest(references[-1]), anchor))
+        notes.append(f"Ends anchored to its own picture at strength {anchor} (clips.anchor_end).")
     if bridge:
         # Full strength: a bridge must land on the next scene's first picture (0.7 let it drift, Demo 01).
         guides.append(Reference("end", bridge["picture"], -1, _digest(bridge["picture"]), BRIDGE_STRENGTH))

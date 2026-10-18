@@ -52,6 +52,16 @@ class EntryBridgeTests(unittest.TestCase):
         if first_shot != shot:
             self.assertIsNone(entry_bridge(self.root, production, scene, first_shot))  # only the scene's last shot
 
+    def test_a_shot_can_be_anchored_to_its_own_picture_at_the_end(self):
+        from cine_toaster.generation import _anchor_strength
+
+        manifest = self.root / "project.yaml"
+        manifest.write_text(manifest.read_text() + "\nclips:\n  anchor_end: {SC-030 P1: 0.6}\n")
+        production = load_production(self.root)
+        scene = next(item for item in production["scenes"] if item["id"] == "SC-030")
+        self.assertEqual(_anchor_strength(production, "SC-030", scene["shots"][0]), 0.6)
+        self.assertEqual(_anchor_strength(production, "SC-010", scene["shots"][0]), 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
