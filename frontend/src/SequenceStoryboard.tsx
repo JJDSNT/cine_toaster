@@ -4,7 +4,21 @@ import { useEffect, useState } from "react";
 import { request } from "./creation.ts";
 import "./sequence-storyboard.css";
 
-interface Shot { scene: string; scene_title: string; shot: string; seconds: number; board: string | null; version: number | null; image_url: string }
+interface Master { gate: string; state: string; candidates: { path: string; url: string }[]; chosen: string; rationale: string }
+interface Shot { scene: string; scene_title: string; shot: string; seconds: number; board: string | null; version: number | null; image_url: string; master?: Master | null }
+
+// A person's decision on a master picture: the same application command the control room sends (SPEC-0009).
+async function decideGate(scene: string, gate: string, outcome: string, chosen: string, rationale: string) {
+  const response = await fetch("/api/commands", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ command: "decide_gate", scene_id: scene, gate_id: gate, outcome, chosen, rationale,
+      actor: { id: "director-gui", kind: "human" } }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body?.error?.message ?? `The runtime answered ${response.status}`);
+  }
+}
 interface View {
   sequences: { id: string; label: string }[]; sequence: string; shots: Shot[]; seconds: number;
   animatics: { version: number; url: string }[];
@@ -83,5 +97,66 @@ export function SequenceStoryboard({ onOpen }: { onOpen?: (scene: string, shot: 
           <span>{shot.scene} {shot.shot}{shot.version ? ` · v${shot.version}` : ""} · {shot.seconds}s</span>
         </button></li>)}
     </ol>
+    {view.shots.some((shot) => shot.master) && <MasterReview shots={view.shots} reload={() => load(view.sequence)} />}
   </details>;
+}
+
+function MasterReview({ shots, reload }: { shots: Shot[]; reload: () => Promise<void> }) {
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const withMaster = shots.filter((shot) => shot.master);
+  const approved = withMaster.filter((shot) => shot.master!.state === "approved").length;
+  const waiting = withMaster.filter((shot) => shot.master!.state === "waiting" && shot.master!.candidates.length);
+  async function act(shot: Shot, outcome: string) {
+    const master = shot.master!;
+    const chosen = master.candidates[master.candidates.length - 1]?.path ?? "";
+    let why = "";
+    if (outcome === "changes_requested") {
+      const answer = window.prompt(`${shot.scene} ${shot.shot}: what should the next version change?`);
+      if (!answer) return;
+      why = answer;
+    }
+    setBusy(shot.scene + shot.shot); setError("");
+    try { await decideGate(shot.scene, master.gate, outcome, chosen, why); await reload(); }
+    catch (reason) { setError(String(reason)); } finally { setBusy(""); }
+  }
+  async function approveAll() {
+    if (!window.confirm(`Approve the latest picture of the ${waiting.length} shots waiting?`)) return;
+    setBusy("all"); setError("");
+    try {
+      for (const shot of waiting) {
+        const master = shot.master!;
+        await decideGate(shot.scene, master.gate, "approved", master.candidates[master.candidates.length - 1].path, "");
+      }
+      await reload();
+    } catch (reason) { setError(String(reason)); } finally { setBusy(""); }
+  }
+  return <section aria-label="Master images" className="sequence-masters">
+    <h3>Master images · {approved} of {withMaster.length} approved{waiting.length ? ` · ${waiting.length} waiting for you` : ""}</h3>
+    <p className="prep-help">Each shot's approved drawing, finished. Approve it, or ask for another version and say what to change; earlier versions are kept.</p>
+    {waiting.length > 1 && <button disabled={!!busy} onClick={() => void approveAll()}>Approve every waiting picture</button>}
+    {error && <p role="alert">{error}</p>}
+    <ol className="sequence-master-grid">
+      {withMaster.map((shot) => {
+        const master = shot.master!;
+        const latest = master.candidates[master.candidates.length - 1];
+        const chosen = master.candidates.find((item) => item.path === master.chosen) ?? latest;
+        return <li key={`${shot.scene}-${shot.shot}`} className={`master-${master.state}`}>
+          <strong>{shot.scene} {shot.shot}</strong> · {master.state === "waiting" ? (latest ? "waiting for you" : "being made")
+            : master.state === "approved" ? "approved" : master.state.replace("_", " ")}
+          <div className="master-pair">
+            {shot.image_url && <img loading="lazy" src={encodeURI(shot.image_url)} alt={`${shot.scene} ${shot.shot} drawing`} title="The approved drawing" />}
+            {(master.state === "approved" ? chosen : latest)
+              ? <a href={encodeURI((master.state === "approved" ? chosen : latest)!.url)} target="_blank" rel="noreferrer">
+                  <img loading="lazy" src={encodeURI((master.state === "approved" ? chosen : latest)!.url)} alt={`${shot.scene} ${shot.shot} master`} /></a>
+              : <span className="sequence-missing">not made yet</span>}
+          </div>
+          {master.candidates.length > 1 && <small>{master.candidates.length} versions</small>}
+          {master.state === "waiting" && latest && <div className="master-actions">
+            <button disabled={!!busy} onClick={() => void act(shot, "approved")}>Approve</button>
+            <button disabled={!!busy} onClick={() => void act(shot, "changes_requested")}>Ask for another</button></div>}
+        </li>;
+      })}
+    </ol>
+  </section>;
 }

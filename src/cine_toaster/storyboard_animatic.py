@@ -119,11 +119,25 @@ def sequence_view(root: Path, sequence: str = "") -> dict[str, Any]:
     from .workflows import phase
     scenes = {item["id"]: item for item in production["scenes"]}
     phases = {}
+    masters: dict[tuple[str, str], dict] = {}
     for scene_id in dict.fromkeys(shot["scene"] for shot in shots):
-        found = phase(root, scenes[scene_id], load_scene_state(scene_directory(root, scene_id), scene_id).gates)
+        scene_state = load_scene_state(scene_directory(root, scene_id), scene_id)
+        gates = scene_state.gates
+        cancelled = {run_id for run_id, run in scene_state.workflows.items() if run.get("state") == "cancelled"}
+        # The latest master-picture question per shot: waiting, or what was decided. A question closed
+        # because its run was cancelled was never answered by anyone, so it is not shown as a verdict.
+        for gate_id, gate in sorted(gates.items(), key=lambda item: item[1].get("requested_at", "")):
+            if gate.get("kind") == "approve_picture" and not (gate.get("workflow") in cancelled
+                                                               and gate.get("state") == "rejected"):
+                masters[(scene_id, str(gate.get("subject", "")))] = {
+                    "gate": gate_id, "state": gate.get("state", ""), "revision_scene": scene_id,
+                    "candidates": [{"path": path, "url": "/media/" + path} for path in gate.get("candidates") or []],
+                    "chosen": gate.get("chosen", ""), "rationale": gate.get("rationale", "")}
+        found = phase(root, scenes[scene_id], gates)
         phases[scene_id] = {"phase": found["phase"], "changed_since": found.get("changed_since", False),
                             "since": found.get("since", "")}
     for shot in shots:
+        shot["master"] = masters.get((shot["scene"], shot["shot"]))
         shot["image_url"] = ("/media/" + str(Path(shot["image"]).relative_to(root))) if shot["image"] else ""
         shot.pop("image", None)
     folder = root / "renders" / "animatics"

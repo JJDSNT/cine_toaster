@@ -12,3 +12,11 @@
 
 .sequence-approval { margin: 0.75rem 0; padding: 0.6rem 0.8rem; border: 1px solid var(--line, #ccc4); border-radius: 6px; }
 .sequence-approval p { margin: 0.2rem 0; }
+
+.sequence-masters { margin-top: 1rem; }
+.sequence-master-grid { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0.75rem; }
+.sequence-master-grid li { border: 1px solid var(--line, #ccc4); border-radius: 6px; padding: 0.5rem; }
+.sequence-master-grid li.master-approved { border-color: #3a8f5a; }
+.master-pair { display: grid; grid-template-columns: 1fr 2fr; gap: 0.4rem; align-items: center; margin: 0.4rem 0; }
+.master-pair img { width: 100%; height: auto; display: block; border-radius: 3px; }
+.master-actions { display: flex; gap: 0.4rem; }
