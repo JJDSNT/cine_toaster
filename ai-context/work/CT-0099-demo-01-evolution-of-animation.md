@@ -325,6 +325,21 @@ flicker, trunk, leaves, spray, mist, sun glare), artefacts trimmed at points
 measured on brightness and saturation, SC-050 regenerated. v7 (92 s): "está
 quase". Learnings in knowledge/providers/ltx-2.5.md and the roadmap.
 
+Delivered 2026-10-18 as v9: `sequences/the-ascent/versions/v9.instagram.mp4`
+(9:16, 720x1280) and `v9.youtube.mp4` (16:9, 1280x720), both -14 LUFS.
+
+Left open, outside the repository:
+- RunPod endpoint `ltx25-i2v` was found at max 0 workers and left at 0..1
+  (min 0, so idle costs nothing); set it back to 0 if the account should
+  take no jobs.
+- The endpoint's configuration carries a Hugging Face token in plain text
+  (its env, visible to any API read): rotate it and keep it as a RunPod
+  secret.
+- Credentials for this work came from `~/confyui/.env` (read only; no
+  SINGULAR tool run).
+- The film repository (~/films/demo-01) has no remote: its media and history
+  live only on this machine (roadmap: where a demo film lives).
+
 Product fixes from this stretch: frame check before a picture approval; a
 refused picture stops only its shot, with Try again; all approvals at once;
 `--from-drawing`; blockout "not needed"; the clips' setup shown in the strip;
