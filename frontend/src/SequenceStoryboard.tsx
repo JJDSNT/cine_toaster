@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { request } from "./creation.ts";
 import "./sequence-storyboard.css";
 
-interface Master { gate: string; state: string; candidates: { path: string; url: string }[]; chosen: string; rationale: string }
+interface Candidate { path: string; url: string; size?: string; ratio?: number; frame_ok?: boolean }
+interface Master { gate: string; state: string; candidates: Candidate[]; chosen: string; rationale: string; decided_by?: string; findings?: string[] }
 interface Shot { scene: string; scene_title: string; shot: string; seconds: number; board: string | null; version: number | null; image_url: string; master?: Master | null }
 
 // A person's decision on a master picture: the same application command the control room sends (SPEC-0009).
@@ -106,7 +107,9 @@ function MasterReview({ shots, reload }: { shots: Shot[]; reload: () => Promise<
   const [error, setError] = useState("");
   const withMaster = shots.filter((shot) => shot.master);
   const approved = withMaster.filter((shot) => shot.master!.state === "approved").length;
-  const waiting = withMaster.filter((shot) => shot.master!.state === "waiting" && shot.master!.candidates.length);
+  const waiting = withMaster.filter((shot) => shot.master!.state === "waiting" && shot.master!.candidates.length
+    && shot.master!.candidates[shot.master!.candidates.length - 1].frame_ok !== false);
+  const failed = withMaster.filter((shot) => shot.master!.state === "failed").length;
   async function act(shot: Shot, outcome: string) {
     const master = shot.master!;
     const chosen = master.candidates[master.candidates.length - 1]?.path ?? "";
@@ -120,6 +123,22 @@ function MasterReview({ shots, reload }: { shots: Shot[]; reload: () => Promise<
     try { await decideGate(shot.scene, master.gate, outcome, chosen, why); await reload(); }
     catch (reason) { setError(String(reason)); } finally { setBusy(""); }
   }
+  async function retry(shot: Shot) {
+    setBusy(shot.scene + shot.shot); setError("");
+    try {
+      // A new masters run for the scene: every picture already made is kept, only the missing ones are made.
+      const response = await fetch("/api/commands", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: "start_workflow", scene_id: shot.scene, template: "masters",
+          actor: { id: "director-gui", kind: "human" } }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body?.error?.message ?? `The runtime answered ${response.status}`);
+      }
+      await reload();
+    } catch (reason) { setError(String(reason)); } finally { setBusy(""); }
+  }
   async function approveAll() {
     if (!window.confirm(`Approve the latest picture of the ${waiting.length} shots waiting?`)) return;
     setBusy("all"); setError("");
@@ -132,9 +151,10 @@ function MasterReview({ shots, reload }: { shots: Shot[]; reload: () => Promise<
     } catch (reason) { setError(String(reason)); } finally { setBusy(""); }
   }
   return <section aria-label="Master images" className="sequence-masters">
-    <h3>Master images · {approved} of {withMaster.length} approved{waiting.length ? ` · ${waiting.length} waiting for you` : ""}</h3>
+    <h3>Master images · {approved} of {withMaster.length} approved{waiting.length ? ` · ${waiting.length} waiting for you` : ""}
+      {failed ? ` · ${failed} refused by the generator` : ""}</h3>
     <p className="prep-help">Each shot's approved drawing, finished. Approve it, or ask for another version and say what to change; earlier versions are kept.</p>
-    {waiting.length > 1 && <button disabled={!!busy} onClick={() => void approveAll()}>Approve every waiting picture</button>}
+    {waiting.length > 1 && <button disabled={!!busy} onClick={() => void approveAll()}>Approve every waiting picture in the film's frame ({waiting.length})</button>}
     {error && <p role="alert">{error}</p>}
     <ol className="sequence-master-grid">
       {withMaster.map((shot) => {
@@ -143,7 +163,9 @@ function MasterReview({ shots, reload }: { shots: Shot[]; reload: () => Promise<
         const chosen = master.candidates.find((item) => item.path === master.chosen) ?? latest;
         return <li key={`${shot.scene}-${shot.shot}`} className={`master-${master.state}`}>
           <strong>{shot.scene} {shot.shot}</strong> · {master.state === "waiting" ? (latest ? "waiting for you" : "being made")
-            : master.state === "approved" ? "approved" : master.state.replace("_", " ")}
+            : master.state === "approved" ? "approved" : master.state === "failed" ? "NOT MADE: the generator refused"
+            : master.state === "making" ? (master.decided_by === "system" ? "being made again (wrong frame)" : "being made")
+            : master.state.replace("_", " ")}
           <div className="master-pair">
             {shot.image_url && <img loading="lazy" src={encodeURI(shot.image_url)} alt={`${shot.scene} ${shot.shot} drawing`} title="The approved drawing" />}
             {(master.state === "approved" ? chosen : latest)
@@ -151,7 +173,17 @@ function MasterReview({ shots, reload }: { shots: Shot[]; reload: () => Promise<
                   <img loading="lazy" src={encodeURI((master.state === "approved" ? chosen : latest)!.url)} alt={`${shot.scene} ${shot.shot} master`} /></a>
               : <span className="sequence-missing">not made yet</span>}
           </div>
-          {master.candidates.length > 1 && <small>{master.candidates.length} versions</small>}
+          {(() => { const shown = master.state === "approved" ? chosen : latest;
+            return shown?.size ? <small className={shown.frame_ok ? "frame-ok" : "frame-off"}>
+              {shown.size} · {shown.ratio}:1 {shown.frame_ok ? "· the film's frame" : "· NOT the film's frame"}</small> : null; })()}
+          {master.candidates.length > 1 && <small> · {master.candidates.length} versions</small>}
+          {master.state === "changes_requested" && master.decided_by === "system" &&
+            <p className="prep-help">Being made again by the system: {master.rationale}</p>}
+          {master.findings?.map((item, index) => <p key={index} className="prep-notice">{item}</p>)}
+          {master.state === "failed" && <>
+            <p className="prep-notice">{master.rationale}</p>
+            <div className="master-actions"><button disabled={!!busy} onClick={() => void retry(shot)}>Try again</button></div></>}
+          {master.state === "making" && master.rationale && <p className="prep-help">{master.rationale}</p>}
           {master.state === "waiting" && latest && <div className="master-actions">
             <button disabled={!!busy} onClick={() => void act(shot, "approved")}>Approve</button>
             <button disabled={!!busy} onClick={() => void act(shot, "changes_requested")}>Ask for another</button></div>}

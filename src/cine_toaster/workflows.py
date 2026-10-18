@@ -25,7 +25,9 @@ GATE_OUTCOMES = ("approved", "changes_requested", "rejected")
 #: What can be wrong with a master picture: a closed list, so refusals can be
 #: counted and compared across scenes, models and prompts later. Free text
 #: says the rest.
-REJECTION_REASONS = ("subject_moved", "identity", "geometry", "light", "detail_lost", "anatomy", "other")
+REJECTION_REASONS = ("subject_moved", "identity", "geometry", "light", "detail_lost", "anatomy", "frame", "other")
+#: How many times a picture off the film's frame is made again before a person is asked anyway.
+FRAME_RETRIES = 2
 FINISHED_RUN = ("done", "failed", "cancelled")
 FINISHED_STEP = ("done", "skipped")
 
@@ -184,13 +186,23 @@ def start_workflow(root: Path, *, scene_id: str, block_id: str, actor: Actor, te
             raise ValidationError(f"{what} already has a workflow in progress ({active[0]['id']})")
         run_id = "wf_" + uuid.uuid4().hex[:12]
         stamp = now()
+        gates = dict(state.gates)
+        if template == "masters":
+            # A question left open by an earlier masters run that stopped is asked again by this one.
+            stopped = {rid for rid, item in state.workflows.items() if item.get("template") == "masters"
+                       and item.get("state") in FINISHED_RUN}
+            for gate_id, gate in state.gates.items():
+                if gate.get("state") == "waiting" and gate.get("workflow") in stopped:
+                    gates[gate_id] = {**gate, "state": "withdrawn", "decided_at": stamp,
+                                      "decided_by": {"id": "workflow", "kind": "system"},
+                                      "rationale": f"Asked again by the masters run {run_id}"}
         run = {"id": run_id, "template": template, "subject": subject,
                "state": "running", "steps": steps, "created_at": stamp, "updated_at": stamp,
                "started_by": actor.public_dict()}
         record = {"kind": "workflow.started", "workflow": run_id, "block": subject["block"], "shot": shot_id,
                   "actor": actor.public_dict(),
                   "decided_at": stamp, "command_id": command_id, "rationale": ""}
-        committed = state.with_decision(decision=record, workflows={**state.workflows, run_id: run})
+        committed = state.with_decision(decision=record, workflows={**state.workflows, run_id: run}, gates=gates)
         write_scene_state(directory, committed)
     event = append_event(root, Event.create("workflow.started", production["id"], scene_id=scene_id,
                                             workflow=run_id, block=subject["block"], shot=shot_id,
@@ -395,13 +407,23 @@ def advance(root: Path, scene_id: str, run_id: str) -> dict[str, Any]:
             run = {**run, "steps": [dict(step) for step in run["steps"]]}
             if run["state"] in FINISHED_RUN:
                 return run
-            step = next((item for item in run["steps"] if item["state"] not in FINISHED_STEP), None)
+            masters = run.get("template") == "masters"
+            refused = {item["shot"] for item in run["steps"] if masters and item["kind"] == "picture"
+                       and item["state"] == "failed"}
+            # In a masters run a refused picture stops only its own shot (its approval waits for a new run).
+            step = next((item for item in run["steps"] if item["state"] not in FINISHED_STEP
+                         and not (masters and item["shot"] in refused)), None)
             if step is None:
                 run["state"] = "done"
                 _save(root, scene_id, directory, state, run)
                 append_event(root, Event.create("workflow.done", production["id"], scene_id=scene_id, workflow=run_id))
                 return run
             moved = _STEPS[step["kind"]](root, production, scene, state, run, step, directory)
+            if masters and step["kind"] == "picture" and step["state"] == "failed":
+                state = load_scene_state(directory, scene_id)
+                kept = {**state.workflows[run_id], "state": "running"}
+                _save(root, scene_id, directory, state, kept)
+                continue
             if not moved:
                 if run.get("template") == "masters" and run["state"] not in FINISHED_RUN:
                     run = _all_gates(root, scene_id, run_id, directory)
@@ -526,11 +548,23 @@ def _gate_step(root, production, scene, state, run, step, directory) -> bool:
             return True
         shot = next(item for item in scene["shots"] if item["id"] == step["shot"])
         work = work_directory_for(root / scene["file"])
-        candidates = [relative(root, path) for path in picture_versions(work, picture_stem(work, str(shot["number"])))]
+        versions = picture_versions(work, picture_stem(work, str(shot["number"])))
+        candidates = [relative(root, path) for path in versions]
+        # A picture off the film's frame is a technical fault, not a question for the director (Demo 01):
+        # it is made again, saying why, before anyone is asked.
+        problem = _frame_problem(production, versions[-1]) if versions and run.get("template") == "masters" else ""
+        picture = next((item for item in run["steps"] if item["id"] == f"picture-{step['shot']}"), None)
+        if problem and picture is not None and int(picture.get("frame_retries", 0)) < FRAME_RETRIES:
+            _again_for_frame(picture, problem)
+            run["state"] = "running"
+            _save(root, scene["id"], directory, state, run)
+            _notify(root, production["id"], scene["id"], run, picture)
+            return True
         gate_id = "gate_" + uuid.uuid4().hex[:12]
         gate = {"id": gate_id, "kind": "approve_picture", "subject": step["shot"], "workflow": run["id"],
                 "step": step["id"], "state": "waiting", "candidates": candidates, "chosen": "",
-                "requested_at": now(), "requested_by": {"id": "workflow", "kind": "system"}}
+                "requested_at": now(), "requested_by": {"id": "workflow", "kind": "system"},
+                **({"findings": [problem + f" after {FRAME_RETRIES} more tries"]} if problem else {})}
         step["state"], step["gate"] = "waiting", gate_id
         run["state"] = "waiting"
         _save(root, scene["id"], directory, state, run, gates={**state.gates, gate_id: gate})
@@ -538,6 +572,17 @@ def _gate_step(root, production, scene, state, run, step, directory) -> bool:
                                         shot_id=step["shot"], workflow=run["id"]))
         return False
     gate = state.gates.get(step.get("gate", ""), {})
+    gates = None
+    if gate.get("state") == "waiting" and run.get("template") == "masters":
+        # A question opened before the frame was checked: the system withdraws it the same way.
+        picture = next((item for item in run["steps"] if item["id"] == f"picture-{step['shot']}"), None)
+        latest = root / gate["candidates"][-1] if gate.get("candidates") else None
+        problem = _frame_problem(production, latest) if latest else ""
+        if problem and picture is not None and int(picture.get("frame_retries", 0)) < FRAME_RETRIES:
+            gate = {**gate, "state": "changes_requested", "decided_at": now(),
+                    "decided_by": {"id": "workflow", "kind": "system"}, "rationale": problem, "reasons": ["frame"]}
+            gates = {**state.gates, gate["id"]: gate}
+            picture["frame_retries"] = int(picture.get("frame_retries", 0)) + 1
     if gate.get("state") in (None, "waiting"):
         return False
     if gate["state"] == "approved":
@@ -555,9 +600,33 @@ def _gate_step(root, production, scene, state, run, step, directory) -> bool:
     else:
         step["state"], step["note"] = "failed", "rejected"
         run["state"] = "cancelled"
-    _save(root, scene["id"], directory, state, run)
+    _save(root, scene["id"], directory, state, run, gates=gates)
     _notify(root, production["id"], scene["id"], run, step)
     return run["state"] == "running"
+
+
+def _frame_problem(production: dict[str, Any], path: Path | None) -> str:
+    """What is wrong with a picture's proportions for this film, or "" (the film's frame, else 16:9)."""
+
+    if path is None or not Path(path).is_file():
+        return ""
+    from PIL import Image
+
+    frame = production.get("frame") or {}
+    target = (frame["width"] / frame["height"]) if frame.get("width") and frame.get("height") else 16 / 9
+    with Image.open(path) as image:
+        width, height = image.size
+    ratio = width / height
+    if abs(ratio - target) / target <= 0.02:
+        return ""
+    return (f"The picture is {width}x{height} ({ratio:.2f}:1); the film's frame is {target:.2f}:1. Recompose it to "
+            "exactly that frame, extending the scene at its edges rather than cropping or squeezing its subject.")
+
+
+def _again_for_frame(picture: dict[str, Any], problem: str) -> None:
+    picture.update(state="pending", again=True, seed=int(picture.get("seed", 1)) + 1, job=None, note=problem,
+                   feedback={"reasons": ["frame"], "text": problem},
+                   frame_retries=int(picture.get("frame_retries", 0)) + 1)
 
 
 def _generated_clip(run: dict[str, Any]) -> str:

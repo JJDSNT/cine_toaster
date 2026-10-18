@@ -94,6 +94,36 @@ class MastersFromStoryboardTests(unittest.TestCase):
         self.assertEqual(states[-1], "done")
         self.assertEqual(states[0], "waiting")
 
+    def test_a_picture_off_the_films_frame_is_made_again_before_anyone_is_asked(self):
+        from cine_toaster.project import scene_directory
+        from cine_toaster.state import load_scene_state
+        from cine_toaster.takes import work_directory_for
+        from cine_toaster.workflows import _frame_problem, start_workflow
+
+        production = load_production(self.root)
+        scene = next(item for item in production["scenes"] if item["id"] == "SC-030")
+        shots = [shot for shot in scene["shots"] if shot.get("derive")]
+        work = work_directory_for(self.root / scene["file"])
+        work.mkdir(parents=True, exist_ok=True)
+        wide = work / f"p{int(shots[0]['number']):02d}.png"
+        Image.new("RGB", (200, 100), "white").save(wide)  # 2:1, not 16:9
+        for shot in shots[1:]:
+            Image.new("RGB", (160, 90), "white").save(work / f"p{int(shot['number']):02d}.png")
+        self.assertIn("16:9" if False else "1.78:1", _frame_problem(production, wide))
+        self.assertEqual(_frame_problem(production, work / f"p{int(shots[1]['number']):02d}.png"), "")
+        start_workflow(self.root, scene_id="SC-030", block_id="", template="masters",
+                       actor=Actor(id="claude-code", kind="agent"))
+        run = next(iter(load_scene_state(scene_directory(self.root, "SC-030"), "SC-030").workflows.values()))
+        picture = next(step for step in run["steps"] if step["id"] == f"picture-{shots[0]['id']}")
+        self.assertEqual(picture["feedback"]["reasons"], ["frame"])
+        self.assertEqual(picture["frame_retries"], 1)
+        gate = next(step for step in run["steps"] if step["id"] == f"approve-{shots[0]['id']}")
+        self.assertNotEqual(gate["state"], "waiting")  # the director was not asked about the wide picture
+        # Here no runtime can make it again, so that picture fails -- and only that shot stops:
+        others = [step for step in run["steps"] if step["kind"] == "gate" and step["shot"] != shots[0]["id"]]
+        self.assertEqual({step["state"] for step in others}, {"waiting"})
+        self.assertNotEqual(run["state"], "failed")
+
 
 if __name__ == "__main__":
     unittest.main()

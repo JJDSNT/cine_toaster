@@ -222,6 +222,7 @@ CORRECTIONS = {
     "light": "Keep the light of image 1: its direction, its warmth and its darkness.",
     "detail_lost": "Keep every small detail of image 1: props, tubes, cables, hands.",
     "anatomy": "Anatomy must be right: hands, fingers, eyes and limbs.",
+    "frame": "The picture must be exactly the film's frame: widescreen, filling it edge to edge.",
 }
 
 

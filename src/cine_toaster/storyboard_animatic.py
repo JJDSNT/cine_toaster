@@ -104,6 +104,22 @@ def render(root: Path, sequence: str) -> dict[str, Any]:
             "undeclared_durations": [f"{shot['scene']} {shot['shot']}" for shot in shots if not shot["declared"]]}
 
 
+def _frame(production: dict[str, Any], path: Path) -> dict[str, Any]:
+    """A picture's size and whether it fits the film's frame, shown beside it so nobody approves blind."""
+
+    from .workflows import _frame_problem
+
+    try:
+        from PIL import Image
+
+        with Image.open(path) as image:
+            width, height = image.size
+    except OSError:
+        return {}
+    return {"size": f"{width}x{height}", "ratio": round(width / height, 2),
+            "frame_ok": not _frame_problem(production, path)}
+
+
 def sequence_view(root: Path, sequence: str = "") -> dict[str, Any]:
     """What the storyboard page shows of a sequence: its shots in order, as a contact sheet, and its animatics."""
 
@@ -127,12 +143,34 @@ def sequence_view(root: Path, sequence: str = "") -> dict[str, Any]:
         # The latest master-picture question per shot: waiting, or what was decided. A question closed
         # because its run was cancelled was never answered by anyone, so it is not shown as a verdict.
         for gate_id, gate in sorted(gates.items(), key=lambda item: item[1].get("requested_at", "")):
-            if gate.get("kind") == "approve_picture" and not (gate.get("workflow") in cancelled
-                                                               and gate.get("state") == "rejected"):
+            if gate.get("kind") == "approve_picture" and gate.get("state") != "withdrawn" and not (
+                    gate.get("workflow") in cancelled and gate.get("state") == "rejected"):
                 masters[(scene_id, str(gate.get("subject", "")))] = {
                     "gate": gate_id, "state": gate.get("state", ""), "revision_scene": scene_id,
-                    "candidates": [{"path": path, "url": "/media/" + path} for path in gate.get("candidates") or []],
-                    "chosen": gate.get("chosen", ""), "rationale": gate.get("rationale", "")}
+                    "candidates": [{"path": path, "url": "/media/" + path, **_frame(production, root / path)}
+                                   for path in gate.get("candidates") or []],
+                    "chosen": gate.get("chosen", ""), "rationale": gate.get("rationale", ""),
+                    "decided_by": (gate.get("decided_by") or {}).get("kind", ""),
+                    "findings": list(gate.get("findings") or [])}
+        # Where no question is open, what the latest masters run says of the shot's picture: being made,
+        # or refused -- a failure is shown, never left as an empty slot (the director, Demo 01).
+        runs = sorted((run for run in scene_state.workflows.values() if run.get("template") == "masters"),
+                      key=lambda run: run.get("created_at", ""))
+        for run in runs:
+            for step in run["steps"]:
+                if step["kind"] != "picture":
+                    continue
+                key = (scene_id, step["shot"])
+                current = masters.get(key)
+                if current and current["state"] in ("waiting", "approved"):
+                    continue
+                if step["state"] == "failed":
+                    masters[key] = {"gate": "", "state": "failed", "candidates": [], "chosen": "",
+                                    "rationale": step.get("note", ""), "findings": [], "run": run["id"]}
+                elif step["state"] in ("pending", "running") and run.get("state") not in ("failed", "cancelled"):
+                    masters[key] = {"gate": "", "state": "making", "candidates": (current or {}).get("candidates", []),
+                                    "chosen": "", "rationale": step.get("note", ""), "findings": [], "run": run["id"],
+                                    "decided_by": "system" if (step.get("feedback") or {}).get("reasons") == ["frame"] else ""}
         found = phase(root, scenes[scene_id], gates)
         phases[scene_id] = {"phase": found["phase"], "changed_since": found.get("changed_since", False),
                             "since": found.get("since", "")}

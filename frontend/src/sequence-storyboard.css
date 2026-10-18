@@ -20,3 +20,5 @@
 .master-pair { display: grid; grid-template-columns: 1fr 2fr; gap: 0.4rem; align-items: center; margin: 0.4rem 0; }
 .master-pair img { width: 100%; height: auto; display: block; border-radius: 3px; }
 .master-actions { display: flex; gap: 0.4rem; }
+.frame-off { color: #c0392b; font-weight: 600; }
+.frame-ok { opacity: 0.75; }
