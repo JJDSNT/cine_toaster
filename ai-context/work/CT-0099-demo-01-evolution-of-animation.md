@@ -292,6 +292,16 @@ now carries step 7 of 7; animatic v5. Lia's master face: none, by decision
 (left to Claude Code) -- her identity is her description, age variants and
 the age references, recorded in her cast sheet.
 
+Cut review left to Claude Code (2026-10-18): SC-050 P2-P4 were near-duplicates
+off the breakdown and, at the director's word, settled as four shots (impact;
+propped on the lip, laughing; rolling over the edge), with P2-P3 mirrored for
+screen direction; SC-060 P1 continues the pull (its declared match on action);
+animatic v8. Masters: `pictures.derive {from: storyboard, request}` in
+project.yaml finishes every approved drawing through codex-image, with a
+`masters` workflow per scene (pictures and their approval gates, no video).
+The ending title is the catalog's `chrome` (the director's idea); titles now
+fit the frame (`titles.fit_to_frame`).
+
 # Frictions (work that left the tool)
 
 - Storyboard corrections, 2026-10-18: to save tokens after costly agent turns,

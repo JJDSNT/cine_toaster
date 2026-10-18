@@ -735,7 +735,8 @@ def command_workflow(args: argparse.Namespace) -> int:
             before = set(load_scene_state(scene_directory(root, args.scene), args.scene).workflows)
             scene = next(item for item in load_production(root)["scenes"] if item["id"] == args.scene)
             blocks = {block["id"] for block in scene.get("blocks") or []}
-            target = {"block": args.block} if args.block in blocks else {"shot": args.block}
+            target = ({"template": "masters"} if args.block == "masters" else
+                      {"block": args.block} if args.block in blocks else {"shot": args.block})
             dispatch(root, "start_workflow", {"scene_id": args.scene, **target, "actor": actor})
             after = load_scene_state(scene_directory(root, args.scene), args.scene).workflows
             return next(run_id for run_id in after if run_id not in before)
@@ -2872,7 +2873,8 @@ def build_parser() -> argparse.ArgumentParser:
     workflow_start = workflow_sub.add_parser("start", help="Start the workflow for a generation block")
     workflow_start.add_argument("project", type=Path)
     workflow_start.add_argument("scene")
-    workflow_start.add_argument("block", help="a generation block's id, or a shot outside any block (e.g. P7)")
+    workflow_start.add_argument("block", help="a generation block's id, a shot outside any block (e.g. P7), "
+                                "or `masters`: every master picture of the scene and its approval, no video")
     workflow_list = workflow_sub.add_parser("list", help="Every run, with its steps")
     workflow_list.add_argument("project", type=Path)
     workflow_list.add_argument("scene", nargs="?")

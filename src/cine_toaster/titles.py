@@ -227,10 +227,48 @@ def title_graph(title: dict[str, Any], duration: float, *, width: int = 1280, he
         raise ValidationError(f"The title {title['id']!r} needs {title['engine']}: {missing}")
     width, height = width // 2 * 2, height // 2 * 2
     font = font_file(title["params"], root)
-    params = {**title["params"], "font": font}
+    params = fit_to_frame({**title["params"], "font": font}, width / height)
     prepared = ({"_clip": _blender_clip(title, duration, width, height, font, run)}
                 if title["engine"] == "blender" else {})
     return graph_for({**title, "params": params, "prepared": prepared}, duration, fps)
+
+
+#: How much of the frame's width a title's longest line may take (the title-safe area, with room for rims).
+SAFE_WIDTH = 0.86
+
+
+def fit_to_frame(params: dict[str, Any], aspect: float = 16 / 9) -> dict[str, Any]:
+    """The title's size, made smaller when its longest line would run off the frame (Demo 01, 2026-10-18).
+
+    A catalog size is chosen for a word or two; a sentence at that size left
+    the frame on both sides. The line is measured in its own font; a style's
+    slant adds its lean. The size never grows, and the change is kept as
+    `fitted_from` so the record says the title was fitted.
+    """
+
+    from PIL import ImageFont
+
+    from .compositing.title_graphs import FRAME_LINES, _maybe_spaced
+
+    size = params.get("size")
+    font = str(params.get("font") or "")
+    if not isinstance(size, (int, float)) or size <= 0 or not font:
+        return params
+    lines = [line for line in _maybe_spaced(params).split("\n") if line.strip()]
+    if not lines:
+        return params
+    try:
+        measure = ImageFont.truetype(font, 100)
+    except OSError:
+        return params
+    widest = max(measure.getlength(line) for line in lines) / 100.0  # in sizes
+    slant = float(((params.get("style") or {}).get("slant") or 0.0)) if isinstance(params.get("style"), dict) else 0.0
+    lean = abs(__import__("math").tan(__import__("math").radians(slant)))
+    room = SAFE_WIDTH * FRAME_LINES * aspect
+    needed = widest * float(size) + lean * float(size)
+    if needed <= room:
+        return params
+    return {**params, "size": round(float(size) * room / needed, 1), "fitted_from": size}
 
 
 def card_picture(title: dict[str, Any], width: int, height: int):

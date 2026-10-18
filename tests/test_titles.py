@@ -139,5 +139,24 @@ class AssemblyTests(unittest.TestCase):
         self.assertIn("title_unknown", codes)
 
 
+class FitToFrameTests(unittest.TestCase):
+    """A catalog size chosen for a word must not push a sentence off the frame (Demo 01, 2026-10-18)."""
+
+    def test_a_long_line_is_made_smaller_and_a_short_one_is_left_alone(self):
+        from cine_toaster.titles import SAFE_WIDTH, fit_to_frame, font_file
+
+        font = font_file({})
+        if not font:
+            self.skipTest("no system font")
+        long = fit_to_frame({"text": "SOMETHING NEW IS COMING", "size": 96, "font": font,
+                             "style": {"slant": 10.0}})
+        self.assertLess(long["size"], 96)
+        self.assertEqual(long["fitted_from"], 96)
+        short = fit_to_frame({"text": "END", "size": 96, "font": font})
+        self.assertEqual(short["size"], 96)
+        self.assertNotIn("fitted_from", short)
+        self.assertLess(SAFE_WIDTH, 1.0)
+
+
 if __name__ == "__main__":
     unittest.main()

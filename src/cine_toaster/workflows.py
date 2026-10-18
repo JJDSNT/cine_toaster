@@ -20,7 +20,7 @@ from .events import Event, append_event
 from .project import load_production, scene_directory
 from .state import Actor, load_scene_state, now, scene_lock, with_progress, write_scene_state
 
-TEMPLATES = ("block", "shot")
+TEMPLATES = ("block", "shot", "masters")
 GATE_OUTCOMES = ("approved", "changes_requested", "rejected")
 #: What can be wrong with a master picture: a closed list, so refusals can be
 #: counted and compared across scenes, models and prompts later. Free text
@@ -104,6 +104,20 @@ def _block_steps(scene: dict[str, Any], block_id: str) -> list[dict[str, Any]]:
     return steps
 
 
+def _master_steps(scene: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every master picture of a scene and its approval, and nothing paid after: no clip is generated."""
+
+    steps: list[dict[str, Any]] = []
+    for master in _masters(scene, [shot["id"] for shot in scene["shots"]]):
+        steps.append({"id": f"picture-{master['id']}", "kind": "picture", "shot": master["id"],
+                      "label": f"Picture {master['number']}", "state": "pending", "seed": 1})
+        steps.append({"id": f"approve-{master['id']}", "kind": "gate", "shot": master["id"],
+                      "label": f"Approve picture {master['number']}", "state": "pending"})
+    if not steps:
+        raise ValidationError(f"{scene['id']} has no shot that says how its picture is made (derive)")
+    return steps
+
+
 # --- commands -----------------------------------------------------------------------
 
 
@@ -147,7 +161,10 @@ def start_workflow(root: Path, *, scene_id: str, block_id: str, actor: Actor, te
     if template not in TEMPLATES:
         raise ValidationError(f"Unknown workflow template {template!r}", available=list(TEMPLATES))
     production, scene = _scene(root, scene_id)
-    steps = _shot_steps(scene, shot_id) if template == "shot" else _block_steps(scene, block_id)
+    steps = (_shot_steps(scene, shot_id) if template == "shot" else _master_steps(scene) if template == "masters"
+             else _block_steps(scene, block_id))
+    if template == "masters":
+        block_id = "masters"  # the run's subject: one masters run per scene at a time
     directory = scene_directory(root, scene_id)
     _check_writable(directory, scene_id)
     command_id = _new_command_id()

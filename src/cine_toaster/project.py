@@ -288,6 +288,29 @@ def _lineage(raw: dict[str, Any]) -> list[dict[str, Any]]:
     return entries
 
 
+def _inherit_derive(production_pictures: Any, scenes: list[dict[str, Any]]) -> None:
+    """A film-wide way to make its master pictures: `pictures: {derive: {from, request}}` (Demo 01).
+
+    A shot that declares no `derive` takes the scene's `pictures.derive`, else
+    the production's, with its own breakdown label appended to the request, so
+    every shot is finished the same way without rewriting each breakdown. A
+    title or composed shot makes no picture. The level it came from is kept.
+    """
+
+    for scene in scenes:
+        for level, pictures in (("scene", scene.get("pictures")), ("production", production_pictures)):
+            default = _derive((pictures or {}).get("derive")) if isinstance(pictures, dict) else None
+            if default and default.get("from") and default.get("request"):
+                break
+        else:
+            continue
+        for shot in scene["shots"]:
+            if shot.get("derive") or shot.get("kind") == "title" or shot.get("source") == "composed":
+                continue
+            shot["derive"] = {**default, "request": f"{default['request']} This shot: {shot['label']}",
+                              "inherited": level}
+
+
 def _derive(value: Any) -> dict[str, Any] | None:
     """A picture made by editing another: `{from, with, request}`.
 
@@ -1842,6 +1865,8 @@ def _load_production(root: Path) -> dict[str, Any]:
                     "message": _text(blocker),
                 }
             )
+
+    _inherit_derive(manifest.get("pictures"), scenes)
 
     production = field(manifest, "production") or {}
     active_scene_id = vtext(production, "active_scene")

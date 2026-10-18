@@ -157,6 +157,15 @@ def source_picture(root: Path, scene: dict[str, Any], name: str, shot: dict[str,
     """The picture a derivation edits: a file, the picture of the shot or master it names, or a location's plate."""
 
     text = str(name or "").strip().lower()
+    if text == "storyboard":
+        # The shot's current storyboard drawing (its latest version): the approved composition to finish.
+        from .storyboard import load_storyboard
+
+        drawings = [item for item in load_storyboard(root)["candidates"]
+                    if shot and item["scene"] == scene["id"] and item["shot"] == shot.get("id")]
+        latest = max(drawings, key=lambda item: item.get("version") or 0, default=None)
+        path = root / latest["image"]["path"] if latest else None
+        return path if path and path.is_file() else None
     if text in ("board", "board:start", "board:end"):
         # The shot's own 3D board (CT-0049): a composition to start the picture from.
         from .board import board_path
@@ -254,6 +263,8 @@ def plan_picture(root: Path, production: dict[str, Any], scene_id: str, shot_id:
             raise ValidationError(
                 f"{shot_id} is made from the plate of {camera or 'its camera'} in {scene.get('location') or 'no location'}, "
                 f"which has none (location.yaml references: {{path, kind: plate, camera: {camera or '<id>'}}})")
+        if str(derive["from"]).lower() == "storyboard":
+            raise ValidationError(f"{shot_id} is finished from its storyboard drawing, and it has none yet")
         if str(derive["from"]).lower().startswith("board"):
             raise ValidationError(f"{shot_id} is made from its 3D board, which is not drawn yet "
                                   f"(toast board frames <project> {scene_id} --shot {shot_id})")
