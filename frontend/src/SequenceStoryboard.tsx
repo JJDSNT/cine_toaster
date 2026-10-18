@@ -8,6 +8,7 @@ interface Shot { scene: string; scene_title: string; shot: string; seconds: numb
 interface View {
   sequences: { id: string; label: string }[]; sequence: string; shots: Shot[]; seconds: number;
   animatics: { version: number; url: string }[];
+  phases?: Record<string, { phase: string; changed_since: boolean; since: string }>;
 }
 
 export function SequenceStoryboard({ onOpen }: { onOpen?: (scene: string, shot: string) => void }) {
@@ -16,6 +17,7 @@ export function SequenceStoryboard({ onOpen }: { onOpen?: (scene: string, shot: 
   const [shown, setShown] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   async function load(chosen = sequence) {
     try {
       const value = await request<View>(`/api/storyboard/sequence?sequence=${encodeURIComponent(chosen)}`);
@@ -26,6 +28,22 @@ export function SequenceStoryboard({ onOpen }: { onOpen?: (scene: string, shot: 
   if (!view || !view.sequence) return error ? <p className="prep-notice" role="alert">{error}</p> : null;
   const label = view.sequences.find((item) => item.id === view.sequence)?.label ?? view.sequence;
   const drawn = view.shots.filter((shot) => shot.board).length;
+  const phases = Object.entries(view.phases ?? {});
+  const approved = phases.filter(([, item]) => item.phase === "production" && !item.changed_since).map(([id]) => id);
+  const whole = phases.length > 0 && approved.length === phases.length;
+  async function decide(approve: boolean) {
+    const why = window.prompt(approve ? `Approve the storyboard of ${label} as what will be produced. Why? (optional)`
+      : `Reopen the storyboard of ${label}. Why?`);
+    if (why === null) return;
+    setBusy(true); setError("");
+    try {
+      const done = await request<{ decided: string[]; skipped: string[] }>("/api/storyboard/sequence-decision",
+        { sequence: view!.sequence, approved: approve, rationale: why });
+      await load(view!.sequence);
+      setNotice(`${approve ? "Approved" : "Reopened"}: ${done.decided.join(", ") || "nothing to change"}` +
+        (done.skipped.length ? ` · already so: ${done.skipped.join(", ")}` : ""));
+    } catch (reason) { setError(String(reason)); } finally { setBusy(false); }
+  }
   const animatic = view.animatics.find((item) => item.version === shown) ?? view.animatics[0];
   async function make() {
     setBusy(true); setError("");
@@ -47,6 +65,16 @@ export function SequenceStoryboard({ onOpen }: { onOpen?: (scene: string, shot: 
       <button disabled={busy} onClick={() => void make()}>{busy ? "Making the animatic…" : "Make a new animatic from the current drawings"}</button>
       {error && <p role="alert">{error}</p>}
     </section>
+    {phases.length > 0 && <section aria-label="Storyboard approval" className="sequence-approval">
+      <p><strong>{whole ? "Storyboard approved" : `Storyboard: ${approved.length} of ${phases.length} scenes approved`}</strong>
+        {phases.some(([, item]) => item.changed_since) && <> · the breakdown changed since the approval of {phases
+          .filter(([, item]) => item.changed_since).map(([id]) => id).join(", ")}</>}</p>
+      <p className="prep-help">Approving says the sequence's storyboard is what will be produced; master images come next. It blocks nothing and can be reopened.</p>
+      <button disabled={busy || drawn < view.shots.length && !whole} onClick={() => void decide(!whole)}>
+        {whole ? "Reopen the sequence's storyboard" : "Approve the sequence's storyboard"}</button>
+      {drawn < view.shots.length && !whole && <span className="prep-help"> Every shot needs a drawing first.</span>}
+      {notice && <p role="status">{notice}</p>}
+    </section>}
     <ol className="sequence-sheet" aria-label="Contact sheet">
       {view.shots.map((shot) => <li key={`${shot.scene}-${shot.shot}`}>
         <button onClick={() => onOpen?.(shot.scene, shot.shot)} title={`${shot.scene_title} · ${shot.seconds} s`}>

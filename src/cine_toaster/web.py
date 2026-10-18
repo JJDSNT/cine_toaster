@@ -856,6 +856,18 @@ class ProjectBrowserHandler(BaseHTTPRequestHandler):
             except CineToasterError as error:
                 self._send_json(error.public_dict(), HTTPStatus(error.http_status))
             return
+        if parsed.path == "/api/storyboard/sequence-decision":
+            # The director approves (or reopens) the storyboard of a whole sequence: one record per scene.
+            from .state import Actor
+            from .workflows import decide_sequence_storyboard
+            try:
+                payload = self._read_json_body(limit=16 * 1024)
+                self._send_json(decide_sequence_storyboard(self.project_root, sequence=str(payload.get("sequence") or ""),
+                    approved=bool(payload.get("approved")), rationale=payload.get("rationale"),
+                    actor=Actor(id="director-gui", kind="human")))
+            except CineToasterError as error:
+                self._send_json(error.public_dict(), HTTPStatus(error.http_status))
+            return
         if parsed.path == "/api/storyboard/animatic":
             # A new numbered animatic of the sequence's current drawings; earlier ones are kept.
             from .storyboard_animatic import render

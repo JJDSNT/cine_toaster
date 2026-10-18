@@ -40,5 +40,23 @@ class AnimaticPlanTests(unittest.TestCase):
         self.assertTrue(all(item["seconds"] > 0 for item in shots))
 
 
+    def test_the_director_approves_a_whole_sequence_and_an_agent_cannot(self):
+        from cine_toaster.errors import ValidationError
+        from cine_toaster.storyboard_animatic import sequence_view
+        from cine_toaster.workflows import decide_sequence_storyboard
+
+        with self.assertRaises(ValidationError):
+            decide_sequence_storyboard(self.root, sequence="the-reply", approved=True, actor=Actor(id="art", kind="agent"))
+        self.assertEqual({item["phase"] for item in sequence_view(self.root, "the-reply")["phases"].values()}, {"fitting"})
+        director = Actor(id="director", kind="human")
+        first = decide_sequence_storyboard(self.root, sequence="the-reply", approved=True, actor=director, rationale="ok")
+        self.assertEqual(first["decided"], ["SC-010", "SC-030"])
+        self.assertEqual({item["phase"] for item in sequence_view(self.root, "the-reply")["phases"].values()}, {"production"})
+        again = decide_sequence_storyboard(self.root, sequence="the-reply", approved=True, actor=director)
+        self.assertEqual((again["decided"], again["skipped"]), ([], ["SC-010", "SC-030"]))
+        reopened = decide_sequence_storyboard(self.root, sequence="the-reply", approved=False, actor=director, rationale="redo")
+        self.assertEqual(reopened["decided"], ["SC-010", "SC-030"])
+
+
 if __name__ == "__main__":
     unittest.main()

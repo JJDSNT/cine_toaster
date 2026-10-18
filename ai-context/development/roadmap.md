@@ -501,6 +501,19 @@ roles the supplied model serves. To do, in order:
   the breakdown's `cut.type`/`reason`, and repeated framing within a scene
   (shot sizes and angles should vary unless the breakdown says otherwise);
   findings name the pair. Run it on every published drawing, whoever made it.
+- [ ] **The GUI is slow for its first minutes after a restart (found
+  2026-10-18, Demo 01).** Right after `toast serve` started on Demo 01
+  (425 MiB of media), `/api/progress` took 18-27 s, `/api/creation` 9-12 s,
+  while the media index and digest cache were cold and several requests
+  shared the process; a few minutes later the same calls took 0.1-0.4 s.
+  Solve: warm the index and digests before the pages ask (or answer with
+  what is known and say "still indexing"), and show a page's loading state
+  instead of a page that looks dead.
+- [x] **The storyboard is approved per sequence in the new GUI (2026-10-18).**
+  The phase gate existed only per scene in the old control room; the
+  Screenplay & Storyboard page now approves or reopens a whole sequence
+  (`workflows.decide_sequence_storyboard`: one human record per scene, a scene
+  already in that phase skipped; an agent is refused).
 - [ ] **Reconcile LTX cold-start knowledge (found 2026-10-17).** The recipe
   uses `generation.COLD_START_SECONDS = 150` (1-02A block 2: 245 s cold,
   2026-09-29) while `knowledge/providers/ltx-2.5.md` says "a cold start of

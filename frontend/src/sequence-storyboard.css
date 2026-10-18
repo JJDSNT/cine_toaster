@@ -9,3 +9,6 @@
 .sequence-sheet span { padding: 0 .35rem .3rem; }
 .sequence-missing { aspect-ratio: 16 / 9; display: grid; place-items: center; background: #202020; }
 @media (max-width: 900px) { .sequence-storyboard { padding: .8rem 1rem; } .sequence-sheet { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.sequence-approval { margin: 0.75rem 0; padding: 0.6rem 0.8rem; border: 1px solid var(--line, #ccc4); border-radius: 6px; }
+.sequence-approval p { margin: 0.2rem 0; }

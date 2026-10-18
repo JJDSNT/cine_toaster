@@ -266,6 +266,39 @@ def decide_storyboard(root: Path, *, scene_id: str, approved: bool, actor: Actor
     return _result(kind, production, scene_id, committed.revision, event)
 
 
+def decide_sequence_storyboard(root: Path, *, sequence: str, approved: bool, actor: Actor,
+                               rationale: str | None = None) -> dict[str, Any]:
+    """The phase gate for a whole sequence, the director's unit of review (ADR 0035).
+
+    One decision per scene, as `decide_storyboard` records it, in sequence
+    order; a scene already in the asked phase, with an unchanged breakdown,
+    is left as it is. Not atomic across scenes: each scene's record stands on
+    its own, and the result says which scenes were decided and which skipped.
+    """
+
+    from .production_context import work_structure
+
+    if actor.kind != "human":
+        raise ValidationError("The storyboard is approved or reopened by a person")
+    production = load_production(root)
+    scope = next((item for item in work_structure(production, sequence=sequence)["sequences"]
+                  if item["id"] == sequence), None)
+    if scope is None:
+        raise ResourceNotFoundError(f"No canonical sequence {sequence!r}")
+    scenes = {item["id"]: item for item in production["scenes"]}
+    decided, skipped = [], []
+    for scene_id in scope["scene_ids"]:
+        state = load_scene_state(scene_directory(root, scene_id), scene_id)
+        current = phase(root, scenes[scene_id], state.gates)
+        if (current["phase"] == "production") == approved and not current.get("changed_since"):
+            skipped.append(scene_id)
+            continue
+        decide_storyboard(root, scene_id=scene_id, approved=approved, actor=actor, rationale=rationale,
+                          expected_revision=state.revision)
+        decided.append(scene_id)
+    return {"sequence": sequence, "approved": approved, "decided": decided, "skipped": skipped}
+
+
 def phase(root: Path, scene: dict[str, Any], gates: dict[str, dict[str, Any]]) -> dict[str, Any]:
     """Which phase the scene is in: fitting the storyboard, or producing what it defines."""
 

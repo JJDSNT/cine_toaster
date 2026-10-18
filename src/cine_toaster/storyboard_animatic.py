@@ -114,6 +114,15 @@ def sequence_view(root: Path, sequence: str = "") -> dict[str, Any]:
     if not chosen:
         return {"sequences": [], "sequence": "", "shots": [], "animatics": []}
     shots = plan(root, chosen)
+    from .project import scene_directory
+    from .state import load_scene_state
+    from .workflows import phase
+    scenes = {item["id"]: item for item in production["scenes"]}
+    phases = {}
+    for scene_id in dict.fromkeys(shot["scene"] for shot in shots):
+        found = phase(root, scenes[scene_id], load_scene_state(scene_directory(root, scene_id), scene_id).gates)
+        phases[scene_id] = {"phase": found["phase"], "changed_since": found.get("changed_since", False),
+                            "since": found.get("since", "")}
     for shot in shots:
         shot["image_url"] = ("/media/" + str(Path(shot["image"]).relative_to(root))) if shot["image"] else ""
         shot.pop("image", None)
@@ -125,5 +134,5 @@ def sequence_view(root: Path, sequence: str = "") -> dict[str, Any]:
             animatics.append({"version": int(number), "url": "/media/" + str(path.relative_to(root)),
                               "made_at": path.stat().st_mtime})
     animatics.sort(key=lambda item: item["version"], reverse=True)
-    return {"sequences": sequences, "sequence": chosen, "shots": shots, "animatics": animatics,
+    return {"sequences": sequences, "sequence": chosen, "shots": shots, "animatics": animatics, "phases": phases,
             "seconds": round(sum(shot["seconds"] for shot in shots), 2)}
