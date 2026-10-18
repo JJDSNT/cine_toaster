@@ -548,6 +548,18 @@ roles the supplied model serves. To do, in order:
     shows the storyboard approval as "breakdown changed" where it applies;
   - an agent may propose them (Directing), a person applies them where they
     change an approved breakdown.
+- [ ] **A drawing can be its shot's master (found 2026-10-18, Demo 01).**
+  Demo 01's storyboard was drawn at near-final finish, so for about half the
+  shots the master made from it was nearly the same picture (the director:
+  "se as imagens mestres forem iguais as dos storyboard, pq as estamos
+  gerando?"). What the masters did fix: 11 of 24 drawings were not 16:9
+  (3:2 to 2.4:1) and the video model needs the film's frame; a style step
+  missing on Lia; light flipped by a mirror. Solve: the masters run checks
+  each drawing (frame ratio and size against the film's, open review
+  findings, style changed since it was drawn) and offers "approve the
+  drawing as the master" for the ones that pass, making a picture only for
+  the rest -- quota and the director's review spent where they change
+  something.
 - [ ] **Reconcile LTX cold-start knowledge (found 2026-10-17).** The recipe
   uses `generation.COLD_START_SECONDS = 150` (1-02A block 2: 245 s cold,
   2026-09-29) while `knowledge/providers/ltx-2.5.md` says "a cold start of
