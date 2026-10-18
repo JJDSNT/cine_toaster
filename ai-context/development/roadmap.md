@@ -560,6 +560,12 @@ roles the supplied model serves. To do, in order:
   drawing as the master" for the ones that pass, making a picture only for
   the rest -- quota and the director's review spent where they change
   something.
+- [ ] **One refused picture fails a whole masters run (found 2026-10-18).**
+  Codex's image tool refused 3 of 23 master pictures without a reason
+  (SC-030 P2, SC-040 P1, SC-060 P3); each failed its scene's run and the
+  shots after it waited. A refusal is common and usually passes on a second
+  try. Solve: retry a refused picture once (rephrased, the refusal recorded),
+  then mark only that shot as needing attention and carry on with the rest.
 - [ ] **Reconcile LTX cold-start knowledge (found 2026-10-17).** The recipe
   uses `generation.COLD_START_SECONDS = 150` (1-02A block 2: 245 s cold,
   2026-09-29) while `knowledge/providers/ltx-2.5.md` says "a cold start of
