@@ -154,6 +154,10 @@ def plan_shot(root: Path, production: dict[str, Any], scene_id: str, shot_id: st
     return plan_block(root, production, scene_id, "", seed=seed, rate=rate, shot_id=shot_id)
 
 
+#: How strongly a bridge's last frame is held to the next scene's first master.
+BRIDGE_STRENGTH = 1.0
+
+
 def entry_bridge(root: Path, production: dict[str, Any], scene: dict[str, Any], shot_id: str) -> dict[str, Any] | None:
     """The next scene's first master, when this shot ends a scene and the next is entered on action (Demo 01).
 
@@ -187,7 +191,11 @@ def entry_bridge(root: Path, production: dict[str, Any], scene: dict[str, Any], 
     if picture is None:
         return None
     style = (following.get("style") or {}).get("prompt", "")
-    text = ("Without stopping the motion, in its last moments the whole image transforms into the next frame"
+    # Measured on Demo 01 (SC-040 P2 v1): told only to transform, the model let Lia fall out of the frame and
+    # held the end picture still for half the clip. The person stays, moving, and arrives in the next pose.
+    text = ("Everyone in the frame stays in the frame and keeps moving the whole time, arriving at the very end in "
+            "exactly the pose of the next frame. Without stopping the motion, during the second half the whole "
+            "image gradually transforms into the next frame's drawing"
             + (f": {style.split('.')[0].strip()}" if style else "") + ".")
     return {"scene": following["id"], "shot": first["id"], "picture": picture, "text": text}
 
@@ -285,7 +293,8 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
             continue
         guides.append(Reference(shot_id, ref, frame, _digest(ref), strength(shot_id)))
     if bridge:
-        guides.append(Reference("end", bridge["picture"], -1, _digest(bridge["picture"]), strength(block.shots[-1])))
+        # Full strength: a bridge must land on the next scene's first picture (0.7 let it drift, Demo 01).
+        guides.append(Reference("end", bridge["picture"], -1, _digest(bridge["picture"]), BRIDGE_STRENGTH))
         notes.append(f"Ends on {bridge['scene']} {bridge['shot']}'s master (its entry is on action): the clip carries "
                      "the cut and the change of style inside the motion.")
     from .providers.ltx import AVOID_MECHANISM, negative_text
