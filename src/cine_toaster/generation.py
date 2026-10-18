@@ -200,7 +200,7 @@ def entry_chain(root: Path, production: dict[str, Any], scene: dict[str, Any], s
     if not before:
         return None
     work = work_directory_for(root / previous["file"])
-    frame = last_frame(work, root, previous, str(before[-1]["number"]))
+    frame = _kept_end(root, work, before[-1]) or last_frame(work, root, previous, str(before[-1]["number"]))
     if frame is not None and not frame.is_relative_to(root):
         # Kept beside the clip, inside the film (SINGULAR's `p<n>-ultimo.png`): the chained scene's start is a
         # production input with an address, not a cache file.
@@ -219,6 +219,38 @@ def entry_chain(root: Path, production: dict[str, Any], scene: dict[str, Any], s
             "two seconds the whole drawing transforms, in the motion, into this frame's look"
             + (f": {style.split('.')[0].strip()}" if style else "") + ".")
     return {"scene": previous["id"], "shot": before[-1]["id"], "frame": frame, "text": text}
+
+
+def _kept_end(root: Path, work: Path, shot: dict[str, Any]) -> Path | None:
+    """The last frame the cut keeps of a trimmed shot: a chain starts where the film is, not where the take ends.
+
+    Demo 01: SC-040 was trimmed at the white of the spray, but its take ran on into an artefact, and SC-050
+    began on the artefact.
+    """
+
+    import shutil
+    import subprocess
+
+    trim = shot.get("trim") or {}
+    if not ("tail" in trim or "out" in trim):
+        return None
+    take = next((item for item in shot.get("takes") or [] if item.get("id") == shot.get("selected_take")), None)
+    if not take or not take.get("media") or not shutil.which("ffmpeg"):
+        return None
+    clip = root / take["media"]
+    probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(clip)],
+                           capture_output=True, text=True)
+    try:
+        length = float(probe.stdout.strip())
+    except ValueError:
+        return None
+    end = float(trim["out"]) if "out" in trim else length - float(trim["tail"])
+    from .blocks import _picture_stems
+
+    kept = work / f"{_picture_stems(str(shot['number']))[-1]}-ultimo.png"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{max(end - 0.05, 0):.3f}", "-i", str(clip),
+                    "-frames:v", "1", str(kept)], check=False, timeout=120)
+    return kept if kept.is_file() else None
 
 
 #: How strongly a bridge's last frame is held to the next scene's first master.
