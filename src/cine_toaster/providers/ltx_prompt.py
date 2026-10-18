@@ -43,6 +43,8 @@ HOLDS = {
     "light": "The camera, the framing and every object stay exactly as in the first frame, only the light "
              "changes, and nobody else enters the frame.",
     "open": "The setting stays exactly as in the first frame.",
+    # A shot that carries a cut into the next scene (a bridge, Demo 01): the place and its drawing change.
+    "bridge": "Nobody else enters the frame; the motion carries straight through to the last frame.",
 }
 
 
@@ -102,7 +104,8 @@ def block_prompt_sections(shots: list[ShotPrompt], style: str = "") -> list[str]
     if len(shots) == 1:
         constant = ""  # said after the camera
     # One sound for the block: it is one continuous room.
-    sound = next((shot.sound for shot in shots if shot.sound), "quiet room")
+    # Undeclared, it is the place's own sound -- a waterfall is not a quiet room (Demo 01).
+    sound = next((shot.sound for shot in shots if shot.sound), "the natural ambience of the place shown")
     closing = [(constant + ("" if spoken else " Nobody speaks.")).strip(),
                *([f"Style: {style.rstrip('.')}."] if style else []),
                f"Sound: {sound}{', continuing across the cuts' if len(shots) > 1 else ''}. No music."]

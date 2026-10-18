@@ -154,6 +154,44 @@ def plan_shot(root: Path, production: dict[str, Any], scene_id: str, shot_id: st
     return plan_block(root, production, scene_id, "", seed=seed, rate=rate, shot_id=shot_id)
 
 
+def entry_bridge(root: Path, production: dict[str, Any], scene: dict[str, Any], shot_id: str) -> dict[str, Any] | None:
+    """The next scene's first master, when this shot ends a scene and the next is entered on action (Demo 01).
+
+    A film that asks for it (`clips: {end_on_entry: true}`) has the last shot of
+    each scene guided at its last frame by the master of the shot that enters
+    the next scene on action or on a match -- so the cut, and a change of style
+    across it, happens inside one generated motion instead of between two clips.
+    """
+
+    from .blocks import reference_picture
+
+    if not (production.get("clips") or {}).get("end_on_entry"):
+        return None
+    if not scene["shots"] or scene["shots"][-1]["id"] != shot_id:
+        # The last shot that makes a picture: a title or a card after it does not move.
+        moving = [shot for shot in scene["shots"] if shot.get("kind") != "title" and shot.get("source") != "composed"]
+        if not moving or moving[-1]["id"] != shot_id:
+            return None
+    sequence = next((item for item in production.get("sequences") or [] if scene["id"] in (item.get("scene_ids") or [])),
+                    None)
+    order = list((sequence or {}).get("scene_ids") or [])
+    if scene["id"] not in order or order.index(scene["id"]) + 1 >= len(order):
+        return None
+    following = next((item for item in production["scenes"] if item["id"] == order[order.index(scene["id"]) + 1]), None)
+    if not following or str((following.get("enter") or {}).get("type") or "") not in ("action", "match"):
+        return None
+    first = next((shot for shot in following["shots"] if shot.get("kind") != "title"), None)
+    if first is None:
+        return None
+    picture = reference_picture(work_directory_for(root / following["file"]), root, following, first)
+    if picture is None:
+        return None
+    style = (following.get("style") or {}).get("prompt", "")
+    text = ("Without stopping the motion, in its last moments the whole image transforms into the next frame"
+            + (f": {style.split('.')[0].strip()}" if style else "") + ".")
+    return {"scene": following["id"], "shot": first["id"], "picture": picture, "text": text}
+
+
 def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: str, seed: int = 1,
                rate: float = HOURLY_RATE_USD, shot_id: str = "") -> BlockPlan:
     """Everything one generation of the block (or of one shot) will be given, and what it should cost."""
@@ -195,12 +233,14 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
     shots = {shot["id"]: shot for shot in scene["shots"]}
     notes: list[str] = list(early_notes)
     prompts, references = [], []
+    bridge = entry_bridge(root, production, scene, block.shots[-1])
     for shot_id in block.shots:
         shot = shots[shot_id]
         source = _from_shot(scene, shot)
         picture = shot.get("picture") or (source or {}).get("picture") or ""
         if not picture:
-            notes.append(f"{shot_id} has no picture description (`picture`); the prompt names only its action.")
+            notes.append(f"{shot_id} has no picture description (`picture`); the prompt names only its action"
+                         " -- the start image shows the rest.")
         reference = reference_picture(work, root, scene, shot)
         if reference is None:
             raise ValidationError(f"{shot_id} has no reference picture to start or guide from "
@@ -217,9 +257,15 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
             manner = line.get("delivery") or (feelings.get(cast_key(line.get("who", ""))) or {}).get("voice", "")
             lines.append(Line(refer, line.get("en") or line.get("text") or "", manner, voice))
         sound = shot.get("sound")
-        prompts.append(ShotPrompt(picture, _camera(scene, shot), shot.get("description") or "", lines,
+        # The action: the shot's description, else its breakdown label -- the one line every breakdown has
+        # (Demo 01's shots said what happens only there, and the prompt said nothing of it).
+        action = shot.get("description") or ("" if shot.get("label") == shot_id else shot.get("label") or "")
+        if bridge and shot_id == block.shots[-1]:
+            action = (action + " " + bridge["text"]).strip()
+        prompts.append(ShotPrompt(picture, _camera(scene, shot), action, lines,
                                   sound if isinstance(sound, str) else "", _acting(production, scene, shot),
-                                  str(shot.get("holds") or "setting")))
+                                  "bridge" if bridge and shot_id == block.shots[-1]
+                                  else str(shot.get("holds") or "setting")))
     # The style in force reaches the model in words of craft, never a name (CT-0049).
     style = (scene.get("style") or {}).get("prompt", "")
     frames = requested_cuts(block.durations, FPS)
@@ -238,6 +284,10 @@ def plan_block(root: Path, production: dict[str, Any], scene_id: str, block_id: 
             notes.append(f"{shot_id} asks for no guide at its cut; the model finds that shot by the prompt alone.")
             continue
         guides.append(Reference(shot_id, ref, frame, _digest(ref), strength(shot_id)))
+    if bridge:
+        guides.append(Reference("end", bridge["picture"], -1, _digest(bridge["picture"]), strength(block.shots[-1])))
+        notes.append(f"Ends on {bridge['scene']} {bridge['shot']}'s master (its entry is on action): the clip carries "
+                     "the cut and the change of style inside the motion.")
     from .providers.ltx import AVOID_MECHANISM, negative_text
 
     avoid = avoidance(production, scene, [shots[shot_id] for shot_id in block.shots])

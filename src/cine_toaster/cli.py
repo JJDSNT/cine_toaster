@@ -625,7 +625,7 @@ def command_generate(args: argparse.Namespace) -> int:
         print(f"  guide at frame {guide.frame:4}: {guide.path.relative_to(root)} ({guide.role})")
     for note in plan.notes:
         print(f"  note: {note}")
-    if plan.cost == "usd":
+    if getattr(plan, "cost", "usd") == "usd":  # a block plan is always paid in dollars
         print(f"  estimate US$ {plan.estimate_usd:.3f}; spent US$ {spend.spent():.2f} of US$ {spend.load().get('limit_usd') or 0:.2f}")
     else:
         print(f"  cost: {plan.cost} (not dollars; the budget does not hold it)")

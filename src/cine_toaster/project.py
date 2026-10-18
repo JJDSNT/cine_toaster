@@ -1885,6 +1885,8 @@ def _load_production(root: Path) -> dict[str, Any]:
         "avoid": _avoid(manifest.get("avoid")),
         # Which adapter makes master pictures (ADR 0025): {provider}; a scene or a shot may name another.
         "pictures": manifest.get("pictures") if isinstance(manifest.get("pictures"), dict) else None,
+        # How clips are generated beyond each shot's own: {end_on_entry: true} bridges scenes entered on action.
+        "clips": manifest.get("clips") if isinstance(manifest.get("clips"), dict) else None,
         "renders": discover_renders(root),
         "script_path": _script_path(manifest, root),
         "script_files": script_files,
