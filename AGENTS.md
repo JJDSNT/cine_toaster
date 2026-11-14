@@ -24,6 +24,12 @@ Keep `ai-context/project-status.md` synchronized when work changes the current
 phase, active queue, delivered capabilities, risks, or next recommended action.
 All `ai-context/` content is written in English.
 
+When modifying ComfyUI integrations, VFX, video finishing, alpha/matte generation,
+reframing, HDR or upscaling, review the pending LTX VFX node/workflow assessment
+in `ai-context/work/CT-LTX-VFX-comfyui-evaluation.md`. Treat it as research,
+not an approved feature or implementation mandate; inventory existing ComfyUI
+nodes and workflows before proposing new adapters or GPU/API spending.
+
 ## Architectural invariants
 
 - The filesystem project is authoritative for production state.
