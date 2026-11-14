@@ -34,6 +34,10 @@ proposal promotion, storyboard generation from a proposal and durable
 autonomous continuation remain open. Validate these handoffs on Demo 01 before
 adding a duplicate Coordinator or a nominal wider workforce (SPEC-0017).
 
+## Toolbelt repertoire research
+
+- **Sound design and Foley** ([work record](../work/CT-SOUND-FOLEY-toolbelt-repertoire.md)): catalogue Earshot, Clipwing Real SFX, Openverse, reeleehq/foley and foley-skill; investigate their complementary uses without imposing a production pipeline or approving integration.
+
 ## VFX toolbelt research intake
 
 - **LTX VFX / ComfyUI nodes** (`ready`, [work record](../work/CT-LTX-VFX-comfyui-evaluation.md)): investigate reusable ComfyUI nodes/workflows for Reframe, AlphaGen, SDR-to-HDR and Upscale; compare with the existing compositor, assess local/API execution and RunPod FinOps. Research only; no implementation or expenditure authorised.
