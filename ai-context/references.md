@@ -67,6 +67,34 @@ Ranked by value to the three priority problems.
 | — | [storytold/filmcraft](https://github.com/storytold/filmcraft) | MIT or Apache-2.0 | code (with attribution) | A clean-room Premiere Pro in Rust (first commit 2026-09-30; alpha, ≈ 56% ready by its own estimate), with its own codecs. **Interchange target**: it opens OpenTimelineIO, FCP7 XML, FCPXML, AAF and EDL -- a version exported as OTIO would open there (and in Resolve and Premiere) for finishing. Its **integer time base** (254,016,000,000 ticks a second, exact for every frame and sample rate) is a reference for ours, which is float seconds. Reviewed 2026-10-14 (CT-0075). |
 | — | [snuq/QuickTitling](https://github.com/snuq/QuickTitling) | GPL-2.0+ | external tool | Blender sequencer addon (v0.6.8, Blender 5.1) that builds title scenes from presets. **Titles candidate**: the user installs it, and Cine Toaster only calls Blender (`CT-0031`). Its preset model is a reference for our composed cards. |
 
+## Sound design and Foley toolbelt candidates (2026-11-13)
+
+These are **discoverable references, not installed or approved integrations**. A
+filmmaker and their production agent may choose, compare and combine tools to
+meet a creative intent. Do not impose a universal sound-design pipeline. Verify
+licenses, APIs, actual functionality and costs before adoption; preserve
+source/attribution, timing and editable audio assets in the film.
+
+| Reference | Candidate use | Integration / validation questions |
+| --- | --- | --- |
+| [Earshot](https://github.com/Leonxlnx/earshot) | Agent-assisted sound analysis, synthesis and effects exploration | Verify current CLI/Python/MCP interfaces, supported synthesis and analysis operations, audio quality, license, CPU/GPU needs and reproducibility. |
+| [Real SFX — Clipwing skills](https://github.com/Clipwing/skills) | Reference for selecting real-world recordings and spotting/placing SFX | Locate the exact skill and source, confirm its workflow and dependencies; treat as a skill design reference, not a ready-to-run Cine Toaster tool. |
+| [Openverse](https://openverse.org/) / [API](https://api.openverse.org/v1/) | Search reusable recordings by metadata and license | Validate audio search API, rate limits, attribution and source licensing; do not equate search-result license metadata with legal clearance. |
+| [reeleehq/foley](https://github.com/reeleehq/foley) | Reference for combining sound libraries, retrieval and placement behind adapters | Inspect repository implementation, maturity, license, interchange and overlap with existing audio/timeline tools. |
+| [foley-skill](https://github.com/ekcheungAI/foley-skill) | Example of combining Openverse, Earshot and FFmpeg for sound-effect workflows | Inspect exact orchestration, dependencies and licensing; reuse ideas only until verified. |
+
+Discovery should begin with **what Cine Toaster already supports**: audio
+tracks/stems, sound generation, timing, mixing, media commands, agents and
+external adapters. Potential capabilities include searching, synthesizing,
+auditioning, spotting, synchronizing, layering and evaluating effects. A tool
+may satisfy several capabilities, and several tools may satisfy one. Preserve
+creative alternatives and user choice.
+
+Development-agent follow-up: [Sound design and Foley repertoire
+assessment](work/CT-SOUND-FOLEY-toolbelt-repertoire.md). The reference catalogue
+is for development discovery; do not inject it as production-agent context.
+Production-agent access requires approved runtime tools and declared contracts.
+
 ## SceneFlow and Auteur Script in detail
 
 SceneFlow is the tool. [Auteur Script](https://auteur-script.taruma.my.id/) is
