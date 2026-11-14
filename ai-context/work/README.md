@@ -39,6 +39,8 @@ execution history and links to those destinations.
 
 - [LTX VFX / ComfyUI nodes](CT-LTX-VFX-comfyui-evaluation.md) — research intake: inventory existing nodes and workflows for Reframe, AlphaGen, SDR-to-HDR and Upscale, compare against the toolbelt, assess RunPod/FinOps and validate before adoption (`ready`; no implementation authorised).
 
+- [Sound design and Foley toolbelt repertoire](CT-SOUND-FOLEY-toolbelt-repertoire.md) — discoverable candidates Earshot, Real SFX, Openverse and Foley approaches; audit existing capabilities before integration (`ready`; research only).
+
 ## Work queue
 
 - `CT-0117` — Project Storage (captured as CT-0098 on `main`, renumbered on the merge of 2026-10-17): production disk footprint, free capacity, per-volume breakdown and render preflight (`ready`; [issue #1](https://github.com/JJDSNT/cine_toaster/issues/1)).
