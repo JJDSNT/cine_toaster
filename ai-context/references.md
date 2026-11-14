@@ -95,6 +95,38 @@ assessment](work/CT-SOUND-FOLEY-toolbelt-repertoire.md). The reference catalogue
 is for development discovery; do not inject it as production-agent context.
 Production-agent access requires approved runtime tools and declared contracts.
 
+## OpenFilm — agent-operated filmmaking reference (2026-11-14)
+
+- Repository: [openfilm/openfilm](https://github.com/openfilm/openfilm)
+- Documentation: [README](https://github.com/openfilm/openfilm/blob/main/README.md), [manual](https://github.com/openfilm/openfilm/blob/main/packages/openfilm/MANUAL.md), [specification](https://github.com/openfilm/openfilm/blob/main/packages/openfilm/SPEC.md)
+- Status: **external reference only**; not an adopted dependency or a validated Cine Toaster integration. Inspect the current upstream license and implementation before reuse.
+
+OpenFilm describes itself as an open-source AI video agent. A coding agent can
+author a film as HTML-based tracks and per-shot web pages, while a local Studio
+offers visual editing. Its README documents a browser-rendered `frame(t)`
+contract; a film timeline composed of video, audio, images and HTML pages;
+editable elements, clips and tracks; a canvas for planning and media; assets
+and media-service connections; skill discovery and community skills; agent
+commands (`open`, `look`, `render`, `get`, `canvas`, `skills`, `doctor`);
+versions and exports including stems and NLE timelines; and checks for
+non-deterministic frames, page errors, missing sounds, font loading and clipped
+text.
+
+**Repertoire rule:** record this as a broad filmmaking reference, not as a
+shortlist of components the development agent must adopt. Review the complete
+project and its evolving implementation against Cine Toaster's actual needs,
+including concerns not enumerated here. For example, Cine Toaster has known
+continuity challenges; whether any OpenFilm approach helps with continuity
+across shots, takes, edits or revisions requires investigation rather than an
+assumption based on its frame-level deterministic rendering. Do not confuse
+deterministic rendering of one page with semantic or cinematic continuity
+between shots.
+
+As with every external reference, the filmmaker and production agent should
+remain free to discover suitable uses of available tools. The development
+agent must not treat this catalogue entry as authorization to install, copy
+code, change architecture or introduce costs.
+
 ## SceneFlow and Auteur Script in detail
 
 SceneFlow is the tool. [Auteur Script](https://auteur-script.taruma.my.id/) is
