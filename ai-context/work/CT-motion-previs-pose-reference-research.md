@@ -104,3 +104,30 @@ The interesting distinction from OpenPose: **pill-based blocking controls spatia
 - **Decisions:** research-only; no new adapter, API key, model download, provider commitment, branch or runtime feature.
 - **To do:** inspect actual template/rig/QA source and compare against existing Cine Toaster code before recommending integration; verify independent editor page/source separately.
 - **Validation:** documentation inspection only; no build, render, model generation or tests executed.
+
+## Recovered Seedance 3D Blockout Editor source — verification (2026-11-18)
+
+**Public copies inspected:**
+- https://github.com/josephcrown920/seedance-blockout-editor
+- https://github.com/cbunseng/seedance-blockout-editor-private
+
+Both repositories expose the same README, `index.html`, `bridge.mjs`, and `package.json` blob SHAs in the checked files. This demonstrates matching source files, **not** complete tree or history equivalence, nor authorization by the original author. The original Sirio Berati repository is still not confirmed accessible.
+
+**Licensing correction:** the recovered editor's `LICENSE`, `NOTICE` reference and `package.json` declare **Apache-2.0**, copyright 2026 Sirio Berati. Do not confuse this with the separate MIT-licensed camera-control project. Before reusing code, inspect provenance, notices, dependency licenses, and whether copies are authorized; links are sufficient for research.
+
+**Source layout and actual behavior:**
+- `index.html`: interactive Three.js editor with synchronized 3D scene, overhead floor plan, camera/frustum/path, final-shot view, editable camera keys and timeline.
+- `tools/previs/`: JSON shot-sheet compiler and checker. A world JS file owns actors, trajectories and timed events, independent of the shot sheet. Shot entries specify `start`, `preset`, `subject`, optional `look`, `params`, `track`, `focus`, and notes. Documentation enumerates **21 presets**, including locked, chase, over-shoulder, crane, top-down and FPV.
+- `bridge.mjs`: local project/draft helper, reference-video render and optional Tein generation integration. `render.mjs` produces stills/video, with Chromium/Puppeteer and FFmpeg dependencies; Node >=20 required.
+- The editor's assisted review uses local Claude Code for camera fixes, shot critique, prompt writing, pacing, before/after images, undo and notes attached to time spans. These functions are optional except that its documented default generation prompt route requires the bundled Seedance skill; a simple test-only prompt writer exists.
+- Reference outputs include video, sketch, depth and contact sheets (up to 16 frames); output variants have different temporal guidance. The default generation route incurs external Tein API costs, while `TEIN_SEND=0` disables paid sends.
+- The documented `npm test` checks a sample shot sheet; the README also acknowledges a camera-turn threshold failure in another example. Do not infer all scenarios pass validation.
+
+**Architecture comparison with Blockout:**
+- The recovered editor demonstrates an actual *interactive cinematography workspace* with world/shot separation, camera editing, explicit temporal notes, review, history and generation submission.
+- Blockout is a complementary reference for reusable shot/actor staging and conditioning export. Do not treat the tools as interchangeable solely because both use simplified 3D.
+- Cine Toaster already has a canonical film model, spatial planning, camera previews, review decisions and continuity checks. Study whether the recovered editor's world/shot-sheet separation and review ergonomics fill an actual gap before considering reuse. In particular, avoid importing its fixed 30-second take assumption or provider-specific prompt rules into the Core.
+- OpenPose remains complementary: skeleton keypoints describe articulated body motion; this editor primarily provides camera trajectory, subject tracking and coarse world events.
+
+**Follow-up checks:** compare the two copies' complete trees and commit history, confirm original author/provenance, inspect specific camera-key and timebase code, evaluate renderer output determinism, and map current Cine Toaster functionality against the editor's workflow. No installation, code import, model call, tests or spending performed.
+
