@@ -37,6 +37,8 @@ Keep records concise. Stable knowledge is promoted to the focused
 `ai-context/` documents or `docs/architecture/`; the work record remains the
 execution history and links to those destinations.
 
+- [StageFlow and SceneFlow filmmaking repertoire](CT-STAGEFLOW-SCENEFLOW-repertoire.md) — agent-discoverable research references for 3D blocking/camera choreography, screenplay-to-video synchronization, spatial and temporal continuity, and evidence-based review (`ready`; no integration mandated).
+
 - [LTX VFX / ComfyUI nodes](CT-LTX-VFX-comfyui-evaluation.md) — research intake: inventory existing nodes and workflows for Reframe, AlphaGen, SDR-to-HDR and Upscale, compare against the toolbelt, assess RunPod/FinOps and validate before adoption (`ready`; no implementation authorised).
 
 - [Sound design and Foley toolbelt repertoire](CT-SOUND-FOLEY-toolbelt-repertoire.md) — discoverable candidates Earshot, Real SFX, Openverse and Foley approaches; audit existing capabilities before integration (`ready`; research only).
