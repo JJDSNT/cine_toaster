@@ -57,3 +57,50 @@ Cine Toaster already documents spatial previs, geometry/movement checks, Blender
 - Not changed: production model, runtime, adapters, tests, or feature status.
 - Validation: documentation-only change; repository README and AGENTS.md reviewed. No runtime tests executed.
 - Remaining: detailed format/license verification and mapping to existing code before any implementation proposal.
+
+## TEIN / Sirio Berati — programmable camera direction and subject replacement (2026-11-18)
+
+**Primary code reference:** https://github.com/sirioberati/ai-filmmaking-camera-control-seedance-2-5
+
+This public MIT-licensed repository is more than a 3D editor demo: it documents a reproducible *camera-first reference-video method*. Its Three.js scene engine runs with Remotion, with camera rigs and framing/cut checks; 137 coded shot templates, their grey-box reference clips, prompts, submission metadata and comparison results; 24 environment references; and an agent-oriented `skills/cinematic-previs/` directory. The template catalogue is at `templates/INDEX.md`, the rendering engine at `engine/cinematic/`, the evaluation tools at `tools/seedance/`, and limitations at `docs/known-limits.md`. Source: project README and `docs/build-your-own-template.md`.
+
+**Key mechanism:** a *pill clip* uses plain environments and striped capsule/pin stand-ins for actors, specifying scale, position, facing and timing without giving the generator detailed anatomy to imitate. A reference video conveys camera motion **and** subject motion; minimizing visual detail in stand-ins aims to prevent the generator from copying an artificial performer. A still/contact-sheet alternative is documented, but lacks the same temporal guidance. The author reports that frame-specific cuts drift more with a contact sheet; these are project observations, not universal model guarantees.
+
+**Cinematographic controls to study:** named camera support/rig, lens and shot size, movement duration, path speed, actor-facing direction, start/end composition, eyeline, cuts and continuity of action. The project describes measured QA checks (distance, shot size, camera path, cut rules) and exceptions rather than relying on prompts alone. Study these as reusable *validation concepts*, not as universally correct filmmaking laws. Some examples are experimental; the repo explicitly documents failures and unproven findings.
+
+**Dependencies and scope:** local reference rendering uses Node/Remotion/Three.js and FFmpeg; final generation goes through the Tein-hosted Seedance API/MCP with an account and key. The MIT license for this source does **not** imply Seedance weights, service, hosted models or sample media are open source. Do not hardwire the Tein API, Seedance, a Three.js scene format, or the 137 templates into the Cine Toaster Core. A template is an *optional repertoire item*, not a canonical film object unless a future design justifies it.
+
+**Secondary reference:** https://github.com/sirioberati/Genjustsu-Open-Source-Workflow
+
+Genjustsu is a separate MIT-licensed, locally orchestrated workflow for *video subject replacement*, using depth estimation, SAM 3 video masks, optional MediaPipe face landmarks, vocal isolation/pitch processing, hosted generation and restoration of the original soundtrack. It explicitly gates generation on human review of masks/landmarks and artifact hashes, creates low-cost drafts before approved HD generation, and warns about limits of single-speaker face tracking and hosted-media URLs. This is a useful example of provenance-bound approval and temporal review, not proof of general-purpose character continuity. It depends on external services and third-party licenses; example media are not covered by its MIT code grant.
+
+**Specific page caveat:** the Tein `open-source/seedance-3d-blockout-editor` web page and the previously mentioned `sirioberati/seedance-blockout-editor` repository are **not verified as an independently downloadable public codebase**. Do not equate that page with the confirmed public camera-control repository. Do not record, share or reuse the `mcp_token` query parameter from a user-provided link; treat it as a credential.
+
+### Comparison and architectural opportunities
+
+| Reference | Distinctive idea | Cine Toaster question |
+| --- | --- | --- |
+| Blockout | 3D authored blocking, cameras and conditioning passes | How do we interchange shot intent and derived passes? |
+| Motion Previs Studio | Recover motion/pose/camera cues from existing footage | How do extracted cues map back to the film's shots? |
+| OpenPose / DWPose | Human keypoints and pose representation | How are joint schemas, timebase and identity documented? |
+| TEIN camera-control | Programmatic camera rigs + intentionally featureless actor stand-ins + measured QA | Can a shot's direction be tested before generation, without mandating a renderer? |
+| Genjustsu | Depth/masks/face mesh, reviewed replacement, audio restoration | Can review/approval bind exactly to the evidence used to generate a take? |
+| Stem Studio | Separate dialogue/music/effects from a mix | Where does derived audio sit in finishing and provenance? |
+
+The interesting distinction from OpenPose: **pill-based blocking controls spatial presence, timing and camera without detailed skeletal pose**; OpenPose-style keypoints express articulated body motion but do not by themselves define lens, camera movement, world geometry or performer identity. They may complement each other; neither is a complete continuity solution.
+
+### Evaluation before proposing implementation
+
+1. Inventory Cine Toaster's current scene geometry, blocking/3D storyboard, camera motion, compositing/depth/segmentation, take provenance, audio stems, ComfyUI and continuity facilities.
+2. Check whether existing interchange can carry camera trajectory and intrinsics, actor placement/facing, joint tracks (where available), exact timebase, and references to rendered control video or passes without introducing provider-owned Core state.
+3. Compare *video control vs contact-sheet control* on the same shot and measure camera adherence, actor movement, cut timing, continuity, repeatability and cost. Attribute observed results to model/version and test inputs.
+4. Review licensing, portability and availability of each codebase and external model/service. Keep local reference rendering separate from paid inference and do not submit media or credentials without authorization.
+5. For agents, preserve discoverable options and evidence rather than telling agents which implementation to choose. Document the input/output contract and observed strengths/limits of each technique.
+
+### Work record update
+
+- **What / why:** extend the existing pose/previs research with confirmed TEIN public code references and the camera-first control method.
+- **Done:** repository-level source and documentation review; conceptual comparison with existing references; integration boundaries and evaluation questions recorded.
+- **Decisions:** research-only; no new adapter, API key, model download, provider commitment, branch or runtime feature.
+- **To do:** inspect actual template/rig/QA source and compare against existing Cine Toaster code before recommending integration; verify independent editor page/source separately.
+- **Validation:** documentation inspection only; no build, render, model generation or tests executed.
